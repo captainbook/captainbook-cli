@@ -71,10 +71,15 @@ func Resolve(profileName string) (*Resolved, error) {
 			profileName = cfg.DefaultProfile
 		}
 		if profileName == "" {
-			// Use the first (or only) profile if no default is set
-			for name := range cfg.Profiles {
-				profileName = name
-				break
+			switch len(cfg.Profiles) {
+			case 0:
+				// no profiles at all — fall through to env var check
+			case 1:
+				for name := range cfg.Profiles {
+					profileName = name
+				}
+			default:
+				return nil, &ConfigError{Message: "multiple profiles configured but no default set. Run 'ceebee config use <name>' to set a default"}
 			}
 		}
 		if profileName != "" {
@@ -167,9 +172,10 @@ func RemoveProfile(name string) error {
 
 	if cfg.DefaultProfile == name {
 		cfg.DefaultProfile = ""
-		for n := range cfg.Profiles {
-			cfg.DefaultProfile = n
-			break
+		if len(cfg.Profiles) == 1 {
+			for n := range cfg.Profiles {
+				cfg.DefaultProfile = n
+			}
 		}
 	}
 
