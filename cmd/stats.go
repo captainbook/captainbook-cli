@@ -107,7 +107,7 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 			os.Exit(api.ExitValidation)
 		}
 
-		// Handle comparison shorthand
+		// Validate comparison flags
 		if compareShorthand != "" {
 			if compareFrom != "" || compareTo != "" {
 				fmt.Fprintln(os.Stderr, "Cannot use --compare with --compare-from/--compare-to")
@@ -119,6 +119,9 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(api.ExitValidation)
 			}
+		} else if (compareFrom == "") != (compareTo == "") {
+			fmt.Fprintln(os.Stderr, "--compare-from and --compare-to must be used together")
+			os.Exit(api.ExitValidation)
 		}
 
 		var businessUnitID, productID int
