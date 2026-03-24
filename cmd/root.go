@@ -46,6 +46,7 @@ var versionCmd = &cobra.Command{
 // Execute runs the root command.
 func Execute() {
 	rootCmd.SilenceErrors = true
+	rootCmd.SilenceUsage = true
 	if err := rootCmd.Execute(); err != nil {
 		var exitErr *api.ExitError
 		if errors.As(err, &exitErr) {

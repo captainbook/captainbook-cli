@@ -86,7 +86,7 @@ func renderArrayTable(w io.Writer, arr []map[string]interface{}) error {
 		return nil
 	}
 
-	headers := sortedKeys(arr[0])
+	headers := unionKeys(arr)
 
 	table := tablewriter.NewTable(w)
 	table.Header(toAnySlice(headers)...)
