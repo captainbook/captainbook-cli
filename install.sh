@@ -42,28 +42,26 @@ curl -fsSL -o "$TMPFILE" "$URL"
 
 # Verify checksum
 CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${TAG}/checksums.txt"
-EXPECTED="$(curl -fsSL "$CHECKSUMS_URL" | grep "  ${ASSET}$" | awk '{print $1}')"
-if [ -n "$EXPECTED" ]; then
-  if command -v sha256sum >/dev/null 2>&1; then
-    ACTUAL="$(sha256sum "$TMPFILE" | awk '{print $1}')"
-  elif command -v shasum >/dev/null 2>&1; then
-    ACTUAL="$(shasum -a 256 "$TMPFILE" | awk '{print $1}')"
-  else
-    ACTUAL=""
-    echo "Warning: no sha256 tool found, skipping checksum verification" >&2
-  fi
-  if [ -n "$ACTUAL" ]; then
-    if [ "$ACTUAL" != "$EXPECTED" ]; then
-      echo "Checksum mismatch!" >&2
-      echo "  Expected: ${EXPECTED}" >&2
-      echo "  Got:      ${ACTUAL}" >&2
-      exit 1
-    fi
-    echo "Checksum verified."
-  fi
-else
-  echo "Warning: checksums not available, skipping verification" >&2
+EXPECTED="$(curl -fsSL "$CHECKSUMS_URL" | grep "  ${ASSET}$" | awk '{print $1}')" || true
+if [ -z "$EXPECTED" ]; then
+  echo "Error: could not retrieve checksum for ${ASSET}" >&2
+  exit 1
 fi
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL="$(sha256sum "$TMPFILE" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL="$(shasum -a 256 "$TMPFILE" | awk '{print $1}')"
+else
+  echo "Error: no sha256 tool found (need sha256sum or shasum)" >&2
+  exit 1
+fi
+if [ "$ACTUAL" != "$EXPECTED" ]; then
+  echo "Checksum mismatch!" >&2
+  echo "  Expected: ${EXPECTED}" >&2
+  echo "  Got:      ${ACTUAL}" >&2
+  exit 1
+fi
+echo "Checksum verified."
 
 # Install
 chmod +x "$TMPFILE"
