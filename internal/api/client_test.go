@@ -321,8 +321,8 @@ func TestDoRequest_VerboseLogging(t *testing.T) {
 	if !strings.Contains(output, "abc***") {
 		t.Error("verbose output should contain redacted token abc***")
 	}
-	if !strings.Contains(output, "HTTP 200") {
-		t.Error("verbose output missing HTTP 200")
+	if !strings.Contains(output, "200 OK") {
+		t.Error("verbose output missing 200 OK")
 	}
 }
 

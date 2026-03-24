@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
@@ -207,5 +208,5 @@ func validateDateRange(from, to string) error {
 }
 
 func joinEnum(values []string) string {
-	return fmt.Sprintf("%s", values)
+	return strings.Join(values, "|")
 }

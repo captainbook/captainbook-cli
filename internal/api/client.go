@@ -118,7 +118,7 @@ func (c *Client) doRequest(ctx context.Context, reqURL string) ([]byte, error) {
 
 	elapsed := time.Since(start)
 	if c.Verbose && c.VerboseW != nil {
-		fmt.Fprintf(c.VerboseW, "← HTTP %d %s (%s, %s)\n", resp.StatusCode, resp.Status, elapsed.Round(time.Millisecond), formatBytes(len(body)))
+		fmt.Fprintf(c.VerboseW, "← %s (%s, %s)\n", resp.Status, elapsed.Round(time.Millisecond), formatBytes(len(body)))
 	}
 
 	switch resp.StatusCode {
