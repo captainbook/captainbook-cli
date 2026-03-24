@@ -120,9 +120,26 @@ func (e *UnexpectedStatusError) Error() string {
 	return fmt.Sprintf("Unexpected API response: %d %s", e.StatusCode, e.Body)
 }
 
+// ExitError wraps an error with a specific exit code.
+// Used by CLI commands to propagate exit codes without calling os.Exit directly.
+type ExitError struct {
+	Err  error
+	Code int
+}
+
+func (e *ExitError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *ExitError) Unwrap() error {
+	return e.Err
+}
+
 // ExitCodeFor returns the exit code for a given error type.
 func ExitCodeFor(err error) int {
 	switch err.(type) {
+	case *ExitError:
+		return err.(*ExitError).Code
 	case *AuthError:
 		return ExitAuth
 	case *ForbiddenError:

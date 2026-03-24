@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
+
+var validProfileName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 const (
 	configDir  = ".ceebee"
@@ -140,8 +143,23 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
+// ValidateProfileName checks if a profile name contains only safe characters.
+func ValidateProfileName(name string) error {
+	if name == "" {
+		return &ConfigError{Message: "profile name cannot be empty"}
+	}
+	if !validProfileName.MatchString(name) {
+		return &ConfigError{Message: fmt.Sprintf("invalid profile name %q: use letters, digits, dots, hyphens, or underscores", name)}
+	}
+	return nil
+}
+
 // AddProfile adds or updates a profile in the config file.
 func AddProfile(name, url, token string) error {
+	if err := ValidateProfileName(name); err != nil {
+		return err
+	}
+
 	cfg, err := Load()
 	if err != nil {
 		cfg = &Config{Profiles: make(map[string]Profile)}

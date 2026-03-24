@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/captainbook/captainbook-cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +45,14 @@ var versionCmd = &cobra.Command{
 
 // Execute runs the root command.
 func Execute() {
+	rootCmd.SilenceErrors = true
 	if err := rootCmd.Execute(); err != nil {
+		var exitErr *api.ExitError
+		if errors.As(err, &exitErr) {
+			fmt.Fprintln(os.Stderr, exitErr.Err)
+			os.Exit(exitErr.Code)
+		}
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

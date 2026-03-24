@@ -114,7 +114,7 @@ func (c *Client) doRequest(ctx context.Context, reqURL string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB max
 	if err != nil {
 		return nil, &NetworkError{Err: fmt.Errorf("reading response: %w", err)}
 	}
@@ -209,9 +209,14 @@ func isRetriable(err error) bool {
 	}
 }
 
+const maxRetryAfter = 60 // seconds
+
 func retryBackoff(lastErr error, attempt int) time.Duration {
 	if rl, ok := lastErr.(*RateLimitError); ok && rl.RetryAfter != "" {
 		if secs, err := strconv.Atoi(rl.RetryAfter); err == nil && secs > 0 {
+			if secs > maxRetryAfter {
+				secs = maxRetryAfter
+			}
 			return time.Duration(secs) * time.Second
 		}
 	}

@@ -99,8 +99,7 @@ func renderArrayTable(w io.Writer, arr []map[string]interface{}) error {
 		table.Append(vals...)
 	}
 
-	table.Render()
-	return nil
+	return table.Render()
 }
 
 func renderObjectTable(w io.Writer, obj map[string]interface{}) error {
@@ -141,8 +140,7 @@ func renderObjectTable(w io.Writer, obj map[string]interface{}) error {
 		}
 	}
 
-	table.Render()
-	return nil
+	return table.Render()
 }
 
 func formatCSV(w io.Writer, data []byte) error {
@@ -162,7 +160,7 @@ func formatCSV(w io.Writer, data []byte) error {
 	// Try array
 	var arr []map[string]interface{}
 	if err := json.Unmarshal(envelope.Data, &arr); err == nil && len(arr) > 0 {
-		headers := sortedKeys(arr[0])
+		headers := unionKeys(arr)
 		if err := cw.Write(headers); err != nil {
 			return err
 		}
@@ -226,6 +224,22 @@ func formatValue(v interface{}) string {
 func sortedKeys(m map[string]interface{}) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// unionKeys returns sorted keys from the union of all maps in the slice.
+func unionKeys(arr []map[string]interface{}) []string {
+	seen := make(map[string]struct{})
+	for _, m := range arr {
+		for k := range m {
+			seen[k] = struct{}{}
+		}
+	}
+	keys := make([]string, 0, len(seen))
+	for k := range seen {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

@@ -80,8 +80,7 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		resolved, err := config.Resolve(profileName)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(api.ExitConfig)
+			return &api.ExitError{Err: err, Code: api.ExitConfig}
 		}
 
 		client := api.NewClient(resolved.URL, resolved.Token)
@@ -97,31 +96,45 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 
 		// Validate format before making the API call
 		if !output.ValidFormat(formatFlag) {
-			fmt.Fprintf(os.Stderr, "Unknown format %q (use json, table, or csv)\n", formatFlag)
-			os.Exit(api.ExitValidation)
+			return &api.ExitError{
+				Err:  fmt.Errorf("Unknown format %q (use json, table, or csv)", formatFlag),
+				Code: api.ExitValidation,
+			}
+		}
+
+		// Validate granularity
+		if err := validateGranularity(granularity); err != nil {
+			return &api.ExitError{Err: err, Code: api.ExitValidation}
 		}
 
 		// Validate date range (max 365 days)
 		if err := validateDateRange(from, to); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(api.ExitValidation)
+			return &api.ExitError{Err: err, Code: api.ExitValidation}
 		}
 
 		// Validate comparison flags
 		if compareShorthand != "" {
 			if compareFrom != "" || compareTo != "" {
-				fmt.Fprintln(os.Stderr, "Cannot use --compare with --compare-from/--compare-to")
-				os.Exit(api.ExitValidation)
+				return &api.ExitError{
+					Err:  fmt.Errorf("Cannot use --compare with --compare-from/--compare-to"),
+					Code: api.ExitValidation,
+				}
 			}
 			var err error
 			compareFrom, compareTo, err = compare.Resolve(compareShorthand, from, to)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(api.ExitValidation)
+				return &api.ExitError{Err: err, Code: api.ExitValidation}
 			}
 		} else if (compareFrom == "") != (compareTo == "") {
-			fmt.Fprintln(os.Stderr, "--compare-from and --compare-to must be used together")
-			os.Exit(api.ExitValidation)
+			return &api.ExitError{
+				Err:  fmt.Errorf("--compare-from and --compare-to must be used together"),
+				Code: api.ExitValidation,
+			}
+		}
+
+		// Validate enum flags
+		if err := validateEnumFlags(cmd, ep); err != nil {
+			return &api.ExitError{Err: err, Code: api.ExitValidation}
 		}
 
 		var businessUnitID, productID int
@@ -168,14 +181,14 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 		ctx := context.Background()
 		body, err := client.Do(ctx, ep, params)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(api.ExitCodeFor(err))
+			return &api.ExitError{Err: err, Code: api.ExitCodeFor(err)}
 		}
 
 		if err := output.Format(os.Stdout, body, formatFlag); err != nil {
-			fmtErr := &api.JSONParseError{Err: err}
-			fmt.Fprintln(os.Stderr, fmtErr)
-			os.Exit(api.ExitCodeFor(fmtErr))
+			return &api.ExitError{
+				Err:  &api.JSONParseError{Err: err},
+				Code: api.ExitJSONParse,
+			}
 		}
 
 		return nil
@@ -204,6 +217,40 @@ func validateDateRange(from, to string) error {
 	}
 	if toDate.Sub(fromDate).Hours()/24 > 365 {
 		return fmt.Errorf("date range exceeds 365 days (from %s to %s)", from, to)
+	}
+	return nil
+}
+
+var validGranularities = []string{"day", "week", "month", "quarter", "year"}
+
+func validateGranularity(g string) error {
+	for _, v := range validGranularities {
+		if g == v {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid granularity %q (use %s)", g, strings.Join(validGranularities, ", "))
+}
+
+func validateEnumFlags(cmd *cobra.Command, ep *api.Endpoint) error {
+	for _, f := range ep.ExtraFlags {
+		if f.Type != "string" || len(f.Enum) == 0 {
+			continue
+		}
+		v, _ := cmd.Flags().GetString(f.Name)
+		if v == "" {
+			continue
+		}
+		valid := false
+		for _, allowed := range f.Enum {
+			if v == allowed {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("invalid value %q for --%s (use %s)", v, f.Name, strings.Join(f.Enum, ", "))
+		}
 	}
 	return nil
 }
