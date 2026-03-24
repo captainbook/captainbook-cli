@@ -2,6 +2,16 @@
 
 You have access to `ceebee`, a CLI tool for querying the CaptainBook Statistics API. This document tells you how to use it.
 
+## Installation
+
+If `ceebee` is not already installed, run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/captainbook/captainbook-cli/main/install.sh | sh
+```
+
+This auto-detects the OS and architecture, downloads the latest release binary, verifies its SHA256 checksum, and installs it to `/usr/local/bin`. No Go toolchain required.
+
 ## Setup
 
 Configuration is required before use. Either:

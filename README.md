@@ -13,6 +13,14 @@
 
 ## Install
 
+### One-liner
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/captainbook/captainbook-cli/main/install.sh | sh
+```
+
+Auto-detects your OS and architecture, downloads the latest release, verifies the checksum, and installs to `/usr/local/bin`.
+
 ### From source
 
 ```bash
