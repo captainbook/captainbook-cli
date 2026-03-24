@@ -148,7 +148,6 @@ func formatCSV(w io.Writer, data []byte) error {
 	}
 
 	cw := csv.NewWriter(w)
-	defer cw.Flush()
 
 	// Try array
 	var arr []map[string]interface{}
@@ -166,7 +165,8 @@ func formatCSV(w io.Writer, data []byte) error {
 				return err
 			}
 		}
-		return nil
+		cw.Flush()
+		return cw.Error()
 	}
 
 	// Try object (aggregate) — single row
@@ -180,7 +180,11 @@ func formatCSV(w io.Writer, data []byte) error {
 		for i, h := range headers {
 			record[i] = formatValue(obj[h])
 		}
-		return cw.Write(record)
+		if err := cw.Write(record); err != nil {
+			return err
+		}
+		cw.Flush()
+		return cw.Error()
 	}
 
 	return nil
