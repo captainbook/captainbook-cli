@@ -127,15 +127,16 @@ ceebee completion fish | source
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Authentication failed (401) |
-| 2 | Access denied (403) |
-| 3 | Validation error (422) |
-| 4 | Network/timeout error |
-| 5 | JSON parse error |
-| 6 | Configuration error |
-| 7 | Server error (5xx) |
-| 8 | Rate limited (429) |
-| 9 | Unexpected status |
+| 1 | CLI usage error (unknown flag, missing subcommand) |
+| 10 | Authentication failed (401) |
+| 11 | Access denied (403) |
+| 12 | Validation error (422) |
+| 13 | Network/timeout error |
+| 14 | JSON parse error |
+| 15 | Configuration error |
+| 16 | Server error (5xx) |
+| 17 | Rate limited (429) |
+| 18 | Unexpected status |
 
 ## Development
 

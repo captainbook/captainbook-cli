@@ -54,14 +54,12 @@ func TestResolve(t *testing.T) {
 			wantTo:    "2025-03-24",
 		},
 		{
-			name:      "year-ago: leap year Feb 29 moves to Feb 28",
+			name:      "year-ago: leap year Feb 29 clamps to Feb 28",
 			shorthand: "year-ago",
 			from:      "2024-02-29",
 			to:        "2024-02-29",
-			// 2023 is not a leap year, so Feb 29 -> Mar 1 in Go's AddDate behavior
-			// Actually Go's AddDate(-1,0,0) from 2024-02-29 gives 2023-03-01
-			wantFrom: "2023-03-01",
-			wantTo:   "2023-03-01",
+			wantFrom:  "2023-02-28",
+			wantTo:    "2023-02-28",
 		},
 		{
 			name:      "year-ago: across year boundary",

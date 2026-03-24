@@ -21,7 +21,7 @@ func TestExitCodeFor(t *testing.T) {
 		{"ServerError", &ServerError{StatusCode: 500}, ExitServer},
 		{"RateLimitError", &RateLimitError{}, ExitRateLimit},
 		{"UnexpectedStatusError", &UnexpectedStatusError{StatusCode: 418}, ExitUnexpected},
-		{"generic error", fmt.Errorf("generic"), 1},
+		{"generic error", fmt.Errorf("generic"), ExitUnexpected},
 	}
 
 	for _, tt := range tests {
@@ -35,7 +35,7 @@ func TestExitCodeFor(t *testing.T) {
 }
 
 func TestExitCodeConstants(t *testing.T) {
-	// Verify all exit codes are unique and in range 1-9
+	// Verify all exit codes are unique and in range 10-18
 	codes := map[int]string{
 		ExitAuth:       "ExitAuth",
 		ExitForbidden:  "ExitForbidden",
@@ -53,8 +53,8 @@ func TestExitCodeConstants(t *testing.T) {
 	}
 
 	for code, name := range codes {
-		if code < 1 || code > 9 {
-			t.Errorf("%s = %d, want value in range 1-9", name, code)
+		if code < 10 || code > 18 {
+			t.Errorf("%s = %d, want value in range 10-18", name, code)
 		}
 	}
 }

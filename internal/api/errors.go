@@ -3,16 +3,17 @@ package api
 import "fmt"
 
 // Exit codes for different error types, enabling agents to distinguish failures.
+// Codes start at 10 to avoid collision with cobra's default exit 1 for CLI errors.
 const (
-	ExitAuth       = 1
-	ExitForbidden  = 2
-	ExitValidation = 3
-	ExitNetwork    = 4
-	ExitJSONParse  = 5
-	ExitConfig     = 6
-	ExitServer     = 7
-	ExitRateLimit  = 8
-	ExitUnexpected = 9
+	ExitAuth       = 10
+	ExitForbidden  = 11
+	ExitValidation = 12
+	ExitNetwork    = 13
+	ExitJSONParse  = 14
+	ExitConfig     = 15
+	ExitServer     = 16
+	ExitRateLimit  = 17
+	ExitUnexpected = 18
 )
 
 type AuthError struct {
@@ -139,6 +140,6 @@ func ExitCodeFor(err error) int {
 	case *UnexpectedStatusError:
 		return ExitUnexpected
 	default:
-		return 1
+		return ExitUnexpected
 	}
 }
