@@ -2,6 +2,16 @@ package api
 
 import "testing"
 
+// endpointByName is a test helper that looks up an endpoint by name.
+func endpointByName(name string) *Endpoint {
+	for i := range Endpoints {
+		if Endpoints[i].Name == name {
+			return &Endpoints[i]
+		}
+	}
+	return nil
+}
+
 func TestEndpointsCount(t *testing.T) {
 	if got := len(Endpoints); got != 11 {
 		t.Errorf("len(Endpoints) = %d, want 11", got)
@@ -28,9 +38,9 @@ func TestAllEndpointsExist(t *testing.T) {
 
 	for _, tt := range expected {
 		t.Run(tt.name, func(t *testing.T) {
-			ep := EndpointByName(tt.name)
+			ep := endpointByName(tt.name)
 			if ep == nil {
-				t.Fatalf("EndpointByName(%q) = nil", tt.name)
+				t.Fatalf("endpointByName(%q) = nil", tt.name)
 			}
 			if ep.Path != tt.path {
 				t.Errorf("endpoint %q path = %q, want %q", tt.name, ep.Path, tt.path)
@@ -56,12 +66,12 @@ func TestEndpointByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ep := EndpointByName(tt.name)
+			ep := endpointByName(tt.name)
 			if tt.wantNil && ep != nil {
-				t.Errorf("EndpointByName(%q) = %v, want nil", tt.name, ep)
+				t.Errorf("endpointByName(%q) = %v, want nil", tt.name, ep)
 			}
 			if !tt.wantNil && ep == nil {
-				t.Errorf("EndpointByName(%q) = nil, want non-nil", tt.name)
+				t.Errorf("endpointByName(%q) = nil, want non-nil", tt.name)
 			}
 		})
 	}
@@ -108,9 +118,9 @@ func TestHasExcludedFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ep := EndpointByName(tt.endpoint)
+			ep := endpointByName(tt.endpoint)
 			if ep == nil {
-				t.Fatalf("EndpointByName(%q) = nil", tt.endpoint)
+				t.Fatalf("endpointByName(%q) = nil", tt.endpoint)
 			}
 			got := ep.HasExcludedFlag(tt.flag)
 			if got != tt.want {
@@ -135,9 +145,9 @@ func TestEndpointExtraFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.endpoint, func(t *testing.T) {
-			ep := EndpointByName(tt.endpoint)
+			ep := endpointByName(tt.endpoint)
 			if ep == nil {
-				t.Fatalf("EndpointByName(%q) = nil", tt.endpoint)
+				t.Fatalf("endpointByName(%q) = nil", tt.endpoint)
 			}
 			if tt.wantFlags == nil {
 				if len(ep.ExtraFlags) != 0 {
@@ -158,7 +168,7 @@ func TestEndpointExtraFlags(t *testing.T) {
 }
 
 func TestEndpointExtraFlagEnums(t *testing.T) {
-	ep := EndpointByName("revenue")
+	ep := endpointByName("revenue")
 	if ep == nil {
 		t.Fatal("revenue endpoint not found")
 	}

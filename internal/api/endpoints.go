@@ -115,16 +115,6 @@ var Endpoints = []Endpoint{
 	},
 }
 
-// EndpointByName returns the endpoint with the given name, or nil if not found.
-func EndpointByName(name string) *Endpoint {
-	for i := range Endpoints {
-		if Endpoints[i].Name == name {
-			return &Endpoints[i]
-		}
-	}
-	return nil
-}
-
 // HasExcludedFlag returns true if the given common flag name should be excluded for this endpoint.
 func (e *Endpoint) HasExcludedFlag(flagName string) bool {
 	for _, f := range e.ExcludeCommonFlags {
