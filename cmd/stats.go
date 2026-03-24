@@ -37,9 +37,9 @@ func makeEndpointCmd(ep *api.Endpoint) *cobra.Command {
 		RunE:  makeRunFunc(ep),
 	}
 
-	// Common flags
-	cmd.Flags().String("from", defaultFrom(), "Period start date (YYYY-MM-DD)")
-	cmd.Flags().String("to", defaultTo(), "Period end date (YYYY-MM-DD)")
+	// Common flags (defaults computed at execution time, not init time)
+	cmd.Flags().String("from", "", "Period start date (YYYY-MM-DD, default: 30 days ago)")
+	cmd.Flags().String("to", "", "Period end date (YYYY-MM-DD, default: today)")
 	cmd.Flags().String("granularity", "day", "Time series bucket: day|week|month|quarter|year")
 
 	if !ep.HasExcludedFlag("business_unit_id") {
@@ -89,6 +89,12 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 
 		from, _ := cmd.Flags().GetString("from")
 		to, _ := cmd.Flags().GetString("to")
+		if from == "" {
+			from = defaultFrom()
+		}
+		if to == "" {
+			to = defaultTo()
+		}
 		granularity, _ := cmd.Flags().GetString("granularity")
 		compareFrom, _ := cmd.Flags().GetString("compare-from")
 		compareTo, _ := cmd.Flags().GetString("compare-to")
