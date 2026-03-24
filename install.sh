@@ -64,7 +64,7 @@ fi
 echo "Checksum verified."
 
 # Install
-chmod +x "$TMPFILE"
+chmod 755 "$TMPFILE"
 if [ -w "$INSTALL_DIR" ]; then
   mv "$TMPFILE" "${INSTALL_DIR}/${BINARY}"
 else
