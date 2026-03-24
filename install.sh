@@ -42,7 +42,7 @@ curl -fsSL -o "$TMPFILE" "$URL"
 
 # Verify checksum
 CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${TAG}/checksums.txt"
-EXPECTED="$(curl -fsSL "$CHECKSUMS_URL" | grep "$ASSET" | awk '{print $1}')"
+EXPECTED="$(curl -fsSL "$CHECKSUMS_URL" | grep "  ${ASSET}$" | awk '{print $1}')"
 if [ -n "$EXPECTED" ]; then
   if command -v sha256sum >/dev/null 2>&1; then
     ACTUAL="$(sha256sum "$TMPFILE" | awk '{print $1}')"
