@@ -53,9 +53,16 @@ func Resolve(profileName string) (*Resolved, error) {
 		return &Resolved{URL: envURL, Token: envToken}, nil
 	}
 
-	cfg, err := Load()
-	if err != nil && envURL == "" && envToken == "" {
-		return nil, err
+	cfg, loadErr := Load()
+
+	// If the user explicitly requested a profile, config must be loadable
+	if loadErr != nil && profileName != "" {
+		return nil, loadErr
+	}
+
+	// If no env vars at all and config failed, surface the load error
+	if loadErr != nil && envURL == "" && envToken == "" {
+		return nil, loadErr
 	}
 
 	var profile Profile

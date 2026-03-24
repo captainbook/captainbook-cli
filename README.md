@@ -1,6 +1,15 @@
-# ceebee
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="art/logo-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="art/logo.svg">
+    <img alt="ceebee" src="art/logo.svg" width="280">
+  </picture>
+</p>
 
-CLI for the CaptainBook Statistics API. Query revenue, bookings, products, resources, customers, channels, occupancy, extras, discounts, gift certificates, and dashboard summary from the command line.
+<p align="center">
+  CLI for the CaptainBook Statistics API.<br>
+  Query revenue, bookings, products, resources, customers, channels, occupancy, extras, discounts, gift certificates, and dashboard summary from the command line.
+</p>
 
 ## Install
 
