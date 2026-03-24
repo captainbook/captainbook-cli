@@ -173,8 +173,9 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 		}
 
 		if err := output.Format(os.Stdout, body, formatFlag); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(api.ExitJSONParse)
+			fmtErr := &api.JSONParseError{Err: err}
+			fmt.Fprintln(os.Stderr, fmtErr)
+			os.Exit(api.ExitCodeFor(fmtErr))
 		}
 
 		return nil

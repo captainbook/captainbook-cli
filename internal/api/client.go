@@ -64,7 +64,10 @@ func (c *Client) Do(ctx context.Context, endpoint *Endpoint, params *QueryParams
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			backoff := time.Duration(1<<(attempt-1)) * time.Second
+			backoff := retryBackoff(lastErr, attempt)
+			if c.Verbose && c.VerboseW != nil {
+				fmt.Fprintf(c.VerboseW, "→ Retry %d/%d in %s\n", attempt, maxRetries, backoff)
+			}
 			select {
 			case <-ctx.Done():
 				return nil, &TimeoutError{Duration: defaultTimeout.String()}
@@ -204,6 +207,15 @@ func isRetriable(err error) bool {
 	default:
 		return false
 	}
+}
+
+func retryBackoff(lastErr error, attempt int) time.Duration {
+	if rl, ok := lastErr.(*RateLimitError); ok && rl.RetryAfter != "" {
+		if secs, err := strconv.Atoi(rl.RetryAfter); err == nil && secs > 0 {
+			return time.Duration(secs) * time.Second
+		}
+	}
+	return time.Duration(1<<(attempt-1)) * time.Second
 }
 
 func redactToken(token string) string {

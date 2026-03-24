@@ -177,7 +177,7 @@ func TestDoRequest_StatusCodes(t *testing.T) {
 			name:       "429 rate limit with retry-after",
 			statusCode: http.StatusTooManyRequests,
 			body:       `{}`,
-			headers:    map[string]string{"Retry-After": "30"},
+			headers:    map[string]string{"Retry-After": "1"},
 			wantType:   "*api.RateLimitError",
 		},
 		{
@@ -328,7 +328,7 @@ func TestDoRequest_VerboseLogging(t *testing.T) {
 
 func TestDoRequest_RateLimitRetryAfter(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Retry-After", "60")
+		w.Header().Set("Retry-After", "1")
 		w.WriteHeader(http.StatusTooManyRequests)
 		w.Write([]byte(`{}`))
 	}))
@@ -346,8 +346,8 @@ func TestDoRequest_RateLimitRetryAfter(t *testing.T) {
 	if !ok {
 		t.Fatalf("error type = %T, want *RateLimitError", err)
 	}
-	if rlErr.RetryAfter != "60" {
-		t.Errorf("RetryAfter = %q, want %q", rlErr.RetryAfter, "60")
+	if rlErr.RetryAfter != "1" {
+		t.Errorf("RetryAfter = %q, want %q", rlErr.RetryAfter, "1")
 	}
 }
 
@@ -400,6 +400,31 @@ func TestIsRetriable(t *testing.T) {
 			got := isRetriable(tt.err)
 			if got != tt.want {
 				t.Errorf("isRetriable(%T) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRetryBackoff(t *testing.T) {
+	tests := []struct {
+		name    string
+		lastErr error
+		attempt int
+		want    time.Duration
+	}{
+		{"rate limit with Retry-After", &RateLimitError{RetryAfter: "30"}, 1, 30 * time.Second},
+		{"rate limit without Retry-After", &RateLimitError{}, 1, 1 * time.Second},
+		{"rate limit with invalid Retry-After", &RateLimitError{RetryAfter: "abc"}, 1, 1 * time.Second},
+		{"server error attempt 1", &ServerError{StatusCode: 500}, 1, 1 * time.Second},
+		{"server error attempt 2", &ServerError{StatusCode: 500}, 2, 2 * time.Second},
+		{"network error attempt 1", &NetworkError{}, 1, 1 * time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := retryBackoff(tt.lastErr, tt.attempt)
+			if got != tt.want {
+				t.Errorf("retryBackoff() = %v, want %v", got, tt.want)
 			}
 		})
 	}
