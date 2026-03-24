@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -96,6 +95,12 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 		compareTo, _ := cmd.Flags().GetString("compare-to")
 		compareShorthand, _ := cmd.Flags().GetString("compare")
 
+		// Validate format before making the API call
+		if !output.ValidFormat(formatFlag) {
+			fmt.Fprintf(os.Stderr, "Unknown format %q (use json, table, or csv)\n", formatFlag)
+			os.Exit(api.ExitValidation)
+		}
+
 		// Validate date range (max 365 days)
 		if err := validateDateRange(from, to); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -162,14 +167,6 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(api.ExitCodeFor(err))
-		}
-
-		// Check for empty data
-		var envelope api.StatisticsResponse
-		if json.Unmarshal(body, &envelope) == nil {
-			if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-				fmt.Fprintln(os.Stderr, "No data returned for this period.")
-			}
 		}
 
 		if err := output.Format(os.Stdout, body, formatFlag); err != nil {

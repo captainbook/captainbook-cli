@@ -11,6 +11,16 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
+// ValidFormat returns true if format is a supported output format.
+func ValidFormat(format string) bool {
+	switch format {
+	case "json", "table", "csv":
+		return true
+	default:
+		return false
+	}
+}
+
 // Format writes the API response in the given format to w.
 // format must be "json", "table", or "csv".
 func Format(w io.Writer, data []byte, format string) error {
