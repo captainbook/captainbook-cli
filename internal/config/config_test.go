@@ -328,6 +328,55 @@ func TestResolve_NamedProfileNotFound(t *testing.T) {
 	}
 }
 
+func TestResolve_ExplicitProfileEmptyURL(t *testing.T) {
+	setTestHome(t)
+
+	// Manually write a config with an empty URL (simulates hand-edited file).
+	_ = AddProfile("broken", "https://placeholder.example.com", "tok")
+	cfg, _ := Load()
+	p := cfg.Profiles["broken"]
+	p.URL = ""
+	cfg.Profiles["broken"] = p
+	if err := save(cfg); err != nil {
+		t.Fatalf("save() error: %v", err)
+	}
+
+	t.Setenv("CEEBEE_API_URL", "")
+	t.Setenv("CEEBEE_API_TOKEN", "")
+
+	_, err := Resolve("broken")
+	if err == nil {
+		t.Fatal("expected error for profile with empty URL")
+	}
+	if !strings.Contains(err.Error(), "no URL") {
+		t.Errorf("error = %q, want substring 'no URL'", err.Error())
+	}
+}
+
+func TestResolve_ExplicitProfileEmptyToken(t *testing.T) {
+	setTestHome(t)
+
+	_ = AddProfile("broken", "https://placeholder.example.com", "tok")
+	cfg, _ := Load()
+	p := cfg.Profiles["broken"]
+	p.Token = ""
+	cfg.Profiles["broken"] = p
+	if err := save(cfg); err != nil {
+		t.Fatalf("save() error: %v", err)
+	}
+
+	t.Setenv("CEEBEE_API_URL", "")
+	t.Setenv("CEEBEE_API_TOKEN", "")
+
+	_, err := Resolve("broken")
+	if err == nil {
+		t.Fatal("expected error for profile with empty token")
+	}
+	if !strings.Contains(err.Error(), "no token") {
+		t.Errorf("error = %q, want substring 'no token'", err.Error())
+	}
+}
+
 func TestResolve_ExplicitProfileIgnoresEnv(t *testing.T) {
 	setTestHome(t)
 

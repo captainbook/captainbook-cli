@@ -66,6 +66,12 @@ func Resolve(profileName string) (*Resolved, error) {
 		if !ok {
 			return nil, &ConfigError{Message: fmt.Sprintf("profile %q not found", profileName)}
 		}
+		if p.URL == "" {
+			return nil, &ConfigError{Message: fmt.Sprintf("profile %q has no URL. Run 'ceebee config add %s --url <url> --token <token>' to set it", profileName, profileName)}
+		}
+		if p.Token == "" {
+			return nil, &ConfigError{Message: fmt.Sprintf("profile %q has no token. Run 'ceebee config add %s --url <url> --token <token>' to set it", profileName, profileName)}
+		}
 		return &Resolved{
 			URL:    p.URL,
 			Token:  p.Token,
