@@ -328,16 +328,89 @@ func TestResolve_NamedProfileNotFound(t *testing.T) {
 	}
 }
 
-func TestResolve_EnvPartialOverridesProfile(t *testing.T) {
+func TestResolve_ExplicitProfileEmptyURL(t *testing.T) {
+	setTestHome(t)
+
+	// Manually write a config with an empty URL (simulates hand-edited file).
+	_ = AddProfile("broken", "https://placeholder.example.com", "tok")
+	cfg, _ := Load()
+	p := cfg.Profiles["broken"]
+	p.URL = ""
+	cfg.Profiles["broken"] = p
+	if err := save(cfg); err != nil {
+		t.Fatalf("save() error: %v", err)
+	}
+
+	t.Setenv("CEEBEE_API_URL", "")
+	t.Setenv("CEEBEE_API_TOKEN", "")
+
+	_, err := Resolve("broken")
+	if err == nil {
+		t.Fatal("expected error for profile with empty URL")
+	}
+	if !strings.Contains(err.Error(), "no URL") {
+		t.Errorf("error = %q, want substring 'no URL'", err.Error())
+	}
+}
+
+func TestResolve_ExplicitProfileEmptyToken(t *testing.T) {
+	setTestHome(t)
+
+	_ = AddProfile("broken", "https://placeholder.example.com", "tok")
+	cfg, _ := Load()
+	p := cfg.Profiles["broken"]
+	p.Token = ""
+	cfg.Profiles["broken"] = p
+	if err := save(cfg); err != nil {
+		t.Fatalf("save() error: %v", err)
+	}
+
+	t.Setenv("CEEBEE_API_URL", "")
+	t.Setenv("CEEBEE_API_TOKEN", "")
+
+	_, err := Resolve("broken")
+	if err == nil {
+		t.Fatal("expected error for profile with empty token")
+	}
+	if !strings.Contains(err.Error(), "no token") {
+		t.Errorf("error = %q, want substring 'no token'", err.Error())
+	}
+}
+
+func TestResolve_ExplicitProfileIgnoresEnv(t *testing.T) {
 	setTestHome(t)
 
 	_ = AddProfile("prod", "https://prod.example.com", "tok-prod")
 
-	// Set only token via env var, URL should come from profile
-	t.Setenv("CEEBEE_API_URL", "")
+	// Env vars set to something else entirely — explicit --profile must win.
+	t.Setenv("CEEBEE_API_URL", "https://env-override.example.com")
 	t.Setenv("CEEBEE_API_TOKEN", "env-tok")
 
 	resolved, err := Resolve("prod")
+	if err != nil {
+		t.Fatalf("Resolve() error: %v", err)
+	}
+	if resolved.URL != "https://prod.example.com" {
+		t.Errorf("URL = %q, want profile URL (explicit --profile must win over env)", resolved.URL)
+	}
+	if resolved.Token != "tok-prod" {
+		t.Errorf("Token = %q, want profile token %q", resolved.Token, "tok-prod")
+	}
+	if resolved.Source != "profile:prod" {
+		t.Errorf("Source = %q, want %q", resolved.Source, "profile:prod")
+	}
+}
+
+func TestResolve_EnvPartialOverridesDefaultProfile(t *testing.T) {
+	setTestHome(t)
+
+	_ = AddProfile("prod", "https://prod.example.com", "tok-prod")
+
+	// Only env token set, no explicit --profile → token from env, URL from default profile.
+	t.Setenv("CEEBEE_API_URL", "")
+	t.Setenv("CEEBEE_API_TOKEN", "env-tok")
+
+	resolved, err := Resolve("")
 	if err != nil {
 		t.Fatalf("Resolve() error: %v", err)
 	}
@@ -346,6 +419,42 @@ func TestResolve_EnvPartialOverridesProfile(t *testing.T) {
 	}
 	if resolved.Token != "env-tok" {
 		t.Errorf("Token = %q, want env override %q", resolved.Token, "env-tok")
+	}
+	if resolved.Source != "env+profile:prod" {
+		t.Errorf("Source = %q, want %q", resolved.Source, "env+profile:prod")
+	}
+}
+
+func TestResolve_Source(t *testing.T) {
+	setTestHome(t)
+
+	_ = AddProfile("prod", "https://prod.example.com", "tok-prod")
+
+	tests := []struct {
+		name       string
+		profile    string
+		envURL     string
+		envToken   string
+		wantSource string
+	}{
+		{"explicit profile", "prod", "https://env.example.com", "env-tok", "profile:prod"},
+		{"default profile, no env", "", "", "", "profile:prod"},
+		{"both env, no explicit profile", "", "https://env.example.com", "env-tok", "env"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CEEBEE_API_URL", tc.envURL)
+			t.Setenv("CEEBEE_API_TOKEN", tc.envToken)
+
+			resolved, err := Resolve(tc.profile)
+			if err != nil {
+				t.Fatalf("Resolve() error: %v", err)
+			}
+			if resolved.Source != tc.wantSource {
+				t.Errorf("Source = %q, want %q", resolved.Source, tc.wantSource)
+			}
+		})
 	}
 }
 
