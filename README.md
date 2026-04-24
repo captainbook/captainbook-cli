@@ -57,7 +57,13 @@ ceebee config use production
 ceebee config list
 ```
 
-Profiles are stored at `~/.ceebee/config.yaml` with 0600 permissions. Environment variables take precedence over profiles.
+Profiles are stored at `~/.ceebee/config.yaml` with 0600 permissions.
+
+**Resolution order:**
+- Explicit `--profile <name>` always wins — env vars are ignored.
+- Without `--profile`, `CEEBEE_API_URL` / `CEEBEE_API_TOKEN` override the default profile (partial overrides are allowed).
+
+Run with `--verbose` to see which source was used (`profile:sandbox`, `env`, or `env+profile:sandbox`).
 
 ## Usage
 
