@@ -32,8 +32,9 @@ type Profile struct {
 
 // Resolved holds the final URL and token after resolving env vars and profiles.
 type Resolved struct {
-	URL   string
-	Token string
+	URL    string
+	Token  string
+	Source string // e.g. "env", "profile:sandbox", "env+profile:sandbox"
 }
 
 // ConfigError is returned for configuration problems.
@@ -46,64 +47,80 @@ func (e *ConfigError) Error() string {
 }
 
 // Resolve returns the API URL and token for the given profile name.
-// Resolution order: env vars > named profile > default profile > error.
+//
+// Resolution order:
+//   - Explicit --profile: use that profile's values, ignoring env vars entirely.
+//   - Otherwise: env vars > default profile, with partial env override allowed.
 func Resolve(profileName string) (*Resolved, error) {
 	envURL := os.Getenv("CEEBEE_API_URL")
 	envToken := os.Getenv("CEEBEE_API_TOKEN")
 
-	// If both env vars are set, use them directly
-	if envURL != "" && envToken != "" {
-		return &Resolved{URL: envURL, Token: envToken}, nil
+	// Explicit --profile wins over env vars. Env is a shell-wide override, not a
+	// per-invocation override — if the user typed --profile, honor it.
+	if profileName != "" {
+		cfg, err := Load()
+		if err != nil {
+			return nil, err
+		}
+		p, ok := cfg.Profiles[profileName]
+		if !ok {
+			return nil, &ConfigError{Message: fmt.Sprintf("profile %q not found", profileName)}
+		}
+		return &Resolved{
+			URL:    p.URL,
+			Token:  p.Token,
+			Source: "profile:" + profileName,
+		}, nil
 	}
 
 	cfg, loadErr := Load()
 
-	// If the user explicitly requested a profile, config must be loadable
-	if loadErr != nil && profileName != "" {
+	// No config file: env vars are the only option.
+	if loadErr != nil {
+		if envURL != "" && envToken != "" {
+			return &Resolved{URL: envURL, Token: envToken, Source: "env"}, nil
+		}
 		return nil, loadErr
 	}
 
-	// If no env vars at all and config failed, surface the load error
-	if loadErr != nil && envURL == "" && envToken == "" {
-		return nil, loadErr
+	// Pick the implicit profile (default, or single entry if only one exists).
+	effective := cfg.DefaultProfile
+	if effective == "" {
+		switch len(cfg.Profiles) {
+		case 0:
+			// no profiles; fall through to env-only path below
+		case 1:
+			for name := range cfg.Profiles {
+				effective = name
+			}
+		default:
+			if envURL != "" && envToken != "" {
+				return &Resolved{URL: envURL, Token: envToken, Source: "env"}, nil
+			}
+			return nil, &ConfigError{Message: "multiple profiles configured but no default set. Run 'ceebee config use <name>' to set a default"}
+		}
 	}
 
 	var profile Profile
-	if cfg != nil {
-		if profileName == "" {
-			profileName = cfg.DefaultProfile
+	profileSource := ""
+	if effective != "" {
+		p, ok := cfg.Profiles[effective]
+		if !ok {
+			return nil, &ConfigError{Message: fmt.Sprintf("profile %q not found", effective)}
 		}
-		if profileName == "" {
-			switch len(cfg.Profiles) {
-			case 0:
-				// no profiles at all — fall through to env var check
-			case 1:
-				for name := range cfg.Profiles {
-					profileName = name
-				}
-			default:
-				return nil, &ConfigError{Message: "multiple profiles configured but no default set. Run 'ceebee config use <name>' to set a default"}
-			}
-		}
-		if profileName != "" {
-			p, ok := cfg.Profiles[profileName]
-			if !ok {
-				return nil, &ConfigError{Message: fmt.Sprintf("profile %q not found", profileName)}
-			}
-			profile = p
-		}
+		profile = p
+		profileSource = "profile:" + effective
 	}
 
-	// Env vars override profile values
-	resolved := &Resolved{
-		URL:   profile.URL,
-		Token: profile.Token,
-	}
+	resolved := &Resolved{URL: profile.URL, Token: profile.Token}
+	urlFromEnv, tokenFromEnv := false, false
 	if envURL != "" {
 		resolved.URL = envURL
+		urlFromEnv = true
 	}
 	if envToken != "" {
 		resolved.Token = envToken
+		tokenFromEnv = true
 	}
 
 	if resolved.URL == "" {
@@ -111,6 +128,15 @@ func Resolve(profileName string) (*Resolved, error) {
 	}
 	if resolved.Token == "" {
 		return nil, &ConfigError{Message: "no API token configured. Run 'ceebee config add <name> --url <url> --token <token>' or set CEEBEE_API_TOKEN"}
+	}
+
+	switch {
+	case urlFromEnv && tokenFromEnv:
+		resolved.Source = "env"
+	case !urlFromEnv && !tokenFromEnv:
+		resolved.Source = profileSource
+	default:
+		resolved.Source = "env+" + profileSource
 	}
 
 	return resolved, nil

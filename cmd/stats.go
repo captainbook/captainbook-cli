@@ -86,6 +86,9 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 		client := api.NewClient(resolved.URL, resolved.Token)
 		client.Verbose = verbose
 		client.VerboseW = os.Stderr
+		if verbose {
+			fmt.Fprintf(os.Stderr, "→ Using %s\n", resolved.Source)
+		}
 
 		from, _ := cmd.Flags().GetString("from")
 		to, _ := cmd.Flags().GetString("to")
