@@ -19,8 +19,8 @@ func transactionsDefs() []CommandDef {
 			Verb: "GET", Path: "/transactions", Ability: invpkg.Read,
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "status", Type: "string", Description: "succeeded|pending|failed"},
-				{Name: "type", Type: "string", Description: "charge|refund|chargeback"},
+				{Name: "status", Type: "string", Description: "pending|succeeded|failed|partial"},
+				{Name: "type", Type: "string", Description: "charge|refund|comp"},
 				{Name: "from", Type: "string", Description: "Transaction created_at >= ISO 8601"},
 				{Name: "to", Type: "string", Description: "Transaction created_at <= ISO 8601"},
 			},

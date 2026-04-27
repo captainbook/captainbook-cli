@@ -605,4 +605,49 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 			}
 		}
 	}
+
+	// Hand-written outliers: bulkUpdateDef (5 children) + uploadCmd are not
+	// in any *Defs() table. Cover them directly.
+	bulkSettings := []string{"capacity", "booking-status", "pricing", "start-time", "end-time"}
+	for _, s := range bulkSettings {
+		def := bulkUpdateDef(s, "test-"+s, nil, func(args RunArgs) (any, error) { return map[string]any{}, nil })
+		if def.Ability == "" {
+			t.Errorf("bulkUpdateDef(%q) has empty Ability", s)
+		}
+	}
+	// uploadCmd is hand-written cobra; it doesn't expose a CommandDef, but
+	// the ability gate is hardcoded inline. Static assertion: the source
+	// must mention `invpkg.Refuse(invpkg.Write` so we know the gate fires.
+	media, _ := os.ReadFile("media.go")
+	if !strings.Contains(string(media), "invpkg.Refuse(invpkg.Write,") {
+		t.Errorf("media.go: uploadCmd must call invpkg.Refuse(invpkg.Write, ...) — ability gate appears missing")
+	}
+}
+
+// TestParseGenResponse_ErrorReturnsPartialResult asserts ParseGenResponse
+// returns a non-nil RunResult on non-2xx so closures can populate
+// res.WireBody and runMutation can hash the wire body for audit. Without
+// this, error-row body_sha256 falls back to args.RawData (empty for
+// typed-flag-only paths) and audit forensics are useless on failures.
+func TestParseGenResponse_ErrorReturnsPartialResult(t *testing.T) {
+	body := []byte(`{"meta":{"request_id":"r1"},"error":{"code":"VALIDATION_FAILED","message":"bad","retriable":false}}`)
+	hr := &http.Response{StatusCode: http.StatusUnprocessableEntity, Header: http.Header{}}
+	res, err := ParseGenResponse(body, hr, "Product", "prod_42")
+	if err == nil {
+		t.Fatal("expected typed error on 422; got nil")
+	}
+	if res == nil {
+		t.Fatal("expected non-nil RunResult alongside error so closures can set WireBody for audit")
+	}
+	if res.Status != http.StatusUnprocessableEntity {
+		t.Errorf("Status: got %d, want 422", res.Status)
+	}
+	if res.ResourceType != "Product" || res.ResourceID != "prod_42" {
+		t.Errorf("ResourceType/ID not threaded: got %q/%q", res.ResourceType, res.ResourceID)
+	}
+	// Body intentionally empty on error — error-envelope bytes don't
+	// belong on a success-shaped RunResult.Body.
+	if res.Body != nil {
+		t.Errorf("Body must be nil on error, got %d bytes", len(res.Body))
+	}
 }

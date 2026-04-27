@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"context"
+	"fmt"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -48,14 +49,18 @@ func bookingsDefs() []CommandDef {
 					p.BookingStatus = &s
 				}
 				if v := args.FlagString("from"); v != "" {
-					if d, err := parseDate(v); err == nil {
-						p.From = &d
+					d, err := parseDate(v)
+					if err != nil {
+						return nil, fmt.Errorf("--from: %w", err)
 					}
+					p.From = &d
 				}
 				if v := args.FlagString("to"); v != "" {
-					if d, err := parseDate(v); err == nil {
-						p.To = &d
+					d, err := parseDate(v)
+					if err != nil {
+						return nil, fmt.Errorf("--to: %w", err)
 					}
+					p.To = &d
 				}
 				if v := args.FlagString("customer-email"); v != "" {
 					e := openapi_types.Email(v)
@@ -97,7 +102,7 @@ func bookingsDefs() []CommandDef {
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
 				{Name: "reason", Type: "string", Required: true, Description: "Cancellation reason"},
-				{Name: "refund-policy", Type: "string", Description: "auto|none|full|partial (CS only for non-auto)"},
+				{Name: "refund-policy", Type: "string", Required: true, Description: "auto|none|full|partial (spec: required; CS-only for non-auto)"},
 				{Name: "refund-amount", Type: "int", Description: "Refund amount in minor units (only with partial)"},
 				{Name: "notify-customer", Type: "bool", Description: "Notify customer of cancellation"},
 			},

@@ -59,14 +59,18 @@ func availabilitiesDefs() []CommandDef {
 					p.ProductOptionId = &v
 				}
 				if v := args.FlagString("from"); v != "" {
-					if d, err := parseDate(v); err == nil {
-						p.From = &d
+					d, err := parseDate(v)
+					if err != nil {
+						return nil, fmt.Errorf("--from: %w", err)
 					}
+					p.From = &d
 				}
 				if v := args.FlagString("to"); v != "" {
-					if d, err := parseDate(v); err == nil {
-						p.To = &d
+					d, err := parseDate(v)
+					if err != nil {
+						return nil, fmt.Errorf("--to: %w", err)
 					}
+					p.To = &d
 				}
 				if args.FlagSet("has-capacity") {
 					b := args.FlagBool("has-capacity")

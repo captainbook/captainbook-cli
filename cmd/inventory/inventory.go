@@ -725,6 +725,16 @@ func readDataFlag(v string) ([]byte, error) {
 // Resource closures call this with the .Body and .HTTPResponse fields of
 // the generated response struct so that error envelopes, dry-run diffs,
 // and async 202 envelopes all flow through one place.
+//
+// On non-2xx, ParseGenResponse returns a partial RunResult populated with
+// (Status, ResourceType, ResourceID) ALONGSIDE the typed error. This lets
+// closures unconditionally do `if res != nil { res.WireBody = body }` and
+// have audit body_sha256 reflect the wire body even on 4xx/5xx — without
+// that, runMutation would fall back to args.RawData (often empty for
+// typed-flag-only paths) and audit rows for failed mutations would carry
+// an empty hash. Callers must still treat a non-nil error as "the call
+// failed"; the returned RunResult exists purely to thread metadata into
+// the audit pipeline.
 func ParseGenResponse(body []byte, httpResp *http.Response, resourceType, resourceID string) (*RunResult, error) {
 	if httpResp == nil {
 		return nil, fmt.Errorf("inventory: gen client returned nil HTTPResponse")
@@ -754,7 +764,15 @@ func ParseGenResponse(body []byte, httpResp *http.Response, resourceType, resour
 	if status == http.StatusTooManyRequests {
 		parsed = invpkg.WithRetryAfter(parsed, invpkg.ParseRetryAfter(httpResp.Header.Get("Retry-After")))
 	}
-	return nil, parsed
+	// Partial result for the audit pipeline. Body intentionally NOT set —
+	// the caller saw a typed error; raw error-envelope bytes don't belong
+	// in res.Body which is reserved for successful response payloads.
+	res := &RunResult{
+		Status:       status,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+	}
+	return res, parsed
 }
 
 // tryParseDiffEnvelope returns a *invpkg.DiffEnvelope if body looks like a

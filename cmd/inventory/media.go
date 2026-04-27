@@ -3,6 +3,8 @@ package inventory
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -237,6 +239,11 @@ func uploadCmd(runner *Runner) *cobra.Command {
 		}
 
 		// Audit entry (D37: file_size, mime_type, file_name).
+		// body_sha256 hashes the actual multipart body that went on the
+		// wire (bodyBuf was assembled above and used by IssueRequest);
+		// matches the runMutation pattern even though this outlier
+		// bypasses runMutation.
+		bodyHash := sha256.Sum256(bodyBuf.Bytes())
 		entry := invpkg.AuditEntry{
 			Ts:             time.Now().UTC(),
 			Profile:        runner.ProfileName,
@@ -244,6 +251,7 @@ func uploadCmd(runner *Runner) *cobra.Command {
 			Command:        "POST /products/{id}/media",
 			Endpoint:       "/products/{id}/media",
 			IdempotencyKey: idemKey,
+			BodySHA256:     hex.EncodeToString(bodyHash[:]),
 			AbilityUsed:    string(invpkg.Write),
 			DryRun:         false,
 			Status:         status,
