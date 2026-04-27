@@ -108,11 +108,34 @@ type Cache interface {
 var homeDirFn = os.UserHomeDir
 
 const (
-	cacheDir      = ".ceebee"
-	cacheFileName = ".whoami-cache.json"
-	cachePerm     = 0o600
-	cacheDirPerm  = 0o700
+	cacheDir       = ".ceebee"
+	cacheFileName  = ".whoami-cache.json"
+	cacheLockName  = ".whoami-cache.lock"
+	cachePerm      = 0o600
+	cacheDirPerm   = 0o700
 )
+
+// withCacheLock acquires an exclusive cross-process lock on the cache lockfile,
+// invokes fn, and releases the lock. The lockfile path is stable across
+// rename-based atomic writes of the cache JSON, so the lock truly serializes
+// concurrent writers across processes — read-modify-write is safe.
+func (c *DiskCache) withCacheLock(fn func() error) error {
+	dir := filepath.Dir(c.path)
+	if err := os.MkdirAll(dir, cacheDirPerm); err != nil {
+		return fmt.Errorf("abilities: creating cache directory: %w", err)
+	}
+	lockPath := filepath.Join(dir, cacheLockName)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, cachePerm)
+	if err != nil {
+		return fmt.Errorf("abilities: opening cache lockfile: %w", err)
+	}
+	defer f.Close()
+	if err := lockFile(f); err != nil {
+		return fmt.Errorf("abilities: acquiring cache lock: %w", err)
+	}
+	defer unlockFile(f)
+	return fn()
+}
 
 // DiskCache is backed by ~/.ceebee/.whoami-cache.json.
 //
@@ -232,28 +255,35 @@ func (c *DiskCache) Get(host, token string) (Entry, bool) {
 }
 
 // Set writes (host, token) -> entry, preserving any other entries in the file.
+// The read-modify-write is serialized across processes via flock on the
+// cache lockfile, so two concurrent writers cannot lose each other's entries.
 func (c *DiskCache) Set(host, token string, entry Entry) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	m := c.loadAll()
-	m[cacheKey(host, token)] = entry
-	return c.saveAll(m)
+	return c.withCacheLock(func() error {
+		m := c.loadAll()
+		m[cacheKey(host, token)] = entry
+		return c.saveAll(m)
+	})
 }
 
 // Invalidate removes the (host, token) entry. Missing entries are not an
 // error — callers (the transport, on a 401) shouldn't have to distinguish.
+// The R-M-W is serialized across processes via the cache lockfile.
 func (c *DiskCache) Invalidate(host, token string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	m := c.loadAll()
-	key := cacheKey(host, token)
-	if _, ok := m[key]; !ok {
-		return nil
-	}
-	delete(m, key)
-	return c.saveAll(m)
+	return c.withCacheLock(func() error {
+		m := c.loadAll()
+		key := cacheKey(host, token)
+		if _, ok := m[key]; !ok {
+			return nil
+		}
+		delete(m, key)
+		return c.saveAll(m)
+	})
 }
 
 // Preflight returns the abilities for (host, token), using the cache if fresh

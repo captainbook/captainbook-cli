@@ -70,6 +70,13 @@ const auditDirName = ".ceebee"
 // auditFileName is the active log filename.
 const auditFileName = "audit.jsonl"
 
+// auditLockFileName is the path of the stable cross-process lockfile. Locking
+// a stable path (instead of the rotating audit.jsonl inode) is what makes
+// rotation race-safe: a sibling process trying to write the new audit.jsonl
+// after a rotation must still acquire this lock first, and we hold it across
+// rename + reopen + write.
+const auditLockFileName = ".audit.lock"
+
 // homeDirFn lives in abilities.go (same package). Tests redirect there
 // once and both audit + abilities pick up the new home dir.
 
@@ -221,38 +228,43 @@ func (l *FileLogger) Append(entry AuditEntry) error {
 }
 
 // appendLocked performs the open + flock + maybe-rotate + write + unlock +
-// close cycle. Returns the underlying error so the caller can decide how
-// to surface it; Append wraps that into the D15 stderr-warn behavior.
+// close cycle. The lock is held on a STABLE lockfile path (audit.lock),
+// not on the audit.jsonl inode — that way the lock survives rotation:
+// after audit.jsonl → audit.jsonl.1, we open the new audit.jsonl and write
+// while still holding the stable lock, so no sibling process can interleave
+// writes into the new file.
 func (l *FileLogger) appendLocked(line []byte) error {
+	lockPath := filepath.Join(filepath.Dir(l.path), auditLockFileName)
+	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, auditFilePerm)
+	if err != nil {
+		return fmt.Errorf("open lockfile: %w", err)
+	}
+	defer lf.Close()
+
+	if err := lockFile(lf); err != nil {
+		return fmt.Errorf("lock: %w", err)
+	}
+	defer unlockFile(lf)
+
+	// Inside the lock: open the active file, check size, rotate if needed,
+	// then append. Because we hold the stable lockfile lock across all of
+	// this, no sibling process can begin its own rotate-or-append cycle.
 	f, err := os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, auditFilePerm)
 	if err != nil {
 		return fmt.Errorf("open: %w", err)
 	}
 	defer f.Close()
-
-	// Belt-and-braces: chmod in case umask softened the perms on creation.
 	_ = os.Chmod(l.path, auditFilePerm)
 
-	if err := lockFile(f); err != nil {
-		return fmt.Errorf("lock: %w", err)
-	}
-	defer unlockFile(f)
-
-	// Inside the lock: check size, rotate if needed, then append. Rotation
-	// happens AFTER acquiring the lock so two processes can't both decide
-	// to rotate at once.
 	rotated, err := l.maybeRotateLocked(f)
 	if err != nil {
 		return fmt.Errorf("rotate: %w", err)
 	}
 
-	// If we rotated, our existing fd points at the renamed (rotated) file.
-	// Open a fresh handle to the canonical path so the entry lands in the
-	// new audit.jsonl. We hold the lock on the old inode through the write
-	// — that's deliberate: any sibling process that opened the path before
-	// we rotated will still be blocked on the rotated inode's lock and
-	// won't write to it after we release. New processes opening the path
-	// fresh will get a separate lock on the new inode.
+	// If we rotated, the existing fd points at the renamed file. Open a
+	// fresh handle to the canonical path so the entry lands in the new
+	// audit.jsonl. The stable lockfile lock is still held, so this write
+	// is race-free with any sibling writer.
 	out := f
 	if rotated {
 		out, err = os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, auditFilePerm)

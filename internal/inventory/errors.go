@@ -218,7 +218,7 @@ func (e *IdempotencyUnknownError) Error() string {
 func (e *IdempotencyUnknownError) UserMessage() string {
 	return fmt.Sprintf(
 		"idempotency key %s expired (server prunes stale keys every 5 min). "+
-			"The retry will mint a new key.",
+			"Retry the command with a fresh key (omit --idempotency-key to auto-mint).",
 		e.Key,
 	)
 }

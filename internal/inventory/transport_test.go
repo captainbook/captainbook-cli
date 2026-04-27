@@ -558,84 +558,6 @@ func TestRetry_BodyWithoutGetBodyFailsClearly(t *testing.T) {
 	}
 }
 
-// ----- audit -----------------------------------------------------------------
-
-type fakeAudit struct {
-	mu      sync.Mutex
-	calls   int
-	lastReq *http.Request
-	lastSt  int
-	lastDur time.Duration
-}
-
-func (f *fakeAudit) Append(req *http.Request, resp *http.Response, dur time.Duration) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls++
-	f.lastReq = req
-	f.lastSt = resp.StatusCode
-	f.lastDur = dur
-	return nil
-}
-
-func TestAudit_CalledOnSuccessful2xx(t *testing.T) {
-	rec := &recordingRT{
-		scripted: []scriptStep{{status: http.StatusOK, body: "ok"}},
-	}
-	logger := &fakeAudit{}
-	rt := &auditRT{next: rec, logger: logger}
-
-	req := newRequest(t, http.MethodPost, "https://acme.captainbook.io/foo", []byte(`{}`))
-	resp, err := rt.RoundTrip(req)
-	if err != nil {
-		t.Fatalf("RoundTrip: %v", err)
-	}
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-	if logger.calls != 1 {
-		t.Errorf("expected 1 audit call, got %d", logger.calls)
-	}
-	if logger.lastSt != 200 {
-		t.Errorf("audit logged wrong status: %d", logger.lastSt)
-	}
-	if logger.lastReq == nil || logger.lastReq.URL.Path != "/foo" {
-		t.Errorf("audit got wrong request: %v", logger.lastReq)
-	}
-}
-
-func TestAudit_NotCalledOnNon2xx(t *testing.T) {
-	rec := &recordingRT{
-		scripted: []scriptStep{{status: http.StatusUnprocessableEntity, body: "no"}},
-	}
-	logger := &fakeAudit{}
-	rt := &auditRT{next: rec, logger: logger}
-
-	req := newRequest(t, http.MethodPost, "https://acme.captainbook.io/foo", []byte(`{}`))
-	if _, err := rt.RoundTrip(req); err != nil {
-		t.Fatalf("RoundTrip: %v", err)
-	}
-	if logger.calls != 0 {
-		t.Errorf("audit should not fire on 4xx; got %d calls", logger.calls)
-	}
-}
-
-func TestAudit_NilLoggerTolerated(t *testing.T) {
-	rec := &recordingRT{
-		scripted: []scriptStep{{status: http.StatusOK, body: "ok"}},
-	}
-	rt := &auditRT{next: rec, logger: nil}
-
-	req := newRequest(t, http.MethodPost, "https://acme.captainbook.io/foo", []byte(`{}`))
-	resp, err := rt.RoundTrip(req)
-	if err != nil {
-		t.Fatalf("RoundTrip: %v", err)
-	}
-	if resp.StatusCode != 200 {
-		t.Errorf("expected 200, got %d", resp.StatusCode)
-	}
-}
-
 // ----- end-to-end via httptest ------------------------------------------------
 
 func TestNew_EndToEndChainOrder(t *testing.T) {
@@ -665,11 +587,11 @@ func TestNew_EndToEndChainOrder(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	logger := &fakeAudit{}
+	srvURL, _ := url.Parse(srv.URL)
 	chain := New(Config{
-		Token:       "endtoendtoken",
-		Verbose:     false,
-		AuditLogger: logger,
+		Token:        "endtoendtoken",
+		ExpectedHost: srvURL.Host,
+		Verbose:      false,
 	}, nil)
 
 	body := []byte(`{"thing":"value"}`)
@@ -708,10 +630,6 @@ func TestNew_EndToEndChainOrder(t *testing.T) {
 			t.Errorf("attempt %d body: got %q want %q", i, b, body)
 		}
 	}
-	// Audit fired exactly once (for the eventual 200).
-	if logger.calls != 1 {
-		t.Errorf("expected 1 audit call, got %d", logger.calls)
-	}
 }
 
 func TestNew_RejectsHTTPSchemelessURL(t *testing.T) {
@@ -734,5 +652,151 @@ func TestNew_NilBaseUsesDefault(t *testing.T) {
 		// Connection refused is the expected outcome; tolerate weird CI
 		// where something happens to listen there.
 		t.Logf("unexpected success against 127.0.0.1:1; tolerating")
+	}
+}
+
+// ----- F5: host validation ---------------------------------------------------
+
+func TestRequestURLValidator_RefusesHostMismatch(t *testing.T) {
+	// Token MUST NOT leak to a different host than the configured profile.
+	// Construct a chain expecting acme.captainbook.io; send to evil.example.
+	rec := &recordingRT{
+		scripted: []scriptStep{{status: http.StatusOK, body: "ok"}},
+	}
+	rt := &requestURLValidatorRT{next: rec, expectedHost: "acme.captainbook.io"}
+
+	req := newRequest(t, http.MethodPost, "https://evil.example/foo", []byte(`{}`))
+	_, err := rt.RoundTrip(req)
+	if err == nil {
+		t.Fatal("expected host-mismatch error, got nil")
+	}
+	if !strings.Contains(err.Error(), "evil.example") || !strings.Contains(err.Error(), "acme.captainbook.io") {
+		t.Errorf("error must name both hosts; got %v", err)
+	}
+	// Critical: the inner round-tripper must NOT have been called.
+	if len(rec.requests) != 0 {
+		t.Errorf("inner RT was called %d times; must be 0 on host mismatch", len(rec.requests))
+	}
+}
+
+func TestRequestURLValidator_PassesMatchingHost(t *testing.T) {
+	rec := &recordingRT{
+		scripted: []scriptStep{{status: http.StatusOK, body: "ok"}},
+	}
+	rt := &requestURLValidatorRT{next: rec, expectedHost: "acme.captainbook.io"}
+
+	req := newRequest(t, http.MethodPost, "https://ACME.captainbook.io/foo", []byte(`{}`))
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("expected pass with case-insensitive host match; got %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRequestURLValidator_EmptyExpectedHostSkipsCheck(t *testing.T) {
+	// expectedHost == "" preserves backward compat for tests / callers that
+	// don't want host enforcement. Production callers should always set it.
+	rec := &recordingRT{
+		scripted: []scriptStep{{status: http.StatusOK, body: "ok"}},
+	}
+	rt := &requestURLValidatorRT{next: rec, expectedHost: ""}
+
+	req := newRequest(t, http.MethodPost, "https://anywhere.example/foo", []byte(`{}`))
+	if _, err := rt.RoundTrip(req); err != nil {
+		t.Errorf("empty expectedHost should skip host check; got %v", err)
+	}
+}
+
+// ----- F4 / D13: IDEMPOTENCY_IN_PROGRESS auto-retry --------------------------
+
+func TestRetry_IdempotencyInProgress_RetriesOnceAt250ms(t *testing.T) {
+	inProgressBody := `{"error":{"code":"IDEMPOTENCY_IN_PROGRESS","message":"still processing"}}`
+	successBody := `{"data":{"id":"prod_1"}}`
+
+	rec := &recordingRT{
+		scripted: []scriptStep{
+			{status: http.StatusConflict, headers: http.Header{"Content-Type": []string{"application/json"}}, body: inProgressBody},
+			{status: http.StatusOK, body: successBody},
+		},
+	}
+	var slept []time.Duration
+	rt := &retryRT{
+		next:  rec,
+		sleep: func(d time.Duration) { slept = append(slept, d) },
+	}
+
+	req := newRequest(t, http.MethodPost, "https://acme.captainbook.io/products", []byte(`{}`))
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Errorf("expected 200 after IN_PROGRESS retry, got %d", resp.StatusCode)
+	}
+	if len(rec.requests) != 2 {
+		t.Errorf("expected 2 attempts, got %d", len(rec.requests))
+	}
+	if len(slept) != 1 || slept[0] != idempotencyInProgressDelay {
+		t.Errorf("expected one 250ms sleep, got %v", slept)
+	}
+}
+
+func TestRetry_IdempotencyInProgress_OnlyOneAutoRetry(t *testing.T) {
+	// Per D13: ONE auto-retry. If still in-progress, surface the typed error.
+	body := `{"error":{"code":"IDEMPOTENCY_IN_PROGRESS","message":"still processing"}}`
+	rec := &recordingRT{
+		scripted: []scriptStep{
+			{status: http.StatusConflict, body: body},
+			{status: http.StatusConflict, body: body},
+		},
+	}
+	rt := &retryRT{next: rec, sleep: func(time.Duration) {}}
+
+	req := newRequest(t, http.MethodPost, "https://acme.captainbook.io/products", []byte(`{}`))
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 409 {
+		t.Errorf("expected 409 surfaced after one retry, got %d", resp.StatusCode)
+	}
+	if len(rec.requests) != 2 {
+		t.Errorf("expected exactly 2 attempts (one retry), got %d", len(rec.requests))
+	}
+	// Body must be readable (we restored it before surfacing).
+	got, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(got), "IDEMPOTENCY_IN_PROGRESS") {
+		t.Errorf("body lost or unreadable on surfaced response: %q", string(got))
+	}
+}
+
+func TestRetry_IdempotencyConflict_NotAutoRetried(t *testing.T) {
+	// Plain IDEMPOTENCY_CONFLICT (different request body, same key) must
+	// NOT auto-retry — the caller minted the wrong key. Surface immediately.
+	body := `{"error":{"code":"IDEMPOTENCY_CONFLICT","message":"key reused with different body"}}`
+	rec := &recordingRT{
+		scripted: []scriptStep{{status: http.StatusConflict, body: body}},
+	}
+	rt := &retryRT{next: rec, sleep: func(time.Duration) {}}
+
+	req := newRequest(t, http.MethodPost, "https://acme.captainbook.io/products", []byte(`{}`))
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 409 {
+		t.Errorf("expected 409, got %d", resp.StatusCode)
+	}
+	if len(rec.requests) != 1 {
+		t.Errorf("plain IDEMPOTENCY_CONFLICT must not auto-retry; got %d attempts", len(rec.requests))
+	}
+	got, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(got), "IDEMPOTENCY_CONFLICT") {
+		t.Errorf("body must be preserved on surfaced 409: %q", string(got))
 	}
 }

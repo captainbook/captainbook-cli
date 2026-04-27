@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
+	"github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,11 @@ var versionCmd = &cobra.Command{
 	},
 }
 
-// Execute runs the root command.
+// Execute runs the root command. The error path renders, in order of
+// precedence: typed exit errors (api.ExitError) → typed inventory errors that
+// implement inventory.UserMessenger → fallback to err.Error(). UserMessenger
+// support means inventory typed errors (IdempotencyConflictError, etc.) print
+// their crisp UserMessage to stderr instead of the developer-facing Error().
 func Execute() {
 	rootCmd.SilenceErrors = true
 	rootCmd.SilenceUsage = true
@@ -53,6 +58,11 @@ func Execute() {
 		if errors.As(err, &exitErr) {
 			fmt.Fprintln(os.Stderr, exitErr.Err)
 			os.Exit(exitErr.Code)
+		}
+		var um inventory.UserMessenger
+		if errors.As(err, &um) {
+			fmt.Fprintln(os.Stderr, um.UserMessage())
+			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

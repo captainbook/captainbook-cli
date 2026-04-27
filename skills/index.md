@@ -103,7 +103,7 @@ ceebee inventory pricing-tiers delete pt_42 --dry-run
 | Reads (`list`, `show`, `whoami`) | `table` (human) |
 | Mutations (`create`, `update`, `delete`, `cancel`, `refund`, `comp`, `apply`, `issue`, `void`, `resend`, `restore`, upload) | `json` (machine) |
 
-Override either way with `--format json|table|csv|yaml`. JSON is always the full envelope (`meta`, `data`, plus `pagination` on list endpoints).
+Override either way with `--format json|table|csv`. JSON is always the full envelope (`meta`, `data`, plus `pagination` on list endpoints).
 
 ### Async bulk update
 
@@ -128,15 +128,14 @@ bulk_id=$(
 
 ### Audit log
 
-Every CLI invocation logs to `~/.ceebee/audit.jsonl` — one JSON object per call: timestamp, command, idempotency key, request hash, response status, exit code, and a `forensic_summary` field for sensitive (`cli:cs`) operations.
+Every successful mutation logs to `~/.ceebee/audit.jsonl` — one JSON object per call: timestamp, profile, tenant, command, endpoint, idempotency key, request body hash (SHA-256, never the body itself — PII-safe), ability used, dry-run flag, response status, response ID, duration, error code (if any), and a `forensic_summary` field for sensitive (`cli:cs`) operations like refund / cancel / comp.
 
 ```bash
-ceebee audit list                                   # last 50 invocations
-ceebee audit list --since 2026-04-20 --command "bookings refund"
+ceebee audit list                                   # most recent first; --limit N
 ceebee audit show 018f5e2c-6c4a-7c5a-9d2c-83a1b1f6e4cd
 ```
 
-Use this to reconstruct what an agent did, or to find an idempotency key for a deliberate replay.
+Use this to reconstruct what an agent did, or to find an idempotency key for a deliberate replay. The file is rotated at 50 MB; the last 3 rotations are kept (`audit.jsonl.1` … `audit.jsonl.3`). Cross-process safety is guaranteed by an advisory lockfile (`~/.ceebee/.audit.lock`) that serializes appends and rotation across concurrent ceebee invocations.
 
 ### Exit codes
 

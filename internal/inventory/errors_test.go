@@ -81,7 +81,7 @@ func TestUserMessages(t *testing.T) {
 			name:        "IdempotencyUnknownError",
 			err:         &IdempotencyUnknownError{Key: "01HXY"},
 			wantError:   "IDEMPOTENCY_UNKNOWN: key=01HXY",
-			wantMessage: "idempotency key 01HXY expired (server prunes stale keys every 5 min). The retry will mint a new key.",
+			wantMessage: "idempotency key 01HXY expired (server prunes stale keys every 5 min). Retry the command with a fresh key (omit --idempotency-key to auto-mint).",
 		},
 		{
 			name:        "DiscountNotApplicableError",

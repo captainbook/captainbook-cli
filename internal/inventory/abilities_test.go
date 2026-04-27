@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -427,6 +430,61 @@ func TestDiskCache_OnDiskShape(t *testing.T) {
 		}
 		if _, ok := entry["cached_at"]; !ok {
 			t.Errorf("missing 'cached_at' field: %v", entry)
+		}
+	}
+}
+
+// TestDiskCache_CrossProcessWritersNoLostUpdates exercises the F2 fix: the
+// cache's read-modify-write must be serialized across processes so two
+// concurrent writers cannot lose each other's entries. We fork-exec N child
+// processes each writing a unique (host, token) -> Entry pair, then assert
+// every entry is present after they all exit. Without the lockfile fix this
+// test reliably loses entries (last-rename-wins).
+func TestDiskCache_CrossProcessWritersNoLostUpdates(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("relies on POSIX flock; the Windows shim is exercised by the audit cross-process test")
+	}
+	dir := t.TempDir()
+
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+
+	const procs = 8
+	var wg sync.WaitGroup
+	for p := 0; p < procs; p++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			cmd := exec.Command(self, "-test.run=^$")
+			cmd.Env = append(os.Environ(),
+				whoamiHelperEnv+"="+dir,
+				"CEEBEE_WHOAMI_HOST=tenant-"+strconv.Itoa(idx)+".captainbook.io",
+				"CEEBEE_WHOAMI_TOKEN=tok-"+strconv.Itoa(idx),
+			)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Errorf("child %d: %v\n%s", idx, err, out)
+			}
+		}(p)
+	}
+	wg.Wait()
+
+	// Read the cache directly and assert every key landed.
+	prev := homeDirFn
+	homeDirFn = func() (string, error) { return dir, nil }
+	t.Cleanup(func() { homeDirFn = prev })
+
+	cache, err := NewDiskCache()
+	if err != nil {
+		t.Fatalf("NewDiskCache: %v", err)
+	}
+	for p := 0; p < procs; p++ {
+		host := "tenant-" + strconv.Itoa(p) + ".captainbook.io"
+		token := "tok-" + strconv.Itoa(p)
+		if _, ok := cache.Get(host, token); !ok {
+			t.Errorf("entry for child %d lost (host=%s, token=%s)", p, host, token)
 		}
 	}
 }

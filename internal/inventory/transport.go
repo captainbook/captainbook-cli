@@ -1,12 +1,18 @@
 // Package inventory wires the generated CLI v1 client (internal/inventory/gen)
 // to the ceebee runtime: a chain of http.RoundTrippers handles tenant URL
-// validation, bearer auth, idempotency-key minting, retry with body replay,
-// and an audit hook.
+// validation, bearer auth, idempotency-key minting, and retry with body
+// replay.
+//
+// Audit logging does NOT live in this chain — D37's forensic_summary needs
+// per-command context (the typed request body, the resolved ability, the
+// command name) that the transport layer has no access to. Audit happens at
+// the runMutation layer (Lane H), which has all of that context plus the
+// timing data.
 //
 // Round-tripper chain (outermost to innermost):
 //
 //	+----------------------+
-//	| requestURLValidator  |  reject missing scheme; assert host == profile
+//	| requestURLValidator  |  reject missing scheme; enforce host == profile
 //	+----------+-----------+
 //	           v
 //	+----------+-----------+
@@ -22,28 +28,30 @@
 //	+----------+-----------+
 //	           v
 //	+----------+-----------+
-//	|        audit         |  AuditLogger.Append on 2xx (nil-tolerant)
-//	+----------+-----------+
-//	           v
-//	+----------+-----------+
 //	|         base         |  http.DefaultTransport unless overridden
 //	+----------------------+
 //
-// Critical invariants (see plan D24, D25, D27, D32, D34, D36 + Critical Rules):
+// Critical invariants (see plan D13, D24, D25, D27, D32, D34, D36 +
+// Critical Rules):
 //   - The same Idempotency-Key MUST be reused across every retry attempt of a
 //     given mutation. Since the key is set on the *http.Request before retry
 //     wraps the call, replays of the same request naturally preserve the key.
 //   - The retry layer MUST replay request bodies via req.GetBody (D25). The
 //     CLI layer is responsible for setting GetBody when it sends a mutation.
 //   - Bearer tokens MUST never appear in verbose output (Critical Rule 3).
+//   - 409 IDEMPOTENCY_IN_PROGRESS gets exactly one auto-retry at 250ms (D13);
+//     after that the typed error surfaces.
 package inventory
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,24 +62,22 @@ type Config struct {
 	// Token is the Sanctum bearer token for the active profile.
 	Token string
 
+	// ExpectedHost is the resolved profile host (e.g. "acme.captainbook.io").
+	// Required: every outgoing request URL is asserted to match this host
+	// case-insensitively. A mismatch is a hard error so a misconstructed
+	// generated client cannot leak the bearer to a different host.
+	ExpectedHost string
+
 	// Verbose enables stderr request/response logging. Bearer is redacted.
 	Verbose bool
 
 	// VerboseW receives verbose log lines. Defaults to os.Stderr when nil
 	// and Verbose is true.
 	VerboseW io.Writer
-
-	// AuditLogger, if non-nil, is invoked once per successful 2xx response.
-	// Lane C will provide the production implementation.
-	AuditLogger AuditLogger
 }
 
-// AuditLogger is the hook the audit subsystem (Lane C) implements. The
-// transport calls Append exactly once per successful (2xx) response. Append
-// MUST NOT mutate req or resp.
-type AuditLogger interface {
-	Append(req *http.Request, resp *http.Response, dur time.Duration) error
-}
+// idempotencyInProgressDelay is the single auto-retry delay for D13.
+const idempotencyInProgressDelay = 250 * time.Millisecond
 
 // retry tuning. Plan: max 2 retries, exponential 250ms then 500ms cap.
 const (
@@ -84,7 +90,7 @@ const (
 // New returns the round-tripper chain wrapping base. If base is nil,
 // http.DefaultTransport is used. The chain order, outermost first, is:
 //
-//	requestURLValidator → bearerAuth → idempotencyKey → retry → audit → base
+//	requestURLValidator → bearerAuth → idempotencyKey → retry → base
 func New(cfg Config, base http.RoundTripper) http.RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
@@ -95,20 +101,20 @@ func New(cfg Config, base http.RoundTripper) http.RoundTripper {
 	}
 
 	var rt http.RoundTripper = base
-	rt = &auditRT{next: rt, logger: cfg.AuditLogger}
 	rt = &retryRT{next: rt, verbose: cfg.Verbose, verboseW: verboseW, sleep: time.Sleep}
 	rt = &idempotencyKeyRT{next: rt, mint: mintUUIDv7}
 	rt = &bearerAuthRT{next: rt, token: cfg.Token, verbose: cfg.Verbose, verboseW: verboseW}
-	rt = &requestURLValidatorRT{next: rt}
+	rt = &requestURLValidatorRT{next: rt, expectedHost: cfg.ExpectedHost}
 	return rt
 }
 
-// requestURLValidatorRT rejects requests whose URL has no scheme. The
-// generated client sets a Server URL at construction time (e.g.
-// https://acme.captainbook.io); this layer asserts the request URL is
-// well-formed before we put it on the wire.
+// requestURLValidatorRT rejects requests whose URL is malformed and enforces
+// that req.URL.Host matches the configured profile host. A mismatch is a hard
+// error: a misconstructed generated client (or a malicious caller) MUST NOT
+// be able to send the bearer to a different tenant or domain.
 type requestURLValidatorRT struct {
-	next http.RoundTripper
+	next         http.RoundTripper
+	expectedHost string
 }
 
 func (r *requestURLValidatorRT) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -120,6 +126,12 @@ func (r *requestURLValidatorRT) RoundTrip(req *http.Request) (*http.Response, er
 	}
 	if req.URL.Host == "" {
 		return nil, fmt.Errorf("inventory transport: request URL %q has no host", req.URL.String())
+	}
+	if r.expectedHost != "" && !strings.EqualFold(req.URL.Host, r.expectedHost) {
+		return nil, fmt.Errorf(
+			"inventory transport: refusing to send to %q; profile host is %q (token would leak to a different host)",
+			req.URL.Host, r.expectedHost,
+		)
 	}
 	return r.next.RoundTrip(req)
 }
@@ -204,8 +216,9 @@ type retryRT struct {
 
 func (r *retryRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	var (
-		resp    *http.Response
-		lastErr error
+		resp                       *http.Response
+		lastErr                    error
+		idempotencyInProgressUsed  bool
 	)
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -223,6 +236,27 @@ func (r *retryRT) RoundTrip(req *http.Request) (*http.Response, error) {
 			r.logRetry(attempt+1, fmt.Sprintf("network error: %v", lastErr))
 			r.sleep(backoffFor(attempt))
 			continue
+		}
+
+		// D13: 409 IDEMPOTENCY_IN_PROGRESS is a transient condition (the
+		// original keyed request is still running server-side). Auto-retry
+		// exactly once at 250ms; surface the typed error after that. Sniff
+		// the body without consuming it for the surfaced response — if we
+		// don't retry, the caller must still see the original body.
+		if resp.StatusCode == http.StatusConflict && !idempotencyInProgressUsed {
+			isInProgress, body := peekIdempotencyInProgress(resp)
+			if isInProgress {
+				idempotencyInProgressUsed = true
+				drainAndClose(resp)
+				r.logRetry(attempt+1, "409 IDEMPOTENCY_IN_PROGRESS, retrying once at 250ms")
+				r.sleep(idempotencyInProgressDelay)
+				continue
+			}
+			// Not IDEMPOTENCY_IN_PROGRESS — restore the body bytes we read
+			// so the caller can parse the typed error normally.
+			if body != nil {
+				resp.Body = io.NopCloser(bytes.NewReader(body))
+			}
 		}
 
 		if !shouldRetryStatus(resp.StatusCode) {
@@ -243,6 +277,32 @@ func (r *retryRT) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, lastErr
 	}
 	return resp, nil
+}
+
+// peekIdempotencyInProgress reads the response body, parses the standard
+// error envelope, and reports whether the code is IDEMPOTENCY_IN_PROGRESS.
+// Returns the read body bytes so the caller can either drop them (on retry)
+// or restore them as resp.Body (on no-retry). On any read/parse error we
+// treat the response as "not IDEMPOTENCY_IN_PROGRESS" — better to surface a
+// surprising 409 than to spin on a malformed response.
+func peekIdempotencyInProgress(resp *http.Response) (bool, []byte) {
+	if resp == nil || resp.Body == nil {
+		return false, nil
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	_ = resp.Body.Close()
+	if err != nil {
+		return false, body
+	}
+	var env struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &env) != nil {
+		return false, body
+	}
+	return env.Error.Code == "IDEMPOTENCY_IN_PROGRESS", body
 }
 
 func (r *retryRT) logRetry(attempt int, reason string) {
@@ -315,26 +375,6 @@ func drainAndClose(resp *http.Response) {
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20)) // bounded drain
 	_ = resp.Body.Close()
-}
-
-// auditRT calls AuditLogger.Append on every successful 2xx response. A nil
-// logger is tolerated. Logger errors are intentionally swallowed (D15: the
-// mutation already succeeded; audit failure is not the caller's problem).
-type auditRT struct {
-	next   http.RoundTripper
-	logger AuditLogger
-}
-
-func (r *auditRT) RoundTrip(req *http.Request) (*http.Response, error) {
-	start := time.Now()
-	resp, err := r.next.RoundTrip(req)
-	if err != nil {
-		return nil, err
-	}
-	if r.logger != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		_ = r.logger.Append(req, resp, time.Since(start))
-	}
-	return resp, nil
 }
 
 // redactToken renders a bearer for verbose logging: first 3 chars + "***".

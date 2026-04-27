@@ -20,15 +20,49 @@ import (
 // running as a child writer instead of as a normal `go test`.
 const helperEnv = "CEEBEE_AUDIT_HELPER_PATH"
 
-// TestMain double-dispatches: when invoked with the helper env var set, it
-// becomes a child process that performs N audit writes and exits. This is
-// the engine for the cross-process flock test below.
+// TestMain double-dispatches: when invoked with a helper env var set, it
+// becomes a child process that performs a specific role (audit writes or
+// whoami-cache writes) and exits. This is the engine for the cross-process
+// flock tests in audit_test.go and abilities_test.go.
 func TestMain(m *testing.M) {
 	if path := os.Getenv(helperEnv); path != "" {
 		runHelperWriter(path)
 		return
 	}
+	if dir := os.Getenv(whoamiHelperEnv); dir != "" {
+		runWhoamiCacheHelper(dir)
+		return
+	}
 	os.Exit(m.Run())
+}
+
+// whoamiHelperEnv is the env var the abilities-cache cross-process helper
+// checks. Its value is the home directory the child should redirect to.
+const whoamiHelperEnv = "CEEBEE_WHOAMI_HELPER_HOME"
+
+// runWhoamiCacheHelper is invoked in the child process. It writes a unique
+// (host, token) -> Entry pair to the shared DiskCache and exits. The parent
+// fans these out in parallel to assert no lost-updates under the cache lock.
+func runWhoamiCacheHelper(home string) {
+	homeDirFn = func() (string, error) { return home, nil }
+	host := os.Getenv("CEEBEE_WHOAMI_HOST")
+	token := os.Getenv("CEEBEE_WHOAMI_TOKEN")
+	if host == "" || token == "" {
+		fmt.Fprintln(os.Stderr, "whoami helper: CEEBEE_WHOAMI_HOST/TOKEN required")
+		os.Exit(2)
+	}
+	cache, err := NewDiskCache()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "whoami helper: NewDiskCache:", err)
+		os.Exit(2)
+	}
+	if err := cache.Set(host, token, Entry{
+		Abilities: Set{Read, Write},
+		CachedAt:  time.Now().UTC(),
+	}); err != nil {
+		fmt.Fprintln(os.Stderr, "whoami helper: Set:", err)
+		os.Exit(2)
+	}
 }
 
 // runHelperWriter is invoked in the child process. It opens the audit log
@@ -685,5 +719,97 @@ func TestDefaultAuditPath(t *testing.T) {
 	want := filepath.Join("/fake/home", ".ceebee", "audit.jsonl")
 	if got != want {
 		t.Errorf("DefaultAuditPath: got %q, want %q", got, want)
+	}
+}
+
+// TestFileLogger_CrossProcessRotation exercises the F3 fix: rotation must
+// be safe when multiple processes are appending concurrently AND the
+// threshold is small enough to trigger rotation during the test. Without
+// the stable lockfile (locking the rotating active-file inode instead),
+// a sibling could open the new audit.jsonl after rename and write
+// unlocked into it, causing interleaved bytes / lost data.
+func TestFileLogger_CrossProcessRotation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "audit.jsonl")
+
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+
+	// Each entry serializes to ~300 bytes. Sizing: 4 procs × 15 entries
+	// ≈ 18 KiB total. Threshold 8 KiB triggers ~2 rotations, comfortably
+	// inside MaxRotations=3 so no data is pruned and we can assert every
+	// entry is preserved end-to-end. The test still exercises the
+	// rotate-then-write boundary that F3 fixed.
+	const procs = 4
+	const perProc = 15
+	const threshold = 8 * 1024
+
+	var wg sync.WaitGroup
+	errs := make(chan error, procs)
+	for p := 0; p < procs; p++ {
+		wg.Add(1)
+		go func(p int) {
+			defer wg.Done()
+			cmd := exec.Command(self, "-test.run=^$")
+			cmd.Env = append(os.Environ(),
+				helperEnv+"="+path,
+				"CEEBEE_AUDIT_HELPER_PREFIX=rp"+strconv.Itoa(p),
+				"CEEBEE_AUDIT_HELPER_COUNT="+strconv.Itoa(perProc),
+				"CEEBEE_AUDIT_HELPER_THRESHOLD="+strconv.Itoa(threshold),
+			)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				errs <- fmt.Errorf("proc %d: %v: %s", p, err, out)
+			}
+		}(p)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Read every rotation file PLUS the active file. Every line must parse;
+	// every (prefix, idx) pair must appear exactly once across the whole
+	// set — nothing duplicated, nothing lost.
+	got := map[string]int{}
+	files := []string{path}
+	for i := 1; i <= MaxRotations; i++ {
+		rp := fmt.Sprintf("%s.%d", path, i)
+		if _, err := os.Stat(rp); err == nil {
+			files = append(files, rp)
+		}
+	}
+	if len(files) < 2 {
+		t.Fatalf("expected at least one rotated file (sanity); only got the active file. Threshold may be too high or too few writes happened.")
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("ReadFile %s: %v", f, err)
+		}
+		for i, line := range bytes.Split(bytes.TrimRight(data, "\n"), []byte{'\n'}) {
+			if len(line) == 0 {
+				continue
+			}
+			var e AuditEntry
+			if err := json.Unmarshal(line, &e); err != nil {
+				t.Fatalf("file %s line %d failed to parse: %v: %q", f, i, err, line)
+			}
+			got[e.IdempotencyKey]++
+		}
+	}
+
+	for p := 0; p < procs; p++ {
+		for i := 0; i < perProc; i++ {
+			key := fmt.Sprintf("rp%d-%d", p, i)
+			if got[key] != 1 {
+				t.Errorf("idempotency_key %q appears %d times across all rotations (want exactly 1)", key, got[key])
+			}
+		}
 	}
 }
