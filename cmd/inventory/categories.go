@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -20,6 +22,7 @@ func categoriesDefs() []CommandDef {
 			Verb: "GET", Path: "/categories", Ability: invpkg.Read,
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListCategoriesParams{}
@@ -28,6 +31,13 @@ func categoriesDefs() []CommandDef {
 				}
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListCategoriesWithResponse(ctx, p)
 				if err != nil {
@@ -61,6 +71,7 @@ func categoriesDefs() []CommandDef {
 				{Name: "description", Type: "string", Description: "Category description"},
 				{Name: "position", Type: "int", Description: "Sort position"},
 			},
+			ForensicFields: []string{"name", "slug", "position"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"name":        "name",

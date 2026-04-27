@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -20,6 +22,7 @@ func guestsDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
 				{Name: "booking-id", Type: "string", Description: "Filter by booking"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListGuestsParams{}
@@ -31,6 +34,13 @@ func guestsDefs() []CommandDef {
 				}
 				if v := args.FlagString("booking-id"); v != "" {
 					p.BookingId = &v
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListGuestsWithResponse(ctx, p)
 				if err != nil {

@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -18,6 +20,7 @@ func extrasDefs() []CommandDef {
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
 				{Name: "product-option-id", Type: "string", Description: "Filter by option"},
 				{Name: "include-trashed", Type: "bool"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListExtrasParams{}
@@ -33,6 +36,13 @@ func extrasDefs() []CommandDef {
 				if args.FlagBool("include-trashed") {
 					t := true
 					p.IncludeTrashed = &t
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListExtrasWithResponse(ctx, p)
 				if err != nil {

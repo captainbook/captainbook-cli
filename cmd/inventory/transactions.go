@@ -32,6 +32,7 @@ func transactionsDefs() []CommandDef {
 				{Name: "type", Type: "string", Description: "charge|refund|comp"},
 				{Name: "from", Type: "string", Description: "Transaction created_at >= ISO 8601"},
 				{Name: "to", Type: "string", Description: "Transaction created_at <= ISO 8601"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListTransactionsParams{}
@@ -58,6 +59,13 @@ func transactionsDefs() []CommandDef {
 						return nil, fmt.Errorf("--to: invalid RFC3339 timestamp: %w", err)
 					}
 					p.To = &t
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListTransactionsWithResponse(ctx, p)
 				if err != nil {

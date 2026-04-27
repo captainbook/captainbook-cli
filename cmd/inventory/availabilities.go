@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -44,6 +45,7 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "from", Type: "string", Description: "Date from (YYYY-MM-DD)"},
 				{Name: "to", Type: "string", Description: "Date to (YYYY-MM-DD)"},
 				{Name: "has-capacity", Type: "bool", Description: "Only slots with remaining capacity"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListAvailabilitiesParams{}
@@ -73,6 +75,13 @@ func availabilitiesDefs() []CommandDef {
 				if args.FlagSet("has-capacity") {
 					b := args.FlagBool("has-capacity")
 					p.HasCapacity = &b
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListAvailabilitiesWithResponse(ctx, p)
 				if err != nil {

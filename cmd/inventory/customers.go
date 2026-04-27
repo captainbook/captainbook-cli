@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -25,6 +27,7 @@ func customersDefs() []CommandDef {
 				{Name: "email", Type: "string", Description: "Filter by exact email"},
 				{Name: "country", Type: "string", Description: "ISO-3166-1 alpha-2"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListCustomersParams{}
@@ -47,6 +50,13 @@ func customersDefs() []CommandDef {
 				if args.FlagBool("include-trashed") {
 					t := true
 					p.IncludeTrashed = &t
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListCustomersWithResponse(ctx, p)
 				if err != nil {
