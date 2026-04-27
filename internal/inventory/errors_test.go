@@ -32,11 +32,14 @@ func TestUserMessages(t *testing.T) {
 		{
 			name: "AbilityMissingError",
 			err: &AbilityMissingError{
-				Needed: "cli:write",
-				Have:   []string{"cli:read"},
+				Needed: Write,
+				Have:   Set{Read},
 			},
-			wantError:   `ABILITY_MISSING: needed="cli:write" have=[cli:read]`,
-			wantMessage: "this command requires `cli:write` but your token has [cli:read]",
+			wantError: `token missing required ability "cli:write" (have [cli:read])`,
+			wantMessage: "This command requires the \"cli:write\" ability, but your token doesn't have it.\n" +
+				"Granted abilities: [cli:read]\n" +
+				"Ask an admin to issue a token with the missing ability, " +
+				"or switch profiles with --profile <name>.",
 		},
 		{
 			name:        "NotFoundError",
@@ -218,10 +221,10 @@ func TestParseError(t *testing.T) {
 				if !errors.As(err, &am) {
 					t.Fatalf("want *AbilityMissingError, got %T: %v", err, err)
 				}
-				if am.Needed != "cli:write" {
+				if am.Needed != Write {
 					t.Errorf("wrong Needed: %q", am.Needed)
 				}
-				if len(am.Have) != 1 || am.Have[0] != "cli:read" {
+				if len(am.Have) != 1 || am.Have[0] != Read {
 					t.Errorf("wrong Have: %v", am.Have)
 				}
 			},

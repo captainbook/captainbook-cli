@@ -70,11 +70,8 @@ const auditDirName = ".ceebee"
 // auditFileName is the active log filename.
 const auditFileName = "audit.jsonl"
 
-// homeDirFn is an indirection that lets tests redirect the audit path to a
-// t.TempDir without touching the real ~/.ceebee. Tests assign and restore
-// it directly. (Lane B's abilities.go uses the same pattern; once that
-// lane lands the two will share this single var.)
-var homeDirFn = os.UserHomeDir
+// homeDirFn lives in abilities.go (same package). Tests redirect there
+// once and both audit + abilities pick up the new home dir.
 
 // ErrNotFound is returned by Reader.Show when no entry matches the given
 // idempotency key across audit.jsonl and its rotations.

@@ -103,26 +103,9 @@ func (e *AuthError) UserMessage() string {
 // -----------------------------------------------------------------------------
 // 2. AbilityMissingError — ABILITY_MISSING, 403
 //
-// PLACEHOLDER (Lane E isolation). On merge with Lane B this type goes away
-// and the registry constructor returns Lane B's canonical type instead. See
-// the package-level comment for the full merge-resolution recipe.
+// The canonical type lives in abilities.go (same package). The registry
+// constructor below builds it from the server's error envelope.
 // -----------------------------------------------------------------------------
-
-type AbilityMissingError struct {
-	Needed string
-	Have   []string
-}
-
-func (e *AbilityMissingError) Error() string {
-	return fmt.Sprintf("ABILITY_MISSING: needed=%q have=%v", e.Needed, e.Have)
-}
-
-func (e *AbilityMissingError) UserMessage() string {
-	return fmt.Sprintf(
-		"this command requires `%s` but your token has %v",
-		e.Needed, e.Have,
-	)
-}
 
 // -----------------------------------------------------------------------------
 // 3. NotFoundError — NOT_FOUND, 404
@@ -447,8 +430,12 @@ func init() {
 
 		"ABILITY_MISSING": func(status int, env errorEnvelope) error {
 			needed, _ := decodeStringField(env.Error.Details, "needed")
-			have, _ := decodeStringSliceField(env.Error.Details, "have")
-			return &AbilityMissingError{Needed: needed, Have: have}
+			haveStrs, _ := decodeStringSliceField(env.Error.Details, "have")
+			have := make(Set, 0, len(haveStrs))
+			for _, s := range haveStrs {
+				have = append(have, Ability(s))
+			}
+			return &AbilityMissingError{Needed: Ability(needed), Have: have}
 		},
 
 		"NOT_FOUND": func(status int, env errorEnvelope) error {
