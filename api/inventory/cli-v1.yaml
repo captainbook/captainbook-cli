@@ -1,0 +1,3564 @@
+openapi: 3.1.0
+info:
+  title: CaptainBook Inventory CLI API
+  version: 1.0.0
+  description: |
+    Internal HTTP JSON API serving the CaptainBook inventory CLI client
+    (which lives in a separate repository). Primary consumer is Claude Code
+    piloting the CLI on behalf of supplier-tenant operators and CB Customer
+    Success engineers.
+
+    ## Conventions
+
+    - **Tenant resolution:** all endpoints mount under the tenant subdomain
+      `{tenant_slug}.captainbook.io/api/v1/cli/*`. Tenant context is initialised via
+      `Stancl\Tenancy\Middleware\InitializeTenancyByDomainOrSubdomain`,
+      mirroring Octo and the Statistics API. There is no header-based or
+      query-param tenant override.
+    - **Auth:** Sanctum personal-access-token in `Authorization: Bearer <token>`.
+      Per-token `expires_at` is enforced framework-side by Sanctum 4's
+      `Guard::isValidAccessToken()`.
+    - **Money:** integer minor units (`15000` = 150.00 EUR; `15000` = 150 JPY).
+      Currency is the tenant's currency, surfaced via `meta.currency`.
+    - **Translatable fields:** API responses always return the English
+      translation of Spatie-translatable columns (matches the Statistics API
+      contract — see commit `e51d27658`).
+    - **Idempotency:** every mutating endpoint accepts an
+      `Idempotency-Key: <UUIDv7>` request header. The `request_hash` for
+      replay matching is SHA-256 of the canonical-JSON (RFC 8785) of the
+      request body, excluding the `dry_run` field. See
+      `app/Support/Cli/Canonicalize.php` (vendored, fuzz-tested against
+      `canonicalize` npm reference).
+    - **Dry-run:** every mutating endpoint accepts `dry_run: true` in the
+      body. The handler runs validation, authorization, and computes the
+      diff, but suppresses all side effects (DB transaction rolled back,
+      jobs not dispatched, mail not sent, Stripe not called). Response
+      includes `data.diff` and `data.would_apply: true`.
+    - **Pagination:** all list endpoints use forward-only cursor pagination.
+      Default `limit=50`, max `200`. Backward pagination is Phase 2.
+    - **Throttle:** plan-based (60 req/min on starter, 240 on ultra).
+    - **Rate limit:** every endpoint may return `429 Rate Limited` with a
+      `Retry-After` header (seconds). Plan-based: 60/min on starter, 240/min on
+      ultra/corporate. The 429 response is omitted from individual operation
+      definitions to keep the spec terse but applies universally; consult the
+      `RateLimited` shared response for the body shape and stable `code`.
+    - **Date-range filters (`from`/`to` on list endpoints):** half-open interval
+      `[from, to)` — `from` is inclusive, `to` is exclusive. Example:
+      `?from=2026-04-01&to=2026-05-01` matches April 2026 in full and excludes
+      May 1. Date-typed filters (e.g. `Booking.starts_at`) are interpreted in
+      the tenant's configured timezone (`Organisation.timezone`). Date-time-typed
+      filters (e.g. `Transaction.created_at`) are UTC unless the supplied value
+      carries an explicit `±HH:MM` offset.
+
+    ## What this API is NOT
+
+    - Not the public reseller API (see `/api/v1/suppliers/...` and Octo).
+    - Not the customer-facing widget API.
+    - Not for end-traveler self-service.
+
+    ## Status
+
+    Phase 1 surface. The endpoints listed here are the V1 contract; Phase 2
+    will extend with full CRUD, internal notes on bookings, bulk booking
+    operations, and a localized render-preview for resend confirmation.
+
+  contact:
+    name: CaptainBook Engineering
+
+servers:
+  - url: "{scheme}://{tenant_slug}.captainbook.io/api/v1/cli"
+    description: Tenant subdomain
+    variables:
+      scheme:
+        default: https
+      tenant_slug:
+        default: demo
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Token validation and identity probe
+  - name: Products
+    description: Product catalog and CRUD (soft-deletable)
+  - name: ProductOptions
+    description: Product option (variant) catalog and CRUD (soft-deletable)
+  - name: Categories
+    description: Product category catalog and CRUD
+  - name: Availabilities
+    description: Per-date capacity reads, single update, and async bulk update
+  - name: PricingTiers
+    description: Pricing tier catalog and CRUD (soft-deletable)
+  - name: Locations
+    description: Meeting / start / end location catalog and CRUD
+  - name: Media
+    description: Product image and document attachments
+  - name: Discounts
+    description: Discount catalog, apply, and cancel
+  - name: GiftCertificates
+    description: Sellable gift-cert SKUs and issued instances (issue / void / resend)
+  - name: Bookings
+    description: Booking reads + cancel / refund / comp commands
+  - name: Transactions
+    description: Booking transaction reads
+  - name: Customers
+    description: Customer catalog (vendor `Customer` model)
+  - name: Guests
+    description: Per-booking guest reads + edits
+  - name: Extras
+    description: Extras / add-ons catalog and CRUD (soft-deletable)
+  - name: Questions
+    description: Booking questions catalog and CRUD (soft-deletable)
+  - name: Notifications
+    description: Customer notification commands
+
+paths:
+  /whoami:
+    get:
+      operationId: whoami
+      summary: Identity probe
+      description: |
+        Validates the bearer token and returns the actor + tenant context.
+        The CLI client uses this on `cb login` to verify credentials.
+      tags: [Auth]
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/WhoamiData"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Q"
+        - $ref: "#/components/parameters/Since"
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived] }
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page of products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+    post:
+      operationId: createProduct
+      summary: Create a product
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: Created (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              product: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /products/{id}:
+    get:
+      operationId: showProduct
+      summary: Show a product
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteProduct
+      summary: Delete a product
+      description: |
+        Soft-deletes the Product (sets `deleted_at`). The row remains in the database; list endpoints exclude it by default. Restore via `POST /products/{id}/restore`.
+
+        **Cascade behavior** (per `Product::$cascadeDeletes = ['options']`):
+        soft-delete cascades to product options. Each soft-deleted option
+        in turn cascades to its `virtualProductOption` and `discount`.
+        PricingTiers and Availabilities are NOT cascaded by Product deletion —
+        they remain readable and can be cleaned up separately.
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Soft-deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+    patch:
+      operationId: updateProduct
+      summary: Update a product
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+      responses:
+        "200":
+          description: Updated (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /product-options:
+    get:
+      operationId: listProductOptions
+      summary: List product options
+      tags: [ProductOptions]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - name: product_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived] }
+      responses:
+        "200":
+          description: Page of product options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductOptionPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createProductOption
+      summary: Create a product option
+      tags: [ProductOptions]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductOptionRequest"
+      responses:
+        "201":
+          description: Created (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              product_option: { $ref: "#/components/schemas/ProductOption" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /product-options/{id}:
+    get:
+      operationId: showProductOption
+      summary: Show a product option
+      tags: [ProductOptions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Product option
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ProductOption" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteProductOption
+      summary: Delete a product option
+      description: |
+        Soft-deletes the ProductOption (sets `deleted_at`). The row remains in the database; list endpoints exclude it by default. Restore via `POST /product-options/{id}/restore`. Cascades to `virtualProductOption` and `discount` via `CascadeSoftDeletes` (per `ProductOption::$cascadeDeletes`). PricingTiers and Availabilities owned by this option are NOT cascaded — handle them separately.
+      tags: [ProductOptions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Soft-deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+    patch:
+      operationId: updateProductOption
+      summary: Update a product option
+      tags: [ProductOptions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductOptionRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /availabilities:
+    get:
+      operationId: listAvailabilities
+      summary: List availabilities
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: product_option_id
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: has_capacity
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Page of availabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /availabilities/{id}:
+    get:
+      operationId: showAvailability
+      summary: Show an availability
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Availability
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Availability" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateAvailability
+      summary: Update a single availability row
+      description: |
+        Updates capacity and/or status on a single availability. For multi-row
+        updates spanning a date range, use `POST /availabilities/bulk-update`.
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAvailabilityRequest"
+      responses:
+        "200":
+          description: Updated (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /availabilities/bulk-update:
+    post:
+      operationId: bulkUpdateAvailabilities
+      summary: Bulk update availabilities across a date range (asynchronous)
+      description: |
+        Update capacity, status, and/or pricing-tier overrides for every
+        availability of one product option within a date range. Used for
+        weather cancellations, seasonal capacity shifts, schedule changes.
+
+        **Asynchronous.** On commit the server (a) creates a
+        `BulkAvailabilityUpdate` audit row capturing the filters and new
+        values, then (b) chunks the matched availability IDs into batches of
+        ~1000 and dispatches `BulkAvailabilityUpdateJob` instances on the
+        `inventory` queue. The HTTP response returns 202 Accepted with
+        `bulk_update_id` and `total_matched` (the count of *queued* rows, not
+        completed). Actual processing happens in the background; there is no
+        in-band completion signal in V1.
+
+        Dry-run (`dry_run: true`) returns 200 with `total_matched` and no
+        side effects — no audit row, no jobs dispatched.
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateAvailabilityRequest"
+      responses:
+        "202":
+          description: |
+            Accepted. The server has created a `BulkAvailabilityUpdate` audit
+            row and queued `BulkAvailabilityUpdateJob` instances on the
+            `inventory` queue. Actual updates run asynchronously in the
+            background. There is no in-band completion signal in V1 — clients
+            confirm by polling `/availabilities` or by inspecting the
+            availabilities the audit row's `filters_json` matched. The Phase 2
+            polling endpoint will be `GET /availabilities/bulk-updates/{id}`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              bulk_update_id:
+                                type: string
+                                description: ID of the `BulkAvailabilityUpdate` audit row
+                              total_matched:
+                                type: integer
+                                description: Number of availability rows the filter matched and queued for update; not a count of completed updates
+                              status:
+                                type: string
+                                enum: [queued]
+                                description: V1 only emits "queued"; Phase 2 will add "completed", "partially_completed"
+        "200":
+          description: Dry-run preview (no jobs dispatched)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              total_matched: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /pricing-tiers:
+    get:
+      operationId: listPricingTiers
+      summary: List pricing tiers
+      tags: [PricingTiers]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: product_option_id
+          in: query
+          schema: { type: string }
+        - name: availability_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page of pricing tiers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingTierPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createPricingTier
+      summary: Create a pricing tier
+      tags: [PricingTiers]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePricingTierRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              pricing_tier: { $ref: "#/components/schemas/PricingTier" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /pricing-tiers/{id}:
+    get:
+      operationId: showPricingTier
+      summary: Show a pricing tier
+      tags: [PricingTiers]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Pricing tier
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/PricingTier" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deletePricingTier
+      summary: Delete a pricing tier (soft-delete)
+      description: |
+        Soft-deletes the pricing tier (sets `deleted_at`). Existing booking
+        references stay valid; the tier no longer appears in active lists.
+        Restore via `POST /pricing-tiers/{id}/restore`.
+
+        **WARNING — data-loss adjacency:** `PricingTier::$cascadeDeletes = ['availabilities']`. Soft-deleting a tier soft-deletes every Availability rendered against it. Calendar data for that tier disappears. Always run `--dry-run` first; consider exporting affected availabilities before delete.
+      tags: [PricingTiers]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Soft-deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+    patch:
+      operationId: updatePricingTier
+      summary: Update a pricing tier
+      tags: [PricingTiers]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePricingTierRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /discounts:
+    get:
+      operationId: listDiscounts
+      summary: List discounts
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - name: code
+          in: query
+          schema: { type: string, description: "Filter by promo code" }
+        - name: product_option_id
+          in: query
+          schema: { type: string, nullable: true, description: "Use 'null' to filter for global discounts" }
+        - name: auto_apply
+          in: query
+          schema: { type: boolean }
+        - name: valid_at
+          in: query
+          description: |
+            Returns discounts whose `validity_start <= valid_at < validity_end`
+            (or where `validity_end IS NULL`). Useful for "what discounts are
+            currently valid?".
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Page of discounts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscountPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      operationId: createDiscount
+      summary: Create a discount
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiscountRequest"
+      responses:
+        "201":
+          description: Created (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              discount: { $ref: "#/components/schemas/Discount" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /discounts/{id}:
+    get:
+      operationId: showDiscount
+      summary: Show a discount
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Discount
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Discount" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteDiscount
+      summary: Delete a discount (soft-delete)
+      description: |
+        Soft-deletes the discount (sets `deleted_at`). Existing booking
+        applications via the `booking_discount` pivot stay valid; the
+        discount no longer applies to new bookings or future redemptions.
+        Restore via `POST /discounts/{id}/restore`. Soft-deletion IS the
+        cancellation operation for discounts.
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: dry_run
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "204":
+          description: Soft-deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /discounts/{id}/apply:
+    post:
+      operationId: applyDiscount
+      summary: Apply a discount to a booking
+      description: |
+        Creates a `BookingDiscount` pivot row attaching this discount to the
+        booking with `applied_at = now()`. Recomputes the booking's
+        `discount_total`. Does not touch Stripe; if a refund is owed for the
+        difference, call `POST /bookings/{id}/refund` separately.
+
+        Returns 409 with `code: DISCOUNT_NOT_APPLICABLE` if the booking is
+        already in a non-applicable state (cancelled, expired) or if the
+        discount's `validity_start`/`validity_end` window doesn't include
+        the booking date, or if the discount is scoped to a different
+        product_option_id, or if `nb_offers` is exhausted.
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_id]
+              properties:
+                booking_id: { type: string }
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Applied (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /gift-certs/available:
+    get:
+      operationId: listAvailableGiftCerts
+      summary: List sellable gift-cert SKUs
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailableGiftCertPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createAvailableGiftCert
+      summary: Create a sellable gift-cert SKU
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAvailableGiftCertRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              available_gift_certificate:
+                                $ref: "#/components/schemas/AvailableGiftCertificate"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /gift-certs/available/{id}:
+    get:
+      operationId: showAvailableGiftCert
+      summary: Show a sellable gift-cert SKU
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Available gift cert
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/AvailableGiftCertificate" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteAvailableGiftCertificate
+      summary: Delete a gift-cert SKU
+      description: |
+        Hard-deletes the AvailableGiftCertificate (the sellable SKU). Returns 409
+        if any issued `GiftCertificate` references this SKU — issued certs hold a
+        FK to the SKU. Caller must void all issued certs first, or accept that
+        deleting the SKU will orphan their lookup.
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+    patch:
+      operationId: updateAvailableGiftCert
+      summary: Update a sellable gift-cert SKU
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAvailableGiftCertRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /gift-certs/issued:
+    get:
+      operationId: listIssuedGiftCerts
+      summary: List issued gift certificates
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, redeemed, partial, void, expired] }
+        - name: recipient_email
+          in: query
+          schema: { type: string, format: email }
+        - name: code
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GiftCertificatePage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /gift-certs/issued/{id}:
+    get:
+      operationId: showIssuedGiftCert
+      summary: Show an issued gift certificate
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Issued gift cert
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/GiftCertificate" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /gift-certs/issue:
+    post:
+      operationId: issueGiftCert
+      summary: Issue a new gift certificate
+      description: |
+        Creates a new `GiftCertificate` instance from an `AvailableGiftCertificate`
+        SKU. Optionally sends the redemption email immediately.
+
+        External side effects: mailer (when `send_now: true`).
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueGiftCertRequest"
+      responses:
+        "201":
+          description: Issued (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              gift_certificate: { $ref: "#/components/schemas/GiftCertificate" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /gift-certs/{id}/void:
+    post:
+      operationId: voidGiftCert
+      summary: Void an issued gift certificate
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+                notify_recipient: { type: boolean, default: false }
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Voided (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /gift-certs/{id}/resend:
+    post:
+      operationId: resendGiftCert
+      summary: Resend the redemption email for an issued cert
+      description: "External side effects: mailer."
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipient_email:
+                  type: string
+                  format: email
+                  description: Override the original recipient
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Resent (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /customers:
+    get:
+      operationId: listCustomers
+      summary: List customers
+      description: |
+        Lists `Customer` rows (the bookings-engine first-class customer model).
+        Soft-deletable; pass `?include_trashed=true` to see deleted rows.
+      tags: [Customers]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Q"
+        - $ref: "#/components/parameters/Since"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - name: email
+          in: query
+          schema: { type: string, format: email }
+        - name: country
+          in: query
+          schema: { type: string, description: "ISO 3166-1 alpha-2" }
+      responses:
+        "200":
+          description: Page of customers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /customers/{id}:
+    get:
+      operationId: showCustomer
+      summary: Show a customer
+      tags: [Customers]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Customer" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings:
+    get:
+      operationId: listBookings
+      summary: List bookings
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Q"
+        - name: booking_status
+          in: query
+          description: |
+            Filter by computed status. Server translates to SQL conditions on
+            `confirmed_at`/`cancelled_at`/`expires_at` (status is an accessor,
+            not a column).
+          schema: { type: string, enum: [ON_HOLD, CONFIRMED, EXPIRED, CANCELLED] }
+        - name: from
+          in: query
+          description: Booking start date >= this
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Booking start date <= this
+          schema: { type: string, format: date }
+        - name: customer_email
+          in: query
+          schema: { type: string, format: email }
+        - name: reference
+          in: query
+          schema: { type: string }
+        - name: product_option_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page of bookings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /bookings/{id}:
+    get:
+      operationId: showBooking
+      summary: Show a booking
+      description: Inlines guests and most-recent transactions.
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Booking
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Booking" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings/{id}/transactions:
+    get:
+      operationId: listBookingTransactions
+      summary: List transactions for a booking
+      tags: [Bookings, Transactions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings/{id}/cancel:
+    post:
+      operationId: cancelBooking
+      summary: Cancel a booking
+      description: |
+        External side effects: Stripe (refund per `refund_policy`), mailer
+        (when `notify_customer: true`). On dry-run, returns the cancellation
+        policy preview + estimated refund without contacting Stripe or
+        sending mail.
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelBookingRequest"
+      responses:
+        "200":
+          description: Cancelled (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              refund_amount: { type: integer }
+                              policy_applied: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /bookings/{id}/refund:
+    post:
+      operationId: refundBooking
+      summary: Refund a booking transaction (full or partial)
+      description: "External side effects: Stripe, mailer."
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundBookingRequest"
+      responses:
+        "200":
+          description: Refunded (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              transaction: { $ref: "#/components/schemas/Transaction" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /bookings/{id}/comp:
+    post:
+      operationId: compBooking
+      summary: Comp a booking (zero-out, no Stripe)
+      description: |
+        Marks the booking as comped. No Stripe call (the transaction is
+        recorded as a `comp` type, no money movement). Mailer fires when
+        `notify_customer: true`.
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+                notify_customer: { type: boolean, default: false }
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Comped (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /bookings/{id}/notifications/resend-confirmation:
+    post:
+      operationId: resendBookingConfirmation
+      summary: Resend the booking confirmation
+      description: "External side effects: mailer (or SMS provider when channel=sms)."
+      tags: [Notifications, Bookings]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: string
+                  enum: [email, sms]
+                  default: email
+                recipient:
+                  type: string
+                  description: Override email/phone (otherwise booking's primary contact)
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Sent (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              notification_id: { type: string }
+                              channel: { type: string }
+                              sent_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /transactions:
+    get:
+      operationId: listTransactions
+      summary: List transactions
+      tags: [Transactions]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, succeeded, failed, partial] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [charge, refund, comp] }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Page of transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /transactions/{id}:
+    get:
+      operationId: showTransaction
+      summary: Show a transaction
+      tags: [Transactions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Transaction" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /guests:
+    get:
+      operationId: listGuests
+      summary: List guests
+      tags: [Guests]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: booking_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page of guests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /guests/{id}:
+    get:
+      operationId: showGuest
+      summary: Show a guest
+      tags: [Guests]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Guest
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Guest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateGuest
+      summary: Update guest info
+      description: |
+        Edits guest name, passport, DOB, dietary requirements, and any
+        custom attributes. Required for the Greek passenger-list legal
+        compliance workflow (CS edits passport numbers post-booking).
+      tags: [Guests]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGuestRequest"
+      responses:
+        "200":
+          description: Updated (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /extras:
+    get:
+      operationId: listExtras
+      summary: List extras / add-ons
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: product_option_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page of extras
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtraPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createExtra
+      summary: Create an extra / add-on
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExtraRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              extra: { $ref: "#/components/schemas/Extra" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /extras/{id}:
+    get:
+      operationId: showExtra
+      summary: Show an extra
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Extra
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Extra" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteExtra
+      summary: Delete an extra
+      description: |
+        Soft-deletes the Extra (sets `deleted_at`). The row remains in the database; list endpoints exclude it by default. Restore via `POST /extras/{id}/restore`. No cascade — children are not affected.
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Soft-deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+    patch:
+      operationId: updateExtra
+      summary: Update an extra
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateExtraRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /questions:
+    get:
+      operationId: listQuestions
+      summary: List booking questions
+      tags: [Questions]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: product_option_id
+          in: query
+          schema: { type: string }
+        - name: required
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Page of questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createQuestion
+      summary: Create a booking question
+      tags: [Questions]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuestionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              question: { $ref: "#/components/schemas/Question" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /questions/{id}:
+    get:
+      operationId: showQuestion
+      summary: Show a question
+      tags: [Questions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Question
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Question" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteQuestion
+      summary: Delete a question
+      description: |
+        Soft-deletes the Question (sets `deleted_at`). The row remains in the database; list endpoints exclude it by default. Restore via `POST /questions/{id}/restore`. Cascades to its `answers` via `CascadeSoftDeletes` (per `Question::$cascadeDeletes = ['answers']`).
+      tags: [Questions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Soft-deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+    patch:
+      operationId: updateQuestion
+      summary: Update a question
+      tags: [Questions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQuestionRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /categories:
+    get:
+      operationId: listCategories
+      summary: List categories
+      tags: [Categories]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+      responses:
+        "200":
+          description: Page of categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      operationId: createCategory
+      summary: Create a category
+      tags: [Categories]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              category: { $ref: "#/components/schemas/Category" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /categories/{id}:
+    get:
+      operationId: showCategory
+      summary: Show a category
+      tags: [Categories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Category
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Category" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateCategory
+      summary: Update a category
+      tags: [Categories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteCategory
+      summary: Delete a category
+      description: |
+        Hard-deletes the Category. Returns 409 if the category is still referenced by published products — detach first.
+      tags: [Categories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Resource is still in use; detach references first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope" 
+  /locations:
+    get:
+      operationId: listLocations
+      summary: List locations (start, end, meeting points)
+      tags: [Locations]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: type
+          in: query
+          schema: { type: string, enum: [START, END, MEETING] }
+      responses:
+        "200":
+          description: Page of locations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      operationId: createLocation
+      summary: Create a location
+      tags: [Locations]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLocationRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              location: { $ref: "#/components/schemas/Location" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /locations/{id}:
+    get:
+      operationId: showLocation
+      summary: Show a location
+      tags: [Locations]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Location
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Location" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateLocation
+      summary: Update a location
+      tags: [Locations]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: deleteLocation
+      summary: Delete a location
+      description: |
+        Hard-deletes the Location. Returns 409 if the location is still referenced by published products — detach first.
+      tags: [Locations]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Resource is still in use; detach references first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope" 
+  /products/{id}/media:
+    get:
+      operationId: listProductMedia
+      summary: List media attached to a product
+      tags: [Media]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Page of media
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: uploadProductMedia
+      summary: Upload media for a product
+      description: |
+        Multipart upload of an image or document. Server enforces max-size,
+        accepted MIME types per tenant plan, and runs through `ProductAttachment`
+        ingestion (Paperclip variants generated async).
+      tags: [Media]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    Accepted MIME types: `image/jpeg`, `image/png`, `image/webp`,
+                    `image/gif`, `application/pdf`. Max size 10 MiB per file (default;
+                    server may lower per tenant plan). Server runs the upload through
+                    `ProductAttachment` ingestion and Paperclip variant generation.
+                    Reject responses: 413 (too large), 415 (unsupported MIME).
+                alt_text: { type: string }
+                position: { type: integer }
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              media: { $ref: "#/components/schemas/Media" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413":
+          description: File too large for tenant plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "415":
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /media/{id}:
+    get:
+      operationId: showMedia
+      summary: Show a media attachment
+      tags: [Media]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Media
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Media" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteMedia
+      summary: Delete a media attachment
+      tags: [Media]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+
+  /products/{id}/restore:
+    post:
+      operationId: restoreProduct
+      summary: Restore a soft-deleted product
+      description: Resurrects a soft-deleted product by clearing `deleted_at`.
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /product-options/{id}/restore:
+    post:
+      operationId: restoreProductOption
+      summary: Restore a soft-deleted product option
+      description: Resurrects a soft-deleted product option by clearing `deleted_at`.
+      tags: [ProductOptions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /extras/{id}/restore:
+    post:
+      operationId: restoreExtra
+      summary: Restore a soft-deleted extra
+      description: Resurrects a soft-deleted extra by clearing `deleted_at`.
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /questions/{id}/restore:
+    post:
+      operationId: restoreQuestion
+      summary: Restore a soft-deleted question
+      description: Resurrects a soft-deleted question by clearing `deleted_at`.
+      tags: [Questions]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /pricing-tiers/{id}/restore:
+    post:
+      operationId: restorePricingTier
+      summary: Restore a soft-deleted pricing tier
+      description: Resurrects a soft-deleted pricing tier by clearing `deleted_at`.
+      tags: [PricingTiers]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /discounts/{id}/restore:
+    post:
+      operationId: restoreDiscount
+      summary: Restore a soft-deleted discount
+      description: Resurrects a soft-deleted discount by clearing `deleted_at`.
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum PAT
+      description: |
+        Sanctum personal-access-token. Issued via the Provider panel (UI).
+        Tenant-scoped; attempting to use a token outside its tenant returns 401.
+        Per-token `expires_at` enforced by Sanctum 4 framework-side.
+
+        **Abilities (token scopes).** Tokens carry an `abilities` array.
+        Endpoints check abilities at the route layer; missing abilities → 403.
+
+        | Ability     | Required for                                                           |
+        | ----------- | ---------------------------------------------------------------------- |
+        | `cli:read`  | Always granted alongside read endpoints; not enforced explicitly.      |
+        | `cli:write` | Mutating endpoints: availabilities update / bulk-update, discounts CRUD + apply, gift-certs issue / void / resend, guest update. |
+        | `cli:cs`    | CS-only sensitive ops: booking comp, booking refund, confirmation resend. Issued only to CS engineers. |
+
+        Recommended issuance: a dedicated `cli:read` token for scripted
+        reporting, a `cli:read` + `cli:write` token for inventory editors, and
+        a `cli:read` + `cli:write` + `cli:cs` token for CS engineers.
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      description: Resource ID (ULID, UUID, or numeric, depending on resource)
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      description: Page size (1-200, default 50)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by previous page's `pagination.cursor_next`
+      schema:
+        type: string
+    Q:
+      name: q
+      in: query
+      description: Free-text search across primary string fields (name, email, reference)
+      schema:
+        type: string
+    Since:
+      name: since
+      in: query
+      description: ISO 8601 lower-bound on `updated_at`
+      schema:
+        type: string
+        format: date-time
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        UUIDv7 recommended. Replays of completed keys with matching request
+        body return the original response. Conflicting body returns 409
+        IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+        409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+        IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+        ad-hoc CLI invocations where the server auto-generates one.
+
+        **Dry-run interaction:** when `dry_run: true`, the server does NOT
+        persist an idempotency row. The same key may be reused once for the
+        real (non-dry-run) call — the dry-run is a "free" preview. If the
+        same key is sent on two real calls, normal idempotency rules apply.
+      schema:
+        type: string
+        format: uuid
+
+    IncludeTrashed:
+      name: include_trashed
+      in: query
+      description: |
+        Include soft-deleted rows in the response (default false).
+        Only applies to resources that use Laravel's `SoftDeletes` trait
+        (products, product options, pricing tiers, extras, questions).
+      schema:
+        type: boolean
+        default: false
+
+  responses:
+    Unauthenticated:
+      description: Missing, invalid, or expired bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            unauthenticated:
+              value:
+                meta:
+                  request_id: req_01HXY...
+                  api_version: v1
+                error:
+                  code: UNAUTHENTICATED
+                  message: Missing or invalid bearer token.
+                  retriable: false
+    Forbidden:
+      description: Token valid but lacks the ability for this action, or attempts cross-tenant access
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Resource not found in this tenant
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ValidationError:
+      description: Request body or query failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            validation:
+              value:
+                meta:
+                  request_id: req_01HXY...
+                  api_version: v1
+                error:
+                  code: VALIDATION_FAILED
+                  message: The request body has invalid fields.
+                  hint: See `error.details` for per-field issues.
+                  retriable: false
+                  details:
+                    capacity: ["The capacity must be at least 0."]
+                    from: ["The from field is required."]
+    IdempotencyConflict:
+      description: |
+        Idempotency-Key already used. One of:
+        - `IDEMPOTENCY_CONFLICT` — same key, different request body.
+        - `IDEMPOTENCY_IN_PROGRESS` — request still executing.
+        - `IDEMPOTENCY_UNKNOWN` — server crashed mid-flight, swept by the `cli:prune-stale` artisan command (runs every 5 min against the central `cli_idempotency_keys` table). Caller must check Stripe/mailer logs by `request_id`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RateLimited:
+      description: Plan-based throttle exceeded
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InternalError:
+      description: Unhandled server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    Envelope:
+      type: object
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: "#/components/schemas/Meta"
+        data:
+          description: Per-endpoint payload (overridden via allOf in concrete responses)
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    Meta:
+      type: object
+      required: [api_version, request_id, tenant_slug, generated_at]
+      properties:
+        api_version:
+          type: string
+          example: v1
+        request_id:
+          type: string
+          description: ULID `req_<26 chars>`
+          example: req_01HXY12345ABCDEFGHJKMNPQRS
+        tenant_slug:
+          type: string
+          example: acme-tours
+        actor:
+          type: object
+          properties:
+            user_id: { type: integer }
+            source:
+              type: string
+              description: Derived from request User-Agent (server does not trust client claims)
+              example: cli/0.3.1
+            is_cs:
+              type: boolean
+              description: Whether the actor token has CS-level abilities
+        currency:
+          type: string
+          description: ISO 4217 code of the tenant
+          example: EUR
+        generated_at:
+          type: string
+          format: date-time
+        dry_run:
+          type: boolean
+        idempotency_key:
+          type: string
+          nullable: true
+
+    Pagination:
+      type: object
+      required: [limit]
+      properties:
+        limit: { type: integer }
+        cursor_next:
+          type: string
+          nullable: true
+          description: Opaque cursor for next page; null at end
+        cursor_prev:
+          type: string
+          nullable: true
+          description: |
+            Reserved for Phase 2 backward pagination. Always `null` in V1.
+            Documented now so adding backward pagination later is non-breaking.
+
+    ErrorEnvelope:
+      type: object
+      required: [meta, error]
+      properties:
+        meta:
+          type: object
+          required: [api_version, request_id, generated_at]
+          properties:
+            api_version: { type: string, example: v1 }
+            request_id: { type: string, example: req_01HXY12345ABCDEFGHJKMNPQRS }
+            tenant_slug:
+              type: string
+              nullable: true
+              description: |
+                Set on errors returned after tenant resolution (most 4xx/5xx).
+                Null on errors returned BEFORE tenancy is initialized
+                (e.g. unauthenticated requests, tenant-not-found responses).
+            generated_at: { type: string, format: date-time }
+        error:
+          $ref: "#/components/schemas/Error"
+
+    Error:
+      type: object
+      required: [code, message, retriable]
+      properties:
+        code:
+          type: string
+          description: |
+            Machine-readable error code. Stable across versions. Examples:
+            UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED,
+            IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_UNKNOWN,
+            BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
+            REFUND_AMOUNT_EXCEEDS_CHARGE, RATE_LIMITED, INTERNAL_ERROR.
+        message:
+          type: string
+        hint:
+          type: string
+          description: Human-readable next-step guidance
+        retriable:
+          type: boolean
+        details:
+          type: object
+          description: Per-field validation errors or domain-specific context
+          additionalProperties: true
+
+    MutationResult:
+      type: object
+      description: Common shape for mutation responses (and dry-run previews)
+      properties:
+        would_apply:
+          type: boolean
+          description: True only when the request was a dry-run
+        diff:
+          type: object
+          description: Before/after summary (always present on dry-run, optional on commit)
+          properties:
+            before: { type: object, additionalProperties: true }
+            after: { type: object, additionalProperties: true }
+        side_effects:
+          type: array
+          description: List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+          items:
+            type: object
+            properties:
+              type: { type: string, enum: [job, mail, broadcast, stripe] }
+              identifier: { type: string }
+              payload_summary: { type: string }
+
+    Money:
+      type: integer
+      description: Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
+      example: 15000
+
+    WhoamiData:
+      type: object
+      properties:
+        actor:
+          type: object
+          properties:
+            user_id: { type: integer }
+            email: { type: string, format: email }
+            name: { type: string }
+            is_cs: { type: boolean }
+        tenant:
+          type: object
+          properties:
+            slug: { type: string }
+            name: { type: string }
+            currency: { type: string }
+            timezone: { type: string }
+        token:
+          type: object
+          properties:
+            name: { type: string }
+            abilities:
+              type: array
+              items: { type: string }
+            expires_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    Product:
+      type: object
+      properties:
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        description: { type: string }
+        status:
+          type: string
+          enum: [draft, published, archived]
+        schedule_type:
+          type: string
+          enum: [FIXED, FLEXIBLE]
+        from_price: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        capacity: { type: integer }
+        cancellation_policy: { type: string }
+        category_ids:
+          type: array
+          items: { type: string }
+        timezone: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProductOption:
+      type: object
+      properties:
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        id: { type: string }
+        product_id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        duration_minutes: { type: integer, nullable: true }
+        capacity: { type: integer }
+        min_age: { type: integer, nullable: true }
+        max_age: { type: integer, nullable: true }
+        status:
+          type: string
+          enum: [draft, published, archived]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Availability:
+      type: object
+      properties:
+        id: { type: string }
+        product_option_id: { type: string }
+        date: { type: string, format: date }
+        start_time: { type: string, nullable: true, example: "09:30" }
+        capacity: { type: integer }
+        capacity_remaining: { type: integer }
+        status:
+          type: string
+          enum: [available, sold_out, blocked, cancelled]
+        pricing_tier_ids:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PricingTier:
+      type: object
+      properties:
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        id: { type: string }
+        product_option_id: { type: string }
+        availability_id: { type: string, nullable: true }
+        name: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+
+    Discount:
+      type: object
+      description: |
+        `Bmbltd\LaravelBookings\Models\Discount`. Soft-deletable (no
+        explicit status enum — soft-delete IS the cancellation). The
+        `discounted_price` column is set for fixed-amount discounts;
+        `discount_pct` is set for percentage discounts (the two are
+        mutually exclusive). Scope is determined by `product_option_id`:
+        null = global, set = scoped to that single product option.
+      properties:
+        id: { type: string, description: "integer ID" }
+        code: { type: string, description: "Promo code (uppercase by convention)" }
+        product_option_id:
+          type: string
+          nullable: true
+          description: When null, discount applies globally; when set, scoped to one product option
+        discounted_price:
+          $ref: "#/components/schemas/Money"
+          nullable: true
+          description: Fixed-amount discount in tenant currency minor units. Mutually exclusive with `discount_pct`.
+        discount_pct:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: Percentage discount (0-100). Mutually exclusive with `discounted_price`.
+        nb_offers: { type: integer, description: "Maximum redemptions; 0 or null = unlimited", nullable: true }
+        start_date: { type: string, format: date-time, nullable: true, description: "Promotional period start (advertising window)" }
+        end_date: { type: string, format: date-time, nullable: true, description: "Promotional period end" }
+        validity_start: { type: string, format: date-time, description: "Booking validity window start (when bookings using this discount must occur)" }
+        validity_end: { type: string, format: date-time, nullable: true, description: "Booking validity window end" }
+        auto_apply: { type: boolean, description: "If true, eligible bookings get this discount automatically without entering the code" }
+        discount_text: { type: string, nullable: true, description: "Translatable customer-facing text (English value returned)" }
+        discount_image: { type: string, nullable: true, description: "Asset path/URL" }
+        groupon_import_id: { type: string, nullable: true }
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise. Soft-deletion IS cancellation for discounts." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AvailableGiftCertificate:
+      type: object
+      description: Sellable gift-cert SKU (the offering)
+      properties:
+        id: { type: string }
+        name: { type: string }
+        amounts:
+          type: array
+          description: Available denominations (minor units)
+          items: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        expiration_period_days: { type: integer, nullable: true }
+        cover_image_url: { type: string, format: uri, nullable: true }
+
+    GiftCertificate:
+      type: object
+      description: Issued gift-cert instance (a real cert in a customer's hands)
+      properties:
+        id: { type: string }
+        available_gift_certificate_id: { type: string }
+        code: { type: string }
+        recipient_email: { type: string, format: email }
+        recipient_name: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        remaining_amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        valid_from: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time, nullable: true }
+        status:
+          type: string
+          enum: [active, redeemed, partial, void, expired]
+        issued_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the cert is voided (status maps to `void`).
+        void_reason:
+          type: string
+          nullable: true
+          description: |
+            Operator-supplied reason captured on `POST /gift-certs/issued/{id}/void`.
+            Null on certs that have not been voided.
+
+    Customer:
+      type: object
+      description: |
+        First-class `Bmbltd\LaravelBookings\Models\Customer` (vendor-package
+        model used by the bookings engine). Soft-deletable, business-unit-scoped,
+        carries Spatie schemaless `extra_attributes`. Aggregates (bookings_count,
+        total_spent) are not surfaced in V1 — query `/bookings` and `/transactions`
+        directly for those.
+      properties:
+        id: { type: string, description: "UUID" }
+        name: { type: string }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        zip_code: { type: string, nullable: true }
+        country: { type: string, nullable: true, description: "ISO 3166-1 alpha-2" }
+        notes: { type: string, nullable: true, description: "Free-form internal notes" }
+        locales:
+          type: array
+          items: { type: string, description: "ISO 639-1 code (e.g. 'en', 'el')" }
+          description: |
+            Customer's preferred locales in priority order.
+            `Customer::preferredLocale()` returns `locales->first()` (defaulting
+            to 'en' if empty).
+        secondary_email: { type: string, format: email, nullable: true, description: "Secondary contact email; receives notifications alongside `email`" }
+        stripe_id: { type: string, nullable: true, description: "Stripe customer ID; nullable if never charged" }
+        extra_attributes:
+          type: object
+          additionalProperties: true
+          description: Schemaless attributes (Spatie `SchemalessAttributes` cast)
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Booking:
+      type: object
+      properties:
+        id: { type: string }
+        reference:
+          type: string
+          nullable: true
+          description: |
+            Sourced from `bookings.reseller_reference` — there's no plain
+            `reference` column on bookings. Populated for reseller-imported
+            bookings, null for direct ones. Filter `?reference=` matches it.
+        booking_status:
+          type: string
+          enum: [ON_HOLD, CONFIRMED, EXPIRED, CANCELLED]
+          description: |
+            Computed accessor (`getBookingStatusAttribute()` on the Booking model).
+            Mapping:
+            - `expires_at` in future → `ON_HOLD`
+            - `expires_at` in past → `EXPIRED`
+            - `cancelled_at` in past OR `deleted_at` set → `CANCELLED`
+            - All-nulls / `confirmed_at` set → `CONFIRMED` (default branch)
+            Filter `?booking_status=` translates to a 4-way SQL condition on the
+            underlying timestamps.
+        product_option_id: { type: string }
+        availability_id: { type: string }
+        customer:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            email: { type: string, format: email }
+            phone: { type: string, nullable: true }
+        guests:
+          type: array
+          items: { $ref: "#/components/schemas/Guest" }
+        transactions:
+          type: array
+          items: { $ref: "#/components/schemas/Transaction" }
+        total_amount:
+          $ref: "#/components/schemas/Money"
+          description: Sourced from `bookings.gross_price` (booking-level total).
+        paid_amount:
+          $ref: "#/components/schemas/Money"
+          description: |
+            Sum of charge `BookingTransaction.amount` (rows with
+            `refund_for IS NULL`). Computed at serialization time from
+            eager-loaded transactions.
+        refunded_amount:
+          $ref: "#/components/schemas/Money"
+          description: |
+            Absolute sum of refund `BookingTransaction.amount` (rows with
+            `refund_for IS NOT NULL`). Refunds are stored negative; the
+            response value is positive.
+        discount_total:
+          $ref: "#/components/schemas/Money"
+          description: |
+            Computed from the booking's `BookingDiscount` pivot rows.
+            Sum of all applied discounts. Updated whenever a discount is
+            applied or detached.
+        applied_discount_ids:
+          type: array
+          items: { type: string }
+          description: |
+            IDs of discounts attached to this booking via `BookingDiscount`
+            pivot rows (with `applied_at` timestamps). Updated by
+            `POST /discounts/{id}/apply`.
+        currency: { type: string }
+        starts_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time, nullable: true }
+        held_until: { type: string, format: date-time, nullable: true }
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the booking transitions to confirmed; null on held/expired/cancelled rows.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set on held bookings; null on confirmed bookings. Past `expires_at` + null `confirmed_at` = expired.
+        cancelled_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        booking_id: { type: string }
+        type:
+          type: string
+          enum: [charge, refund]
+          description: |
+            Derived from CB's `BookingTransaction.refund_for` column: rows
+            with `refund_for IS NULL` are charges; rows with `refund_for`
+            pointing at the parent charge id are refunds. Refund rows have
+            negative `amount` (e.g. `-5000` for a 5,000 minor-units refund).
+        status:
+          type: string
+          enum: [succeeded]
+          description: |
+            Always `succeeded` — CB's `booking_transactions` table has no
+            status column, so a row's existence implies the payment / refund
+            landed. Failed payments don't produce a row at all.
+        amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        stripe_charge_id:
+          type: string
+          nullable: true
+          description: Stripe payment_intent id (charges only — null on refund rows).
+        stripe_refund_id:
+          type: string
+          nullable: true
+          description: Stripe refund id (refunds only — null on charge rows).
+        refund_for:
+          type: string
+          nullable: true
+          description: |
+            For refund rows, the id of the parent charge transaction this
+            refund settles. Null on charges.
+        method:
+          type: string
+          nullable: true
+          enum: [card, cash, paypal, gift, voucher, transfer]
+        created_at: { type: string, format: date-time }
+
+    Guest:
+      type: object
+      properties:
+        id: { type: string }
+        booking_id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        passport: { type: string, nullable: true }
+        dob: { type: string, format: date, nullable: true }
+        dietary: { type: string, nullable: true }
+        custom_attributes:
+          type: object
+          additionalProperties: true
+
+    Extra:
+      type: object
+      properties:
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        id: { type: string }
+        product_option_id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        max_quantity: { type: integer, nullable: true }
+
+    Question:
+      type: object
+      properties:
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        id: { type: string }
+        product_option_id: { type: string }
+        label: { type: string }
+        type:
+          type: string
+          enum: [text, textarea, select, date, number, boolean]
+        required: { type: boolean }
+        options:
+          type: array
+          items: { type: string }
+          description: For type=select
+
+    UpdateAvailabilityRequest:
+      type: object
+      properties:
+        capacity: { type: integer, minimum: 0 }
+        status:
+          type: string
+          enum: [available, blocked, cancelled]
+        dry_run: { type: boolean, default: false }
+
+    BulkUpdateAvailabilityRequest:
+      type: object
+      required: [product_option_id, from, to, setting, new_value]
+      description: |
+        Single setting per request — the underlying `BulkAvailabilityUpdateJob`
+        only handles one setting at a time. To change multiple settings (e.g.
+        capacity AND bookable status), make multiple calls. Server fan-outs
+        chunks of ~1000 IDs into `inventory` queue jobs; response returns 202
+        with `bulk_update_id`.
+      properties:
+        product_option_id: { type: string }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        setting:
+          type: string
+          enum: [booking_status, capacity, pricing, start_time, end_time]
+          description: |
+            Discriminator for `new_value` shape. Maps to `BulkAvailabilityUpdateJob::$setting`.
+        new_value:
+          oneOf:
+            - title: BookingStatusValue
+              type: object
+              required: [is_bookable]
+              properties:
+                is_bookable: { type: boolean }
+              description: "When `setting=booking_status`."
+            - title: CapacityValue
+              type: object
+              required: [value, operator]
+              properties:
+                value: { type: integer, minimum: 0 }
+                operator:
+                  type: string
+                  enum: [SET, INCREASE_BY, DECREASE_BY]
+                  description: From `App\Enums\Inventory\CapacityOperator`. SET replaces; INCREASE_BY/DECREASE_BY are deltas.
+              description: "When `setting=capacity`."
+            - title: PricingValue
+              type: object
+              required: [fares]
+              properties:
+                fares:
+                  type: array
+                  items:
+                    type: object
+                    required: [pricing_tier_id, amount]
+                    properties:
+                      pricing_tier_id: { type: string }
+                      amount: { $ref: "#/components/schemas/Money" }
+              description: "When `setting=pricing`. Replaces existing fares for the listed tiers; tiers omitted are left alone (the underlying service uses `replaceAll: false`)."
+            - title: TimeValue
+              type: object
+              required: [start_time, end_time]
+              properties:
+                start_time: { type: string, example: "09:30" }
+                end_time: { type: string, example: "11:30" }
+                day_count: { type: integer, default: 0, description: "Days the activity spans (for multi-day tours)" }
+              description: "When `setting=start_time` or `setting=end_time`."
+        dry_run: { type: boolean, default: false }
+
+    CreateDiscountRequest:
+      type: object
+      required: [code, validity_start]
+      description: |
+        Provide exactly one of `discounted_price` (fixed-amount) or
+        `discount_pct` (percentage). Server returns 422 if both or neither
+        are provided. `product_option_id` null = global discount; otherwise
+        scoped to one option.
+      properties:
+        code: { type: string, maxLength: 100 }
+        product_option_id: { type: string, nullable: true }
+        discounted_price:
+          $ref: "#/components/schemas/Money"
+          nullable: true
+        discount_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        nb_offers: { type: integer, nullable: true }
+        start_date: { type: string, format: date-time, nullable: true }
+        end_date: { type: string, format: date-time, nullable: true }
+        validity_start: { type: string, format: date-time }
+        validity_end: { type: string, format: date-time, nullable: true }
+        auto_apply: { type: boolean, default: false }
+        discount_text: { type: string, nullable: true }
+        discount_image: { type: string, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    IssueGiftCertRequest:
+      type: object
+      required: [available_gift_certificate_id, recipient_email, recipient_name, amount]
+      properties:
+        available_gift_certificate_id: { type: string }
+        recipient_email: { type: string, format: email }
+        recipient_name: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        expires_at: { type: string, format: date-time, nullable: true }
+        send_now:
+          type: boolean
+          default: false
+          description: |
+            If true, server emails the redemption code to `recipient_email`
+            immediately. Default false to avoid accidental emails when the
+            CLI / LLM intends to issue + manually verify before sending. To
+            send a previously-issued cert, use `POST /gift-certs/{id}/resend`.
+        sender_message: { type: string, maxLength: 1000, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    CancelBookingRequest:
+      type: object
+      required: [reason, refund_policy]
+      properties:
+        reason: { type: string, maxLength: 500 }
+        notify_customer: { type: boolean, default: true }
+        refund_policy:
+          type: string
+          enum: [auto, none, full, partial]
+          description: |
+            `auto` applies the product's cancellation policy. `none`, `full`,
+            `partial` override (CS only — operator tokens are 403 on overrides).
+        refund_amount:
+          $ref: "#/components/schemas/Money"
+          description: Required when refund_policy=partial
+        dry_run: { type: boolean, default: false }
+
+    RefundBookingRequest:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount: { $ref: "#/components/schemas/Money" }
+        transaction_id:
+          type: string
+          nullable: true
+          description: Specific charge to refund (otherwise newest succeeded charge)
+        reason: { type: string, maxLength: 500 }
+        notify_customer:
+          type: boolean
+          default: false
+          description: |
+            Defaults OFF — this is a CS engineering tool, and operators
+            debugging refund flows shouldn't silently email customers. Set
+            `true` explicitly to dispatch the refund-receipt notification.
+        dry_run: { type: boolean, default: false }
+
+    UpdateGuestRequest:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        passport: { type: string }
+        dob: { type: string, format: date }
+        dietary: { type: string }
+        custom_attributes:
+          type: object
+          additionalProperties: true
+        dry_run: { type: boolean, default: false }
+
+    ProductPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Product" }
+
+    ProductOptionPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/ProductOption" }
+
+    AvailabilityPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Availability" }
+
+    PricingTierPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/PricingTier" }
+
+    DiscountPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Discount" }
+
+    AvailableGiftCertPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/AvailableGiftCertificate" }
+
+    GiftCertificatePage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/GiftCertificate" }
+
+    CustomerPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Customer" }
+
+    BookingPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Booking" }
+
+    TransactionPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Transaction" }
+
+    GuestPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Guest" }
+
+    ExtraPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Extra" }
+
+    QuestionPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Question" }
+
+    Category:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        position: { type: integer }
+        product_count: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    Location:
+      type: object
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum: [START, END, MEETING]
+        name: { type: string }
+        address: { type: string }
+        latitude: { type: number, format: float, nullable: true }
+        longitude: { type: number, format: float, nullable: true }
+        google_place_id: { type: string, nullable: true }
+        timezone: { type: string }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Media:
+      type: object
+      properties:
+        id: { type: string }
+        product_id: { type: string }
+        type:
+          type: string
+          enum: [image, document]
+        url: { type: string, format: uri }
+        thumbnail_url: { type: string, format: uri, nullable: true }
+        original_filename: { type: string }
+        mime_type: { type: string }
+        size_bytes: { type: integer }
+        alt_text: { type: string, nullable: true }
+        position: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    CategoryPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Category" }
+
+    LocationPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Location" }
+
+    MediaPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Media" }
+
+    CreateProductRequest:
+      type: object
+      required: [title, currency]
+      properties:
+        title: { type: string, maxLength: 200 }
+        slug: { type: string, description: "Auto-generated if omitted" }
+        description: { type: string }
+        status:
+          type: string
+          enum: [draft, published]
+          default: draft
+        schedule_type:
+          type: string
+          enum: [FIXED, FLEXIBLE]
+          default: FIXED
+        from_price: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        capacity: { type: integer }
+        cancellation_policy: { type: string }
+        category_ids:
+          type: array
+          items: { type: string }
+        timezone: { type: string }
+        dry_run: { type: boolean, default: false }
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        title: { type: string, maxLength: 200 }
+        slug: { type: string }
+        description: { type: string }
+        status:
+          type: string
+          enum: [draft, published]
+        schedule_type:
+          type: string
+          enum: [FIXED, FLEXIBLE]
+        from_price: { $ref: "#/components/schemas/Money" }
+        capacity: { type: integer }
+        cancellation_policy: { type: string }
+        category_ids:
+          type: array
+          items: { type: string }
+        timezone: { type: string }
+        dry_run: { type: boolean, default: false }
+
+    CreateProductOptionRequest:
+      type: object
+      required: [product_id, title]
+      properties:
+        product_id: { type: string }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        duration_minutes: { type: integer, nullable: true }
+        capacity: { type: integer }
+        min_age: { type: integer, nullable: true }
+        max_age: { type: integer, nullable: true }
+        status:
+          type: string
+          enum: [draft, published]
+          default: draft
+        dry_run: { type: boolean, default: false }
+
+    UpdateProductOptionRequest:
+      type: object
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        duration_minutes: { type: integer, nullable: true }
+        capacity: { type: integer }
+        min_age: { type: integer, nullable: true }
+        max_age: { type: integer, nullable: true }
+        status:
+          type: string
+          enum: [draft, published]
+        dry_run: { type: boolean, default: false }
+
+    CreatePricingTierRequest:
+      type: object
+      required: [product_option_id, name, amount, currency]
+      properties:
+        product_option_id: { type: string }
+        availability_id: { type: string, nullable: true, description: "Scope tier to a single availability; otherwise applies broadly" }
+        name: { type: string, maxLength: 100 }
+        amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        dry_run: { type: boolean, default: false }
+
+    UpdatePricingTierRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100 }
+        amount: { $ref: "#/components/schemas/Money" }
+        dry_run: { type: boolean, default: false }
+
+    CreateExtraRequest:
+      type: object
+      required: [product_option_id, name, amount, currency]
+      properties:
+        product_option_id: { type: string }
+        name: { type: string, maxLength: 200 }
+        description: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        max_quantity: { type: integer, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    UpdateExtraRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        description: { type: string }
+        amount: { $ref: "#/components/schemas/Money" }
+        max_quantity: { type: integer, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    CreateQuestionRequest:
+      type: object
+      required: [product_option_id, label, type]
+      properties:
+        product_option_id: { type: string }
+        label: { type: string, maxLength: 200 }
+        type:
+          type: string
+          enum: [text, textarea, select, date, number, boolean]
+        required: { type: boolean, default: false }
+        options:
+          type: array
+          items: { type: string }
+          description: For type=select
+        dry_run: { type: boolean, default: false }
+
+    UpdateQuestionRequest:
+      type: object
+      properties:
+        label: { type: string, maxLength: 200 }
+        type:
+          type: string
+          enum: [text, textarea, select, date, number, boolean]
+        required: { type: boolean }
+        options:
+          type: array
+          items: { type: string }
+        dry_run: { type: boolean, default: false }
+
+    CreateAvailableGiftCertRequest:
+      type: object
+      required: [name, amounts, currency]
+      properties:
+        name: { type: string, maxLength: 200 }
+        amounts:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/Money" }
+        currency: { type: string }
+        expiration_period_days: { type: integer, nullable: true }
+        cover_image_url: { type: string, format: uri, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    UpdateAvailableGiftCertRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        amounts:
+          type: array
+          items: { $ref: "#/components/schemas/Money" }
+        expiration_period_days: { type: integer, nullable: true }
+        cover_image_url: { type: string, format: uri, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    CreateCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 200 }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        position: { type: integer }
+        dry_run: { type: boolean, default: false }
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        position: { type: integer }
+        dry_run: { type: boolean, default: false }
+
+    CreateLocationRequest:
+      type: object
+      required: [type, name, address]
+      properties:
+        type:
+          type: string
+          enum: [START, END, MEETING]
+        name: { type: string, maxLength: 200 }
+        address: { type: string }
+        latitude: { type: number, format: float, nullable: true }
+        longitude: { type: number, format: float, nullable: true }
+        google_place_id: { type: string, nullable: true }
+        timezone: { type: string }
+        notes: { type: string, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    UpdateLocationRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [START, END, MEETING]
+        name: { type: string, maxLength: 200 }
+        address: { type: string }
+        latitude: { type: number, format: float, nullable: true }
+        longitude: { type: number, format: float, nullable: true }
+        google_place_id: { type: string, nullable: true }
+        timezone: { type: string }
+        notes: { type: string, nullable: true }
+        dry_run: { type: boolean, default: false }
