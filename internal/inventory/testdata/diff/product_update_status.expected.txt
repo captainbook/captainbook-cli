@@ -1,0 +1,7 @@
+Dry-run preview for Product 99 (would_apply: true):
+
+  - status:        "draft"  →  "published"
+  - updated_at:    2026-03-15 08:00 UTC  →  2026-04-27 09:00 UTC
+  - published_at:  (unset)  →  2026-04-27 09:00 UTC
+
+Run without --dry-run to apply.

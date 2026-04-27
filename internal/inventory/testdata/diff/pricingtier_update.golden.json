@@ -1,0 +1,21 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "tier_42",
+      "name": "Adult",
+      "amount": 4500,
+      "currency": "EUR",
+      "product_option_id": "po_17",
+      "availability_id": null
+    },
+    "after": {
+      "id": "tier_42",
+      "name": "Adult",
+      "amount": 5000,
+      "currency": "EUR",
+      "product_option_id": "po_17",
+      "availability_id": null
+    }
+  }
+}

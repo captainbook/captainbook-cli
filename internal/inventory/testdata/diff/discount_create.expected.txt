@@ -1,0 +1,15 @@
+Dry-run preview for Discount 7 (would_apply: true):
+
+  - code:            (unset)  →  "SUMMER2026"
+  - discount_pct:    (unset)  →  15
+  - nb_offers:       (unset)  →  100
+  - auto_apply:      (unset)  →  false
+  - start_date:      (unset)  →  2026-06-01 00:00 UTC
+  - end_date:        (unset)  →  2026-08-31 23:59 UTC
+  - validity_start:  (unset)  →  2026-06-01 00:00 UTC
+  - validity_end:    (unset)  →  2026-09-30 23:59 UTC
+  - discount_text:   (unset)  →  "Summer special"
+  - created_at:      (unset)  →  2026-04-27 10:00 UTC
+  - id:              (unset)  →  "7"
+
+Run without --dry-run to apply.

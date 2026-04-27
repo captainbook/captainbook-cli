@@ -1,0 +1,21 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "42",
+      "title": "Sunset Sail Tour",
+      "from_price": 12000,
+      "currency": "EUR",
+      "status": "published",
+      "updated_at": "2026-04-01T09:00:00Z"
+    },
+    "after": {
+      "id": "42",
+      "title": "Sunset Sail Tour",
+      "from_price": 15000,
+      "currency": "EUR",
+      "status": "published",
+      "updated_at": "2026-04-27T10:00:00Z"
+    }
+  }
+}
