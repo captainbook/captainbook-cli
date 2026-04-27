@@ -362,8 +362,11 @@ func (e *AbilityMissingError) UserMessage() string {
 // nil otherwise. Use it as the gate at the top of any command handler:
 //
 //	if err := inventory.Refuse(inventory.Write, have); err != nil { return err }
+// An empty Needed is treated as "no ability gate" — useful for endpoints
+// like whoami where the call IS the ability-discovery mechanism. Every
+// other CommandDef must set Ability explicitly; tests assert this.
 func Refuse(needed Ability, have Set) error {
-	if have.Has(needed) {
+	if needed == "" || have.Has(needed) {
 		return nil
 	}
 	return &AbilityMissingError{Needed: needed, Have: have}

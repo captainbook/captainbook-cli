@@ -482,3 +482,54 @@ func TestCmd_TopLevel(t *testing.T) {
 		}
 	}
 }
+
+// TestGiftCertsIssue_SendNowMapsToSpecField verifies the --send-now flag
+// maps to the spec's `send_now` JSON field, NOT `send_email` (which the
+// server silently drops). Drives the actual Run closure with a flag set
+// and asserts the wire body contains the correct key.
+func TestGiftCertsIssue_SendNowMapsToSpecField(t *testing.T) {
+	var defs []CommandDef
+	for _, d := range giftCertificatesDefs() {
+		if d.Use == "gift-certificates issue" {
+			defs = append(defs, d)
+		}
+	}
+	if len(defs) != 1 {
+		t.Fatalf("expected exactly one gift-certificates issue CommandDef, got %d", len(defs))
+	}
+	def := defs[0]
+
+	args := RunArgs{
+		Flags: map[string]any{
+			"available-gift-certificate-id": "agc_1",
+			"recipient-email":               "alice@example.com",
+			"recipient-name":                "Alice",
+			"amount":                        15000,
+			"send-now":                      true,
+		},
+		DryRun: false,
+	}
+	srv, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"gift_certificate":{"id":"gc_42"}},"meta":{"request_id":"r1"}}`))
+	})
+	_ = srv
+
+	res, err := def.Run(context.Background(), runner, args)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res == nil || res.WireBody == nil {
+		t.Fatal("expected non-nil RunResult with WireBody set")
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(res.WireBody, &parsed); err != nil {
+		t.Fatalf("unmarshal wire body: %v", err)
+	}
+	if _, hasOldKey := parsed["send_email"]; hasOldKey {
+		t.Errorf("wire body has obsolete `send_email` key (server would silently drop it): %v", parsed)
+	}
+	if got, ok := parsed["send_now"]; !ok || got != true {
+		t.Errorf("wire body must carry send_now=true; got %v (full body: %v)", got, parsed)
+	}
+}

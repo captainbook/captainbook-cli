@@ -317,6 +317,16 @@ func TestRefuse(t *testing.T) {
 	if IsAbilityMissing(errors.New("plain error")) {
 		t.Fatal("IsAbilityMissing should report false for unrelated errors")
 	}
+	// Empty Needed = "no ability gate" — required for whoami, where the
+	// call IS the ability-discovery mechanism. Pre-fix this returned a
+	// spurious AbilityMissingError because no token has empty-string in
+	// its abilities, making whoami permanently unusable.
+	if err := Refuse("", Set{Read}); err != nil {
+		t.Errorf("empty Needed must be a no-op gate, got %v", err)
+	}
+	if err := Refuse("", nil); err != nil {
+		t.Errorf("empty Needed must be a no-op gate even with nil have, got %v", err)
+	}
 	if msg := amErr.UserMessage(); msg == "" {
 		t.Fatal("UserMessage should be non-empty")
 	}
