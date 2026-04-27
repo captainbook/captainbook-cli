@@ -119,9 +119,7 @@ func availabilitiesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
 				if res != nil {
 					res.WireBody = body
@@ -155,9 +153,7 @@ func availabilitiesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
 				if res != nil {
 					res.WireBody = body
@@ -326,7 +322,7 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 			}
 			resp, err := r.Client.BulkUpdateAvailabilitiesWithBodyWithResponse(ctx, &gen.BulkUpdateAvailabilitiesParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(raw))
 			if err != nil {
-				return nil, err
+				return &RunResult{WireBody: raw}, err
 			}
 			res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
 			if res != nil {

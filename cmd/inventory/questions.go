@@ -85,9 +85,7 @@ func questionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateQuestionWithBodyWithResponse(ctx, &gen.CreateQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", "")
 				if res != nil {
 					res.WireBody = body
@@ -121,9 +119,7 @@ func questionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateQuestionWithBodyWithResponse(ctx, id, &gen.UpdateQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
 				if res != nil {
 					res.WireBody = body
@@ -161,9 +157,7 @@ func questionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreQuestionWithBodyWithResponse(ctx, id, &gen.RestoreQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
 				if res != nil {
 					res.WireBody = body

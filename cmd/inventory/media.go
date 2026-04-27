@@ -217,12 +217,24 @@ func uploadCmd(runner *Runner) *cobra.Command {
 				Code: api.ExitValidation,
 			}
 		}
+		// Canonicalize so audit's idempotency_key matches the wire form
+		// (parsed.String() — lowercase, hyphenated, no braces).
+		idemKey = parsedKey.String()
 
 		params := &gen.UploadProductMediaParams{IdempotencyKey: &parsedKey}
 		ctx := cmd.Context()
 		if ctx == nil {
 			ctx = context.Background()
 		}
+
+		// Snapshot the multipart bytes for audit BEFORE the read consumes
+		// the buffer. bytes.Buffer's read pointer advances during the
+		// upload; calling .Bytes() afterward returns the unread tail
+		// (typically empty), which would hash to e3b0c44... on every
+		// upload — a silent forensics bug. The buffer is at most 10 MiB
+		// (D18) so this snapshot is bounded.
+		multipartBytes := append([]byte(nil), bodyBuf.Bytes()...)
+		bodyHash := sha256.Sum256(multipartBytes)
 
 		start := time.Now()
 		resp, err := runner.Client.UploadProductMediaWithBodyWithResponse(ctx, productID, params, mw.FormDataContentType(), &bodyBuf)
@@ -240,13 +252,6 @@ func uploadCmd(runner *Runner) *cobra.Command {
 				responseID = runRes.ResponseID
 			}
 		}
-
-		// Audit entry (D37: file_size, mime_type, file_name).
-		// body_sha256 hashes the actual multipart body that went on the
-		// wire (bodyBuf was assembled above and used by IssueRequest);
-		// matches the runMutation pattern even though this outlier
-		// bypasses runMutation.
-		bodyHash := sha256.Sum256(bodyBuf.Bytes())
 		entry := invpkg.AuditEntry{
 			Ts:             time.Now().UTC(),
 			Profile:        runner.ProfileName,

@@ -431,6 +431,11 @@ func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) e
 			}
 		}
 		keyUUID = parsed
+		// Canonicalize: the gen client serializes parsed.String() (lowercase
+		// without braces) onto the wire. Audit must match what hits the
+		// server, so overwrite the original (possibly uppercase / hyphen-
+		// noise / brace-wrapped) input with the canonical form.
+		args.IdempotencyKey = parsed.String()
 	}
 	args.IdempotencyKeyUUID = &keyUUID
 
@@ -701,6 +706,23 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 			case "string":
 				v, _ := cmd.Flags().GetString(fd.Name)
 				args.Flags[fd.Name] = v
+				// Client-side enum gate: if the description leads with a
+				// "tok|tok|tok" run, validate the value before sending. Some
+				// server endpoints (e.g. transactions list ?type=) silently
+				// ignore unknown enum values and return unfiltered results,
+				// so a CLI typo would hand the agent wrong data with no
+				// signal. Better to fail loudly here.
+				if tokens := extractEnumTokens(fd.Description); tokens != nil && v != "" {
+					if !inSlice(v, tokens) {
+						return &api.ExitError{
+							Err: fmt.Errorf(
+								"invalid value for --%s: %q (allowed: %s)",
+								fd.Name, v, strings.Join(tokens, ", "),
+							),
+							Code: api.ExitValidation,
+						}
+					}
+				}
 			case "int":
 				v, _ := cmd.Flags().GetInt(fd.Name)
 				args.Flags[fd.Name] = v
@@ -1102,3 +1124,49 @@ func newRunner(c *cobra.Command) (*Runner, error) {
 // testNewRunner is the override used by inventory_test.go to inject a fake
 // transport / config without touching disk or env.
 var testNewRunner func() (*Runner, error)
+
+// extractEnumTokens returns the leading "tok|tok|tok" run of a description,
+// split into individual tokens. Returns nil if the leading run is not
+// pipe-delimited. Tokens accept [A-Za-z0-9_]. Used by makeRunE to gate
+// flag values against the spec enum (the description IS the spec enum,
+// asserted by TestSpecDrift_FlagDescriptionEnumsMatchSpec) and by the
+// drift test itself.
+func extractEnumTokens(desc string) []string {
+	desc = strings.TrimSpace(desc)
+	if !strings.Contains(desc, "|") {
+		return nil
+	}
+	end := 0
+	for end < len(desc) {
+		c := desc[end]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '|' {
+			end++
+			continue
+		}
+		break
+	}
+	head := desc[:end]
+	if !strings.Contains(head, "|") {
+		return nil
+	}
+	parts := strings.Split(head, "|")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) < 2 {
+		return nil
+	}
+	return out
+}
+
+func inSlice(v string, xs []string) bool {
+	for _, x := range xs {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}

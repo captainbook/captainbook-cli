@@ -455,43 +455,9 @@ func (s *specDoc) bodyField(op *opDef, jsonKey string) *specField {
 }
 
 // -----------------------------------------------------------------------------
-// Helpers — enum-token extraction, set comparison.
+// Helpers — set comparison. extractEnumTokens lives in inventory.go now
+// because makeRunE uses it for client-side flag validation.
 // -----------------------------------------------------------------------------
-
-// extractEnumTokens returns the leading "tok|tok|tok" run of a description,
-// split into individual tokens. Returns nil if the leading run is not
-// pipe-delimited. Tokens accept [A-Za-z0-9_].
-func extractEnumTokens(desc string) []string {
-	desc = strings.TrimSpace(desc)
-	if !strings.Contains(desc, "|") {
-		return nil
-	}
-	end := 0
-	for end < len(desc) {
-		c := desc[end]
-		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '|' {
-			end++
-			continue
-		}
-		break
-	}
-	head := desc[:end]
-	if !strings.Contains(head, "|") {
-		return nil
-	}
-	parts := strings.Split(head, "|")
-	// Drop empty tokens (caused by a trailing/leading pipe).
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	if len(out) < 2 {
-		return nil
-	}
-	return out
-}
 
 func sameSet(a, b []string) bool {
 	if len(a) != len(b) {
@@ -594,23 +560,69 @@ func TestSpecDrift_IdempotencyKeyThreaded(t *testing.T) {
 					return true
 				}
 				// Found a mutation Params literal — does it set
-				// IdempotencyKey?
+				// IdempotencyKey to a non-trivial value? `nil`,
+				// missing, or a wrong value all break audit/wire
+				// correlation; only `args.IdempotencyKeyUUID` (used
+				// from runMutation) and `&parsedKey` (the multipart
+				// upload outlier's local) are accepted.
+				var keyValue ast.Expr
 				for _, elt := range cl.Elts {
 					kv, ok := elt.(*ast.KeyValueExpr)
 					if !ok {
 						continue
 					}
 					if id, ok := kv.Key.(*ast.Ident); ok && id.Name == "IdempotencyKey" {
-						return true // OK, key is set
+						keyValue = kv.Value
+						break
 					}
 				}
 				pos := fset.Position(cl.Pos())
-				t.Errorf("[%s:%d] gen.%s literal does NOT set IdempotencyKey — audit/wire keys will diverge",
-					short, pos.Line, name)
+				if keyValue == nil {
+					t.Errorf("[%s:%d] gen.%s literal does NOT set IdempotencyKey — audit/wire keys will diverge",
+						short, pos.Line, name)
+					return true
+				}
+				if !isAcceptedIdempotencyKeyExpr(keyValue) {
+					t.Errorf("[%s:%d] gen.%s.IdempotencyKey is %s — must be args.IdempotencyKeyUUID (or the multipart outlier's &parsedKey)",
+						short, pos.Line, name, exprToString(keyValue))
+				}
 				return true
 			})
 		}
 	}
+}
+
+// isAcceptedIdempotencyKeyExpr returns true when the given expression
+// is one of the two known-correct value expressions for Params.IdempotencyKey:
+//   - args.IdempotencyKeyUUID (the runMutation thread)
+//   - &parsedKey (the uploadCmd multipart outlier's local)
+// Anything else (nil, &someOtherVar, helper-call, etc.) is a bug.
+func isAcceptedIdempotencyKeyExpr(e ast.Expr) bool {
+	if se, ok := e.(*ast.SelectorExpr); ok {
+		if x, ok := se.X.(*ast.Ident); ok && x.Name == "args" && se.Sel.Name == "IdempotencyKeyUUID" {
+			return true
+		}
+	}
+	if u, ok := e.(*ast.UnaryExpr); ok && u.Op.String() == "&" {
+		if id, ok := u.X.(*ast.Ident); ok && id.Name == "parsedKey" {
+			return true
+		}
+	}
+	return false
+}
+
+func exprToString(e ast.Expr) string {
+	switch v := e.(type) {
+	case *ast.Ident:
+		return v.Name
+	case *ast.SelectorExpr:
+		return exprToString(v.X) + "." + v.Sel.Name
+	case *ast.UnaryExpr:
+		return v.Op.String() + exprToString(v.X)
+	case *ast.BasicLit:
+		return v.Value
+	}
+	return "<unrecognized expr>"
 }
 
 // mutationParamsTypes returns the set of gen.<Name>Params type names

@@ -90,9 +90,7 @@ func guestsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateGuestWithBodyWithResponse(ctx, id, &gen.UpdateGuestParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Guest", id)
 				if res != nil {
 					res.WireBody = body

@@ -40,9 +40,7 @@ func notificationsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.ResendBookingConfirmationWithBodyWithResponse(ctx, id, &gen.ResendBookingConfirmationParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
 				if res != nil {
 					res.WireBody = body

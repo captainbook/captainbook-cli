@@ -160,6 +160,85 @@ func TestRunMutation_ValidationError(t *testing.T) {
 
 // TestRunMutation_DryRunGate_NotSupported verifies D32: --dry-run on a
 // NotSupported endpoint hard-errors before any network call.
+// TestEnumFlagGate_RejectsInvalidValue exercises the client-side enum
+// validation in makeRunE: any flag whose Description leads with a
+// "tok|tok|tok" run gates user input against those tokens BEFORE the
+// network call. Without this, server endpoints with lax filter
+// validation (e.g. transactions list ?type= silently ignores unknown
+// values) would hand the agent unfiltered results without any signal.
+func TestEnumFlagGate_RejectsInvalidValue(t *testing.T) {
+	hits := 0
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		hits++
+	})
+
+	def := CommandDef{
+		Use:  "list", Kind: KindRead, Verb: "GET", Path: "/transactions",
+		Ability: invpkg.Read,
+		Flags: []FlagDef{
+			{Name: "type", Type: "string", Description: "charge|refund|comp"},
+		},
+		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+			t.Errorf("Run closure should not be invoked when validation rejects input")
+			return nil, nil
+		},
+	}
+
+	parent := &cobra.Command{Use: "test"}
+	bindCommands(parent, []CommandDef{def}, runner)
+	parent.SetArgs([]string{"list", "--type", "refunds"})
+	parent.SetOut(&bytes.Buffer{})
+	parent.SetErr(&bytes.Buffer{})
+
+	err := parent.Execute()
+	if err == nil {
+		t.Fatal("expected error on --type refunds, got nil")
+	}
+	var exitErr *api.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected *api.ExitError, got %T: %v", err, err)
+	}
+	if !strings.Contains(exitErr.Err.Error(), "refunds") || !strings.Contains(exitErr.Err.Error(), "charge, refund, comp") {
+		t.Errorf("error must name the bad value and the allowed set; got: %v", exitErr.Err)
+	}
+	if hits != 0 {
+		t.Errorf("server hit %d times; expected 0 (gate must fire pre-network)", hits)
+	}
+}
+
+// TestEnumFlagGate_AcceptsValidValue verifies a valid enum value passes
+// through (no false positives).
+func TestEnumFlagGate_AcceptsValidValue(t *testing.T) {
+	hits := 0
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"request_id":"r1"}}`))
+	})
+
+	def := CommandDef{
+		Use:  "list", Kind: KindRead, Verb: "GET", Path: "/transactions",
+		Ability: invpkg.Read,
+		Flags: []FlagDef{
+			{Name: "type", Type: "string", Description: "charge|refund|comp"},
+		},
+		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+			// Just succeed — we only care that the validator didn't reject.
+			return &RunResult{Status: 200, Body: []byte(`{}`), ResourceType: "Transaction"}, nil
+		},
+	}
+
+	parent := &cobra.Command{Use: "test"}
+	bindCommands(parent, []CommandDef{def}, runner)
+	parent.SetArgs([]string{"list", "--type", "comp"})
+	parent.SetOut(&bytes.Buffer{})
+	parent.SetErr(&bytes.Buffer{})
+
+	if err := parent.Execute(); err != nil {
+		t.Errorf("valid --type comp should pass validation; got: %v", err)
+	}
+}
+
 func TestRunMutation_DryRunGate_NotSupported(t *testing.T) {
 	calls := 0
 	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {

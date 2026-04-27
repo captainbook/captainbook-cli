@@ -114,9 +114,7 @@ func discountsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateDiscountWithBodyWithResponse(ctx, &gen.CreateDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", "")
 				if res != nil {
 					res.WireBody = body
@@ -170,9 +168,7 @@ func discountsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.ApplyDiscountWithBodyWithResponse(ctx, id, &gen.ApplyDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
 				if res != nil {
 					res.WireBody = body
@@ -195,9 +191,7 @@ func discountsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreDiscountWithBodyWithResponse(ctx, id, &gen.RestoreDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
 				if res != nil {
 					res.WireBody = body

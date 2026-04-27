@@ -69,9 +69,7 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateAvailableGiftCertWithBodyWithResponse(ctx, &gen.CreateAvailableGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
 				if res != nil {
 					res.WireBody = body
@@ -158,9 +156,7 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.IssueGiftCertWithBodyWithResponse(ctx, &gen.IssueGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
 				if res != nil {
 					res.WireBody = body
@@ -192,9 +188,7 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.VoidGiftCertWithBodyWithResponse(ctx, id, &gen.VoidGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
 				if res != nil {
 					res.WireBody = body
@@ -223,9 +217,7 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.ResendGiftCertWithBodyWithResponse(ctx, id, &gen.ResendGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
 				if res != nil {
 					res.WireBody = body

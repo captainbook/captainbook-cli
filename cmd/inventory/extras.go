@@ -82,9 +82,7 @@ func extrasDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateExtraWithBodyWithResponse(ctx, &gen.CreateExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", "")
 				if res != nil {
 					res.WireBody = body
@@ -118,9 +116,7 @@ func extrasDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateExtraWithBodyWithResponse(ctx, id, &gen.UpdateExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
 				if res != nil {
 					res.WireBody = body
@@ -158,9 +154,7 @@ func extrasDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreExtraWithBodyWithResponse(ctx, id, &gen.RestoreExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
 				if res != nil {
 					res.WireBody = body

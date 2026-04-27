@@ -92,9 +92,7 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreatePricingTierWithBodyWithResponse(ctx, &gen.CreatePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", "")
 				if res != nil {
 					res.WireBody = body
@@ -125,9 +123,7 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdatePricingTierWithBodyWithResponse(ctx, id, &gen.UpdatePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
 				if res != nil {
 					res.WireBody = body
@@ -171,9 +167,7 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestorePricingTierWithBodyWithResponse(ctx, id, &gen.RestorePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
 				if res != nil {
 					res.WireBody = body

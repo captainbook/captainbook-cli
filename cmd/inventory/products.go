@@ -105,9 +105,7 @@ func productsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateProductWithBodyWithResponse(ctx, &gen.CreateProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", "")
 				if res != nil {
 					res.WireBody = body
@@ -154,9 +152,7 @@ func productsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateProductWithBodyWithResponse(ctx, id, &gen.UpdateProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
 				if res != nil {
 					res.WireBody = body
@@ -199,9 +195,7 @@ func productsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreProductWithBodyWithResponse(ctx, id, &gen.RestoreProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil {
-					return nil, err
-				}
+				if err != nil { return &RunResult{WireBody: body}, err }
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
 				if res != nil {
 					res.WireBody = body
