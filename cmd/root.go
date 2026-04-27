@@ -32,6 +32,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(statsCmd())
 	rootCmd.AddCommand(configCmd())
+	rootCmd.AddCommand(auditCmd())
 	rootCmd.AddCommand(completionCmd)
 }
 
