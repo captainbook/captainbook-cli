@@ -38,8 +38,17 @@ func mediaCmd(runner *Runner) *cobra.Command {
 		Use:   "media",
 		Short: "Manage product media (images, PDFs)",
 	}
+	bindCommands(parent, mediaDefs(), runner)
+	parent.AddCommand(uploadCmd(runner))
+	return parent
+}
 
-	bindCommands(parent, []CommandDef{
+// mediaDefs returns the media commands that flow through the standard
+// bindCommands pipeline. The multipart upload outlier (uploadCmd) is
+// hand-written separately because it needs pre-flight stat + MIME sniff
+// before any network call (D18 + Critical Rule §5).
+func mediaDefs() []CommandDef {
+	return []CommandDef{
 		{
 			Use: "list <product-id>", Short: "List media for a product",
 			Kind: KindRead, Verb: "GET", Path: "/products/{id}/media",
@@ -99,10 +108,7 @@ func mediaCmd(runner *Runner) *cobra.Command {
 				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Media", id)
 			},
 		},
-	}, runner)
-
-	parent.AddCommand(uploadCmd(runner))
-	return parent
+	}
 }
 
 // uploadCmd builds the multipart-upload outlier as a hand-written cobra

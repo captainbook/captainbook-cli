@@ -533,3 +533,76 @@ func TestGiftCertsIssue_SendNowMapsToSpecField(t *testing.T) {
 		t.Errorf("wire body must carry send_now=true; got %v (full body: %v)", got, parsed)
 	}
 }
+
+// TestGiftCertsIssue_SenderMessageMapping verifies the --sender-message
+// flag maps to the spec's sender_message JSON field. Same pattern as
+// TestGiftCertsIssue_SendNowMapsToSpecField; codex flagged that the
+// previous regression test only covered send_now and would silently miss
+// any drift on sender_message.
+func TestGiftCertsIssue_SenderMessageMapping(t *testing.T) {
+	var def CommandDef
+	for _, d := range giftCertificatesDefs() {
+		if d.Use == "gift-certificates issue" {
+			def = d
+			break
+		}
+	}
+	args := RunArgs{
+		Flags: map[string]any{
+			"available-gift-certificate-id": "agc_1",
+			"recipient-email":               "alice@example.com",
+			"recipient-name":                "Alice",
+			"amount":                        15000,
+			"sender-message":                "Happy birthday!",
+		},
+	}
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"gift_certificate":{"id":"gc_42"}},"meta":{"request_id":"r1"}}`))
+	})
+
+	res, err := def.Run(context.Background(), runner, args)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(res.WireBody, &parsed); err != nil {
+		t.Fatalf("unmarshal wire body: %v", err)
+	}
+	if got, ok := parsed["sender_message"]; !ok || got != "Happy birthday!" {
+		t.Errorf("wire body must carry sender_message; got %v (full body: %v)", got, parsed)
+	}
+}
+
+// TestCommandDef_NoStrayEmptyAbility asserts the only CommandDef with
+// Ability == "" is whoami (which is documented as the
+// ability-discovery endpoint). This prevents accidental ability-gate
+// bypass on other endpoints — Refuse("") short-circuits as a no-op so
+// any CommandDef that forgets to set Ability would be wide-open.
+func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
+	defGroups := [][]CommandDef{
+		authDefs(),
+		productsDefs(),
+		productOptionsDefs(),
+		availabilitiesDefs(),
+		pricingTiersDefs(),
+		discountsDefs(),
+		giftCertificatesDefs(),
+		bookingsDefs(),
+		transactionsDefs(),
+		customersDefs(),
+		guestsDefs(),
+		extrasDefs(),
+		questionsDefs(),
+		categoriesDefs(),
+		mediaDefs(),
+		notificationsDefs(),
+	}
+	for _, defs := range defGroups {
+		for _, d := range defs {
+			if d.Ability == "" && !strings.Contains(d.Use, "whoami") {
+				t.Errorf("CommandDef %q has empty Ability — only whoami may; please set Read/Write/CS explicitly", d.Use)
+			}
+		}
+	}
+}

@@ -24,8 +24,18 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 		Use:   "availabilities",
 		Short: "Manage availabilities (slots / sessions)",
 	}
+	bindCommands(parent, availabilitiesDefs(), runner)
+	parent.AddCommand(bulkUpdateCmd(runner))
+	return parent
+}
 
-	bindCommands(parent, []CommandDef{
+// availabilitiesDefs returns the regular (non-bulk-update) command tree.
+// Bulk-update lives in bulkUpdateCmd because it splits into 5 per-setting
+// subcommands constructed dynamically via bulkUpdateDef. The split is
+// expressed at the cobra layer; the per-setting CommandDefs share the
+// same HTTP path and only differ in their typed flags + StaticForensic.
+func availabilitiesDefs() []CommandDef {
+	return []CommandDef{
 		{
 			Use: "list", Short: "List availabilities", Kind: KindRead,
 			Verb: "GET", Path: "/availabilities", Ability: invpkg.Read,
@@ -149,12 +159,7 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 				return res, err
 			},
 		},
-	}, runner)
-
-	// bulk-update sub-tree: D38 — 5 per-setting subcommands.
-	parent.AddCommand(bulkUpdateCmd(runner))
-
-	return parent
+	}
 }
 
 // bulkUpdateCmd builds the `availabilities bulk-update` parent + 5
@@ -317,7 +322,11 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 			if err != nil {
 				return nil, err
 			}
-			return ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
+			res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
+			if res != nil {
+				res.WireBody = raw
+			}
+			return res, err
 		},
 	}
 }

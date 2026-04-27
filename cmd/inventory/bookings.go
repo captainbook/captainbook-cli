@@ -25,7 +25,7 @@ func bookingsDefs() []CommandDef {
 				{Name: "limit", Type: "int"},
 				{Name: "cursor", Type: "string"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
-				{Name: "booking-status", Type: "string", Description: "confirmed|pending|cancelled|expired"},
+				{Name: "booking-status", Type: "string", Description: "ON_HOLD|CONFIRMED|EXPIRED|CANCELLED (uppercase per spec)"},
 				{Name: "from", Type: "string", Description: "Booking start date >= (YYYY-MM-DD)"},
 				{Name: "to", Type: "string", Description: "Booking start date <= (YYYY-MM-DD)"},
 				{Name: "customer-email", Type: "string", Description: "Filter by customer email"},

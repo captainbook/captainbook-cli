@@ -84,7 +84,7 @@ func giftCertificatesDefs() []CommandDef {
 			Kind: KindRead, Verb: "GET", Path: "/gift-certs/issued", Ability: invpkg.Read,
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "status", Type: "string", Description: "active|redeemed|voided"},
+				{Name: "status", Type: "string", Description: "active|redeemed|partial|void|expired"},
 				{Name: "recipient-email", Type: "string", Description: "Filter by recipient email"},
 				{Name: "code", Type: "string", Description: "Filter by code"},
 			},
