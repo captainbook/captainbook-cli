@@ -65,8 +65,22 @@ func questionsDefs() []CommandDef {
 		{
 			Use: "questions create", Short: "Create a question", Kind: KindMutation,
 			Verb: "POST", Path: "/questions", Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "label", Type: "string", Required: true, Description: "Question text shown to customer"},
+				{Name: "type", Type: "string", Required: true, Description: "text|textarea|select|date|number|boolean"},
+				{Name: "product-option-id", Type: "string", Required: true, Description: "Owning product option"},
+				{Name: "required", Type: "bool", Description: "Whether the answer is required"},
+				{Name: "options", Type: "stringSlice", Description: "Options (for type=select)"},
+			},
+			ForensicFields: []string{"required", "type"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"label":             "label",
+					"type":              "type",
+					"product-option-id": "product_option_id",
+					"required":          "required",
+					"options":           "options",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -74,19 +88,35 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
 			Use: "questions update <id>", Short: "Update a question", Kind: KindMutation,
 			Verb: "PATCH", Path: "/questions/{id}", Ability: invpkg.Write,
 			DryRunMode: DryRunBody, PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "label", Type: "string", Description: "Question text shown to customer"},
+				{Name: "type", Type: "string", Description: "text|textarea|select|date|number|boolean"},
+				{Name: "required", Type: "bool", Description: "Whether the answer is required"},
+				{Name: "options", Type: "stringSlice", Description: "Options (for type=select)"},
+			},
+			ForensicFields: []string{"required", "type"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"label":    "label",
+					"type":     "type",
+					"required": "required",
+					"options":  "options",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -94,7 +124,11 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

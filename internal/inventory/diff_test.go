@@ -68,6 +68,57 @@ func TestRenderDiff_GoldenFiles(t *testing.T) {
 				return RenderPricingTierDiff(w, id, env)
 			},
 		},
+		// Generic-renderer cases for resources without tuned renderers.
+		// resourceID is intentionally empty: RenderDiff extracts the ID from
+		// the diff envelope itself via extractID().
+		{
+			name:     "product option update capacity",
+			fixture:  "productoption_update_capacity",
+			resource: "",
+			render: func(w *bytes.Buffer, _ string, env DiffEnvelope) error {
+				return RenderDiff(w, "ProductOption", env)
+			},
+		},
+		{
+			name:     "availability update capacity",
+			fixture:  "availability_update_capacity",
+			resource: "",
+			render: func(w *bytes.Buffer, _ string, env DiffEnvelope) error {
+				return RenderDiff(w, "Availability", env)
+			},
+		},
+		{
+			name:     "extra update amount",
+			fixture:  "extra_update_amount",
+			resource: "",
+			render: func(w *bytes.Buffer, _ string, env DiffEnvelope) error {
+				return RenderDiff(w, "Extra", env)
+			},
+		},
+		{
+			name:     "question update label",
+			fixture:  "question_update_label",
+			resource: "",
+			render: func(w *bytes.Buffer, _ string, env DiffEnvelope) error {
+				return RenderDiff(w, "Question", env)
+			},
+		},
+		{
+			name:     "category update position",
+			fixture:  "category_update_position",
+			resource: "",
+			render: func(w *bytes.Buffer, _ string, env DiffEnvelope) error {
+				return RenderDiff(w, "Category", env)
+			},
+		},
+		{
+			name:     "guest update passport",
+			fixture:  "guest_update_passport",
+			resource: "",
+			render: func(w *bytes.Buffer, _ string, env DiffEnvelope) error {
+				return RenderDiff(w, "Guest", env)
+			},
+		},
 	}
 
 	for _, tc := range cases {

@@ -1,0 +1,17 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "q_99",
+      "label": "Dietary requirements?",
+      "type": "text",
+      "required": false
+    },
+    "after": {
+      "id": "q_99",
+      "label": "Any dietary requirements or allergies?",
+      "type": "text",
+      "required": true
+    }
+  }
+}

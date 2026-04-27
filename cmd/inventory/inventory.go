@@ -155,7 +155,7 @@ type CommandDef struct {
 
 // FlagDef declares one flag bound to a CommandDef.
 //
-// Type is one of "string", "int", "bool", "stringSlice".
+// Type is one of "string", "int", "bool", "stringSlice", "intSlice".
 type FlagDef struct {
 	Name        string
 	Short       string
@@ -609,6 +609,16 @@ func declareFlag(c *cobra.Command, fd FlagDef) {
 		} else {
 			c.Flags().StringSlice(fd.Name, def, fd.Description)
 		}
+	case "intSlice":
+		var def []int
+		if d, ok := fd.Default.([]int); ok {
+			def = d
+		}
+		if fd.Short != "" {
+			c.Flags().IntSliceP(fd.Name, fd.Short, def, fd.Description)
+		} else {
+			c.Flags().IntSlice(fd.Name, def, fd.Description)
+		}
 	}
 	if fd.Required {
 		_ = c.MarkFlagRequired(fd.Name)
@@ -669,6 +679,9 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 				args.Flags[fd.Name] = v
 			case "stringSlice":
 				v, _ := cmd.Flags().GetStringSlice(fd.Name)
+				args.Flags[fd.Name] = v
+			case "intSlice":
+				v, _ := cmd.Flags().GetIntSlice(fd.Name)
 				args.Flags[fd.Name] = v
 			}
 		}

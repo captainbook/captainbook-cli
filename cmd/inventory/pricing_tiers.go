@@ -72,8 +72,22 @@ func pricingTiersDefs() []CommandDef {
 			Use: "pricing-tiers create", Short: "Create a pricing tier", Kind: KindMutation,
 			Verb: "POST", Path: "/pricing-tiers", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Required: true, Description: "Tier name"},
+				{Name: "amount", Type: "int", Required: true, Description: "Price in minor units"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
+				{Name: "product-option-id", Type: "string", Required: true, Description: "Owning product option"},
+				{Name: "availability-id", Type: "string", Description: "Scope tier to a single availability"},
+			},
+			ForensicFields: []string{"amount", "product-option-id", "availability-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":              "name",
+					"amount":            "amount",
+					"currency":          "currency",
+					"product-option-id": "product_option_id",
+					"availability-id":   "availability_id",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -81,7 +95,11 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -89,12 +107,20 @@ func pricingTiersDefs() []CommandDef {
 			Verb: "PATCH", Path: "/pricing-tiers/{id}", Ability: invpkg.Write,
 			DryRunMode:     DryRunBody,
 			PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Description: "Tier name"},
+				{Name: "amount", Type: "int", Description: "Price in minor units"},
+			},
+			ForensicFields: []string{"amount"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":   "name",
+					"amount": "amount",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -102,7 +128,11 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

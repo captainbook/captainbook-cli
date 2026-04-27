@@ -49,8 +49,22 @@ func giftCertificatesDefs() []CommandDef {
 			Use: "gift-certificates create-available", Short: "Create a gift cert template",
 			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/available",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Required: true, Description: "Template name"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
+				{Name: "amounts", Type: "intSlice", Required: true, Description: "Allowed denominations (minor units, comma-separated)"},
+				{Name: "cover-image-url", Type: "string", Description: "Cover image URL"},
+				{Name: "expiration-period-days", Type: "int", Description: "Days until expiry once issued"},
+			},
+			ForensicFields: []string{"amounts", "expiration-period-days"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":                   "name",
+					"currency":               "currency",
+					"amounts":                "amounts",
+					"cover-image-url":        "cover_image_url",
+					"expiration-period-days": "expiration_period_days",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -58,7 +72,11 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -125,7 +143,11 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -155,7 +177,11 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -182,7 +208,11 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

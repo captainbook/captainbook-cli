@@ -1,0 +1,5 @@
+Dry-run preview for Category cat_5 (would_apply: true):
+
+  - position:  1  →  3
+
+Run without --dry-run to apply.

@@ -1,0 +1,19 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "extra_3",
+      "name": "Audio guide",
+      "amount": 1500,
+      "currency": "EUR",
+      "max_quantity": 4
+    },
+    "after": {
+      "id": "extra_3",
+      "name": "Audio guide",
+      "amount": 2000,
+      "currency": "EUR",
+      "max_quantity": 4
+    }
+  }
+}

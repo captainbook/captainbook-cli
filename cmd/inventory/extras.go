@@ -60,8 +60,24 @@ func extrasDefs() []CommandDef {
 		{
 			Use: "extras create", Short: "Create an extra", Kind: KindMutation,
 			Verb: "POST", Path: "/extras", Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Required: true, Description: "Extra name"},
+				{Name: "amount", Type: "int", Required: true, Description: "Price in minor units"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
+				{Name: "product-option-id", Type: "string", Required: true, Description: "Owning product option"},
+				{Name: "description", Type: "string", Description: "Extra description"},
+				{Name: "max-quantity", Type: "int", Description: "Maximum purchasable per booking"},
+			},
+			ForensicFields: []string{"amount", "max-quantity", "product-option-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":              "name",
+					"amount":            "amount",
+					"currency":          "currency",
+					"product-option-id": "product_option_id",
+					"description":       "description",
+					"max-quantity":      "max_quantity",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -69,19 +85,35 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
 			Use: "extras update <id>", Short: "Update an extra", Kind: KindMutation,
 			Verb: "PATCH", Path: "/extras/{id}", Ability: invpkg.Write,
 			DryRunMode: DryRunBody, PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Description: "Extra name"},
+				{Name: "amount", Type: "int", Description: "Price in minor units"},
+				{Name: "description", Type: "string", Description: "Extra description"},
+				{Name: "max-quantity", Type: "int", Description: "Maximum purchasable per booking"},
+			},
+			ForensicFields: []string{"amount", "max-quantity"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":         "name",
+					"amount":       "amount",
+					"description":  "description",
+					"max-quantity": "max_quantity",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -89,7 +121,11 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

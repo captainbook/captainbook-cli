@@ -1,0 +1,19 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "g_88",
+      "name": "Maria Papadopoulos",
+      "passport": "AA1234567",
+      "dob": "1990-03-15",
+      "dietary": null
+    },
+    "after": {
+      "id": "g_88",
+      "name": "Maria Papadopoulos",
+      "passport": "AB7654321",
+      "dob": "1990-03-15",
+      "dietary": "vegetarian"
+    }
+  }
+}

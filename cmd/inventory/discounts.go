@@ -77,8 +77,39 @@ func discountsDefs() []CommandDef {
 			Use: "discounts create", Short: "Create a discount", Kind: KindMutation,
 			Verb: "POST", Path: "/discounts", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
+			Long: "Create a discount. Provide exactly one of --discounted-price (fixed amount in " +
+				"minor units) or --discount-pct (percentage, 0-100, float). Server returns 422 " +
+				"if both or neither are provided. Omit --product-option-id for a global discount; " +
+				"otherwise the discount is scoped to one option. " +
+				"Pass --discount-pct via --data when fractional precision is required.",
+			Flags: []FlagDef{
+				{Name: "code", Type: "string", Required: true, Description: "Discount code"},
+				{Name: "validity-start", Type: "string", Required: true, Description: "RFC3339 timestamp when validity begins"},
+				{Name: "validity-end", Type: "string", Description: "RFC3339 timestamp when validity ends"},
+				{Name: "start-date", Type: "string", Description: "RFC3339 promo window start"},
+				{Name: "end-date", Type: "string", Description: "RFC3339 promo window end"},
+				{Name: "discounted-price", Type: "int", Description: "Fixed discount amount in minor units (xor --discount-pct)"},
+				{Name: "nb-offers", Type: "int", Description: "Maximum number of redemptions"},
+				{Name: "auto-apply", Type: "bool", Description: "Auto-apply discount to matching bookings"},
+				{Name: "product-option-id", Type: "string", Description: "Scope to a single product option"},
+				{Name: "discount-text", Type: "string", Description: "Customer-facing label"},
+				{Name: "discount-image", Type: "string", Description: "URL of accompanying image"},
+			},
+			ForensicFields: []string{"code", "discounted-price", "nb-offers", "auto-apply", "product-option-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"code":              "code",
+					"validity-start":    "validity_start",
+					"validity-end":      "validity_end",
+					"start-date":        "start_date",
+					"end-date":          "end_date",
+					"discounted-price":  "discounted_price",
+					"nb-offers":         "nb_offers",
+					"auto-apply":        "auto_apply",
+					"product-option-id": "product_option_id",
+					"discount-text":    "discount_text",
+					"discount-image":   "discount_image",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -86,7 +117,11 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -138,7 +173,11 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

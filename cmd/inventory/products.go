@@ -73,8 +73,34 @@ func productsDefs() []CommandDef {
 			Use: "products create", Short: "Create a product", Kind: KindMutation,
 			Verb: "POST", Path: "/products", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "title", Type: "string", Required: true, Description: "Product title"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code (e.g. EUR, USD)"},
+				{Name: "description", Type: "string", Description: "Product description"},
+				{Name: "status", Type: "string", Description: "draft|published"},
+				{Name: "schedule-type", Type: "string", Description: "FIXED|FLEXIBLE"},
+				{Name: "capacity", Type: "int", Description: "Default capacity"},
+				{Name: "cancellation-policy", Type: "string", Description: "Cancellation policy text"},
+				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
+				{Name: "category-ids", Type: "stringSlice", Description: "Comma-separated category IDs"},
+				{Name: "slug", Type: "string", Description: "URL slug (auto-generated if omitted)"},
+				{Name: "timezone", Type: "string", Description: "IANA timezone"},
+			},
+			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "cancellation-policy"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"title":               "title",
+					"currency":            "currency",
+					"description":         "description",
+					"status":              "status",
+					"schedule-type":       "schedule_type",
+					"capacity":            "capacity",
+					"cancellation-policy": "cancellation_policy",
+					"from-price":          "from_price",
+					"category-ids":        "category_ids",
+					"slug":                "slug",
+					"timezone":            "timezone",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -82,7 +108,11 @@ func productsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -92,17 +122,33 @@ func productsDefs() []CommandDef {
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
 				{Name: "title", Type: "string", Description: "Product title"},
-				{Name: "status", Type: "string", Description: "draft|published"},
+				{Name: "description", Type: "string", Description: "Product description"},
+				{Name: "status", Type: "string", Description: "draft|published|archived"},
+				{Name: "schedule-type", Type: "string", Description: "FIXED|FLEXIBLE"},
+				{Name: "capacity", Type: "int", Description: "Default capacity"},
+				{Name: "cancellation-policy", Type: "string", Description: "Cancellation policy text"},
+				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
+				{Name: "category-ids", Type: "stringSlice", Description: "Comma-separated category IDs"},
+				{Name: "slug", Type: "string", Description: "URL slug"},
+				{Name: "timezone", Type: "string", Description: "IANA timezone"},
 			},
-			ForensicFields: []string{"title", "status"},
+			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "cancellation-policy"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"title":  "title",
-					"status": "status",
+					"title":               "title",
+					"description":         "description",
+					"status":              "status",
+					"schedule-type":       "schedule_type",
+					"capacity":            "capacity",
+					"cancellation-policy": "cancellation_policy",
+					"from-price":          "from_price",
+					"category-ids":        "category_ids",
+					"slug":                "slug",
+					"timezone":            "timezone",
 				})
 				if err != nil {
 					return nil, err
@@ -111,7 +157,11 @@ func productsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

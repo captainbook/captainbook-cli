@@ -60,8 +60,28 @@ func productOptionsDefs() []CommandDef {
 			Use: "product-options create", Short: "Create a product option", Kind: KindMutation,
 			Verb: "POST", Path: "/product-options", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "title", Type: "string", Required: true, Description: "Option title"},
+				{Name: "product-id", Type: "string", Required: true, Description: "Parent product ID"},
+				{Name: "description", Type: "string", Description: "Option description"},
+				{Name: "capacity", Type: "int", Description: "Default capacity"},
+				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
+				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
+				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
+				{Name: "status", Type: "string", Description: "draft|published|archived"},
+			},
+			ForensicFields: []string{"capacity", "status", "product-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"title":            "title",
+					"product-id":       "product_id",
+					"description":      "description",
+					"capacity":         "capacity",
+					"duration-minutes": "duration_minutes",
+					"min-age":          "min_age",
+					"max-age":          "max_age",
+					"status":           "status",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -69,7 +89,11 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -77,12 +101,30 @@ func productOptionsDefs() []CommandDef {
 			Verb: "PATCH", Path: "/product-options/{id}", Ability: invpkg.Write,
 			DryRunMode:     DryRunBody,
 			PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "title", Type: "string", Description: "Option title"},
+				{Name: "description", Type: "string", Description: "Option description"},
+				{Name: "capacity", Type: "int", Description: "Default capacity"},
+				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
+				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
+				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
+				{Name: "status", Type: "string", Description: "draft|published|archived"},
+			},
+			ForensicFields: []string{"capacity", "status"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"title":            "title",
+					"description":      "description",
+					"capacity":         "capacity",
+					"duration-minutes": "duration_minutes",
+					"min-age":          "min_age",
+					"max-age":          "max_age",
+					"status":           "status",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -90,7 +132,11 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

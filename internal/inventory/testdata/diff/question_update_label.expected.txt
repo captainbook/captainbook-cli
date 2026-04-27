@@ -1,0 +1,6 @@
+Dry-run preview for Question q_99 (would_apply: true):
+
+  - label:     "Dietary requirements?"  →  "Any dietary requirements or allergies?"
+  - required:  false  →  true
+
+Run without --dry-run to apply.

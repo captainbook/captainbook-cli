@@ -55,8 +55,19 @@ func categoriesDefs() []CommandDef {
 		{
 			Use: "categories create", Short: "Create a category", Kind: KindMutation,
 			Verb: "POST", Path: "/categories", Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Required: true, Description: "Category name"},
+				{Name: "slug", Type: "string", Description: "URL slug"},
+				{Name: "description", Type: "string", Description: "Category description"},
+				{Name: "position", Type: "int", Description: "Sort position"},
+			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":        "name",
+					"slug":        "slug",
+					"description": "description",
+					"position":    "position",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -64,7 +75,11 @@ func categoriesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Category", "")
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Category", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

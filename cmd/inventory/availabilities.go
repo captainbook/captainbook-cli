@@ -89,12 +89,20 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 			Use: "update <id>", Short: "Update one availability", Kind: KindMutation,
 			Verb: "PATCH", Path: "/availabilities/{id}", Ability: invpkg.Write,
 			DryRunMode: DryRunBody, PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "capacity", Type: "int", Description: "Slot capacity"},
+				{Name: "status", Type: "string", Description: "available|blocked|cancelled"},
+			},
+			ForensicFields: []string{"capacity", "status"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"capacity": "capacity",
+					"status":   "status",
+				})
 				if err != nil {
 					return nil, err
 				}
@@ -102,7 +110,11 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{
@@ -110,6 +122,9 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 			Kind: KindMutation, Verb: "POST", Path: "/availabilities/{id}",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
+			Long: "The spec defines no dedicated /availabilities/{id}/restore endpoint; " +
+				"restoration is performed via UpdateAvailability with a restore-shaped body. " +
+				"Pass the body via --data; this command accepts no typed flags beyond --dry-run.",
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				// Availability "restore" is implemented at the spec level
 				// as a generic update with a restore-shaped body; there is
@@ -127,7 +142,11 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}, runner)

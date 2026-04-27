@@ -1,0 +1,6 @@
+Dry-run preview for Availability avail_42 (would_apply: true):
+
+  - capacity:            10  →  5
+  - capacity_remaining:  10  →  5
+
+Run without --dry-run to apply.

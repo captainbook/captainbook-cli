@@ -1,0 +1,19 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "po_17",
+      "name": "Adult ticket",
+      "duration_minutes": 60,
+      "capacity": 8,
+      "status": "active"
+    },
+    "after": {
+      "id": "po_17",
+      "name": "Adult ticket",
+      "duration_minutes": 60,
+      "capacity": 12,
+      "status": "active"
+    }
+  }
+}

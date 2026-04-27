@@ -1,0 +1,21 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "avail_42",
+      "date": "2026-05-15",
+      "start_time": "10:00",
+      "capacity": 10,
+      "capacity_remaining": 10,
+      "status": "available"
+    },
+    "after": {
+      "id": "avail_42",
+      "date": "2026-05-15",
+      "start_time": "10:00",
+      "capacity": 5,
+      "capacity_remaining": 5,
+      "status": "available"
+    }
+  }
+}

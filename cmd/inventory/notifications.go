@@ -43,7 +43,11 @@ func notificationsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}
