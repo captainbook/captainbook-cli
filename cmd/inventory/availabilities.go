@@ -192,45 +192,37 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 				return map[string]any{"fares": fares}, nil
 			},
 		),
-		bulkUpdateDef("start-time",
-			"Bulk update slot start time (and optional day-count for multi-day)",
-			[]FlagDef{
-				{Name: "start-time", Type: "string", Required: true, Description: "HH:MM"},
-				{Name: "end-time", Type: "string", Required: true, Description: "HH:MM"},
-				{Name: "day-count", Type: "int", Description: "Days the activity spans"},
-			},
-			func(args RunArgs) (any, error) {
-				v := map[string]any{
-					"start_time": args.FlagString("start-time"),
-					"end_time":   args.FlagString("end-time"),
-				}
-				if args.FlagSet("day-count") {
-					v["day_count"] = args.FlagInt("day-count")
-				}
-				return v, nil
-			},
-		),
-		bulkUpdateDef("end-time",
-			"Bulk update slot end time",
-			[]FlagDef{
-				{Name: "start-time", Type: "string", Required: true, Description: "HH:MM"},
-				{Name: "end-time", Type: "string", Required: true, Description: "HH:MM"},
-				{Name: "day-count", Type: "int", Description: "Days the activity spans"},
-			},
-			func(args RunArgs) (any, error) {
-				v := map[string]any{
-					"start_time": args.FlagString("start-time"),
-					"end_time":   args.FlagString("end-time"),
-				}
-				if args.FlagSet("day-count") {
-					v["day_count"] = args.FlagInt("day-count")
-				}
-				return v, nil
-			},
-		),
+		// start-time and end-time share spec's TimeValue shape (start_time +
+		// end_time + optional day_count) — only the `setting` discriminator
+		// differs. Build both from the same flag list and closure so a fix
+		// to one path can't drift from the other.
+		bulkUpdateDef("start-time", "Bulk update slot start time (and optional day-count for multi-day)", timeValueFlags, timeValueNewValue),
+		bulkUpdateDef("end-time", "Bulk update slot end time", timeValueFlags, timeValueNewValue),
 	}, runner)
 
 	return parent
+}
+
+// timeValueFlags / timeValueNewValue back both the start-time and end-time
+// bulk-update subcommands. The spec's TimeValue shape is identical for
+// `setting=start_time` and `setting=end_time` (start_time + end_time +
+// optional day_count); only the discriminator differs, so we share the
+// flag list and the body-builder closure.
+var timeValueFlags = []FlagDef{
+	{Name: "start-time", Type: "string", Required: true, Description: "HH:MM"},
+	{Name: "end-time", Type: "string", Required: true, Description: "HH:MM"},
+	{Name: "day-count", Type: "int", Description: "Days the activity spans"},
+}
+
+func timeValueNewValue(args RunArgs) (any, error) {
+	v := map[string]any{
+		"start_time": args.FlagString("start-time"),
+		"end_time":   args.FlagString("end-time"),
+	}
+	if args.FlagSet("day-count") {
+		v["day_count"] = args.FlagInt("day-count")
+	}
+	return v, nil
 }
 
 // bulkUpdateDef returns one CommandDef for an `availabilities bulk-update
