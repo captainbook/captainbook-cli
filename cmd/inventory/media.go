@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/captainbook/captainbook-cli/internal/api"
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 	"github.com/spf13/cobra"
@@ -121,12 +122,24 @@ func uploadCmd(runner *Runner) *cobra.Command {
 	c.Flags().StringP("file", "F", "", "Path to the media file (required)")
 	c.Flags().StringP("format", "f", "json", "Output format: json, table, csv")
 	c.Flags().String("idempotency-key", "", "Override the auto-minted UUIDv7 idempotency key")
+	// --dry-run is declared so users get the typed "not supported" error
+	// from D32 instead of cobra's "unknown flag --dry-run" output.
+	c.Flags().Bool("dry-run", false, "Not supported by uploadProductMedia (multipart endpoint has no server-side dry-run)")
 	_ = c.MarkFlagRequired("file")
 	c.RunE = func(cmd *cobra.Command, posArgs []string) error {
 		productID := posArgs[0]
 		path, _ := cmd.Flags().GetString("file")
 		idemKey, _ := cmd.Flags().GetString("idempotency-key")
 		fmtFlag, _ := cmd.Flags().GetString("format")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		// D32: --dry-run on a NotSupported endpoint = hard error.
+		if dryRun {
+			return &api.ExitError{
+				Err:  fmt.Errorf("--dry-run is not supported by POST /products/{id}/media (multipart upload has no server-side dry-run capability)"),
+				Code: api.ExitValidation,
+			}
+		}
 
 		// Ability gate first.
 		if err := invpkg.Refuse(invpkg.Write, runner.Abilities); err != nil {

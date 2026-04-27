@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
@@ -312,13 +313,9 @@ func TestErrorCode_Mapping(t *testing.T) {
 // TestMultipartUpload_OversizedFile verifies the pre-flight size check
 // rejects a file > 10 MiB before any network call (Critical Rule §5).
 //
-// We don't actually allocate 10 MiB; we use a temp file and override the
-// stat result by patching the cap via a helper. Simpler: write a small
-// sentinel file and assert the rejection code path on the actual stat
-// result by constructing a runner that points at a known-too-big path.
-//
-// For the purposes of this test we exercise the helper directly via a
-// custom path. Skipped on systems without sparse-file support.
+// Drives the real uploadCmd against a httptest server; if the pre-flight
+// check broke, the server would see a request and the test would fail.
+// Sparse-file truncate keeps disk usage trivial.
 func TestMultipartUpload_OversizedFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "huge.bin")
@@ -326,12 +323,10 @@ func TestMultipartUpload_OversizedFile(t *testing.T) {
 	if err != nil {
 		t.Skipf("create temp file: %v", err)
 	}
-	// Truncate to 11 MiB (sparse — no actual disk consumption).
 	if err := f.Truncate(maxUploadBytes + 1); err != nil {
 		t.Skipf("truncate: %v", err)
 	}
 	_ = f.Close()
-
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat: %v", err)
@@ -340,14 +335,28 @@ func TestMultipartUpload_OversizedFile(t *testing.T) {
 		t.Skipf("filesystem doesn't support sparse files; got size %d", info.Size())
 	}
 
-	// We can't easily invoke uploadCmd in isolation without a runner +
-	// httptest, but the size-check is the first thing it does. Assert
-	// the typed error directly via the same code path.
-	if info.Size() > maxUploadBytes {
-		err := &invpkg.PayloadTooLargeError{ActualBytes: info.Size(), MaxBytes: maxUploadBytes}
-		if !strings.Contains(err.UserMessage(), "MB") {
-			t.Errorf("UserMessage doesn't mention size: %s", err.UserMessage())
-		}
+	// Server records every hit so we can assert it never fired.
+	var hits int32
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	cmd := uploadCmd(runner)
+	cmd.SetArgs([]string{"prod_42", "--file", path})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var pte *invpkg.PayloadTooLargeError
+	if !errors.As(err, &pte) {
+		t.Fatalf("expected *PayloadTooLargeError, got %T: %v", err, err)
+	}
+	if got := atomic.LoadInt32(&hits); got != 0 {
+		t.Errorf("expected zero network calls before size check; got %d", got)
 	}
 }
 

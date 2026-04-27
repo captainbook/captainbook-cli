@@ -15,15 +15,18 @@ import (
 //
 // Note: the spec separates "available" (templates) from "issued" (an
 // instance with a code). The CLI mirrors that split:
-//   - list-available / get-available / create-available work on the
-//     /gift-certificates resource (templates).
-//   - list-issued / get-issued / issue / void / resend work on the
-//     /issued-gift-certificates resource.
+//   - list-available / create-available work on /gift-certs/available.
+//   - list-issued / get-issued work on /gift-certs/issued.
+//   - issue posts to /gift-certs/issue.
+//   - void / resend operate on /gift-certs/{id}/...
+// Spec abilities: gift-certs issue / void / resend require cli:write
+// (per spec line 2312). cli:cs is for booking comp/refund/confirmation
+// resend only.
 func giftCertificatesDefs() []CommandDef {
 	return []CommandDef{
 		{
 			Use: "gift-certificates list-available", Short: "List available (template) gift certs",
-			Kind: KindRead, Verb: "GET", Path: "/gift-certificates", Ability: invpkg.Read,
+			Kind: KindRead, Verb: "GET", Path: "/gift-certs/available", Ability: invpkg.Read,
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
 			},
@@ -44,7 +47,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates create-available", Short: "Create a gift cert template",
-			Kind: KindMutation, Verb: "POST", Path: "/gift-certificates",
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/available",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
@@ -60,7 +63,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates list-issued", Short: "List issued gift certs",
-			Kind: KindRead, Verb: "GET", Path: "/issued-gift-certificates", Ability: invpkg.Read,
+			Kind: KindRead, Verb: "GET", Path: "/gift-certs/issued", Ability: invpkg.Read,
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
 				{Name: "status", Type: "string", Description: "active|redeemed|voided"},
@@ -95,7 +98,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates get-issued <id>", Short: "Show one issued gift cert",
-			Kind: KindRead, Verb: "GET", Path: "/issued-gift-certificates/{id}",
+			Kind: KindRead, Verb: "GET", Path: "/gift-certs/issued/{id}",
 			Ability: invpkg.Read, PositionalArgs: []string{"id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
@@ -111,7 +114,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates issue", Short: "Issue a gift cert from a template",
-			Kind: KindMutation, Verb: "POST", Path: "/issued-gift-certificates",
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issue",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
@@ -127,8 +130,8 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates void <id>", Short: "Void an issued gift cert",
-			Kind: KindMutation, Verb: "POST", Path: "/issued-gift-certificates/{id}/void",
-			Ability:    invpkg.CS, // Voiding is a CS-only override action.
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/{id}/void",
+			Ability:    invpkg.Write, // Spec line 2312: gift-certs void is cli:write.
 			DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
@@ -157,7 +160,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates resend <id>", Short: "Resend a gift cert email",
-			Kind: KindMutation, Verb: "POST", Path: "/issued-gift-certificates/{id}/resend",
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/{id}/resend",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{

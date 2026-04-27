@@ -122,6 +122,14 @@ type CommandDef struct {
 	// flag-name list is identical to the API field-name list.
 	ForensicFields []string
 
+	// StaticForensic is fixed-value metadata merged into forensic_summary
+	// regardless of the user's flags. Use it when the CommandDef itself
+	// implies forensic facts that aren't visible in the request body —
+	// e.g. the bulk-update split has 5 sibling subcommands sharing one HTTP
+	// path; each one tags forensic_summary["setting"] with its own setting
+	// keyword so audit entries stay disambiguated.
+	StaticForensic map[string]any
+
 	// Run is the per-command function. It receives the orchestration
 	// context (Runner) plus parsed flags + path args, and is expected to
 	// invoke the generated client method, return the parsed response, and
@@ -263,6 +271,15 @@ type RunResult struct {
 	// only BulkUpdateAvailabilities). The runner emits the stderr signal
 	// "BULK_UPDATE_ACCEPTED bulk_update_id=<uuid>" (D31) and exits 0.
 	AsyncJobID string
+
+	// WireBody is the actual request bytes the closure sent (after typed
+	// flags merged, after dry_run injection). runMutation hashes WireBody
+	// for audit body_sha256 so the audit log accurately reflects what
+	// went on the wire — not the pre-merge --data input.
+	//
+	// Closures using JSONBodyFromArgs MUST populate this; closures sending
+	// no body (most DELETEs) leave it nil.
+	WireBody []byte
 }
 
 // Runner is the per-invocation orchestration context.
@@ -365,7 +382,9 @@ func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) e
 		return err
 	}
 
-	// D32: --dry-run on NotSupported is a hard error before network.
+	// D32: --dry-run on NotSupported is a hard error before network. With
+	// fix #2, --dry-run is now declared on every mutation (so cobra doesn't
+	// error with "unknown flag"); this gate is the user-facing message.
 	if args.DryRun && def.DryRunMode == DryRunNotSupported {
 		return &api.ExitError{
 			Err:  fmt.Errorf("--dry-run is not supported by %s %s (this endpoint has no server-side dry-run capability)", def.Verb, def.Path),
@@ -373,12 +392,30 @@ func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) e
 		}
 	}
 
-	// Body capture: we need bytes for the audit body_sha256.
-	bodyForHash := args.RawData
+	// Centralize idempotency-key minting so audit logs the actual key on
+	// the wire, not just the user override. Closures pass args.IdempotencyKey
+	// through Params.IdempotencyKey to the gen client; the transport's
+	// idempotencyKeyRT respects pre-set headers (no double-mint).
+	if args.IdempotencyKey == "" {
+		key, err := MintIdempotencyKey()
+		if err != nil {
+			return &api.ExitError{Err: fmt.Errorf("minting idempotency key: %w", err), Code: api.ExitUnexpected}
+		}
+		args.IdempotencyKey = key
+	}
 
 	start := time.Now()
 	res, runErr := def.Run(ctx, r, args)
 	duration := time.Since(start)
+
+	// Body hash reflects the actual wire body when the closure populated
+	// res.WireBody (after typed-flag merge + dry_run injection). Falls back
+	// to raw --data for closures that don't (e.g. closures that didn't
+	// thread WireBody through, or errors before any body was assembled).
+	bodyForHash := args.RawData
+	if res != nil && res.WireBody != nil {
+		bodyForHash = res.WireBody
+	}
 
 	auditEntry := invpkg.AuditEntry{
 		Ts:              time.Now().UTC(),
@@ -449,13 +486,18 @@ func errorCode(err error) string {
 	return ""
 }
 
-// forensicSummary captures the per-CommandDef ForensicFields slice into a
-// map for the audit entry's forensic_summary (D37).
+// forensicSummary captures the per-CommandDef ForensicFields slice + any
+// StaticForensic values into a map for the audit entry's forensic_summary
+// (D37). StaticForensic always lands in the output; ForensicFields only
+// populate when the user supplied that flag.
 func forensicSummary(def CommandDef, args RunArgs) map[string]any {
-	if len(def.ForensicFields) == 0 {
+	if len(def.ForensicFields) == 0 && len(def.StaticForensic) == 0 {
 		return nil
 	}
 	out := map[string]any{}
+	for k, v := range def.StaticForensic {
+		out[k] = v
+	}
 	for _, name := range def.ForensicFields {
 		if v, ok := args.Flags[name]; ok {
 			out[name] = v
@@ -501,11 +543,11 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 		}
 		c.Flags().StringP("format", "f", formatDefault, "Output format: json, table, csv")
 
-		// Common mutation flags.
+		// Common mutation flags. --dry-run is always declared so the
+		// runMutation gate (D32) can return a typed "endpoint does not
+		// support dry-run" error instead of cobra's "unknown flag".
 		if def.Kind == KindMutation {
-			if def.DryRunMode != DryRunNotSupported {
-				c.Flags().Bool("dry-run", false, "Preview the change without committing it")
-			}
+			c.Flags().Bool("dry-run", false, "Preview the change without committing it (rejected if endpoint does not support dry-run)")
 			c.Flags().String("idempotency-key", "", "Override the auto-minted UUIDv7 idempotency key")
 			c.Flags().String("data", "", "JSON request body (literal or @file.json)")
 		}
@@ -594,9 +636,10 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 		}
 
 		if def.Kind == KindMutation {
-			if def.DryRunMode != DryRunNotSupported {
-				args.DryRun, _ = cmd.Flags().GetBool("dry-run")
-			}
+			// --dry-run is always declared (so unsupported endpoints can return
+			// a typed error instead of "unknown flag"); read it unconditionally
+			// here. The gate at runMutation:369 enforces D32.
+			args.DryRun, _ = cmd.Flags().GetBool("dry-run")
 			args.IdempotencyKey, _ = cmd.Flags().GetString("idempotency-key")
 			data, _ := cmd.Flags().GetString("data")
 			if data != "" {
@@ -690,7 +733,7 @@ func ParseGenResponse(body []byte, httpResp *http.Response, resourceType, resour
 				res.AsyncJobID = jobID
 			}
 		}
-		res.ResponseID = tryParseDataID(body)
+		res.ResponseID = tryParseDataID(body, resourceType)
 		return res, nil
 	}
 
@@ -735,12 +778,18 @@ func tryParseAsyncJobID(body []byte) string {
 }
 
 // tryParseDataID extracts data.id (or data.<resource>.id as a fallback) for
-// audit logging.
-func tryParseDataID(body []byte) string {
+// audit logging. The fallback handles spec shapes like create-product where
+// the response is `{ "data": { "product": { "id": "prod_42", ... } } }`.
+// resourceType is the lowercase resource word ("product", "booking", etc.)
+// — closures pass it via ParseGenResponse.
+func tryParseDataID(body []byte, resourceType string) string {
 	var env struct {
 		Data json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal(body, &env); err != nil {
+		return ""
+	}
+	if len(env.Data) == 0 {
 		return ""
 	}
 	var direct struct {
@@ -749,7 +798,26 @@ func tryParseDataID(body []byte) string {
 	if err := json.Unmarshal(env.Data, &direct); err == nil && direct.ID != "" {
 		return direct.ID
 	}
-	return ""
+	if resourceType == "" {
+		return ""
+	}
+	// Fallback: look for data.<lowercased-resourceType>.id.
+	key := strings.ToLower(resourceType)
+	var nested map[string]json.RawMessage
+	if err := json.Unmarshal(env.Data, &nested); err != nil {
+		return ""
+	}
+	raw, ok := nested[key]
+	if !ok {
+		return ""
+	}
+	var inner struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &inner); err != nil {
+		return ""
+	}
+	return inner.ID
 }
 
 // MintIdempotencyKey returns a fresh UUIDv7 string.
@@ -883,22 +951,21 @@ func makeResourceParent(name, short string, defs []CommandDef, runner *Runner) *
 // time RunE fires, *sharedRunner is fully initialised.
 var sharedRunner *Runner
 
-// ProfileFlag and VerboseFlag are set by cmd/root.go before Execute().
-// The inventory package reads them in newRunner rather than reaching into
-// the root cobra command's flag set, so root and inventory stay decoupled.
-var (
-	ProfileFlag = ""
-	VerboseFlag = false
-)
-
 // newRunner resolves the profile, builds the transport, runs the abilities
-// preflight, and opens the audit log.
-func newRunner(_ *cobra.Command) (*Runner, error) {
+// preflight, and opens the audit log. It reads --profile and --verbose
+// directly from the cobra flag tree (which inherits from root's persistent
+// flags) so the inventory package doesn't depend on root-side mirroring.
+// Cobra runs only the first non-nil PersistentPreRun in the chain, so any
+// mirroring on the root would be shadowed by Cmd()'s own PersistentPreRunE.
+func newRunner(c *cobra.Command) (*Runner, error) {
 	if testNewRunner != nil {
 		return testNewRunner()
 	}
 
-	resolved, err := config.Resolve(ProfileFlag)
+	profileName, _ := c.Flags().GetString("profile")
+	verbose, _ := c.Flags().GetBool("verbose")
+
+	resolved, err := config.Resolve(profileName)
 	if err != nil {
 		return nil, &api.ExitError{Err: err, Code: api.ExitConfig}
 	}
@@ -915,7 +982,7 @@ func newRunner(_ *cobra.Command) (*Runner, error) {
 	transport := invpkg.New(invpkg.Config{
 		Token:        resolved.Token,
 		ExpectedHost: u.Host,
-		Verbose:      VerboseFlag,
+		Verbose:      verbose,
 		VerboseW:     verboseW,
 	}, nil)
 
@@ -963,9 +1030,9 @@ func newRunner(_ *cobra.Command) (*Runner, error) {
 		AuditLogger: logger,
 		Abilities:   abilities,
 		Profile:     resolved,
-		ProfileName: ProfileFlag,
+		ProfileName: profileName,
 		Tenant:      u.Host,
-		Verbose:     VerboseFlag,
+		Verbose:     verbose,
 		Out:         os.Stdout,
 		Err:         os.Stderr,
 	}, nil

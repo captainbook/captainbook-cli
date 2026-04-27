@@ -263,6 +263,10 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 		Ability: invpkg.Write, DryRunMode: DryRunBody,
 		Flags:          flags,
 		ForensicFields: forensic,
+		// All 5 bulk-update subcommands hit the same HTTP path; the
+		// `setting` discriminator is what distinguishes them. Static
+		// forensic ensures audit_summary records which one ran.
+		StaticForensic: map[string]any{"setting": specSetting},
 		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 			from, err := parseDate(args.FlagString("from"))
 			if err != nil {

@@ -194,7 +194,7 @@ func bookingsDefs() []CommandDef {
 		{
 			Use: "bookings resend-confirmation <id>", Short: "Resend booking confirmation",
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/notifications/resend-confirmation",
-			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Ability: invpkg.CS, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
 				{Name: "channel", Type: "string", Description: "email|sms"},

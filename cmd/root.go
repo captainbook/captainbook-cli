@@ -31,15 +31,11 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&profileName, "profile", "", "Config profile to use")
 	rootCmd.PersistentFlags().StringVarP(&formatFlag, "format", "f", "json", "Output format: json, table, csv")
 
-	// PersistentPreRun on the root mirrors the global flags into the
-	// inventory package so newRunner can resolve config + verbose without
-	// reaching into rootCmd's flagset (decoupling cmd/root from
-	// cmd/inventory). Lives here, runs once per invocation, before any
-	// subcommand's RunE.
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		cmdinventory.ProfileFlag = profileName
-		cmdinventory.VerboseFlag = verbose
-	}
+	// Note: cobra runs only the FIRST non-nil PersistentPreRun in the
+	// command chain. Cmd() under cmd/inventory installs its own (lazy
+	// runner construction), so any mirror-into-globals here would be
+	// shadowed and never fire. cmd/inventory/inventory.go reads --profile
+	// / --verbose directly via cobra's inherited flagset.
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(statsCmd())
