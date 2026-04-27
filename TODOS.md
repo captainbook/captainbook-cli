@@ -7,45 +7,22 @@ Test config file path handling on Windows (`%USERPROFILE%\.ceebee\config.yaml`).
 **Why:** Broadens agent compatibility for Windows-based dev environments.
 **Priority:** P3 — no known Windows users yet.
 
-## Spec/code enum-drift test (inventory CLI)
-Add a test that walks every `FlagDef.Description` in `cmd/inventory/*.go`,
-parses any `|`-separated tokens it finds, locates the matching spec field
-in `api/inventory/cli-v1.yaml` (via the flag-name → JSON-key map already
-in each Run closure), and asserts the description tokens match the spec's
-`enum:` list verbatim.
+## ~~Spec/code enum-drift test (inventory CLI)~~ — DONE in commit TBD
 
-**Why:** During PR review on the inventory CLI v1 work, automated tooling
-and codex caught three instances of enum/string drift between flag help
-text and the spec within two days:
-- `--booking-status` advertised `confirmed|pending|cancelled|expired`;
-  spec is `ON_HOLD|CONFIRMED|EXPIRED|CANCELLED` (uppercase, no "pending").
-- gift-cert `--status` advertised `active|redeemed|voided`; spec is
-  `active|redeemed|partial|void|expired` ("voided" doesn't exist).
-- `--send-email` mapped to JSON `send_email`; spec field is `send_now`
-  (server silently dropped, gift-cert emails never sent on issue).
+Implemented as `cmd/inventory/spec_drift_test.go`. Walks the AST of
+`cmd/inventory/*.go` to extract every `CommandDef` literal and the field
+map from each `JSONBodyFromArgs` call inside its Run closure, parses
+`api/inventory/cli-v1.yaml` into a flat ops + schemas map (single-hop
+$ref + allOf composition), and runs two assertions:
 
-The drift is silent for the agent (the help text reads, the JSON sends,
-the server returns 2xx because the unknown field is ignored) and only
-surfaces via review or production failure. A targeted CI test would
-catch the entire class.
+- `TestSpecDrift_FieldMapKeysExistInSpec`: every JSON key the CLI sends
+  must be a property of the spec request body OR a query parameter on
+  the operation. Catches the `--send-email → send_email` class.
+- `TestSpecDrift_FlagDescriptionEnumsMatchSpec`: every `FlagDef`
+  whose description starts with a `tok|tok|tok` run is set-equal-checked
+  against the spec enum at the corresponding field. Catches the
+  booking-status / gift-cert-status / transactions-type drift class.
 
-**Implementation sketch:**
-1. Walk `cmd/inventory/*.go` (AST or regex `FlagDef{`-blocks); collect
-   `(file, command-Use, flag-Name, flag-Description)` tuples.
-2. For each tuple, look up the corresponding `JSONBodyFromArgs` map call
-   in the same Run closure to get the flag-name → JSON-key mapping.
-3. Parse `api/inventory/cli-v1.yaml`; flatten to
-   `map[verb+path]map[json-key]{type, enum?}`.
-4. If the spec field has an `enum:` list, parse the description's
-   `|`-separated tokens and assert the sets match (order-independent,
-   case-sensitive — `pending` vs `ON_HOLD` is the bug).
-5. If the description has no `|`, skip — only enums are validated.
-
-A second, simpler check worth bundling: assert every JSON key produced
-by `JSONBodyFromArgs` exists as a property on the spec's request body
-schema. Catches the `--send-email → send_email` class even when no enum
-is involved.
-
-**Effort:** S–M (1–2 hours with a one-off YAML-to-flat-map parse).
-**Priority:** P2 — this bug class has shipped to a PR three times in
-two days. Worth automating before the surface grows.
+Verified to catch all four historical drift bugs by reverting each fix
+in turn and observing test failure with the expected file/line/flag
+detail.
