@@ -4,12 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 )
 
@@ -338,11 +336,3 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 		},
 	}
 }
-
-// _ ensures we keep the openapi_types import for future expansion (the
-// Date type is reachable via parseDate but the symbol isn't named here).
-var _ = openapi_types.Date{}
-
-// _ keeps http.StatusAccepted in scope for documentation purposes; the
-// 202-handling lives in ParseGenResponse.
-var _ = http.StatusAccepted
