@@ -279,13 +279,22 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 			if err != nil {
 				return nil, err
 			}
-			body := map[string]any{
-				"setting":           specSetting,
-				"from":              from.Format("2006-01-02"),
-				"to":                to.Format("2006-01-02"),
-				"product_option_id": args.FlagString("product-option-id"),
-				"new_value":         newValue,
+			// Start with --data (if any) as the base, then overlay typed
+			// fields. Matches JSONBodyFromArgs ordering used by every other
+			// mutation. Typed flags + the static `setting` discriminator
+			// always WIN so the subcommand's body shape stays correct even
+			// if --data tries to override them.
+			body := map[string]any{}
+			if len(args.RawData) > 0 {
+				if err := json.Unmarshal(args.RawData, &body); err != nil {
+					return nil, fmt.Errorf("--data: invalid JSON: %w", err)
+				}
 			}
+			body["setting"] = specSetting
+			body["from"] = from.Format("2006-01-02")
+			body["to"] = to.Format("2006-01-02")
+			body["product_option_id"] = args.FlagString("product-option-id")
+			body["new_value"] = newValue
 			if args.DryRun {
 				body["dry_run"] = true
 			}

@@ -24,6 +24,7 @@ func customersDefs() []CommandDef {
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "email", Type: "string", Description: "Filter by exact email"},
 				{Name: "country", Type: "string", Description: "ISO-3166-1 alpha-2"},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListCustomersParams{}
@@ -42,6 +43,10 @@ func customersDefs() []CommandDef {
 				}
 				if v := args.FlagString("country"); v != "" {
 					p.Country = &v
+				}
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
 				}
 				resp, err := r.Client.ListCustomersWithResponse(ctx, p)
 				if err != nil {

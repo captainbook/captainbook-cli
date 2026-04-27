@@ -80,8 +80,7 @@ func discountsDefs() []CommandDef {
 			Long: "Create a discount. Provide exactly one of --discounted-price (fixed amount in " +
 				"minor units) or --discount-pct (percentage, 0-100, float). Server returns 422 " +
 				"if both or neither are provided. Omit --product-option-id for a global discount; " +
-				"otherwise the discount is scoped to one option. " +
-				"Pass --discount-pct via --data when fractional precision is required.",
+				"otherwise the discount is scoped to one option.",
 			Flags: []FlagDef{
 				{Name: "code", Type: "string", Required: true, Description: "Discount code"},
 				{Name: "validity-start", Type: "string", Required: true, Description: "RFC3339 timestamp when validity begins"},
@@ -89,13 +88,14 @@ func discountsDefs() []CommandDef {
 				{Name: "start-date", Type: "string", Description: "RFC3339 promo window start"},
 				{Name: "end-date", Type: "string", Description: "RFC3339 promo window end"},
 				{Name: "discounted-price", Type: "int", Description: "Fixed discount amount in minor units (xor --discount-pct)"},
+				{Name: "discount-pct", Type: "float", Description: "Percentage discount, 0-100 (xor --discounted-price)"},
 				{Name: "nb-offers", Type: "int", Description: "Maximum number of redemptions"},
 				{Name: "auto-apply", Type: "bool", Description: "Auto-apply discount to matching bookings"},
 				{Name: "product-option-id", Type: "string", Description: "Scope to a single product option"},
 				{Name: "discount-text", Type: "string", Description: "Customer-facing label"},
 				{Name: "discount-image", Type: "string", Description: "URL of accompanying image"},
 			},
-			ForensicFields: []string{"code", "discounted-price", "nb-offers", "auto-apply", "product-option-id"},
+			ForensicFields: []string{"code", "discounted-price", "discount-pct", "nb-offers", "auto-apply", "product-option-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"code":              "code",
@@ -104,6 +104,7 @@ func discountsDefs() []CommandDef {
 					"start-date":        "start_date",
 					"end-date":          "end_date",
 					"discounted-price":  "discounted_price",
+					"discount-pct":     "discount_pct",
 					"nb-offers":         "nb_offers",
 					"auto-apply":        "auto_apply",
 					"product-option-id": "product_option_id",

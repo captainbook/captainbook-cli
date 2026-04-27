@@ -235,6 +235,16 @@ func (a RunArgs) FlagBool(name string) bool {
 	return false
 }
 
+// FlagFloat returns args.Flags[name] as a float64 (or 0 if absent).
+func (a RunArgs) FlagFloat(name string) float64 {
+	if v, ok := a.Flags[name]; ok {
+		if f, ok := v.(float64); ok {
+			return f
+		}
+	}
+	return 0
+}
+
 // FlagSlice returns args.Flags[name] as a []string (or nil if absent).
 func (a RunArgs) FlagSlice(name string) []string {
 	if v, ok := a.Flags[name]; ok {
@@ -654,6 +664,13 @@ func declareFlag(c *cobra.Command, fd FlagDef) {
 		} else {
 			c.Flags().IntSlice(fd.Name, def, fd.Description)
 		}
+	case "float":
+		def, _ := fd.Default.(float64)
+		if fd.Short != "" {
+			c.Flags().Float64P(fd.Name, fd.Short, def, fd.Description)
+		} else {
+			c.Flags().Float64(fd.Name, def, fd.Description)
+		}
 	}
 	if fd.Required {
 		_ = c.MarkFlagRequired(fd.Name)
@@ -734,6 +751,9 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 				args.Flags[fd.Name] = v
 			case "intSlice":
 				v, _ := cmd.Flags().GetIntSlice(fd.Name)
+				args.Flags[fd.Name] = v
+			case "float":
+				v, _ := cmd.Flags().GetFloat64(fd.Name)
 				args.Flags[fd.Name] = v
 			}
 		}
