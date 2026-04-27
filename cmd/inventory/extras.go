@@ -161,7 +161,11 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

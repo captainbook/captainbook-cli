@@ -72,7 +72,7 @@ func questionsDefs() []CommandDef {
 				{Name: "required", Type: "bool", Description: "Whether the answer is required"},
 				{Name: "options", Type: "stringSlice", Description: "Options (for type=select)"},
 			},
-			ForensicFields: []string{"required", "type"},
+			ForensicFields: []string{"label", "type", "required", "options"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"label":             "label",
@@ -105,7 +105,7 @@ func questionsDefs() []CommandDef {
 				{Name: "required", Type: "bool", Description: "Whether the answer is required"},
 				{Name: "options", Type: "stringSlice", Description: "Options (for type=select)"},
 			},
-			ForensicFields: []string{"required", "type"},
+			ForensicFields: []string{"label", "type", "required", "options"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
@@ -164,7 +164,11 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

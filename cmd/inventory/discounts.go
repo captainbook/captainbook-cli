@@ -198,7 +198,11 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

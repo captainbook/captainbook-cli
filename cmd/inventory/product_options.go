@@ -68,7 +68,7 @@ func productOptionsDefs() []CommandDef {
 				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
 				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
-				{Name: "status", Type: "string", Description: "draft|published|archived"},
+				{Name: "status", Type: "string", Description: "draft|published"},
 			},
 			ForensicFields: []string{"capacity", "status", "product-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -108,7 +108,7 @@ func productOptionsDefs() []CommandDef {
 				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
 				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
-				{Name: "status", Type: "string", Description: "draft|published|archived"},
+				{Name: "status", Type: "string", Description: "draft|published"},
 			},
 			ForensicFields: []string{"capacity", "status"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -176,7 +176,11 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

@@ -134,8 +134,24 @@ func giftCertificatesDefs() []CommandDef {
 			Use: "gift-certificates issue", Short: "Issue a gift cert from a template",
 			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issue",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Flags: []FlagDef{
+				{Name: "available-gift-certificate-id", Type: "string", Required: true, Description: "Source SKU template"},
+				{Name: "recipient-email", Type: "string", Required: true, Description: "Recipient email address"},
+				{Name: "recipient-name", Type: "string", Required: true, Description: "Recipient full name"},
+				{Name: "amount", Type: "int", Required: true, Description: "Issued amount (minor units)"},
+				{Name: "send-email", Type: "bool", Description: "Send the cert email immediately on issue"},
+				{Name: "expires-at", Type: "string", Description: "Override expiry (ISO date)"},
+			},
+			ForensicFields: []string{"available-gift-certificate-id", "recipient-email", "amount"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"available-gift-certificate-id": "available_gift_certificate_id",
+					"recipient-email":               "recipient_email",
+					"recipient-name":                "recipient_name",
+					"amount":                        "amount",
+					"send-email":                    "send_email",
+					"expires-at":                    "expires_at",
+				})
 				if err != nil {
 					return nil, err
 				}

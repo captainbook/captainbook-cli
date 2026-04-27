@@ -174,7 +174,11 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

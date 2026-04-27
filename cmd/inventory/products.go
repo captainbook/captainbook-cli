@@ -123,7 +123,7 @@ func productsDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "title", Type: "string", Description: "Product title"},
 				{Name: "description", Type: "string", Description: "Product description"},
-				{Name: "status", Type: "string", Description: "draft|published|archived"},
+				{Name: "status", Type: "string", Description: "draft|published"},
 				{Name: "schedule-type", Type: "string", Description: "FIXED|FLEXIBLE"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "cancellation-policy", Type: "string", Description: "Cancellation policy text"},
@@ -202,7 +202,11 @@ func productsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 	}

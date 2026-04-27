@@ -3,17 +3,17 @@
   "diff": {
     "before": {
       "id": "po_17",
-      "name": "Adult ticket",
+      "title": "Adult ticket",
       "duration_minutes": 60,
       "capacity": 8,
-      "status": "active"
+      "status": "published"
     },
     "after": {
       "id": "po_17",
-      "name": "Adult ticket",
+      "title": "Adult ticket",
       "duration_minutes": 60,
       "capacity": 12,
-      "status": "active"
+      "status": "published"
     }
   }
 }
