@@ -18,9 +18,17 @@ func transactionsDefs() []CommandDef {
 		{
 			Use: "transactions list", Short: "List transactions", Kind: KindRead,
 			Verb: "GET", Path: "/transactions", Ability: invpkg.Read,
+			// NOTE: --status is intentionally NOT exposed. The spec's
+			// listTransactions query parameter accepts
+			// [pending,succeeded,failed,partial], but the Transaction
+			// schema's status enum is [succeeded] with the description
+			// "Always `succeeded` — failed payments don't produce a row at
+			// all." Filtering by anything other than `succeeded` is
+			// guaranteed zero results, and `succeeded` filters everything,
+			// so the flag is a no-op trap. Filed as a server-team issue;
+			// re-add the flag when the schema gains real status semantics.
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "status", Type: "string", Description: "pending|succeeded|failed|partial"},
 				{Name: "type", Type: "string", Description: "charge|refund|comp"},
 				{Name: "from", Type: "string", Description: "Transaction created_at >= ISO 8601"},
 				{Name: "to", Type: "string", Description: "Transaction created_at <= ISO 8601"},
@@ -32,10 +40,6 @@ func transactionsDefs() []CommandDef {
 				}
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
-				}
-				if v := args.FlagString("status"); v != "" {
-					s := gen.ListTransactionsParamsStatus(v)
-					p.Status = &s
 				}
 				if v := args.FlagString("type"); v != "" {
 					t := gen.ListTransactionsParamsType(v)
