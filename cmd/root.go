@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	cmdinventory "github.com/captainbook/captainbook-cli/cmd/inventory"
 	"github.com/captainbook/captainbook-cli/internal/api"
 	"github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/spf13/cobra"
@@ -30,11 +31,22 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&profileName, "profile", "", "Config profile to use")
 	rootCmd.PersistentFlags().StringVarP(&formatFlag, "format", "f", "json", "Output format: json, table, csv")
 
+	// PersistentPreRun on the root mirrors the global flags into the
+	// inventory package so newRunner can resolve config + verbose without
+	// reaching into rootCmd's flagset (decoupling cmd/root from
+	// cmd/inventory). Lives here, runs once per invocation, before any
+	// subcommand's RunE.
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		cmdinventory.ProfileFlag = profileName
+		cmdinventory.VerboseFlag = verbose
+	}
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(statsCmd())
 	rootCmd.AddCommand(configCmd())
 	rootCmd.AddCommand(auditCmd())
 	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(cmdinventory.Cmd())
 }
 
 var versionCmd = &cobra.Command{
