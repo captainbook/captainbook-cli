@@ -127,40 +127,13 @@ func availabilitiesDefs() []CommandDef {
 				return res, err
 			},
 		},
-		{
-			Use: "restore <id>", Short: "Restore a soft-deleted availability",
-			// Restoration is a PATCH against /availabilities/{id} with a
-			// restore-shaped body (the spec has no dedicated restore
-			// endpoint — see Long below). Verb tracks the wire request
-			// so audit + access logs correlate.
-			Kind: KindMutation, Verb: "PATCH", Path: "/availabilities/{id}",
-			Ability: invpkg.Write, DryRunMode: DryRunBody,
-			PositionalArgs: []string{"id"},
-			Long: "The spec defines no dedicated /availabilities/{id}/restore endpoint; " +
-				"restoration is performed via UpdateAvailability with a restore-shaped body. " +
-				"Pass the body via --data; this command accepts no typed flags beyond --dry-run.",
-			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				// Availability "restore" is implemented at the spec level
-				// as a generic update with a restore-shaped body; there is
-				// no dedicated restore endpoint in the gen client today.
-				// We reuse update to keep the surface consistent.
-				id, err := pathArg(args)
-				if err != nil {
-					return nil, err
-				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, nil)
-				if err != nil {
-					return nil, err
-				}
-				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
-				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
-				if res != nil {
-					res.WireBody = body
-				}
-				return res, err
-			},
-		},
+		// NOTE: no restore command. Per spec, Availability is NOT a
+		// soft-deletable resource: the schema has no `deleted_at` property,
+		// the list endpoint has no `?include_trashed=` parameter, and there
+		// is no /availabilities/{id}/restore operation. Earlier scaffolding
+		// added a restore command that PATCH'd the update endpoint with an
+		// empty body — a no-op that misled users (and Claude Code) into
+		// thinking soft-delete recovery was supported. Removed.
 	}
 }
 
