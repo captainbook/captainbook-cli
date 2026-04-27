@@ -71,7 +71,7 @@ func categoriesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreateCategoryWithBodyWithResponse(ctx, &gen.CreateCategoryParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreateCategoryWithBodyWithResponse(ctx, &gen.CreateCategoryParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

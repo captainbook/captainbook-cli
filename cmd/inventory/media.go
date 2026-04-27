@@ -18,6 +18,7 @@ import (
 	"github.com/captainbook/captainbook-cli/internal/api"
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -103,7 +104,7 @@ func mediaDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.DeleteMediaWithResponse(ctx, id, &gen.DeleteMediaParams{})
+				resp, err := r.Client.DeleteMediaWithResponse(ctx, id, &gen.DeleteMediaParams{IdempotencyKey: args.IdempotencyKeyUUID})
 				if err != nil {
 					return nil, err
 				}
@@ -197,32 +198,34 @@ func uploadCmd(runner *Runner) *cobra.Command {
 			return fmt.Errorf("upload: close multipart: %w", err)
 		}
 
-		// Mint or honor the idempotency key.
+		// Mint or honor the idempotency key. Parse into a *UUID so we
+		// can pass it via Params.IdempotencyKey (matching how runMutation
+		// threads keys through the gen client). This keeps the audit
+		// entry's idempotency_key in lockstep with the wire request and
+		// satisfies the structural TestSpecDrift_IdempotencyKeyThreaded
+		// guard that no mutation Params literal goes out without a key.
 		if idemKey == "" {
 			idemKey, err = MintIdempotencyKey()
 			if err != nil {
 				return fmt.Errorf("upload: minting idempotency key: %w", err)
 			}
 		}
+		parsedKey, err := uuid.Parse(idemKey)
+		if err != nil {
+			return &api.ExitError{
+				Err:  fmt.Errorf("--idempotency-key %q is not a valid UUID: %w", idemKey, err),
+				Code: api.ExitValidation,
+			}
+		}
 
-		// Send via gen client's WithBody method. The transport's
-		// idempotencyKeyRT will see the key already set on the request
-		// and skip re-minting.
-		params := &gen.UploadProductMediaParams{}
-		// Convert idemKey to *IdempotencyKey (UUID under the hood); the
-		// transport sets the header from req.Header rather than the typed
-		// param, so we attach via reqEditors below for correctness.
+		params := &gen.UploadProductMediaParams{IdempotencyKey: &parsedKey}
 		ctx := cmd.Context()
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		reqEditor := func(_ context.Context, req *http.Request) error {
-			req.Header.Set("Idempotency-Key", idemKey)
-			return nil
-		}
 
 		start := time.Now()
-		resp, err := runner.Client.UploadProductMediaWithBodyWithResponse(ctx, productID, params, mw.FormDataContentType(), &bodyBuf, reqEditor)
+		resp, err := runner.Client.UploadProductMediaWithBodyWithResponse(ctx, productID, params, mw.FormDataContentType(), &bodyBuf)
 		duration := time.Since(start)
 		var status int
 		var responseID string

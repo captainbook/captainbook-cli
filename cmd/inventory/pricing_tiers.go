@@ -91,7 +91,7 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreatePricingTierWithBodyWithResponse(ctx, &gen.CreatePricingTierParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreatePricingTierWithBodyWithResponse(ctx, &gen.CreatePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -124,7 +124,7 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdatePricingTierWithBodyWithResponse(ctx, id, &gen.UpdatePricingTierParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdatePricingTierWithBodyWithResponse(ctx, id, &gen.UpdatePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -149,7 +149,7 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.DeletePricingTierWithResponse(ctx, id, &gen.DeletePricingTierParams{})
+				resp, err := r.Client.DeletePricingTierWithResponse(ctx, id, &gen.DeletePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID})
 				if err != nil {
 					return nil, err
 				}
@@ -170,7 +170,7 @@ func pricingTiersDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.RestorePricingTierWithBodyWithResponse(ctx, id, &gen.RestorePricingTierParams{}, "application/json", asReader(body))
+				resp, err := r.Client.RestorePricingTierWithBodyWithResponse(ctx, id, &gen.RestorePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

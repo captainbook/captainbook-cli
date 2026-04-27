@@ -7,22 +7,27 @@ Test config file path handling on Windows (`%USERPROFILE%\.ceebee\config.yaml`).
 **Why:** Broadens agent compatibility for Windows-based dev environments.
 **Priority:** P3 — no known Windows users yet.
 
-## ~~Spec/code enum-drift test (inventory CLI)~~ — DONE in commit TBD
+## ~~Spec/code drift tests (inventory CLI)~~ — DONE
 
 Implemented as `cmd/inventory/spec_drift_test.go`. Walks the AST of
-`cmd/inventory/*.go` to extract every `CommandDef` literal and the field
-map from each `JSONBodyFromArgs` call inside its Run closure, parses
-`api/inventory/cli-v1.yaml` into a flat ops + schemas map (single-hop
-$ref + allOf composition), and runs two assertions:
+`cmd/inventory/*.go` and parses `api/inventory/cli-v1.yaml` (single-hop
+`$ref` + `allOf` composition), running three assertions:
 
-- `TestSpecDrift_FieldMapKeysExistInSpec`: every JSON key the CLI sends
-  must be a property of the spec request body OR a query parameter on
-  the operation. Catches the `--send-email → send_email` class.
+- `TestSpecDrift_FieldMapKeysExistInSpec`: every JSON key in every
+  `JSONBodyFromArgs` map literal must be a property of the spec's
+  request body OR a query parameter. Also catches verb/path typos (e.g.
+  POST /availabilities/{id} when the spec has only PATCH there).
+  Caught: `--send-email → send_email`, availability-restore POST/PATCH,
+  `/auth/whoami` vs `/whoami`.
 - `TestSpecDrift_FlagDescriptionEnumsMatchSpec`: every `FlagDef`
   whose description starts with a `tok|tok|tok` run is set-equal-checked
-  against the spec enum at the corresponding field. Catches the
-  booking-status / gift-cert-status / transactions-type drift class.
+  against the spec enum at the corresponding field. Caught: booking-
+  status / gift-cert-status / transactions-type / transactions-status.
+- `TestSpecDrift_IdempotencyKeyThreaded`: every `gen.<Mutation>Params`
+  literal MUST set `IdempotencyKey` (the set of "mutation Params" is
+  derived statically from `internal/inventory/gen` so the test stays
+  accurate as the spec evolves). Caught: 33 mutation closures that were
+  passing empty Params, causing audit/wire key divergence.
 
-Verified to catch all four historical drift bugs by reverting each fix
-in turn and observing test failure with the expected file/line/flag
-detail.
+Validated by reverting each historical drift bug in turn and observing
+precise file:line failure output.

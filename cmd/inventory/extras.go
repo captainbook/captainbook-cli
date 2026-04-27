@@ -81,7 +81,7 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreateExtraWithBodyWithResponse(ctx, &gen.CreateExtraParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreateExtraWithBodyWithResponse(ctx, &gen.CreateExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -117,7 +117,7 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdateExtraWithBodyWithResponse(ctx, id, &gen.UpdateExtraParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdateExtraWithBodyWithResponse(ctx, id, &gen.UpdateExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -137,7 +137,7 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.DeleteExtraWithResponse(ctx, id, &gen.DeleteExtraParams{})
+				resp, err := r.Client.DeleteExtraWithResponse(ctx, id, &gen.DeleteExtraParams{IdempotencyKey: args.IdempotencyKeyUUID})
 				if err != nil {
 					return nil, err
 				}
@@ -157,7 +157,7 @@ func extrasDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.RestoreExtraWithBodyWithResponse(ctx, id, &gen.RestoreExtraParams{}, "application/json", asReader(body))
+				resp, err := r.Client.RestoreExtraWithBodyWithResponse(ctx, id, &gen.RestoreExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

@@ -89,7 +89,7 @@ func guestsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdateGuestWithBodyWithResponse(ctx, id, &gen.UpdateGuestParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdateGuestWithBodyWithResponse(ctx, id, &gen.UpdateGuestParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

@@ -113,7 +113,7 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreateDiscountWithBodyWithResponse(ctx, &gen.CreateDiscountParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreateDiscountWithBodyWithResponse(ctx, &gen.CreateDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -137,7 +137,7 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				p := &gen.DeleteDiscountParams{}
+				p := &gen.DeleteDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}
 				if args.DryRun {
 					t := true
 					p.DryRun = &t
@@ -169,7 +169,7 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.ApplyDiscountWithBodyWithResponse(ctx, id, &gen.ApplyDiscountParams{}, "application/json", asReader(body))
+				resp, err := r.Client.ApplyDiscountWithBodyWithResponse(ctx, id, &gen.ApplyDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -194,7 +194,7 @@ func discountsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.RestoreDiscountWithBodyWithResponse(ctx, id, &gen.RestoreDiscountParams{}, "application/json", asReader(body))
+				resp, err := r.Client.RestoreDiscountWithBodyWithResponse(ctx, id, &gen.RestoreDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

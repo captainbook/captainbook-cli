@@ -61,6 +61,7 @@ import (
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 	"github.com/captainbook/captainbook-cli/internal/output"
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 )
 
@@ -172,10 +173,21 @@ type RunArgs struct {
 	// authoritative.
 	DryRun bool
 
-	// IdempotencyKey is the resolved value of --idempotency-key (empty if
-	// not set; the transport layer mints a UUIDv7 in that case). Closures
-	// rarely need to read this — the transport handles it.
+	// IdempotencyKey is the resolved UUIDv7 idempotency key as a string.
+	// runMutation mints one upfront if the user didn't pass
+	// --idempotency-key, so this is ALWAYS populated for mutations by the
+	// time def.Run fires. Used for the audit log; closures should pass
+	// IdempotencyKeyUUID (the parsed pointer form) into Params.IdempotencyKey
+	// of the generated client to ensure the wire key matches what audit
+	// records.
 	IdempotencyKey string
+
+	// IdempotencyKeyUUID is the parsed *openapi_types.UUID form of
+	// IdempotencyKey, suitable for direct assignment to the generated
+	// client's Params.IdempotencyKey field. Without threading this through,
+	// the transport's idempotencyKeyRT mints a SECOND key on the wire and
+	// audit's idempotency_key diverges from the server's view.
+	IdempotencyKeyUUID *openapi_types.UUID
 
 	// Flags is the parsed flag values keyed by FlagDef.Name (kebab-case).
 	// Missing flags are omitted from the map. Use FlagString / FlagInt /
@@ -392,17 +404,35 @@ func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) e
 		}
 	}
 
-	// Centralize idempotency-key minting so audit logs the actual key on
-	// the wire, not just the user override. Closures pass args.IdempotencyKey
-	// through Params.IdempotencyKey to the gen client; the transport's
-	// idempotencyKeyRT respects pre-set headers (no double-mint).
+	// Centralize idempotency-key resolution so the audit log records the
+	// SAME key that goes on the wire. Steps:
+	//   1. If user passed --idempotency-key, validate it's a UUID; else
+	//      mint a fresh UUIDv7.
+	//   2. Store both string + *UUID forms on args.
+	//   3. Closures MUST set Params.IdempotencyKey = args.IdempotencyKeyUUID
+	//      on the generated client. Without that, the transport's
+	//      idempotencyKeyRT would mint a SECOND key and audit's
+	//      idempotency_key would diverge from the server's view, breaking
+	//      forensic correlation with server-side state.
+	var keyUUID openapi_types.UUID
 	if args.IdempotencyKey == "" {
-		key, err := MintIdempotencyKey()
+		minted, err := uuid.NewV7()
 		if err != nil {
 			return &api.ExitError{Err: fmt.Errorf("minting idempotency key: %w", err), Code: api.ExitUnexpected}
 		}
-		args.IdempotencyKey = key
+		args.IdempotencyKey = minted.String()
+		keyUUID = minted
+	} else {
+		parsed, err := uuid.Parse(args.IdempotencyKey)
+		if err != nil {
+			return &api.ExitError{
+				Err:  fmt.Errorf("--idempotency-key %q is not a valid UUID: %w", args.IdempotencyKey, err),
+				Code: api.ExitValidation,
+			}
+		}
+		keyUUID = parsed
 	}
+	args.IdempotencyKeyUUID = &keyUUID
 
 	start := time.Now()
 	res, runErr := def.Run(ctx, r, args)

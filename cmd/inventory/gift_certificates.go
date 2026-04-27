@@ -68,7 +68,7 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreateAvailableGiftCertWithBodyWithResponse(ctx, &gen.CreateAvailableGiftCertParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreateAvailableGiftCertWithBodyWithResponse(ctx, &gen.CreateAvailableGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -157,7 +157,7 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.IssueGiftCertWithBodyWithResponse(ctx, &gen.IssueGiftCertParams{}, "application/json", asReader(body))
+				resp, err := r.Client.IssueGiftCertWithBodyWithResponse(ctx, &gen.IssueGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -191,7 +191,7 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.VoidGiftCertWithBodyWithResponse(ctx, id, &gen.VoidGiftCertParams{}, "application/json", asReader(body))
+				resp, err := r.Client.VoidGiftCertWithBodyWithResponse(ctx, id, &gen.VoidGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -222,7 +222,7 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.ResendGiftCertWithBodyWithResponse(ctx, id, &gen.ResendGiftCertParams{}, "application/json", asReader(body))
+				resp, err := r.Client.ResendGiftCertWithBodyWithResponse(ctx, id, &gen.ResendGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

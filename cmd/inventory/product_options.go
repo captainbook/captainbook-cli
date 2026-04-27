@@ -85,7 +85,7 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreateProductOptionWithBodyWithResponse(ctx, &gen.CreateProductOptionParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreateProductOptionWithBodyWithResponse(ctx, &gen.CreateProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -128,7 +128,7 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdateProductOptionWithBodyWithResponse(ctx, id, &gen.UpdateProductOptionParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdateProductOptionWithBodyWithResponse(ctx, id, &gen.UpdateProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -151,7 +151,7 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.DeleteProductOptionWithResponse(ctx, id, &gen.DeleteProductOptionParams{})
+				resp, err := r.Client.DeleteProductOptionWithResponse(ctx, id, &gen.DeleteProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID})
 				if err != nil {
 					return nil, err
 				}
@@ -172,7 +172,7 @@ func productOptionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.RestoreProductOptionWithBodyWithResponse(ctx, id, &gen.RestoreProductOptionParams{}, "application/json", asReader(body))
+				resp, err := r.Client.RestoreProductOptionWithBodyWithResponse(ctx, id, &gen.RestoreProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}

@@ -120,7 +120,7 @@ func availabilitiesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -133,7 +133,11 @@ func availabilitiesDefs() []CommandDef {
 		},
 		{
 			Use: "restore <id>", Short: "Restore a soft-deleted availability",
-			Kind: KindMutation, Verb: "POST", Path: "/availabilities/{id}",
+			// Restoration is a PATCH against /availabilities/{id} with a
+			// restore-shaped body (the spec has no dedicated restore
+			// endpoint — see Long below). Verb tracks the wire request
+			// so audit + access logs correlate.
+			Kind: KindMutation, Verb: "PATCH", Path: "/availabilities/{id}",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
 			Long: "The spec defines no dedicated /availabilities/{id}/restore endpoint; " +
@@ -152,7 +156,7 @@ func availabilitiesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -322,7 +326,7 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 			if err != nil {
 				return nil, err
 			}
-			resp, err := r.Client.BulkUpdateAvailabilitiesWithBodyWithResponse(ctx, &gen.BulkUpdateAvailabilitiesParams{}, "application/json", asReader(raw))
+			resp, err := r.Client.BulkUpdateAvailabilitiesWithBodyWithResponse(ctx, &gen.BulkUpdateAvailabilitiesParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(raw))
 			if err != nil {
 				return nil, err
 			}

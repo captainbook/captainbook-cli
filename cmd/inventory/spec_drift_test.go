@@ -527,12 +527,15 @@ func TestSpecDrift_FieldMapKeysExistInSpec(t *testing.T) {
 		t.Fatal("no CommandDef literals found — AST walker broken")
 	}
 	for _, c := range cmds {
-		if len(c.FieldMap) == 0 {
-			continue // read-only or body-less mutation
-		}
+		// Look up the spec op for EVERY command (not just ones with a
+		// non-empty FieldMap). A typo in Verb/Path is its own bug class
+		// — the audit log records a non-existent endpoint and forensic
+		// correlation with server access logs breaks. Skipping
+		// FieldMap-less commands here would let those slip through.
 		op := spec.findOp(c.Verb, c.Path)
 		if op == nil {
-			t.Errorf("[%s] %q: no spec operation for %s %s", c.File, c.Use, c.Verb, c.Path)
+			t.Errorf("[%s] %q: no spec operation for %s %s (verb/path typo? — audit will record a non-existent endpoint)",
+				c.File, c.Use, c.Verb, c.Path)
 			continue
 		}
 		for flagName, jsonKey := range c.FieldMap {
@@ -549,6 +552,125 @@ func TestSpecDrift_FieldMapKeysExistInSpec(t *testing.T) {
 				c.File, c.Use, c.Verb, c.Path, flagName, jsonKey)
 		}
 	}
+}
+
+// TestSpecDrift_IdempotencyKeyThreaded asserts every gen.<Mutation>Params
+// literal in cmd/inventory/*.go sets the IdempotencyKey field. Without
+// it, the transport's idempotencyKeyRT mints a SECOND UUIDv7 on the
+// wire, audit logs a different key from what hits the server, and
+// forensic correlation breaks. This is the structural shape of the
+// "every mutation closure must thread the key" rule.
+//
+// The set of "mutation Params" is derived statically from the gen
+// package: any Params struct that declares a field literally typed
+// `*IdempotencyKey` is a mutation params and MUST have the field set
+// at construction.
+func TestSpecDrift_IdempotencyKeyThreaded(t *testing.T) {
+	mutationParams := mutationParamsTypes(t)
+	if len(mutationParams) == 0 {
+		t.Fatal("no mutation Params types found — gen package walker broken")
+	}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, ".", func(fi os.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go")
+	}, parser.AllErrors)
+	if err != nil {
+		t.Fatalf("parser.ParseDir: %v", err)
+	}
+	for _, pkg := range pkgs {
+		for fname, file := range pkg.Files {
+			short := filepath.Base(fname)
+			ast.Inspect(file, func(n ast.Node) bool {
+				cl, ok := n.(*ast.CompositeLit)
+				if !ok {
+					return true
+				}
+				name, isGen := genParamsName(cl.Type)
+				if !isGen {
+					return true
+				}
+				if !mutationParams[name] {
+					return true
+				}
+				// Found a mutation Params literal — does it set
+				// IdempotencyKey?
+				for _, elt := range cl.Elts {
+					kv, ok := elt.(*ast.KeyValueExpr)
+					if !ok {
+						continue
+					}
+					if id, ok := kv.Key.(*ast.Ident); ok && id.Name == "IdempotencyKey" {
+						return true // OK, key is set
+					}
+				}
+				pos := fset.Position(cl.Pos())
+				t.Errorf("[%s:%d] gen.%s literal does NOT set IdempotencyKey — audit/wire keys will diverge",
+					short, pos.Line, name)
+				return true
+			})
+		}
+	}
+}
+
+// mutationParamsTypes returns the set of gen.<Name>Params type names
+// that declare an IdempotencyKey field. Statically derived from
+// internal/inventory/gen/inventory.gen.go via a small AST walk so the
+// test stays accurate as the spec evolves.
+func mutationParamsTypes(t *testing.T) map[string]bool {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "../../internal/inventory/gen/inventory.gen.go", nil, parser.AllErrors)
+	if err != nil {
+		t.Fatalf("parse gen file: %v", err)
+	}
+	out := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		ts, ok := n.(*ast.TypeSpec)
+		if !ok {
+			return true
+		}
+		st, ok := ts.Type.(*ast.StructType)
+		if !ok {
+			return true
+		}
+		if !strings.HasSuffix(ts.Name.Name, "Params") {
+			return true
+		}
+		for _, field := range st.Fields.List {
+			if len(field.Names) == 0 || field.Names[0].Name != "IdempotencyKey" {
+				continue
+			}
+			// Must be *IdempotencyKey to count.
+			star, ok := field.Type.(*ast.StarExpr)
+			if !ok {
+				continue
+			}
+			if id, ok := star.X.(*ast.Ident); ok && id.Name == "IdempotencyKey" {
+				out[ts.Name.Name] = true
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// genParamsName matches `gen.NameParams` in a CompositeLit.Type and
+// returns "NameParams". Returns "", false when the type isn't a gen
+// package selector.
+func genParamsName(e ast.Expr) (string, bool) {
+	se, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	pkg, ok := se.X.(*ast.Ident)
+	if !ok || pkg.Name != "gen" {
+		return "", false
+	}
+	if !strings.HasSuffix(se.Sel.Name, "Params") {
+		return "", false
+	}
+	return se.Sel.Name, true
 }
 
 // TestSpecDrift_FlagDescriptionEnumsMatchSpec asserts every FlagDef

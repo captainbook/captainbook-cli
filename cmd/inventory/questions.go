@@ -84,7 +84,7 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.CreateQuestionWithBodyWithResponse(ctx, &gen.CreateQuestionParams{}, "application/json", asReader(body))
+				resp, err := r.Client.CreateQuestionWithBodyWithResponse(ctx, &gen.CreateQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -120,7 +120,7 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.UpdateQuestionWithBodyWithResponse(ctx, id, &gen.UpdateQuestionParams{}, "application/json", asReader(body))
+				resp, err := r.Client.UpdateQuestionWithBodyWithResponse(ctx, id, &gen.UpdateQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
@@ -140,7 +140,7 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.DeleteQuestionWithResponse(ctx, id, &gen.DeleteQuestionParams{})
+				resp, err := r.Client.DeleteQuestionWithResponse(ctx, id, &gen.DeleteQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID})
 				if err != nil {
 					return nil, err
 				}
@@ -160,7 +160,7 @@ func questionsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.RestoreQuestionWithBodyWithResponse(ctx, id, &gen.RestoreQuestionParams{}, "application/json", asReader(body))
+				resp, err := r.Client.RestoreQuestionWithBodyWithResponse(ctx, id, &gen.RestoreQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
 					return nil, err
 				}
