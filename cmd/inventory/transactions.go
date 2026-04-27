@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
@@ -41,14 +42,18 @@ func transactionsDefs() []CommandDef {
 					p.Type = &t
 				}
 				if v := args.FlagString("from"); v != "" {
-					if t, err := time.Parse(time.RFC3339, v); err == nil {
-						p.From = &t
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--from: invalid RFC3339 timestamp: %w", err)
 					}
+					p.From = &t
 				}
 				if v := args.FlagString("to"); v != "" {
-					if t, err := time.Parse(time.RFC3339, v); err == nil {
-						p.To = &t
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--to: invalid RFC3339 timestamp: %w", err)
 					}
+					p.To = &t
 				}
 				resp, err := r.Client.ListTransactionsWithResponse(ctx, p)
 				if err != nil {

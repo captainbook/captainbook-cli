@@ -21,6 +21,7 @@ func productOptionsDefs() []CommandDef {
 				{Name: "limit", Type: "int", Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "string", Description: "Filter by parent product"},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				params := &gen.ListProductOptionsParams{}
@@ -32,6 +33,10 @@ func productOptionsDefs() []CommandDef {
 				}
 				if v := args.FlagString("product-id"); v != "" {
 					params.ProductId = &v
+				}
+				if args.FlagBool("include-trashed") {
+					t := true
+					params.IncludeTrashed = &t
 				}
 				resp, err := r.Client.ListProductOptionsWithResponse(ctx, params)
 				if err != nil {
