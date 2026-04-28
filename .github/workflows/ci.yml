@@ -19,7 +19,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Test
-        run: go test ./... -count=1
+        run: go test ./... -race -count=1
 
       - name: Vet
         run: go vet ./...
