@@ -730,3 +730,69 @@ func TestParseGenResponse_ErrorReturnsPartialResult(t *testing.T) {
 		t.Errorf("Body must be nil on error, got %d bytes", len(res.Body))
 	}
 }
+
+// TestTryParseDataID_PascalCaseFallback covers the snake_case fallback for
+// multi-word resource types. Spec response shapes use snake_case keys
+// (data.product_option.id, data.gift_certificate.id), but closures pass
+// PascalCase resource names — so the helper must convert between the two
+// or audit response_id silently disappears for ProductOption / PricingTier
+// / GiftCertificate / AvailableGiftCertificate creates.
+func TestTryParseDataID_PascalCaseFallback(t *testing.T) {
+	cases := []struct {
+		name         string
+		body         string
+		resourceType string
+		want         string
+	}{
+		{
+			name:         "direct data.id",
+			body:         `{"data":{"id":"x_1"}}`,
+			resourceType: "Product",
+			want:         "x_1",
+		},
+		{
+			name:         "single-word fallback",
+			body:         `{"data":{"product":{"id":"prod_42"}}}`,
+			resourceType: "Product",
+			want:         "prod_42",
+		},
+		{
+			name:         "two-word PascalCase",
+			body:         `{"data":{"product_option":{"id":"opt_7"}}}`,
+			resourceType: "ProductOption",
+			want:         "opt_7",
+		},
+		{
+			name:         "two-word PascalCase (PricingTier)",
+			body:         `{"data":{"pricing_tier":{"id":"tier_3"}}}`,
+			resourceType: "PricingTier",
+			want:         "tier_3",
+		},
+		{
+			name:         "two-word PascalCase (GiftCertificate)",
+			body:         `{"data":{"gift_certificate":{"id":"gc_9"}}}`,
+			resourceType: "GiftCertificate",
+			want:         "gc_9",
+		},
+		{
+			name:         "three-word PascalCase",
+			body:         `{"data":{"available_gift_certificate":{"id":"agc_2"}}}`,
+			resourceType: "AvailableGiftCertificate",
+			want:         "agc_2",
+		},
+		{
+			name:         "no resource type",
+			body:         `{"data":{"product":{"id":"prod_42"}}}`,
+			resourceType: "",
+			want:         "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tryParseDataID([]byte(tc.body), tc.resourceType)
+			if got != tc.want {
+				t.Errorf("tryParseDataID(%q, %q) = %q, want %q", tc.body, tc.resourceType, got, tc.want)
+			}
+		})
+	}
+}

@@ -883,8 +883,10 @@ func tryParseAsyncJobID(body []byte) string {
 // tryParseDataID extracts data.id (or data.<resource>.id as a fallback) for
 // audit logging. The fallback handles spec shapes like create-product where
 // the response is `{ "data": { "product": { "id": "prod_42", ... } } }`.
-// resourceType is the lowercase resource word ("product", "booking", etc.)
-// — closures pass it via ParseGenResponse.
+// resourceType is the PascalCase resource name closures pass via
+// ParseGenResponse ("Product", "ProductOption", "GiftCertificate", ...);
+// it is lowered + snake_cased to match the spec's response key shape
+// (`product_option`, `gift_certificate`).
 func tryParseDataID(body []byte, resourceType string) string {
 	var env struct {
 		Data json.RawMessage `json:"data"`
@@ -904,8 +906,11 @@ func tryParseDataID(body []byte, resourceType string) string {
 	if resourceType == "" {
 		return ""
 	}
-	// Fallback: look for data.<lowercased-resourceType>.id.
-	key := strings.ToLower(resourceType)
+	// Fallback: look for data.<snake_cased-resourceType>.id. PascalCase
+	// resource names like "ProductOption" must become "product_option" to
+	// match the spec — strings.ToLower alone yields "productoption" which
+	// silently misses for every multi-word resource.
+	key := pascalToSnake(resourceType)
 	var nested map[string]json.RawMessage
 	if err := json.Unmarshal(env.Data, &nested); err != nil {
 		return ""
@@ -921,6 +926,25 @@ func tryParseDataID(body []byte, resourceType string) string {
 		return ""
 	}
 	return inner.ID
+}
+
+// pascalToSnake converts "ProductOption" → "product_option",
+// "AvailableGiftCertificate" → "available_gift_certificate". Lowercase or
+// already-snake input passes through unchanged ("product" → "product",
+// "product_option" → "product_option").
+func pascalToSnake(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 3)
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			b.WriteByte('_')
+		}
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // MintIdempotencyKey returns a fresh UUIDv7 string.
