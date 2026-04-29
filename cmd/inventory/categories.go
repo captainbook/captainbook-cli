@@ -9,12 +9,13 @@ import (
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 )
 
-// categoriesDefs declares the categories resource: list, get, create.
+// categoriesDefs declares the categories resource: list, get.
 //
-// Update + delete exist server-side too (the gen client has them) but per
-// the brief the v1 surface is list/get/create. Update + delete are
-// available through `--data` if the user really needs them by extending
-// the table here later.
+// Categories are READ-ONLY at the CLI / tenant level. Tenants do not
+// create / update / delete categories — those are platform-managed
+// (operations happen through CB internal tooling, not the tenant CLI).
+// The gen client carries create/update/delete methods (the spec exposes
+// the routes) but they are intentionally NOT bound here.
 func categoriesDefs() []CommandDef {
 	return []CommandDef{
 		{
@@ -60,35 +61,6 @@ func categoriesDefs() []CommandDef {
 					return nil, err
 				}
 				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Category", id)
-			},
-		},
-		{
-			Use: "categories create", Short: "Create a category", Kind: KindMutation,
-			Verb: "POST", Path: "/categories", Ability: invpkg.Write, DryRunMode: DryRunBody,
-			Flags: []FlagDef{
-				{Name: "name", Type: "string", Required: true, Description: "Category name"},
-				{Name: "slug", Type: "string", Description: "URL slug"},
-				{Name: "description", Type: "string", Description: "Category description"},
-				{Name: "position", Type: "int", Description: "Sort position"},
-			},
-			ForensicFields: []string{"name", "slug", "position"},
-			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":        "name",
-					"slug":        "slug",
-					"description": "description",
-					"position":    "position",
-				})
-				if err != nil {
-					return nil, err
-				}
-				resp, err := r.Client.CreateCategoryWithBodyWithResponse(ctx, &gen.CreateCategoryParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
-				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Category", "")
-				if res != nil {
-					res.WireBody = body
-				}
-				return res, err
 			},
 		},
 	}

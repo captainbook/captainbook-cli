@@ -96,6 +96,33 @@ func bookingsDefs() []CommandDef {
 			},
 		},
 		{
+			Use: "bookings transactions <id>", Short: "List transactions for a booking",
+			Kind: KindRead, Verb: "GET", Path: "/bookings/{id}/transactions",
+			Ability: invpkg.Read, PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
+			},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				p := &gen.ListBookingTransactionsParams{}
+				if v := args.FlagInt("limit"); v != 0 {
+					p.Limit = &v
+				}
+				if v := args.FlagString("cursor"); v != "" {
+					p.Cursor = &v
+				}
+				resp, err := r.Client.ListBookingTransactionsWithResponse(ctx, id, p)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Transaction", id)
+			},
+		},
+		{
 			Use: "bookings cancel <id>", Short: "Cancel a booking",
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/cancel",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
