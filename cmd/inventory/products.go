@@ -30,6 +30,7 @@ func productsDefs() []CommandDef {
 				{Name: "category", Type: "string", Description: "Filter by category slug or ID"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+				{Name: "status", Type: "string", Description: "draft|published|archived"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				params := &gen.ListProductsParams{}
@@ -55,6 +56,10 @@ func productsDefs() []CommandDef {
 						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
 					}
 					params.Since = &t
+				}
+				if v := args.FlagString("status"); v != "" {
+					s := gen.ListProductsParamsStatus(v)
+					params.Status = &s
 				}
 				resp, err := r.Client.ListProductsWithResponse(ctx, params)
 				if err != nil {
