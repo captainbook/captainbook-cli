@@ -183,6 +183,14 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 				{Name: "is-bookable", Type: "bool", Required: true, Description: "true to open, false to close"},
 			},
 			func(args RunArgs) (any, error) {
+				// Defensive: even though Required:true means cobra will reject
+				// invocations without --is-bookable, we still gate on FlagSet
+				// before reading the value. If Required is ever relaxed,
+				// FlagBool would silently return false (cobra default) and
+				// quietly close every slot in range.
+				if !args.FlagSet("is-bookable") {
+					return nil, fmt.Errorf("--is-bookable is required")
+				}
 				return map[string]any{
 					"is_bookable": args.FlagBool("is-bookable"),
 				}, nil

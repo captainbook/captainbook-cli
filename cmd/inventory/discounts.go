@@ -30,6 +30,7 @@ func discountsDefs() []CommandDef {
 				{Name: "auto-apply", Type: "bool", Description: "Filter auto-apply"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+				{Name: "valid-at", Type: "string", Description: "ISO 8601 timestamp; returns discounts where validity_start <= valid_at < validity_end"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListDiscountsParams{}
@@ -59,6 +60,13 @@ func discountsDefs() []CommandDef {
 						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
 					}
 					p.Since = &t
+				}
+				if v := args.FlagString("valid-at"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--valid-at: invalid RFC3339 timestamp: %w", err)
+					}
+					p.ValidAt = &t
 				}
 				resp, err := r.Client.ListDiscountsWithResponse(ctx, p)
 				if err != nil {

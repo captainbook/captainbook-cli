@@ -444,8 +444,8 @@ func (r *Reader) candidateFiles() []string {
 		rots = append(rots, rot{n, m})
 	}
 	sort.Slice(rots, func(i, j int) bool { return rots[i].idx < rots[j].idx })
-	for _, r := range rots {
-		files = append(files, r.path)
+	for _, rt := range rots {
+		files = append(files, rt.path)
 	}
 	return files
 }
