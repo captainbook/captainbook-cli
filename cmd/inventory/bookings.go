@@ -207,31 +207,9 @@ func bookingsDefs() []CommandDef {
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/notifications/resend-confirmation",
 			Ability: invpkg.CS, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
-			Flags: []FlagDef{
-				{Name: "channel", Type: "string", Description: "email|sms"},
-				{Name: "recipient", Type: "string", Description: "Override email/phone"},
-			},
+			Flags:          resendBookingConfirmationFlags,
 			ForensicFields: []string{"channel", "recipient"},
-			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				id, err := pathArg(args)
-				if err != nil {
-					return nil, err
-				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"channel":   "channel",
-					"recipient": "recipient",
-				})
-				if err != nil {
-					return nil, err
-				}
-				resp, err := r.Client.ResendBookingConfirmationWithBodyWithResponse(ctx, id, &gen.ResendBookingConfirmationParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
-				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
-				if res != nil {
-					res.WireBody = body
-				}
-				return res, err
-			},
+			Run:            resendBookingConfirmationRun,
 		},
 	}
 }
@@ -243,4 +221,37 @@ func parseDate(s string) (openapi_types.Date, error) {
 		return openapi_types.Date{}, err
 	}
 	return openapi_types.Date{Time: t}, nil
+}
+
+// resendBookingConfirmationFlags / resendBookingConfirmationRun back both
+// `bookings resend-confirmation <id>` and `notifications resend <booking-id>`.
+// The latter is a top-level alias of the former (spec only defines one
+// endpoint, POST /bookings/{id}/notifications/resend-confirmation), so the
+// closure and flag list are shared here to prevent the two from drifting.
+var resendBookingConfirmationFlags = []FlagDef{
+	{Name: "channel", Type: "string", Description: "email|sms"},
+	{Name: "recipient", Type: "string", Description: "Override email/phone"},
+}
+
+func resendBookingConfirmationRun(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+	id, err := pathArg(args)
+	if err != nil {
+		return nil, err
+	}
+	body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+		"channel":   "channel",
+		"recipient": "recipient",
+	})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := r.Client.ResendBookingConfirmationWithBodyWithResponse(ctx, id, &gen.ResendBookingConfirmationParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+	if err != nil {
+		return &RunResult{WireBody: body}, err
+	}
+	res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
+	if res != nil {
+		res.WireBody = body
+	}
+	return res, err
 }

@@ -1,10 +1,7 @@
 package inventory
 
 import (
-	"context"
-
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
-	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 )
 
 // notificationsDefs declares the notifications surface.
@@ -14,7 +11,10 @@ import (
 // the agent-facing UX consistent the brief calls for a top-level
 // `notifications resend` shortcut; we provide it as an alias of
 // `bookings resend-confirmation <booking-id>` so the audit entry's
-// command field correctly identifies the underlying endpoint.
+// command field correctly identifies the underlying endpoint. Flags +
+// closure are shared with bookings.resend-confirmation via
+// resendBookingConfirmationFlags / resendBookingConfirmationRun (defined
+// in bookings.go) so the two paths can't drift.
 func notificationsDefs() []CommandDef {
 	return []CommandDef{
 		{
@@ -22,31 +22,9 @@ func notificationsDefs() []CommandDef {
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/notifications/resend-confirmation",
 			Ability: invpkg.CS, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"booking-id"},
-			Flags: []FlagDef{
-				{Name: "channel", Type: "string", Description: "email|sms"},
-				{Name: "recipient", Type: "string", Description: "Override email/phone"},
-			},
+			Flags:          resendBookingConfirmationFlags,
 			ForensicFields: []string{"channel", "recipient"},
-			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-				id, err := pathArg(args)
-				if err != nil {
-					return nil, err
-				}
-				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"channel":   "channel",
-					"recipient": "recipient",
-				})
-				if err != nil {
-					return nil, err
-				}
-				resp, err := r.Client.ResendBookingConfirmationWithBodyWithResponse(ctx, id, &gen.ResendBookingConfirmationParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
-				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
-				if res != nil {
-					res.WireBody = body
-				}
-				return res, err
-			},
+			Run:            resendBookingConfirmationRun,
 		},
 	}
 }
