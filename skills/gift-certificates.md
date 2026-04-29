@@ -9,13 +9,13 @@ Two distinct resources live under `gift-certificates`:
 
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
-| `inventory gift-certificates available list` | GET /gift-certs/available | `cli:read` | n/a |
-| `inventory gift-certificates available show <id>` | GET /gift-certs/available/{id} | `cli:read` | n/a |
-| `inventory gift-certificates available create` | POST /gift-certs/available | `cli:write` | body |
-| `inventory gift-certificates available update <id>` | PATCH /gift-certs/available/{id} | `cli:write` | body |
-| `inventory gift-certificates available delete <id>` | DELETE /gift-certs/available/{id} | `cli:write` | none |
-| `inventory gift-certificates issued list` | GET /gift-certs/issued | `cli:read` | n/a |
-| `inventory gift-certificates issued show <id>` | GET /gift-certs/issued/{id} | `cli:read` | n/a |
+| `inventory gift-certificates list-available` | GET /gift-certs/available | `cli:read` | n/a |
+| `inventory gift-certificates get-available <id>` | GET /gift-certs/available/{id} | `cli:read` | n/a |
+| `inventory gift-certificates create-available` | POST /gift-certs/available | `cli:write` | body |
+| `inventory gift-certificates update-available <id>` | PATCH /gift-certs/available/{id} | `cli:write` | body |
+| `inventory gift-certificates delete-available <id>` | DELETE /gift-certs/available/{id} | `cli:write` | none |
+| `inventory gift-certificates list-issued` | GET /gift-certs/issued | `cli:read` | n/a |
+| `inventory gift-certificates get-issued <id>` | GET /gift-certs/issued/{id} | `cli:read` | n/a |
 | `inventory gift-certificates issue` | POST /gift-certs/issue | `cli:write` | body |
 | `inventory gift-certificates void <id>` | POST /gift-certs/{id}/void | `cli:write` | body |
 | `inventory gift-certificates resend <id>` | POST /gift-certs/{id}/resend | `cli:write` | body |
@@ -25,7 +25,7 @@ Two distinct resources live under `gift-certificates`:
 ### 1. List active issued certs for one recipient
 
 ```bash
-ceebee inventory gift-certificates issued list \
+ceebee inventory gift-certificates list-issued \
   --status active \
   --recipient-email customer@example.com
 ```
@@ -85,8 +85,8 @@ Without `--recipient-email`, resends to the original recipient. External side ef
 
 ## Pitfalls
 
-- ⚠️ **`available delete` is HARD delete** (not soft). Returns `409 RESOURCE_IN_USE` if any issued `GiftCertificate` still references the SKU. Either void all issued certs first, or accept the orphaning. There is no `available restore` — once deleted, the SKU is gone.
-- ⚠️ **No server-side dry-run on `available delete`.** CLI rejects `--dry-run`. Check references first: `ceebee inventory gift-certificates issued list --available-gift-certificate-id agc_basic --format json | jq '.data | length'`.
+- ⚠️ **`delete-available` is HARD delete** (not soft). Returns `409 RESOURCE_IN_USE` if any issued `GiftCertificate` still references the SKU. Either void all issued certs first, or accept the orphaning. There is no `restore-available` — once deleted, the SKU is gone.
+- ⚠️ **No server-side dry-run on `delete-available`.** CLI rejects `--dry-run`. Check references first: `ceebee inventory gift-certificates list-issued --code <SKU-name> --format json | jq '.data | length'`.
 - ⚠️ **`issue --send-now true` is a one-way email trigger.** There is no "unsend"; voiding the cert with `--notify-recipient true` is the closest you get. Default is `false` deliberately so an LLM doesn't accidentally dispatch a redemption email mid-experimentation.
 - ⚠️ **Money is in tenant currency minor units.** `--amount 5000` is €50.00 EUR or ¥5000 JPY — confirm `meta.currency` first via `whoami`.
 

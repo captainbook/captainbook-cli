@@ -84,6 +84,81 @@ func giftCertificatesDefs() []CommandDef {
 			},
 		},
 		{
+			Use: "gift-certificates get-available <id>", Short: "Show one gift cert template",
+			Kind: KindRead, Verb: "GET", Path: "/gift-certs/available/{id}",
+			Ability: invpkg.Read, PositionalArgs: []string{"id"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.ShowAvailableGiftCertWithResponse(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", id)
+			},
+		},
+		{
+			Use: "gift-certificates update-available <id>", Short: "Update a gift cert template",
+			Kind: KindMutation, Verb: "PATCH", Path: "/gift-certs/available/{id}",
+			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "name", Type: "string", Description: "Template name"},
+				{Name: "amounts", Type: "intSlice", Description: "Allowed denominations (minor units, comma-separated)"},
+				{Name: "cover-image-url", Type: "string", Description: "Cover image URL"},
+				{Name: "expiration-period-days", Type: "int", Description: "Days until expiry once issued"},
+			},
+			ForensicFields: []string{"amounts", "expiration-period-days"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"name":                   "name",
+					"amounts":                "amounts",
+					"cover-image-url":        "cover_image_url",
+					"expiration-period-days": "expiration_period_days",
+				})
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.UpdateAvailableGiftCertWithBodyWithResponse(ctx, id, &gen.UpdateAvailableGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+				if err != nil { return &RunResult{WireBody: body}, err }
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
+			},
+		},
+		{
+			Use: "gift-certificates delete-available <id>", Short: "Hard-delete a gift cert template",
+			Kind: KindMutation, Verb: "DELETE", Path: "/gift-certs/available/{id}",
+			Ability: invpkg.Write,
+			// Spec: DELETE has no body and Params carries only IdempotencyKey
+			// (no DryRun). 409 IDEMPOTENCY_CONFLICT if any issued GiftCertificate
+			// references this SKU — caller must void all issued first.
+			DryRunMode:     DryRunNotSupported,
+			PositionalArgs: []string{"id"},
+			Long: "Hard-deletes the SKU template. Returns 409 if any issued gift " +
+				"certificate references this template — void those first or accept " +
+				"that the lookup will be orphaned.",
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.DeleteAvailableGiftCertificateWithResponse(ctx, id, &gen.DeleteAvailableGiftCertificateParams{IdempotencyKey: args.IdempotencyKeyUUID})
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", id)
+			},
+		},
+		{
 			Use: "gift-certificates list-issued", Short: "List issued gift certs",
 			Kind: KindRead, Verb: "GET", Path: "/gift-certs/issued", Ability: invpkg.Read,
 			Flags: []FlagDef{
