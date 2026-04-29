@@ -42,7 +42,11 @@ func giftCertificatesDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
+				// Spec nests the SKU shape under data.available_gift_certificate
+				// (NOT gift_certificate). The pascalToSnake fallback in
+				// tryParseDataID needs the full PascalCase name to land on the
+				// right response key.
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", "")
 			},
 		},
 		{
@@ -70,7 +74,9 @@ func giftCertificatesDefs() []CommandDef {
 				}
 				resp, err := r.Client.CreateAvailableGiftCertWithBodyWithResponse(ctx, &gen.CreateAvailableGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil { return &RunResult{WireBody: body}, err }
-				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
+				// Spec response: data.available_gift_certificate.id —
+				// pascalToSnake("AvailableGiftCertificate") yields the right key.
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", "")
 				if res != nil {
 					res.WireBody = body
 				}
