@@ -136,6 +136,53 @@ func availabilitiesDefs() []CommandDef {
 				return res, err
 			},
 		},
+		{
+			Use: "availabilities create-rule", Short: "Generate availabilities from a recurrence rule",
+			Kind: KindMutation, Verb: "POST", Path: "/availability-rules",
+			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Long: "One-shot generator: takes a weekday-based recurrence rule and dispatches " +
+				"CreateBatchAvailabilityJob (the same job the dashboard uses) to materialize " +
+				"Availability rows. The rule itself is NOT stored; once the job runs, query " +
+				"materialized rows via `availabilities list`. " +
+				"--weekdays uses PHP's format('w'): Sunday=0, Saturday=6. " +
+				"For datetime products --start-time and --end-time are required; for date " +
+				"products both are ignored. --dry-run returns total_matched + first 3 [from,to] " +
+				"pairs so an agent can preview the slot count before committing. If the date " +
+				"range × weekdays matches zero days, returns 200 status=no_op (no dispatch).",
+			Flags: []FlagDef{
+				{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option"},
+				{Name: "start-date", Type: "string", Required: true, Description: "Recurrence window start (YYYY-MM-DD)"},
+				{Name: "end-date", Type: "string", Required: true, Description: "Recurrence window end (YYYY-MM-DD)"},
+				{Name: "weekdays", Type: "intSlice", Required: true, Description: "Days of week (0=Sun .. 6=Sat); comma-separated"},
+				{Name: "start-time", Type: "string", Description: "HH:MM (datetime products only)"},
+				{Name: "end-time", Type: "string", Description: "HH:MM (datetime products only)"},
+				{Name: "add-days-count", Type: "int", Description: "Multi-day events: extra days added to the `to` timestamp"},
+			},
+			ForensicFields: []string{"product-option-id", "start-date", "end-date", "weekdays", "start-time", "end-time"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"product-option-id": "product_option_id",
+					"start-date":        "start_date",
+					"end-date":          "end_date",
+					"weekdays":          "weekdays",
+					"start-time":        "start_time",
+					"end-time":          "end_time",
+					"add-days-count":    "add_days_count",
+				})
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.CreateAvailabilityRuleWithBodyWithResponse(ctx, &gen.CreateAvailabilityRuleParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
+			},
+		},
 		// NOTE: no restore command. Per spec, Availability is NOT a
 		// soft-deletable resource: the schema has no `deleted_at` property,
 		// the list endpoint has no `?include_trashed=` parameter, and there

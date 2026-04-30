@@ -525,6 +525,83 @@ paths:
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+  /availability-rules:
+    post:
+      operationId: createAvailabilityRule
+      summary: Generate availabilities from a recurrence rule (asynchronous)
+      description: |
+        One-shot generator: takes a weekday-based recurrence rule and fans
+        out to materialize Availability rows by dispatching the existing
+        `CreateBatchAvailabilityJob` (same job the dashboard uses). NOT a
+        persistent entity — the rule itself is not stored. Once the job
+        runs, materialized rows are queryable via `GET /availabilities`.
+
+        **Schedule type semantics:**
+        - For `datetime` products, `start_time` and `end_time` are required.
+        - For `date`-only products, both are ignored; rows span full days.
+
+        **Dry-run:** returns `total_matched` and a sample of the first 3
+        `[from, to]` pairs so an agent can preview "this rule would create
+        N Saturday slots" before committing.
+
+        **No-op:** if the date range × weekdays produces zero matches, the
+        endpoint returns 200 with `status=no_op` and skips the dispatch.
+        Otherwise returns 202 with `status=queued`.
+
+        **Idempotency:** standard CLI idempotency — replay-with-same-body
+        rebroadcasts the cached response without re-dispatching the job.
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAvailabilityRuleRequest"
+      responses:
+        "202":
+          description: Queued — the recurrence job has been dispatched.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              status: { type: string, enum: [queued] }
+                              total_matched: { type: integer, description: "Number of (date, time) pairs that will be materialized." }
+                              rule:
+                                $ref: "#/components/schemas/AvailabilityRulePreview"
+        "200":
+          description: |
+            No-op (zero matches), OR dry-run preview. `would_apply` differentiates.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              status: { type: string, enum: [no_op] }
+                              total_matched: { type: integer }
+                              rule:
+                                $ref: "#/components/schemas/AvailabilityRulePreview"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /availabilities/bulk-update:
     post:
       operationId: bulkUpdateAvailabilities
@@ -612,6 +689,160 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+
+  /pricing-categories:
+    get:
+      operationId: listPricingCategories
+      summary: List pricing categories
+      description: |
+        Pricing categories are the parent buckets (`Adults`, `Children`, etc.)
+        that pricing tiers attach to. Filter by `product_id` to scope to a
+        single product.
+      tags: [PricingCategories]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: product_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page of pricing categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingCategoryPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createPricingCategory
+      summary: Create a pricing category
+      description: |
+        Creates the parent bucket that one or more pricing tiers will live
+        under. The `name` is translatable (stored as the `{"en": "..."}`
+        HasTranslations bag); pass a bare string and the server wraps it.
+        Defaults `type` to `TRAVELLER`. The optional `min_age`/`max_age`
+        let you describe the bucket's age range without baking it into the
+        name. No implicit overrides — input passes through as supplied.
+      tags: [PricingCategories]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePricingCategoryRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              pricing_category: { $ref: "#/components/schemas/PricingCategory" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /pricing-categories/{id}:
+    get:
+      operationId: showPricingCategory
+      summary: Show a pricing category
+      tags: [PricingCategories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Pricing category
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/PricingCategory" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      operationId: updatePricingCategory
+      summary: Update a pricing category
+      tags: [PricingCategories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePricingCategoryRequest"
+      responses:
+        "200":
+          description: Updated (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: deletePricingCategory
+      summary: Soft-delete a pricing category
+      description: |
+        Soft-deletes the category and cascades to its pricing tiers
+        (`PricingCategory::$cascadeDeletes = ['pricingTiers']`).
+      tags: [PricingCategories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": { description: Soft-deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /pricing-categories/{id}/restore:
+    post:
+      operationId: restorePricingCategory
+      summary: Restore a soft-deleted pricing category
+      tags: [PricingCategories]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /pricing-tiers:
     get:
@@ -1875,6 +2106,203 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /resources:
+    get:
+      operationId: listResources
+      summary: List resources
+      description: |
+        Resources are physical or human inventory that bound a ProductOption's
+        capacity (a boat, a guide, a yoga studio). Filter by `category` to
+        scope to one kind.
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Since"
+        - name: category
+          in: query
+          schema: { type: string, enum: [guide, asset, equipment, auxiliary] }
+      responses:
+        "200":
+          description: Page of resources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourcePage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+    post:
+      operationId: createResource
+      summary: Create a resource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateResourceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              resource: { $ref: "#/components/schemas/Resource" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /resources/{id}:
+    get:
+      operationId: showResource
+      summary: Show a resource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Resource
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Resource" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      operationId: updateResource
+      summary: Update a resource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateResourceRequest"
+      responses:
+        "200":
+          description: Updated (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: deleteResource
+      summary: Soft-delete a resource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": { description: Soft-deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /resources/{id}/restore:
+    post:
+      operationId: restoreResource
+      summary: Restore a soft-deleted resource
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /product-options/{id}/resources:
+    post:
+      operationId: attachResourceToProductOption
+      summary: Attach a Resource to a ProductOption
+      description: |
+        Writes the `resourceables` polymorphic pivot row. Idempotent:
+        re-attaching an already-linked resource is a no-op rewrite of the
+        pivot's optional fields (`capacity` / `seniority`). Use the
+        DELETE on this resource's detach route to remove the link.
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachResourceRequest"
+      responses:
+        "201":
+          description: Attached
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /product-options/{option_id}/resources/{resource_id}:
+    delete:
+      operationId: detachResourceFromProductOption
+      summary: Detach a Resource from a ProductOption
+      tags: [Resources]
+      parameters:
+        - name: option_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: resource_id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204": { description: Detached }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /locations:
     get:
       operationId: listLocations
@@ -2698,12 +3126,39 @@ components:
         id: { type: string }
         product_id: { type: string }
         title: { type: string, nullable: true, description: "Sourced from the `name` column (no translatable layer)." }
+        option_code: { type: string, nullable: true, description: "Tenant-supplied SKU. Auto-generated from the title slug + random suffix when omitted on create." }
         capacity: { type: integer, nullable: true }
         min_age: { type: integer, nullable: true }
         max_age: { type: integer, nullable: true }
         deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         created_at: { type: string, format: date-time, nullable: true }
         updated_at: { type: string, format: date-time, nullable: true }
+
+    AvailabilityRulePreview:
+      type: object
+      description: |
+        Echo of the recurrence rule the server expanded plus a small sample
+        of the resulting (from, to) windows for human inspection.
+      properties:
+        product_option_id: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        weekdays:
+          type: array
+          items: { type: integer, minimum: 0, maximum: 6 }
+          description: "PHP `format('w')` — Sunday=0 through Saturday=6."
+        start_time: { type: string, example: "14:00" }
+        end_time: { type: string, example: "18:00" }
+        add_days_count: { type: integer, minimum: 0 }
+        total_matched: { type: integer }
+        sample_dates:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            properties:
+              from: { type: string, format: date-time }
+              to: { type: string, format: date-time }
 
     Availability:
       type: object
@@ -2722,6 +3177,27 @@ components:
           items: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    PricingCategory:
+      type: object
+      description: |
+        Parent bucket that one or more `PricingTier` rows live under. Carries
+        the named label (`Adults`, `Children`, ...) — translatable, returned
+        in English. Soft-deleted rows cascade-delete their pricing tiers.
+      properties:
+        id: { type: string }
+        product_id: { type: string, nullable: true }
+        name: { type: string, nullable: true, description: "Translatable; English value returned." }
+        type:
+          type: string
+          nullable: true
+          enum: [ADULT, CHILD, INFANT, YOUTH, STUDENT, SENIOR, TRAVELLER, EU_CITIZEN, MILITARY, EU_CITIZEN_STUDENT]
+        min_age: { type: integer, nullable: true }
+        max_age: { type: integer, nullable: true }
+        is_internal: { type: boolean, nullable: true, description: "Internal categories are excluded from public-facing checkout flows." }
+        deleted_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     PricingTier:
       type: object
@@ -3100,6 +3576,32 @@ components:
           enum: [available, blocked, cancelled]
         dry_run: { type: boolean, default: false }
 
+    CreateAvailabilityRuleRequest:
+      type: object
+      required: [product_option_id, start_date, end_date, weekdays]
+      description: |
+        Mirrors `CreateAvailabilityRuleRequest::rules()`. `start_time` and
+        `end_time` are required for `datetime` products; ignored for
+        `date`-only products. Weekday values use PHP's `format('w')`
+        convention — Sunday=0, Saturday=6.
+      properties:
+        product_option_id: { type: string }
+        start_date: { type: string, format: date, example: "2026-05-01" }
+        end_date: { type: string, format: date, example: "2026-08-31" }
+        weekdays:
+          type: array
+          minItems: 1
+          items: { type: integer, minimum: 0, maximum: 6 }
+          example: [3, 6]
+        start_time: { type: string, nullable: true, example: "14:00" }
+        end_time: { type: string, nullable: true, example: "18:00" }
+        add_days_count:
+          type: integer
+          minimum: 0
+          default: 0
+          description: "Multi-day events: number of days to add to the `to` timestamp."
+        dry_run: { type: boolean, default: false }
+
     BulkUpdateAvailabilityRequest:
       type: object
       required: [product_option_id, from, to, setting, new_value]
@@ -3285,6 +3787,15 @@ components:
               type: array
               items: { $ref: "#/components/schemas/Availability" }
 
+    PricingCategoryPage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/PricingCategory" }
+
     PricingTierPage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -3393,6 +3904,28 @@ components:
         product_count: { type: integer, nullable: true, description: "Set only when the `products` relation is eager-loaded; otherwise null." }
         created_at: { type: string, format: date-time, nullable: true }
 
+    Resource:
+      type: object
+      description: |
+        Physical or human inventory bound to a ProductOption (a boat, a
+        guide, a yoga studio). `category` is the kind of resource;
+        `type` is a free-form label tenants pick (`Sailboat`, `Senior
+        Guide`, etc.). `capacity` is optional — null means the resource
+        doesn't constrain seat count by itself.
+      properties:
+        id: { type: string }
+        name: { type: string, nullable: true }
+        type: { type: string, nullable: true }
+        category:
+          type: string
+          nullable: true
+          enum: [guide, asset, equipment, auxiliary]
+        capacity: { type: integer, nullable: true }
+        rating: { type: number, format: float, nullable: true }
+        deleted_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+
     Location:
       type: object
       description: |
@@ -3444,6 +3977,15 @@ components:
               type: array
               items: { $ref: "#/components/schemas/Category" }
 
+    ResourcePage:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Resource" }
+
     LocationPage:
       allOf:
         - $ref: "#/components/schemas/Envelope"
@@ -3468,14 +4010,16 @@ components:
       description: |
         Mirrors `CreateProductRequest::rules()`. `product_code` is optional —
         when omitted, the server auto-generates one from the title slug plus
-        a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). Translatable rich-text
-        fields (`description`, `instructions`, `requirements`, `inclusions`,
-        `exclusions`) accept bare strings; the server wraps them into the
-        `{"en": "..."}` HasTranslations bag.
+        a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). `description` is
+        optional on the wire but is materialized as `{"en": ""}` server-side
+        when omitted, because `central_products.description` is NOT NULL.
+        Translatable rich-text fields (`description`, `instructions`,
+        `requirements`, `inclusions`, `exclusions`) accept bare strings;
+        the server wraps them into the `{"en": "..."}` HasTranslations bag.
       properties:
         title: { type: string, maxLength: 200 }
         product_code: { type: string, maxLength: 50, nullable: true, description: "Tenant-supplied SKU. Auto-generated from title when omitted." }
-        description: { type: string, nullable: true }
+        description: { type: string, nullable: true, description: "Defaults to empty string server-side when omitted (central_products.description is NOT NULL)." }
         instructions: { type: string, nullable: true, description: "Rich text shown to confirmed customers. Translatable." }
         requirements: { type: string, nullable: true, description: "Rich text — what the customer needs. Translatable." }
         inclusions: { type: string, nullable: true, description: "Rich text — what's included. Translatable." }
@@ -3578,6 +4122,40 @@ components:
         capacity: { type: integer, minimum: 0, nullable: true }
         min_age: { type: integer, minimum: 0, nullable: true }
         max_age: { type: integer, minimum: 0, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    CreatePricingCategoryRequest:
+      type: object
+      required: [product_id, name]
+      description: |
+        Mirrors `CreatePricingCategoryRequest::rules()`. `name` is
+        translatable — accepts a bare string, persisted as `{"en": "..."}`.
+      properties:
+        product_id: { type: string }
+        name: { type: string, maxLength: 200 }
+        type:
+          type: string
+          enum: [ADULT, CHILD, INFANT, YOUTH, STUDENT, SENIOR, TRAVELLER, EU_CITIZEN, MILITARY, EU_CITIZEN_STUDENT]
+          default: TRAVELLER
+        min_age: { type: integer, minimum: 0, nullable: true }
+        max_age: { type: integer, minimum: 0, nullable: true }
+        is_internal: { type: boolean, default: false }
+        dry_run: { type: boolean, default: false }
+
+    UpdatePricingCategoryRequest:
+      type: object
+      description: |
+        Mirrors `UpdatePricingCategoryRequest::rules()`. Reparenting (changing
+        `product_id`) is not supported via PATCH; create a new category if you
+        need to move tiers across products.
+      properties:
+        name: { type: string, maxLength: 200 }
+        type:
+          type: string
+          enum: [ADULT, CHILD, INFANT, YOUTH, STUDENT, SENIOR, TRAVELLER, EU_CITIZEN, MILITARY, EU_CITIZEN_STUDENT]
+        min_age: { type: integer, minimum: 0, nullable: true }
+        max_age: { type: integer, minimum: 0, nullable: true }
+        is_internal: { type: boolean }
         dry_run: { type: boolean, default: false }
 
     CreatePricingTierRequest:
@@ -3721,6 +4299,44 @@ components:
           minItems: 1
           items: { type: integer, minimum: 0 }
         expiration_period_months: { type: integer, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    CreateResourceRequest:
+      type: object
+      required: [name, type, category]
+      properties:
+        name: { type: string, maxLength: 200 }
+        type: { type: string, maxLength: 200, description: "Free-form label (Sailboat, Senior Guide, …)." }
+        category:
+          type: string
+          enum: [guide, asset, equipment, auxiliary]
+        capacity: { type: integer, minimum: 0, nullable: true }
+        rating: { type: number, format: float, minimum: 0, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    UpdateResourceRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        type: { type: string, maxLength: 200 }
+        category:
+          type: string
+          enum: [guide, asset, equipment, auxiliary]
+        capacity: { type: integer, minimum: 0, nullable: true }
+        rating: { type: number, format: float, minimum: 0, nullable: true }
+        dry_run: { type: boolean, default: false }
+
+    AttachResourceRequest:
+      type: object
+      required: [resource_id]
+      description: |
+        Attaches a Resource to a ProductOption. `capacity` and `seniority`
+        are optional pivot-level overrides; omit to inherit the
+        Resource-level defaults.
+      properties:
+        resource_id: { type: string }
+        capacity: { type: integer, minimum: 0, nullable: true, description: "Overrides the Resource's capacity for this specific ProductOption attachment." }
+        seniority: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
     CreateLocationRequest:

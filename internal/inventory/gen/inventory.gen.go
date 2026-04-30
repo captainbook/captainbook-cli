@@ -190,6 +190,48 @@ func (e CreateLocationRequestType) Valid() bool {
 	}
 }
 
+// Defines values for CreatePricingCategoryRequestType.
+const (
+	CreatePricingCategoryRequestTypeADULT            CreatePricingCategoryRequestType = "ADULT"
+	CreatePricingCategoryRequestTypeCHILD            CreatePricingCategoryRequestType = "CHILD"
+	CreatePricingCategoryRequestTypeEUCITIZEN        CreatePricingCategoryRequestType = "EU_CITIZEN"
+	CreatePricingCategoryRequestTypeEUCITIZENSTUDENT CreatePricingCategoryRequestType = "EU_CITIZEN_STUDENT"
+	CreatePricingCategoryRequestTypeINFANT           CreatePricingCategoryRequestType = "INFANT"
+	CreatePricingCategoryRequestTypeMILITARY         CreatePricingCategoryRequestType = "MILITARY"
+	CreatePricingCategoryRequestTypeSENIOR           CreatePricingCategoryRequestType = "SENIOR"
+	CreatePricingCategoryRequestTypeSTUDENT          CreatePricingCategoryRequestType = "STUDENT"
+	CreatePricingCategoryRequestTypeTRAVELLER        CreatePricingCategoryRequestType = "TRAVELLER"
+	CreatePricingCategoryRequestTypeYOUTH            CreatePricingCategoryRequestType = "YOUTH"
+)
+
+// Valid indicates whether the value is a known member of the CreatePricingCategoryRequestType enum.
+func (e CreatePricingCategoryRequestType) Valid() bool {
+	switch e {
+	case CreatePricingCategoryRequestTypeADULT:
+		return true
+	case CreatePricingCategoryRequestTypeCHILD:
+		return true
+	case CreatePricingCategoryRequestTypeEUCITIZEN:
+		return true
+	case CreatePricingCategoryRequestTypeEUCITIZENSTUDENT:
+		return true
+	case CreatePricingCategoryRequestTypeINFANT:
+		return true
+	case CreatePricingCategoryRequestTypeMILITARY:
+		return true
+	case CreatePricingCategoryRequestTypeSENIOR:
+		return true
+	case CreatePricingCategoryRequestTypeSTUDENT:
+		return true
+	case CreatePricingCategoryRequestTypeTRAVELLER:
+		return true
+	case CreatePricingCategoryRequestTypeYOUTH:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateProductRequestScheduleType.
 const (
 	CreateProductRequestScheduleTypeDate     CreateProductRequestScheduleType = "date"
@@ -250,6 +292,30 @@ func (e CreateQuestionRequestType) Valid() bool {
 	case CreateQuestionRequestTypeText:
 		return true
 	case CreateQuestionRequestTypeTextarea:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateResourceRequestCategory.
+const (
+	CreateResourceRequestCategoryAsset     CreateResourceRequestCategory = "asset"
+	CreateResourceRequestCategoryAuxiliary CreateResourceRequestCategory = "auxiliary"
+	CreateResourceRequestCategoryEquipment CreateResourceRequestCategory = "equipment"
+	CreateResourceRequestCategoryGuide     CreateResourceRequestCategory = "guide"
+)
+
+// Valid indicates whether the value is a known member of the CreateResourceRequestCategory enum.
+func (e CreateResourceRequestCategory) Valid() bool {
+	switch e {
+	case CreateResourceRequestCategoryAsset:
+		return true
+	case CreateResourceRequestCategoryAuxiliary:
+		return true
+	case CreateResourceRequestCategoryEquipment:
+		return true
+	case CreateResourceRequestCategoryGuide:
 		return true
 	default:
 		return false
@@ -352,6 +418,48 @@ func (e MutationResultSideEffectsType) Valid() bool {
 	}
 }
 
+// Defines values for PricingCategoryType.
+const (
+	PricingCategoryTypeADULT            PricingCategoryType = "ADULT"
+	PricingCategoryTypeCHILD            PricingCategoryType = "CHILD"
+	PricingCategoryTypeEUCITIZEN        PricingCategoryType = "EU_CITIZEN"
+	PricingCategoryTypeEUCITIZENSTUDENT PricingCategoryType = "EU_CITIZEN_STUDENT"
+	PricingCategoryTypeINFANT           PricingCategoryType = "INFANT"
+	PricingCategoryTypeMILITARY         PricingCategoryType = "MILITARY"
+	PricingCategoryTypeSENIOR           PricingCategoryType = "SENIOR"
+	PricingCategoryTypeSTUDENT          PricingCategoryType = "STUDENT"
+	PricingCategoryTypeTRAVELLER        PricingCategoryType = "TRAVELLER"
+	PricingCategoryTypeYOUTH            PricingCategoryType = "YOUTH"
+)
+
+// Valid indicates whether the value is a known member of the PricingCategoryType enum.
+func (e PricingCategoryType) Valid() bool {
+	switch e {
+	case PricingCategoryTypeADULT:
+		return true
+	case PricingCategoryTypeCHILD:
+		return true
+	case PricingCategoryTypeEUCITIZEN:
+		return true
+	case PricingCategoryTypeEUCITIZENSTUDENT:
+		return true
+	case PricingCategoryTypeINFANT:
+		return true
+	case PricingCategoryTypeMILITARY:
+		return true
+	case PricingCategoryTypeSENIOR:
+		return true
+	case PricingCategoryTypeSTUDENT:
+		return true
+	case PricingCategoryTypeTRAVELLER:
+		return true
+	case PricingCategoryTypeYOUTH:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProductScheduleType.
 const (
 	ProductScheduleTypeDate     ProductScheduleType = "date"
@@ -439,6 +547,30 @@ func (e QuestionType) Valid() bool {
 	case QuestionTypeShortText:
 		return true
 	case QuestionTypeTime:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceCategory.
+const (
+	ResourceCategoryAsset     ResourceCategory = "asset"
+	ResourceCategoryAuxiliary ResourceCategory = "auxiliary"
+	ResourceCategoryEquipment ResourceCategory = "equipment"
+	ResourceCategoryGuide     ResourceCategory = "guide"
+)
+
+// Valid indicates whether the value is a known member of the ResourceCategory enum.
+func (e ResourceCategory) Valid() bool {
+	switch e {
+	case ResourceCategoryAsset:
+		return true
+	case ResourceCategoryAuxiliary:
+		return true
+	case ResourceCategoryEquipment:
+		return true
+	case ResourceCategoryGuide:
 		return true
 	default:
 		return false
@@ -556,6 +688,48 @@ func (e UpdateLocationRequestType) Valid() bool {
 	}
 }
 
+// Defines values for UpdatePricingCategoryRequestType.
+const (
+	ADULT            UpdatePricingCategoryRequestType = "ADULT"
+	CHILD            UpdatePricingCategoryRequestType = "CHILD"
+	EUCITIZEN        UpdatePricingCategoryRequestType = "EU_CITIZEN"
+	EUCITIZENSTUDENT UpdatePricingCategoryRequestType = "EU_CITIZEN_STUDENT"
+	INFANT           UpdatePricingCategoryRequestType = "INFANT"
+	MILITARY         UpdatePricingCategoryRequestType = "MILITARY"
+	SENIOR           UpdatePricingCategoryRequestType = "SENIOR"
+	STUDENT          UpdatePricingCategoryRequestType = "STUDENT"
+	TRAVELLER        UpdatePricingCategoryRequestType = "TRAVELLER"
+	YOUTH            UpdatePricingCategoryRequestType = "YOUTH"
+)
+
+// Valid indicates whether the value is a known member of the UpdatePricingCategoryRequestType enum.
+func (e UpdatePricingCategoryRequestType) Valid() bool {
+	switch e {
+	case ADULT:
+		return true
+	case CHILD:
+		return true
+	case EUCITIZEN:
+		return true
+	case EUCITIZENSTUDENT:
+		return true
+	case INFANT:
+		return true
+	case MILITARY:
+		return true
+	case SENIOR:
+		return true
+	case STUDENT:
+		return true
+	case TRAVELLER:
+		return true
+	case YOUTH:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateProductRequestScheduleType.
 const (
 	UpdateProductRequestScheduleTypeDate     UpdateProductRequestScheduleType = "date"
@@ -616,6 +790,30 @@ func (e UpdateQuestionRequestType) Valid() bool {
 	case UpdateQuestionRequestTypeText:
 		return true
 	case UpdateQuestionRequestTypeTextarea:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateResourceRequestCategory.
+const (
+	UpdateResourceRequestCategoryAsset     UpdateResourceRequestCategory = "asset"
+	UpdateResourceRequestCategoryAuxiliary UpdateResourceRequestCategory = "auxiliary"
+	UpdateResourceRequestCategoryEquipment UpdateResourceRequestCategory = "equipment"
+	UpdateResourceRequestCategoryGuide     UpdateResourceRequestCategory = "guide"
+)
+
+// Valid indicates whether the value is a known member of the UpdateResourceRequestCategory enum.
+func (e UpdateResourceRequestCategory) Valid() bool {
+	switch e {
+	case UpdateResourceRequestCategoryAsset:
+		return true
+	case UpdateResourceRequestCategoryAuxiliary:
+		return true
+	case UpdateResourceRequestCategoryEquipment:
+		return true
+	case UpdateResourceRequestCategoryGuide:
 		return true
 	default:
 		return false
@@ -739,6 +937,30 @@ func (e ListProductsParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListResourcesParamsCategory.
+const (
+	ListResourcesParamsCategoryAsset     ListResourcesParamsCategory = "asset"
+	ListResourcesParamsCategoryAuxiliary ListResourcesParamsCategory = "auxiliary"
+	ListResourcesParamsCategoryEquipment ListResourcesParamsCategory = "equipment"
+	ListResourcesParamsCategoryGuide     ListResourcesParamsCategory = "guide"
+)
+
+// Valid indicates whether the value is a known member of the ListResourcesParamsCategory enum.
+func (e ListResourcesParamsCategory) Valid() bool {
+	switch e {
+	case ListResourcesParamsCategoryAsset:
+		return true
+	case ListResourcesParamsCategoryAuxiliary:
+		return true
+	case ListResourcesParamsCategoryEquipment:
+		return true
+	case ListResourcesParamsCategoryGuide:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListTransactionsParamsStatus.
 const (
 	ListTransactionsParamsStatusFailed    ListTransactionsParamsStatus = "failed"
@@ -784,6 +1006,17 @@ func (e ListTransactionsParamsType) Valid() bool {
 	}
 }
 
+// AttachResourceRequest Attaches a Resource to a ProductOption. `capacity` and `seniority`
+// are optional pivot-level overrides; omit to inherit the
+// Resource-level defaults.
+type AttachResourceRequest struct {
+	// Capacity Overrides the Resource's capacity for this specific ProductOption attachment.
+	Capacity   *int   `json:"capacity,omitempty"`
+	DryRun     *bool  `json:"dry_run,omitempty"`
+	ResourceId string `json:"resource_id"`
+	Seniority  *int   `json:"seniority,omitempty"`
+}
+
 // Availability defines model for Availability.
 type Availability struct {
 	Capacity          *int                `json:"capacity,omitempty"`
@@ -806,6 +1039,25 @@ type AvailabilityPage struct {
 	Data       []Availability `json:"data"`
 	Meta       Meta           `json:"meta"`
 	Pagination *Pagination    `json:"pagination,omitempty"`
+}
+
+// AvailabilityRulePreview Echo of the recurrence rule the server expanded plus a small sample
+// of the resulting (from, to) windows for human inspection.
+type AvailabilityRulePreview struct {
+	AddDaysCount    *int                `json:"add_days_count,omitempty"`
+	EndDate         *openapi_types.Date `json:"end_date,omitempty"`
+	EndTime         *string             `json:"end_time,omitempty"`
+	ProductOptionId *string             `json:"product_option_id,omitempty"`
+	SampleDates     *[]struct {
+		From *time.Time `json:"from,omitempty"`
+		To   *time.Time `json:"to,omitempty"`
+	} `json:"sample_dates,omitempty"`
+	StartDate    *openapi_types.Date `json:"start_date,omitempty"`
+	StartTime    *string             `json:"start_time,omitempty"`
+	TotalMatched *int                `json:"total_matched,omitempty"`
+
+	// Weekdays PHP `format('w')` — Sunday=0 through Saturday=6.
+	Weekdays *[]int `json:"weekdays,omitempty"`
 }
 
 // AvailableGiftCertPage defines model for AvailableGiftCertPage.
@@ -1027,6 +1279,22 @@ type CategoryPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+// CreateAvailabilityRuleRequest Mirrors `CreateAvailabilityRuleRequest::rules()`. `start_time` and
+// `end_time` are required for `datetime` products; ignored for
+// `date`-only products. Weekday values use PHP's `format('w')`
+// convention — Sunday=0, Saturday=6.
+type CreateAvailabilityRuleRequest struct {
+	// AddDaysCount Multi-day events: number of days to add to the `to` timestamp.
+	AddDaysCount    *int               `json:"add_days_count,omitempty"`
+	DryRun          *bool              `json:"dry_run,omitempty"`
+	EndDate         openapi_types.Date `json:"end_date"`
+	EndTime         *string            `json:"end_time,omitempty"`
+	ProductOptionId string             `json:"product_option_id"`
+	StartDate       openapi_types.Date `json:"start_date"`
+	StartTime       *string            `json:"start_time,omitempty"`
+	Weekdays        []int              `json:"weekdays"`
+}
+
 // CreateAvailableGiftCertRequest Mirrors `CreateAvailableGiftCertRequest::rules()`. `currency` is
 // accepted for symmetry but not stored (no column on the table).
 // `expiration_period_months` persists to the `expiration_period`
@@ -1137,6 +1405,21 @@ type CreateLocationRequestAttachTo string
 // CreateLocationRequestType defines model for CreateLocationRequest.Type.
 type CreateLocationRequestType string
 
+// CreatePricingCategoryRequest Mirrors `CreatePricingCategoryRequest::rules()`. `name` is
+// translatable — accepts a bare string, persisted as `{"en": "..."}`.
+type CreatePricingCategoryRequest struct {
+	DryRun     *bool                             `json:"dry_run,omitempty"`
+	IsInternal *bool                             `json:"is_internal,omitempty"`
+	MaxAge     *int                              `json:"max_age,omitempty"`
+	MinAge     *int                              `json:"min_age,omitempty"`
+	Name       string                            `json:"name"`
+	ProductId  string                            `json:"product_id"`
+	Type       *CreatePricingCategoryRequestType `json:"type,omitempty"`
+}
+
+// CreatePricingCategoryRequestType defines model for CreatePricingCategoryRequest.Type.
+type CreatePricingCategoryRequestType string
+
 // CreatePricingTierRequest Mirrors `CreatePricingTierRequest::rules()`. The actual `pricing_tiers`
 // table has no `product_option_id`, `availability_id`, or `name` column;
 // all three are accepted as legacy aliases and ignored by the controller.
@@ -1192,10 +1475,12 @@ type CreateProductOptionRequest struct {
 
 // CreateProductRequest Mirrors `CreateProductRequest::rules()`. `product_code` is optional —
 // when omitted, the server auto-generates one from the title slug plus
-// a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). Translatable rich-text
-// fields (`description`, `instructions`, `requirements`, `inclusions`,
-// `exclusions`) accept bare strings; the server wraps them into the
-// `{"en": "..."}` HasTranslations bag.
+// a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). `description` is
+// optional on the wire but is materialized as `{"en": ""}` server-side
+// when omitted, because `central_products.description` is NOT NULL.
+// Translatable rich-text fields (`description`, `instructions`,
+// `requirements`, `inclusions`, `exclusions`) accept bare strings;
+// the server wraps them into the `{"en": "..."}` HasTranslations bag.
 type CreateProductRequest struct {
 	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
@@ -1205,7 +1490,9 @@ type CreateProductRequest struct {
 	Capacity               *int    `json:"capacity,omitempty"`
 	CategoryIds            *[]int  `json:"category_ids,omitempty"`
 	Currency               string  `json:"currency"`
-	Description            *string `json:"description,omitempty"`
+
+	// Description Defaults to empty string server-side when omitted (central_products.description is NOT NULL).
+	Description *string `json:"description,omitempty"`
 
 	// Displayable Whether the product is shown in widgets / catalog.
 	Displayable *bool `json:"displayable,omitempty"`
@@ -1295,6 +1582,21 @@ type CreateQuestionRequest struct {
 
 // CreateQuestionRequestType Mapped onto `answer_type` (see schema-level description).
 type CreateQuestionRequestType string
+
+// CreateResourceRequest defines model for CreateResourceRequest.
+type CreateResourceRequest struct {
+	Capacity *int                          `json:"capacity,omitempty"`
+	Category CreateResourceRequestCategory `json:"category"`
+	DryRun   *bool                         `json:"dry_run,omitempty"`
+	Name     string                        `json:"name"`
+	Rating   *float32                      `json:"rating,omitempty"`
+
+	// Type Free-form label (Sailboat, Senior Guide, …).
+	Type string `json:"type"`
+}
+
+// CreateResourceRequestCategory defines model for CreateResourceRequest.Category.
+type CreateResourceRequestCategory string
 
 // Customer First-class `Bmbltd\LaravelBookings\Models\Customer` (vendor-package
 // model used by the bookings engine). Soft-deletable, business-unit-scoped,
@@ -1680,6 +1982,36 @@ type Pagination struct {
 	Limit      int     `json:"limit"`
 }
 
+// PricingCategory Parent bucket that one or more `PricingTier` rows live under. Carries
+// the named label (`Adults`, `Children`, ...) — translatable, returned
+// in English. Soft-deleted rows cascade-delete their pricing tiers.
+type PricingCategory struct {
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	Id        *string    `json:"id,omitempty"`
+
+	// IsInternal Internal categories are excluded from public-facing checkout flows.
+	IsInternal *bool `json:"is_internal,omitempty"`
+	MaxAge     *int  `json:"max_age,omitempty"`
+	MinAge     *int  `json:"min_age,omitempty"`
+
+	// Name Translatable; English value returned.
+	Name      *string              `json:"name,omitempty"`
+	ProductId *string              `json:"product_id,omitempty"`
+	Type      *PricingCategoryType `json:"type,omitempty"`
+	UpdatedAt *time.Time           `json:"updated_at,omitempty"`
+}
+
+// PricingCategoryType defines model for PricingCategory.Type.
+type PricingCategoryType string
+
+// PricingCategoryPage defines model for PricingCategoryPage.
+type PricingCategoryPage struct {
+	Data       []PricingCategory `json:"data"`
+	Meta       Meta              `json:"meta"`
+	Pagination *Pagination       `json:"pagination,omitempty"`
+}
+
 // PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
 // has no `product_option_id`, `availability_id`, or `name` column — those
 // belong to the parent `PricingCategory` (carries `name` + `product_id`)
@@ -1818,7 +2150,10 @@ type ProductOption struct {
 	Id        *string    `json:"id,omitempty"`
 	MaxAge    *int       `json:"max_age,omitempty"`
 	MinAge    *int       `json:"min_age,omitempty"`
-	ProductId *string    `json:"product_id,omitempty"`
+
+	// OptionCode Tenant-supplied SKU. Auto-generated from the title slug + random suffix when omitted on create.
+	OptionCode *string `json:"option_code,omitempty"`
+	ProductId  *string `json:"product_id,omitempty"`
 
 	// Title Sourced from the `name` column (no translatable layer).
 	Title     *string    `json:"title,omitempty"`
@@ -1896,6 +2231,33 @@ type RefundBookingRequest struct {
 
 	// TransactionId Specific charge to refund (otherwise newest succeeded charge)
 	TransactionId *string `json:"transaction_id,omitempty"`
+}
+
+// Resource Physical or human inventory bound to a ProductOption (a boat, a
+// guide, a yoga studio). `category` is the kind of resource;
+// `type` is a free-form label tenants pick (`Sailboat`, `Senior
+// Guide`, etc.). `capacity` is optional — null means the resource
+// doesn't constrain seat count by itself.
+type Resource struct {
+	Capacity  *int              `json:"capacity,omitempty"`
+	Category  *ResourceCategory `json:"category,omitempty"`
+	CreatedAt *time.Time        `json:"created_at,omitempty"`
+	DeletedAt *time.Time        `json:"deleted_at,omitempty"`
+	Id        *string           `json:"id,omitempty"`
+	Name      *string           `json:"name,omitempty"`
+	Rating    *float32          `json:"rating,omitempty"`
+	Type      *string           `json:"type,omitempty"`
+	UpdatedAt *time.Time        `json:"updated_at,omitempty"`
+}
+
+// ResourceCategory defines model for Resource.Category.
+type ResourceCategory string
+
+// ResourcePage defines model for ResourcePage.
+type ResourcePage struct {
+	Data       []Resource  `json:"data"`
+	Meta       Meta        `json:"meta"`
+	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
 // Transaction defines model for Transaction.
@@ -2016,6 +2378,21 @@ type UpdateLocationRequest struct {
 // UpdateLocationRequestType defines model for UpdateLocationRequest.Type.
 type UpdateLocationRequestType string
 
+// UpdatePricingCategoryRequest Mirrors `UpdatePricingCategoryRequest::rules()`. Reparenting (changing
+// `product_id`) is not supported via PATCH; create a new category if you
+// need to move tiers across products.
+type UpdatePricingCategoryRequest struct {
+	DryRun     *bool                             `json:"dry_run,omitempty"`
+	IsInternal *bool                             `json:"is_internal,omitempty"`
+	MaxAge     *int                              `json:"max_age,omitempty"`
+	MinAge     *int                              `json:"min_age,omitempty"`
+	Name       *string                           `json:"name,omitempty"`
+	Type       *UpdatePricingCategoryRequestType `json:"type,omitempty"`
+}
+
+// UpdatePricingCategoryRequestType defines model for UpdatePricingCategoryRequest.Type.
+type UpdatePricingCategoryRequestType string
+
 // UpdatePricingTierRequest Mirrors `UpdatePricingTierRequest::rules()`. `pricing_category_id`,
 // `min`, `max`, and `amount` (→ `fare`) are persisted; sending
 // `pricing_category_id` reparents the tier (404 if the target
@@ -2100,6 +2477,19 @@ type UpdateQuestionRequest struct {
 
 // UpdateQuestionRequestType defines model for UpdateQuestionRequest.Type.
 type UpdateQuestionRequestType string
+
+// UpdateResourceRequest defines model for UpdateResourceRequest.
+type UpdateResourceRequest struct {
+	Capacity *int                           `json:"capacity,omitempty"`
+	Category *UpdateResourceRequestCategory `json:"category,omitempty"`
+	DryRun   *bool                          `json:"dry_run,omitempty"`
+	Name     *string                        `json:"name,omitempty"`
+	Rating   *float32                       `json:"rating,omitempty"`
+	Type     *string                        `json:"type,omitempty"`
+}
+
+// UpdateResourceRequestCategory defines model for UpdateResourceRequest.Category.
+type UpdateResourceRequestCategory string
 
 // WhoamiData defines model for WhoamiData.
 type WhoamiData struct {
@@ -2198,6 +2588,22 @@ type BulkUpdateAvailabilitiesParams struct {
 
 // UpdateAvailabilityParams defines parameters for UpdateAvailability.
 type UpdateAvailabilityParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateAvailabilityRuleParams defines parameters for CreateAvailabilityRule.
+type CreateAvailabilityRuleParams struct {
 	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
 	// body return the original response. Conflicting body returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
@@ -2808,6 +3214,88 @@ type DeleteMediaParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListPricingCategoriesParams defines parameters for ListPricingCategories.
+type ListPricingCategoriesParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`
+	Since     *Since  `form:"since,omitempty" json:"since,omitempty"`
+	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+}
+
+// CreatePricingCategoryParams defines parameters for CreatePricingCategory.
+type CreatePricingCategoryParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DeletePricingCategoryParams defines parameters for DeletePricingCategory.
+type DeletePricingCategoryParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdatePricingCategoryParams defines parameters for UpdatePricingCategory.
+type UpdatePricingCategoryParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RestorePricingCategoryParams defines parameters for RestorePricingCategory.
+type RestorePricingCategoryParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListPricingTiersParams defines parameters for ListPricingTiers.
 type ListPricingTiersParams struct {
 	// Limit Page size (1-200, default 50)
@@ -2960,6 +3448,22 @@ type UpdateProductOptionParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// AttachResourceToProductOptionParams defines parameters for AttachResourceToProductOption.
+type AttachResourceToProductOptionParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // RestoreProductOptionJSONBody defines parameters for RestoreProductOption.
 type RestoreProductOptionJSONBody struct {
 	DryRun *bool `json:"dry_run,omitempty"`
@@ -2967,6 +3471,22 @@ type RestoreProductOptionJSONBody struct {
 
 // RestoreProductOptionParams defines parameters for RestoreProductOption.
 type RestoreProductOptionParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DetachResourceFromProductOptionParams defines parameters for DetachResourceFromProductOption.
+type DetachResourceFromProductOptionParams struct {
 	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
 	// body return the original response. Conflicting body returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
@@ -3201,6 +3721,91 @@ type RestoreQuestionParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListResourcesParams defines parameters for ListResources.
+type ListResourcesParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`
+	Since    *Since                       `form:"since,omitempty" json:"since,omitempty"`
+	Category *ListResourcesParamsCategory `form:"category,omitempty" json:"category,omitempty"`
+}
+
+// ListResourcesParamsCategory defines parameters for ListResources.
+type ListResourcesParamsCategory string
+
+// CreateResourceParams defines parameters for CreateResource.
+type CreateResourceParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DeleteResourceParams defines parameters for DeleteResource.
+type DeleteResourceParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateResourceParams defines parameters for UpdateResource.
+type UpdateResourceParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RestoreResourceParams defines parameters for RestoreResource.
+type RestoreResourceParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListTransactionsParams defines parameters for ListTransactions.
 type ListTransactionsParams struct {
 	// Limit Page size (1-200, default 50)
@@ -3228,6 +3833,9 @@ type BulkUpdateAvailabilitiesJSONRequestBody = BulkUpdateAvailabilityRequest
 
 // UpdateAvailabilityJSONRequestBody defines body for UpdateAvailability for application/json ContentType.
 type UpdateAvailabilityJSONRequestBody = UpdateAvailabilityRequest
+
+// CreateAvailabilityRuleJSONRequestBody defines body for CreateAvailabilityRule for application/json ContentType.
+type CreateAvailabilityRuleJSONRequestBody = CreateAvailabilityRuleRequest
 
 // CancelBookingJSONRequestBody defines body for CancelBooking for application/json ContentType.
 type CancelBookingJSONRequestBody = CancelBookingRequest
@@ -3283,6 +3891,12 @@ type CreateLocationJSONRequestBody = CreateLocationRequest
 // UpdateLocationJSONRequestBody defines body for UpdateLocation for application/json ContentType.
 type UpdateLocationJSONRequestBody = UpdateLocationRequest
 
+// CreatePricingCategoryJSONRequestBody defines body for CreatePricingCategory for application/json ContentType.
+type CreatePricingCategoryJSONRequestBody = CreatePricingCategoryRequest
+
+// UpdatePricingCategoryJSONRequestBody defines body for UpdatePricingCategory for application/json ContentType.
+type UpdatePricingCategoryJSONRequestBody = UpdatePricingCategoryRequest
+
 // CreatePricingTierJSONRequestBody defines body for CreatePricingTier for application/json ContentType.
 type CreatePricingTierJSONRequestBody = CreatePricingTierRequest
 
@@ -3297,6 +3911,9 @@ type CreateProductOptionJSONRequestBody = CreateProductOptionRequest
 
 // UpdateProductOptionJSONRequestBody defines body for UpdateProductOption for application/json ContentType.
 type UpdateProductOptionJSONRequestBody = UpdateProductOptionRequest
+
+// AttachResourceToProductOptionJSONRequestBody defines body for AttachResourceToProductOption for application/json ContentType.
+type AttachResourceToProductOptionJSONRequestBody = AttachResourceRequest
 
 // RestoreProductOptionJSONRequestBody defines body for RestoreProductOption for application/json ContentType.
 type RestoreProductOptionJSONRequestBody RestoreProductOptionJSONBody
@@ -3321,6 +3938,12 @@ type UpdateQuestionJSONRequestBody = UpdateQuestionRequest
 
 // RestoreQuestionJSONRequestBody defines body for RestoreQuestion for application/json ContentType.
 type RestoreQuestionJSONRequestBody RestoreQuestionJSONBody
+
+// CreateResourceJSONRequestBody defines body for CreateResource for application/json ContentType.
+type CreateResourceJSONRequestBody = CreateResourceRequest
+
+// UpdateResourceJSONRequestBody defines body for UpdateResource for application/json ContentType.
+type UpdateResourceJSONRequestBody = UpdateResourceRequest
 
 // AsBulkUpdateAvailabilityRequestNewValue0 returns the union data inside the BulkUpdateAvailabilityRequest_NewValue as a BulkUpdateAvailabilityRequestNewValue0
 func (t BulkUpdateAvailabilityRequest_NewValue) AsBulkUpdateAvailabilityRequestNewValue0() (BulkUpdateAvailabilityRequestNewValue0, error) {
@@ -3525,6 +4148,11 @@ type ClientInterface interface {
 
 	UpdateAvailability(ctx context.Context, id IdPath, params *UpdateAvailabilityParams, body UpdateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateAvailabilityRuleWithBody request with any body
+	CreateAvailabilityRuleWithBody(ctx context.Context, params *CreateAvailabilityRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAvailabilityRule(ctx context.Context, params *CreateAvailabilityRuleParams, body CreateAvailabilityRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListBookings request
 	ListBookings(ctx context.Context, params *ListBookingsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -3690,6 +4318,28 @@ type ClientInterface interface {
 	// ShowMedia request
 	ShowMedia(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListPricingCategories request
+	ListPricingCategories(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePricingCategoryWithBody request with any body
+	CreatePricingCategoryWithBody(ctx context.Context, params *CreatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreatePricingCategory(ctx context.Context, params *CreatePricingCategoryParams, body CreatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeletePricingCategory request
+	DeletePricingCategory(ctx context.Context, id IdPath, params *DeletePricingCategoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShowPricingCategory request
+	ShowPricingCategory(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdatePricingCategoryWithBody request with any body
+	UpdatePricingCategoryWithBody(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdatePricingCategory(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, body UpdatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestorePricingCategory request
+	RestorePricingCategory(ctx context.Context, id IdPath, params *RestorePricingCategoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPricingTiers request
 	ListPricingTiers(ctx context.Context, params *ListPricingTiersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -3733,10 +4383,18 @@ type ClientInterface interface {
 
 	UpdateProductOption(ctx context.Context, id IdPath, params *UpdateProductOptionParams, body UpdateProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AttachResourceToProductOptionWithBody request with any body
+	AttachResourceToProductOptionWithBody(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AttachResourceToProductOption(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, body AttachResourceToProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RestoreProductOptionWithBody request with any body
 	RestoreProductOptionWithBody(ctx context.Context, id IdPath, params *RestoreProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	RestoreProductOption(ctx context.Context, id IdPath, params *RestoreProductOptionParams, body RestoreProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DetachResourceFromProductOption request
+	DetachResourceFromProductOption(ctx context.Context, optionId string, resourceId string, params *DetachResourceFromProductOptionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProducts request
 	ListProducts(ctx context.Context, params *ListProductsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3791,6 +4449,28 @@ type ClientInterface interface {
 	RestoreQuestionWithBody(ctx context.Context, id IdPath, params *RestoreQuestionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	RestoreQuestion(ctx context.Context, id IdPath, params *RestoreQuestionParams, body RestoreQuestionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListResources request
+	ListResources(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateResourceWithBody request with any body
+	CreateResourceWithBody(ctx context.Context, params *CreateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateResource(ctx context.Context, params *CreateResourceParams, body CreateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteResource request
+	DeleteResource(ctx context.Context, id IdPath, params *DeleteResourceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShowResource request
+	ShowResource(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateResourceWithBody request with any body
+	UpdateResourceWithBody(ctx context.Context, id IdPath, params *UpdateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateResource(ctx context.Context, id IdPath, params *UpdateResourceParams, body UpdateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreResource request
+	RestoreResource(ctx context.Context, id IdPath, params *RestoreResourceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListTransactions request
 	ListTransactions(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3864,6 +4544,30 @@ func (c *Client) UpdateAvailabilityWithBody(ctx context.Context, id IdPath, para
 
 func (c *Client) UpdateAvailability(ctx context.Context, id IdPath, params *UpdateAvailabilityParams, body UpdateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAvailabilityRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAvailabilityRuleWithBody(ctx context.Context, params *CreateAvailabilityRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAvailabilityRuleRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAvailabilityRule(ctx context.Context, params *CreateAvailabilityRuleParams, body CreateAvailabilityRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAvailabilityRuleRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4606,6 +5310,102 @@ func (c *Client) ShowMedia(ctx context.Context, id IdPath, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListPricingCategories(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPricingCategoriesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePricingCategoryWithBody(ctx context.Context, params *CreatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePricingCategoryRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePricingCategory(ctx context.Context, params *CreatePricingCategoryParams, body CreatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePricingCategoryRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeletePricingCategory(ctx context.Context, id IdPath, params *DeletePricingCategoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeletePricingCategoryRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ShowPricingCategory(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowPricingCategoryRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdatePricingCategoryWithBody(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePricingCategoryRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdatePricingCategory(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, body UpdatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePricingCategoryRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RestorePricingCategory(ctx context.Context, id IdPath, params *RestorePricingCategoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestorePricingCategoryRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListPricingTiers(ctx context.Context, params *ListPricingTiersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPricingTiersRequest(c.Server, params)
 	if err != nil {
@@ -4798,6 +5598,30 @@ func (c *Client) UpdateProductOption(ctx context.Context, id IdPath, params *Upd
 	return c.Client.Do(req)
 }
 
+func (c *Client) AttachResourceToProductOptionWithBody(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAttachResourceToProductOptionRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AttachResourceToProductOption(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, body AttachResourceToProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAttachResourceToProductOptionRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) RestoreProductOptionWithBody(ctx context.Context, id IdPath, params *RestoreProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRestoreProductOptionRequestWithBody(c.Server, id, params, contentType, body)
 	if err != nil {
@@ -4812,6 +5636,18 @@ func (c *Client) RestoreProductOptionWithBody(ctx context.Context, id IdPath, pa
 
 func (c *Client) RestoreProductOption(ctx context.Context, id IdPath, params *RestoreProductOptionParams, body RestoreProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRestoreProductOptionRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DetachResourceFromProductOption(ctx context.Context, optionId string, resourceId string, params *DetachResourceFromProductOptionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDetachResourceFromProductOptionRequest(c.Server, optionId, resourceId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5052,6 +5888,102 @@ func (c *Client) RestoreQuestionWithBody(ctx context.Context, id IdPath, params 
 
 func (c *Client) RestoreQuestion(ctx context.Context, id IdPath, params *RestoreQuestionParams, body RestoreQuestionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRestoreQuestionRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListResources(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListResourcesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateResourceWithBody(ctx context.Context, params *CreateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateResourceRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateResource(ctx context.Context, params *CreateResourceParams, body CreateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateResourceRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteResource(ctx context.Context, id IdPath, params *DeleteResourceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteResourceRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ShowResource(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowResourceRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateResourceWithBody(ctx context.Context, id IdPath, params *UpdateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateResourceRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateResource(ctx context.Context, id IdPath, params *UpdateResourceParams, body UpdateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateResourceRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RestoreResource(ctx context.Context, id IdPath, params *RestoreResourceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreResourceRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5370,6 +6302,61 @@ func NewUpdateAvailabilityRequestWithBody(server string, id IdPath, params *Upda
 	}
 
 	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCreateAvailabilityRuleRequest calls the generic CreateAvailabilityRule builder with application/json body
+func NewCreateAvailabilityRuleRequest(server string, params *CreateAvailabilityRuleParams, body CreateAvailabilityRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAvailabilityRuleRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateAvailabilityRuleRequestWithBody generates requests for CreateAvailabilityRule with any type of body
+func NewCreateAvailabilityRuleRequestWithBody(server string, params *CreateAvailabilityRuleParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/availability-rules")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -8219,6 +9206,368 @@ func NewShowMediaRequest(server string, id IdPath) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListPricingCategoriesRequest generates requests for ListPricingCategories
+func NewListPricingCategoriesRequest(server string, params *ListPricingCategoriesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pricing-categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProductId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreatePricingCategoryRequest calls the generic CreatePricingCategory builder with application/json body
+func NewCreatePricingCategoryRequest(server string, params *CreatePricingCategoryParams, body CreatePricingCategoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreatePricingCategoryRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreatePricingCategoryRequestWithBody generates requests for CreatePricingCategory with any type of body
+func NewCreatePricingCategoryRequestWithBody(server string, params *CreatePricingCategoryParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pricing-categories")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeletePricingCategoryRequest generates requests for DeletePricingCategory
+func NewDeletePricingCategoryRequest(server string, id IdPath, params *DeletePricingCategoryParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pricing-categories/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewShowPricingCategoryRequest generates requests for ShowPricingCategory
+func NewShowPricingCategoryRequest(server string, id IdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pricing-categories/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdatePricingCategoryRequest calls the generic UpdatePricingCategory builder with application/json body
+func NewUpdatePricingCategoryRequest(server string, id IdPath, params *UpdatePricingCategoryParams, body UpdatePricingCategoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdatePricingCategoryRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUpdatePricingCategoryRequestWithBody generates requests for UpdatePricingCategory with any type of body
+func NewUpdatePricingCategoryRequestWithBody(server string, id IdPath, params *UpdatePricingCategoryParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pricing-categories/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRestorePricingCategoryRequest generates requests for RestorePricingCategory
+func NewRestorePricingCategoryRequest(server string, id IdPath, params *RestorePricingCategoryParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pricing-categories/%s/restore", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListPricingTiersRequest generates requests for ListPricingTiers
 func NewListPricingTiersRequest(server string, params *ListPricingTiersParams) (*http.Request, error) {
 	var err error
@@ -8891,6 +10240,68 @@ func NewUpdateProductOptionRequestWithBody(server string, id IdPath, params *Upd
 	return req, nil
 }
 
+// NewAttachResourceToProductOptionRequest calls the generic AttachResourceToProductOption builder with application/json body
+func NewAttachResourceToProductOptionRequest(server string, id IdPath, params *AttachResourceToProductOptionParams, body AttachResourceToProductOptionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAttachResourceToProductOptionRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewAttachResourceToProductOptionRequestWithBody generates requests for AttachResourceToProductOption with any type of body
+func NewAttachResourceToProductOptionRequestWithBody(server string, id IdPath, params *AttachResourceToProductOptionParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/product-options/%s/resources", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewRestoreProductOptionRequest calls the generic RestoreProductOption builder with application/json body
 func NewRestoreProductOptionRequest(server string, id IdPath, params *RestoreProductOptionParams, body RestoreProductOptionJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -8934,6 +10345,62 @@ func NewRestoreProductOptionRequestWithBody(server string, id IdPath, params *Re
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDetachResourceFromProductOptionRequest generates requests for DetachResourceFromProductOption
+func NewDetachResourceFromProductOptionRequest(server string, optionId string, resourceId string, params *DetachResourceFromProductOptionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "option_id", optionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "resource_id", resourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/product-options/%s/resources/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	if params != nil {
 
@@ -9874,6 +11341,368 @@ func NewRestoreQuestionRequestWithBody(server string, id IdPath, params *Restore
 	return req, nil
 }
 
+// NewListResourcesRequest generates requests for ListResources
+func NewListResourcesRequest(server string, params *ListResourcesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resources")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Category != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "category", *params.Category, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateResourceRequest calls the generic CreateResource builder with application/json body
+func NewCreateResourceRequest(server string, params *CreateResourceParams, body CreateResourceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateResourceRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateResourceRequestWithBody generates requests for CreateResource with any type of body
+func NewCreateResourceRequestWithBody(server string, params *CreateResourceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resources")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeleteResourceRequest generates requests for DeleteResource
+func NewDeleteResourceRequest(server string, id IdPath, params *DeleteResourceParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewShowResourceRequest generates requests for ShowResource
+func NewShowResourceRequest(server string, id IdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateResourceRequest calls the generic UpdateResource builder with application/json body
+func NewUpdateResourceRequest(server string, id IdPath, params *UpdateResourceParams, body UpdateResourceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateResourceRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUpdateResourceRequestWithBody generates requests for UpdateResource with any type of body
+func NewUpdateResourceRequestWithBody(server string, id IdPath, params *UpdateResourceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRestoreResourceRequest generates requests for RestoreResource
+func NewRestoreResourceRequest(server string, id IdPath, params *RestoreResourceParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resources/%s/restore", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListTransactionsRequest generates requests for ListTransactions
 func NewListTransactionsRequest(server string, params *ListTransactionsParams) (*http.Request, error) {
 	var err error
@@ -10139,6 +11968,11 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAvailabilityWithResponse(ctx context.Context, id IdPath, params *UpdateAvailabilityParams, body UpdateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAvailabilityResponse, error)
 
+	// CreateAvailabilityRuleWithBodyWithResponse request with any body
+	CreateAvailabilityRuleWithBodyWithResponse(ctx context.Context, params *CreateAvailabilityRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAvailabilityRuleResponse, error)
+
+	CreateAvailabilityRuleWithResponse(ctx context.Context, params *CreateAvailabilityRuleParams, body CreateAvailabilityRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAvailabilityRuleResponse, error)
+
 	// ListBookingsWithResponse request
 	ListBookingsWithResponse(ctx context.Context, params *ListBookingsParams, reqEditors ...RequestEditorFn) (*ListBookingsResponse, error)
 
@@ -10304,6 +12138,28 @@ type ClientWithResponsesInterface interface {
 	// ShowMediaWithResponse request
 	ShowMediaWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowMediaResponse, error)
 
+	// ListPricingCategoriesWithResponse request
+	ListPricingCategoriesWithResponse(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*ListPricingCategoriesResponse, error)
+
+	// CreatePricingCategoryWithBodyWithResponse request with any body
+	CreatePricingCategoryWithBodyWithResponse(ctx context.Context, params *CreatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePricingCategoryResponse, error)
+
+	CreatePricingCategoryWithResponse(ctx context.Context, params *CreatePricingCategoryParams, body CreatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePricingCategoryResponse, error)
+
+	// DeletePricingCategoryWithResponse request
+	DeletePricingCategoryWithResponse(ctx context.Context, id IdPath, params *DeletePricingCategoryParams, reqEditors ...RequestEditorFn) (*DeletePricingCategoryResponse, error)
+
+	// ShowPricingCategoryWithResponse request
+	ShowPricingCategoryWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowPricingCategoryResponse, error)
+
+	// UpdatePricingCategoryWithBodyWithResponse request with any body
+	UpdatePricingCategoryWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePricingCategoryResponse, error)
+
+	UpdatePricingCategoryWithResponse(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, body UpdatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePricingCategoryResponse, error)
+
+	// RestorePricingCategoryWithResponse request
+	RestorePricingCategoryWithResponse(ctx context.Context, id IdPath, params *RestorePricingCategoryParams, reqEditors ...RequestEditorFn) (*RestorePricingCategoryResponse, error)
+
 	// ListPricingTiersWithResponse request
 	ListPricingTiersWithResponse(ctx context.Context, params *ListPricingTiersParams, reqEditors ...RequestEditorFn) (*ListPricingTiersResponse, error)
 
@@ -10347,10 +12203,18 @@ type ClientWithResponsesInterface interface {
 
 	UpdateProductOptionWithResponse(ctx context.Context, id IdPath, params *UpdateProductOptionParams, body UpdateProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProductOptionResponse, error)
 
+	// AttachResourceToProductOptionWithBodyWithResponse request with any body
+	AttachResourceToProductOptionWithBodyWithResponse(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AttachResourceToProductOptionResponse, error)
+
+	AttachResourceToProductOptionWithResponse(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, body AttachResourceToProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachResourceToProductOptionResponse, error)
+
 	// RestoreProductOptionWithBodyWithResponse request with any body
 	RestoreProductOptionWithBodyWithResponse(ctx context.Context, id IdPath, params *RestoreProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RestoreProductOptionResponse, error)
 
 	RestoreProductOptionWithResponse(ctx context.Context, id IdPath, params *RestoreProductOptionParams, body RestoreProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*RestoreProductOptionResponse, error)
+
+	// DetachResourceFromProductOptionWithResponse request
+	DetachResourceFromProductOptionWithResponse(ctx context.Context, optionId string, resourceId string, params *DetachResourceFromProductOptionParams, reqEditors ...RequestEditorFn) (*DetachResourceFromProductOptionResponse, error)
 
 	// ListProductsWithResponse request
 	ListProductsWithResponse(ctx context.Context, params *ListProductsParams, reqEditors ...RequestEditorFn) (*ListProductsResponse, error)
@@ -10405,6 +12269,28 @@ type ClientWithResponsesInterface interface {
 	RestoreQuestionWithBodyWithResponse(ctx context.Context, id IdPath, params *RestoreQuestionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RestoreQuestionResponse, error)
 
 	RestoreQuestionWithResponse(ctx context.Context, id IdPath, params *RestoreQuestionParams, body RestoreQuestionJSONRequestBody, reqEditors ...RequestEditorFn) (*RestoreQuestionResponse, error)
+
+	// ListResourcesWithResponse request
+	ListResourcesWithResponse(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*ListResourcesResponse, error)
+
+	// CreateResourceWithBodyWithResponse request with any body
+	CreateResourceWithBodyWithResponse(ctx context.Context, params *CreateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateResourceResponse, error)
+
+	CreateResourceWithResponse(ctx context.Context, params *CreateResourceParams, body CreateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateResourceResponse, error)
+
+	// DeleteResourceWithResponse request
+	DeleteResourceWithResponse(ctx context.Context, id IdPath, params *DeleteResourceParams, reqEditors ...RequestEditorFn) (*DeleteResourceResponse, error)
+
+	// ShowResourceWithResponse request
+	ShowResourceWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowResourceResponse, error)
+
+	// UpdateResourceWithBodyWithResponse request with any body
+	UpdateResourceWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateResourceResponse, error)
+
+	UpdateResourceWithResponse(ctx context.Context, id IdPath, params *UpdateResourceParams, body UpdateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateResourceResponse, error)
+
+	// RestoreResourceWithResponse request
+	RestoreResourceWithResponse(ctx context.Context, id IdPath, params *RestoreResourceParams, reqEditors ...RequestEditorFn) (*RestoreResourceResponse, error)
 
 	// ListTransactionsWithResponse request
 	ListTransactionsWithResponse(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*ListTransactionsResponse, error)
@@ -10573,6 +12459,91 @@ func (r UpdateAvailabilityResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateAvailabilityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAvailabilityRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// Rule Echo of the recurrence rule the server expanded plus a small sample
+			// of the resulting (from, to) windows for human inspection.
+			Rule *AvailabilityRulePreview `json:"rule,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                       `json:"identifier,omitempty"`
+				PayloadSummary *string                                       `json:"payload_summary,omitempty"`
+				Type           *CreateAvailabilityRule200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+			Status       *CreateAvailabilityRule200DataStatus `json:"status,omitempty"`
+			TotalMatched *int                                 `json:"total_matched,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON202 *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// Rule Echo of the recurrence rule the server expanded plus a small sample
+			// of the resulting (from, to) windows for human inspection.
+			Rule *AvailabilityRulePreview `json:"rule,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                       `json:"identifier,omitempty"`
+				PayloadSummary *string                                       `json:"payload_summary,omitempty"`
+				Type           *CreateAvailabilityRule202DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+			Status *CreateAvailabilityRule202DataStatus `json:"status,omitempty"`
+
+			// TotalMatched Number of (date, time) pairs that will be materialized.
+			TotalMatched *int `json:"total_matched,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+type CreateAvailabilityRule200DataSideEffectsType string
+type CreateAvailabilityRule200DataStatus string
+type CreateAvailabilityRule202DataSideEffectsType string
+type CreateAvailabilityRule202DataStatus string
+
+// Status returns HTTPResponse.Status
+func (r CreateAvailabilityRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAvailabilityRuleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -11983,6 +13954,196 @@ func (r ShowMediaResponse) StatusCode() int {
 	return 0
 }
 
+type ListPricingCategoriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PricingCategoryPage
+	JSON401      *Unauthenticated
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPricingCategoriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPricingCategoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreatePricingCategoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// PricingCategory Parent bucket that one or more `PricingTier` rows live under. Carries
+			// the named label (`Adults`, `Children`, ...) — translatable, returned
+			// in English. Soft-deleted rows cascade-delete their pricing tiers.
+			PricingCategory *PricingCategory `json:"pricing_category,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                      `json:"identifier,omitempty"`
+				PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+				Type           *CreatePricingCategory201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+type CreatePricingCategory201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreatePricingCategoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePricingCategoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeletePricingCategoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthenticated
+	JSON404      *NotFound
+	JSON409      *IdempotencyConflict
+}
+
+// Status returns HTTPResponse.Status
+func (r DeletePricingCategoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeletePricingCategoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ShowPricingCategoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Parent bucket that one or more `PricingTier` rows live under. Carries
+		// the named label (`Adults`, `Children`, ...) — translatable, returned
+		// in English. Soft-deleted rows cascade-delete their pricing tiers.
+		Data       PricingCategory `json:"data"`
+		Meta       Meta            `json:"meta"`
+		Pagination *Pagination     `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ShowPricingCategoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShowPricingCategoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdatePricingCategoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdatePricingCategoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdatePricingCategoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RestorePricingCategoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r RestorePricingCategoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RestorePricingCategoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListPricingTiersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12347,6 +14508,37 @@ func (r UpdateProductOptionResponse) StatusCode() int {
 	return 0
 }
 
+type AttachResourceToProductOptionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r AttachResourceToProductOptionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AttachResourceToProductOptionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type RestoreProductOptionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12371,6 +14563,29 @@ func (r RestoreProductOptionResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r RestoreProductOptionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DetachResourceFromProductOptionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthenticated
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r DetachResourceFromProductOptionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DetachResourceFromProductOptionResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -12845,6 +15060,198 @@ func (r RestoreQuestionResponse) StatusCode() int {
 	return 0
 }
 
+type ListResourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ResourcePage
+	JSON401      *Unauthenticated
+}
+
+// Status returns HTTPResponse.Status
+func (r ListResourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListResourcesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateResourceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// Resource Physical or human inventory bound to a ProductOption (a boat, a
+			// guide, a yoga studio). `category` is the kind of resource;
+			// `type` is a free-form label tenants pick (`Sailboat`, `Senior
+			// Guide`, etc.). `capacity` is optional — null means the resource
+			// doesn't constrain seat count by itself.
+			Resource *Resource `json:"resource,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                               `json:"identifier,omitempty"`
+				PayloadSummary *string                               `json:"payload_summary,omitempty"`
+				Type           *CreateResource201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+type CreateResource201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateResourceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateResourceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteResourceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthenticated
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteResourceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteResourceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ShowResourceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Physical or human inventory bound to a ProductOption (a boat, a
+		// guide, a yoga studio). `category` is the kind of resource;
+		// `type` is a free-form label tenants pick (`Sailboat`, `Senior
+		// Guide`, etc.). `capacity` is optional — null means the resource
+		// doesn't constrain seat count by itself.
+		Data       Resource    `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ShowResourceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShowResourceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateResourceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateResourceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateResourceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RestoreResourceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r RestoreResourceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RestoreResourceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListTransactionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12973,6 +15380,23 @@ func (c *ClientWithResponses) UpdateAvailabilityWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseUpdateAvailabilityResponse(rsp)
+}
+
+// CreateAvailabilityRuleWithBodyWithResponse request with arbitrary body returning *CreateAvailabilityRuleResponse
+func (c *ClientWithResponses) CreateAvailabilityRuleWithBodyWithResponse(ctx context.Context, params *CreateAvailabilityRuleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAvailabilityRuleResponse, error) {
+	rsp, err := c.CreateAvailabilityRuleWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAvailabilityRuleResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAvailabilityRuleWithResponse(ctx context.Context, params *CreateAvailabilityRuleParams, body CreateAvailabilityRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAvailabilityRuleResponse, error) {
+	rsp, err := c.CreateAvailabilityRule(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAvailabilityRuleResponse(rsp)
 }
 
 // ListBookingsWithResponse request returning *ListBookingsResponse
@@ -13506,6 +15930,76 @@ func (c *ClientWithResponses) ShowMediaWithResponse(ctx context.Context, id IdPa
 	return ParseShowMediaResponse(rsp)
 }
 
+// ListPricingCategoriesWithResponse request returning *ListPricingCategoriesResponse
+func (c *ClientWithResponses) ListPricingCategoriesWithResponse(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*ListPricingCategoriesResponse, error) {
+	rsp, err := c.ListPricingCategories(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPricingCategoriesResponse(rsp)
+}
+
+// CreatePricingCategoryWithBodyWithResponse request with arbitrary body returning *CreatePricingCategoryResponse
+func (c *ClientWithResponses) CreatePricingCategoryWithBodyWithResponse(ctx context.Context, params *CreatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePricingCategoryResponse, error) {
+	rsp, err := c.CreatePricingCategoryWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePricingCategoryResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreatePricingCategoryWithResponse(ctx context.Context, params *CreatePricingCategoryParams, body CreatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePricingCategoryResponse, error) {
+	rsp, err := c.CreatePricingCategory(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePricingCategoryResponse(rsp)
+}
+
+// DeletePricingCategoryWithResponse request returning *DeletePricingCategoryResponse
+func (c *ClientWithResponses) DeletePricingCategoryWithResponse(ctx context.Context, id IdPath, params *DeletePricingCategoryParams, reqEditors ...RequestEditorFn) (*DeletePricingCategoryResponse, error) {
+	rsp, err := c.DeletePricingCategory(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeletePricingCategoryResponse(rsp)
+}
+
+// ShowPricingCategoryWithResponse request returning *ShowPricingCategoryResponse
+func (c *ClientWithResponses) ShowPricingCategoryWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowPricingCategoryResponse, error) {
+	rsp, err := c.ShowPricingCategory(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShowPricingCategoryResponse(rsp)
+}
+
+// UpdatePricingCategoryWithBodyWithResponse request with arbitrary body returning *UpdatePricingCategoryResponse
+func (c *ClientWithResponses) UpdatePricingCategoryWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePricingCategoryResponse, error) {
+	rsp, err := c.UpdatePricingCategoryWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePricingCategoryResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdatePricingCategoryWithResponse(ctx context.Context, id IdPath, params *UpdatePricingCategoryParams, body UpdatePricingCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePricingCategoryResponse, error) {
+	rsp, err := c.UpdatePricingCategory(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePricingCategoryResponse(rsp)
+}
+
+// RestorePricingCategoryWithResponse request returning *RestorePricingCategoryResponse
+func (c *ClientWithResponses) RestorePricingCategoryWithResponse(ctx context.Context, id IdPath, params *RestorePricingCategoryParams, reqEditors ...RequestEditorFn) (*RestorePricingCategoryResponse, error) {
+	rsp, err := c.RestorePricingCategory(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRestorePricingCategoryResponse(rsp)
+}
+
 // ListPricingTiersWithResponse request returning *ListPricingTiersResponse
 func (c *ClientWithResponses) ListPricingTiersWithResponse(ctx context.Context, params *ListPricingTiersParams, reqEditors ...RequestEditorFn) (*ListPricingTiersResponse, error) {
 	rsp, err := c.ListPricingTiers(ctx, params, reqEditors...)
@@ -13645,6 +16139,23 @@ func (c *ClientWithResponses) UpdateProductOptionWithResponse(ctx context.Contex
 	return ParseUpdateProductOptionResponse(rsp)
 }
 
+// AttachResourceToProductOptionWithBodyWithResponse request with arbitrary body returning *AttachResourceToProductOptionResponse
+func (c *ClientWithResponses) AttachResourceToProductOptionWithBodyWithResponse(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AttachResourceToProductOptionResponse, error) {
+	rsp, err := c.AttachResourceToProductOptionWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAttachResourceToProductOptionResponse(rsp)
+}
+
+func (c *ClientWithResponses) AttachResourceToProductOptionWithResponse(ctx context.Context, id IdPath, params *AttachResourceToProductOptionParams, body AttachResourceToProductOptionJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachResourceToProductOptionResponse, error) {
+	rsp, err := c.AttachResourceToProductOption(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAttachResourceToProductOptionResponse(rsp)
+}
+
 // RestoreProductOptionWithBodyWithResponse request with arbitrary body returning *RestoreProductOptionResponse
 func (c *ClientWithResponses) RestoreProductOptionWithBodyWithResponse(ctx context.Context, id IdPath, params *RestoreProductOptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RestoreProductOptionResponse, error) {
 	rsp, err := c.RestoreProductOptionWithBody(ctx, id, params, contentType, body, reqEditors...)
@@ -13660,6 +16171,15 @@ func (c *ClientWithResponses) RestoreProductOptionWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseRestoreProductOptionResponse(rsp)
+}
+
+// DetachResourceFromProductOptionWithResponse request returning *DetachResourceFromProductOptionResponse
+func (c *ClientWithResponses) DetachResourceFromProductOptionWithResponse(ctx context.Context, optionId string, resourceId string, params *DetachResourceFromProductOptionParams, reqEditors ...RequestEditorFn) (*DetachResourceFromProductOptionResponse, error) {
+	rsp, err := c.DetachResourceFromProductOption(ctx, optionId, resourceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDetachResourceFromProductOptionResponse(rsp)
 }
 
 // ListProductsWithResponse request returning *ListProductsResponse
@@ -13834,6 +16354,76 @@ func (c *ClientWithResponses) RestoreQuestionWithResponse(ctx context.Context, i
 		return nil, err
 	}
 	return ParseRestoreQuestionResponse(rsp)
+}
+
+// ListResourcesWithResponse request returning *ListResourcesResponse
+func (c *ClientWithResponses) ListResourcesWithResponse(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*ListResourcesResponse, error) {
+	rsp, err := c.ListResources(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListResourcesResponse(rsp)
+}
+
+// CreateResourceWithBodyWithResponse request with arbitrary body returning *CreateResourceResponse
+func (c *ClientWithResponses) CreateResourceWithBodyWithResponse(ctx context.Context, params *CreateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateResourceResponse, error) {
+	rsp, err := c.CreateResourceWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateResourceResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateResourceWithResponse(ctx context.Context, params *CreateResourceParams, body CreateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateResourceResponse, error) {
+	rsp, err := c.CreateResource(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateResourceResponse(rsp)
+}
+
+// DeleteResourceWithResponse request returning *DeleteResourceResponse
+func (c *ClientWithResponses) DeleteResourceWithResponse(ctx context.Context, id IdPath, params *DeleteResourceParams, reqEditors ...RequestEditorFn) (*DeleteResourceResponse, error) {
+	rsp, err := c.DeleteResource(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteResourceResponse(rsp)
+}
+
+// ShowResourceWithResponse request returning *ShowResourceResponse
+func (c *ClientWithResponses) ShowResourceWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowResourceResponse, error) {
+	rsp, err := c.ShowResource(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShowResourceResponse(rsp)
+}
+
+// UpdateResourceWithBodyWithResponse request with arbitrary body returning *UpdateResourceResponse
+func (c *ClientWithResponses) UpdateResourceWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateResourceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateResourceResponse, error) {
+	rsp, err := c.UpdateResourceWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateResourceResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateResourceWithResponse(ctx context.Context, id IdPath, params *UpdateResourceParams, body UpdateResourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateResourceResponse, error) {
+	rsp, err := c.UpdateResource(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateResourceResponse(rsp)
+}
+
+// RestoreResourceWithResponse request returning *RestoreResourceResponse
+func (c *ClientWithResponses) RestoreResourceWithResponse(ctx context.Context, id IdPath, params *RestoreResourceParams, reqEditors ...RequestEditorFn) (*RestoreResourceResponse, error) {
+	rsp, err := c.RestoreResource(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRestoreResourceResponse(rsp)
 }
 
 // ListTransactionsWithResponse request returning *ListTransactionsResponse
@@ -14070,6 +16660,121 @@ func ParseUpdateAvailabilityResponse(rsp *http.Response) (*UpdateAvailabilityRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAvailabilityRuleResponse parses an HTTP response from a CreateAvailabilityRuleWithResponse call
+func ParseCreateAvailabilityRuleResponse(rsp *http.Response) (*CreateAvailabilityRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAvailabilityRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// Rule Echo of the recurrence rule the server expanded plus a small sample
+				// of the resulting (from, to) windows for human inspection.
+				Rule *AvailabilityRulePreview `json:"rule,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                       `json:"identifier,omitempty"`
+					PayloadSummary *string                                       `json:"payload_summary,omitempty"`
+					Type           *CreateAvailabilityRule200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+				Status       *CreateAvailabilityRule200DataStatus `json:"status,omitempty"`
+				TotalMatched *int                                 `json:"total_matched,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// Rule Echo of the recurrence rule the server expanded plus a small sample
+				// of the resulting (from, to) windows for human inspection.
+				Rule *AvailabilityRulePreview `json:"rule,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                       `json:"identifier,omitempty"`
+					PayloadSummary *string                                       `json:"payload_summary,omitempty"`
+					Type           *CreateAvailabilityRule202DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+				Status *CreateAvailabilityRule202DataStatus `json:"status,omitempty"`
+
+				// TotalMatched Number of (date, time) pairs that will be materialized.
+				TotalMatched *int `json:"total_matched,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
@@ -16248,6 +18953,309 @@ func ParseShowMediaResponse(rsp *http.Response) (*ShowMediaResponse, error) {
 	return response, nil
 }
 
+// ParseListPricingCategoriesResponse parses an HTTP response from a ListPricingCategoriesWithResponse call
+func ParseListPricingCategoriesResponse(rsp *http.Response) (*ListPricingCategoriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPricingCategoriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PricingCategoryPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePricingCategoryResponse parses an HTTP response from a CreatePricingCategoryWithResponse call
+func ParseCreatePricingCategoryResponse(rsp *http.Response) (*CreatePricingCategoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePricingCategoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// PricingCategory Parent bucket that one or more `PricingTier` rows live under. Carries
+				// the named label (`Adults`, `Children`, ...) — translatable, returned
+				// in English. Soft-deleted rows cascade-delete their pricing tiers.
+				PricingCategory *PricingCategory `json:"pricing_category,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                      `json:"identifier,omitempty"`
+					PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+					Type           *CreatePricingCategory201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeletePricingCategoryResponse parses an HTTP response from a DeletePricingCategoryWithResponse call
+func ParseDeletePricingCategoryResponse(rsp *http.Response) (*DeletePricingCategoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeletePricingCategoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShowPricingCategoryResponse parses an HTTP response from a ShowPricingCategoryWithResponse call
+func ParseShowPricingCategoryResponse(rsp *http.Response) (*ShowPricingCategoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShowPricingCategoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Parent bucket that one or more `PricingTier` rows live under. Carries
+			// the named label (`Adults`, `Children`, ...) — translatable, returned
+			// in English. Soft-deleted rows cascade-delete their pricing tiers.
+			Data       PricingCategory `json:"data"`
+			Meta       Meta            `json:"meta"`
+			Pagination *Pagination     `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdatePricingCategoryResponse parses an HTTP response from a UpdatePricingCategoryWithResponse call
+func ParseUpdatePricingCategoryResponse(rsp *http.Response) (*UpdatePricingCategoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdatePricingCategoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRestorePricingCategoryResponse parses an HTTP response from a RestorePricingCategoryWithResponse call
+func ParseRestorePricingCategoryResponse(rsp *http.Response) (*RestorePricingCategoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RestorePricingCategoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListPricingTiersResponse parses an HTTP response from a ListPricingTiersWithResponse call
 func ParseListPricingTiersResponse(rsp *http.Response) (*ListPricingTiersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -16816,6 +19824,65 @@ func ParseUpdateProductOptionResponse(rsp *http.Response) (*UpdateProductOptionR
 	return response, nil
 }
 
+// ParseAttachResourceToProductOptionResponse parses an HTTP response from a AttachResourceToProductOptionWithResponse call
+func ParseAttachResourceToProductOptionResponse(rsp *http.Response) (*AttachResourceToProductOptionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AttachResourceToProductOptionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseRestoreProductOptionResponse parses an HTTP response from a RestoreProductOptionWithResponse call
 func ParseRestoreProductOptionResponse(rsp *http.Response) (*RestoreProductOptionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -16862,6 +19929,39 @@ func ParseRestoreProductOptionResponse(rsp *http.Response) (*RestoreProductOptio
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDetachResourceFromProductOptionResponse parses an HTTP response from a DetachResourceFromProductOptionWithResponse call
+func ParseDetachResourceFromProductOptionResponse(rsp *http.Response) (*DetachResourceFromProductOptionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DetachResourceFromProductOptionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 
@@ -17599,6 +20699,299 @@ func ParseRestoreQuestionResponse(rsp *http.Response) (*RestoreQuestionResponse,
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListResourcesResponse parses an HTTP response from a ListResourcesWithResponse call
+func ParseListResourcesResponse(rsp *http.Response) (*ListResourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListResourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ResourcePage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateResourceResponse parses an HTTP response from a CreateResourceWithResponse call
+func ParseCreateResourceResponse(rsp *http.Response) (*CreateResourceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateResourceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// Resource Physical or human inventory bound to a ProductOption (a boat, a
+				// guide, a yoga studio). `category` is the kind of resource;
+				// `type` is a free-form label tenants pick (`Sailboat`, `Senior
+				// Guide`, etc.). `capacity` is optional — null means the resource
+				// doesn't constrain seat count by itself.
+				Resource *Resource `json:"resource,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                               `json:"identifier,omitempty"`
+					PayloadSummary *string                               `json:"payload_summary,omitempty"`
+					Type           *CreateResource201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteResourceResponse parses an HTTP response from a DeleteResourceWithResponse call
+func ParseDeleteResourceResponse(rsp *http.Response) (*DeleteResourceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteResourceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShowResourceResponse parses an HTTP response from a ShowResourceWithResponse call
+func ParseShowResourceResponse(rsp *http.Response) (*ShowResourceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShowResourceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Physical or human inventory bound to a ProductOption (a boat, a
+			// guide, a yoga studio). `category` is the kind of resource;
+			// `type` is a free-form label tenants pick (`Sailboat`, `Senior
+			// Guide`, etc.). `capacity` is optional — null means the resource
+			// doesn't constrain seat count by itself.
+			Data       Resource    `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateResourceResponse parses an HTTP response from a UpdateResourceWithResponse call
+func ParseUpdateResourceResponse(rsp *http.Response) (*UpdateResourceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateResourceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRestoreResourceResponse parses an HTTP response from a RestoreResourceWithResponse call
+func ParseRestoreResourceResponse(rsp *http.Response) (*RestoreResourceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RestoreResourceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 
