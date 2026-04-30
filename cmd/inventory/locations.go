@@ -74,27 +74,41 @@ func locationsDefs() []CommandDef {
 		{
 			Use: "locations create", Short: "Create a location", Kind: KindMutation,
 			Verb: "POST", Path: "/locations", Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Long: "Every location must be attached to an owning record. Specify --attach-to " +
+				"(product|organisation|partner) and --attach-to-id (the owner row's id). The CLI " +
+				"never exposes Eloquent FQCNs. --address is used as street_address when " +
+				"--street-address isn't supplied.",
 			Flags: []FlagDef{
-				{Name: "type", Type: "string", Required: true, Description: "START|END|MEETING"},
+				{Name: "type", Type: "string", Required: true, Description: "START|END|MEETING|PRIMARY|SECONDARY|VISITED"},
 				{Name: "name", Type: "string", Required: true, Description: "Location name"},
-				{Name: "address", Type: "string", Required: true, Description: "Postal address"},
+				{Name: "address", Type: "string", Required: true, Description: "Postal address (used as street_address fallback)"},
+				{Name: "attach-to", Type: "string", Required: true, Description: "product|organisation|partner"},
+				{Name: "attach-to-id", Type: "string", Required: true, Description: "Id of the owning record"},
+				{Name: "street-address", Type: "string", Description: "Preferred — persisted directly"},
+				{Name: "city", Type: "string", Description: "City"},
+				{Name: "country-code", Type: "string", Description: "ISO 3166-1 alpha-2"},
+				{Name: "postal-code", Type: "string", Description: "Postal code"},
+				{Name: "region", Type: "string", Description: "Region / state / department"},
 				{Name: "latitude", Type: "float", Description: "Latitude (decimal)"},
 				{Name: "longitude", Type: "float", Description: "Longitude (decimal)"},
 				{Name: "google-place-id", Type: "string", Description: "Google Maps place ID"},
-				{Name: "timezone", Type: "string", Description: "IANA timezone"},
-				{Name: "notes", Type: "string", Description: "Internal notes"},
 			},
-			ForensicFields: []string{"type", "name", "address"},
+			ForensicFields: []string{"type", "name", "attach-to", "attach-to-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"type":            "type",
 					"name":            "name",
 					"address":         "address",
+					"attach-to":       "attach_to",
+					"attach-to-id":    "attach_to_id",
+					"street-address":  "street_address",
+					"city":            "city",
+					"country-code":    "country_code",
+					"postal-code":     "postal_code",
+					"region":          "region",
 					"latitude":        "latitude",
 					"longitude":       "longitude",
 					"google-place-id": "google_place_id",
-					"timezone":        "timezone",
-					"notes":           "notes",
 				})
 				if err != nil {
 					return nil, err
@@ -114,17 +128,17 @@ func locationsDefs() []CommandDef {
 			Use: "locations update <id>", Short: "Update a location", Kind: KindMutation,
 			Verb: "PATCH", Path: "/locations/{id}", Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
+			Long: "Update enum is narrower than create — only START|END|MEETING are allowed " +
+				"per UpdateLocationRequest::rules() in the spec.",
 			Flags: []FlagDef{
 				{Name: "type", Type: "string", Description: "START|END|MEETING"},
 				{Name: "name", Type: "string", Description: "Location name"},
-				{Name: "address", Type: "string", Description: "Postal address"},
+				{Name: "address", Type: "string", Description: "Postal address (persisted as street_address)"},
 				{Name: "latitude", Type: "float", Description: "Latitude (decimal)"},
 				{Name: "longitude", Type: "float", Description: "Longitude (decimal)"},
 				{Name: "google-place-id", Type: "string", Description: "Google Maps place ID"},
-				{Name: "timezone", Type: "string", Description: "IANA timezone"},
-				{Name: "notes", Type: "string", Description: "Internal notes"},
 			},
-			ForensicFields: []string{"type", "name", "address"},
+			ForensicFields: []string{"type", "name"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
@@ -137,8 +151,6 @@ func locationsDefs() []CommandDef {
 					"latitude":        "latitude",
 					"longitude":       "longitude",
 					"google-place-id": "google_place_id",
-					"timezone":        "timezone",
-					"notes":           "notes",
 				})
 				if err != nil {
 					return nil, err

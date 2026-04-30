@@ -30,7 +30,6 @@ func productsDefs() []CommandDef {
 				{Name: "category", Type: "string", Description: "Filter by category slug or ID"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
-				{Name: "status", Type: "string", Description: "draft|published|archived"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				params := &gen.ListProductsParams{}
@@ -56,10 +55,6 @@ func productsDefs() []CommandDef {
 						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
 					}
 					params.Since = &t
-				}
-				if v := args.FlagString("status"); v != "" {
-					s := gen.ListProductsParamsStatus(v)
-					params.Status = &s
 				}
 				resp, err := r.Client.ListProductsWithResponse(ctx, params)
 				if err != nil {
@@ -93,12 +88,11 @@ func productsDefs() []CommandDef {
 				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code (e.g. EUR, USD)"},
 				{Name: "description", Type: "string", Description: "Product description"},
 				{Name: "status", Type: "string", Description: "draft|published"},
-				{Name: "schedule-type", Type: "string", Description: "FIXED|FLEXIBLE"},
+				{Name: "schedule-type", Type: "string", Description: "date|datetime"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "cancellation-policy", Type: "string", Description: "Cancellation policy text"},
 				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
-				{Name: "category-ids", Type: "stringSlice", Description: "Comma-separated category IDs"},
-				{Name: "slug", Type: "string", Description: "URL slug (auto-generated if omitted)"},
+				{Name: "category-ids", Type: "intSlice", Description: "Comma-separated category IDs (integer)"},
 				{Name: "timezone", Type: "string", Description: "IANA timezone"},
 			},
 			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "cancellation-policy"},
@@ -113,7 +107,6 @@ func productsDefs() []CommandDef {
 					"cancellation-policy": "cancellation_policy",
 					"from-price":          "from_price",
 					"category-ids":        "category_ids",
-					"slug":                "slug",
 					"timezone":            "timezone",
 				})
 				if err != nil {
@@ -137,12 +130,11 @@ func productsDefs() []CommandDef {
 				{Name: "title", Type: "string", Description: "Product title"},
 				{Name: "description", Type: "string", Description: "Product description"},
 				{Name: "status", Type: "string", Description: "draft|published"},
-				{Name: "schedule-type", Type: "string", Description: "FIXED|FLEXIBLE"},
+				{Name: "schedule-type", Type: "string", Description: "date|datetime"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "cancellation-policy", Type: "string", Description: "Cancellation policy text"},
 				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
-				{Name: "category-ids", Type: "stringSlice", Description: "Comma-separated category IDs"},
-				{Name: "slug", Type: "string", Description: "URL slug"},
+				{Name: "category-ids", Type: "intSlice", Description: "Comma-separated category IDs (integer)"},
 				{Name: "timezone", Type: "string", Description: "IANA timezone"},
 			},
 			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "cancellation-policy"},
@@ -160,7 +152,6 @@ func productsDefs() []CommandDef {
 					"cancellation-policy": "cancellation_policy",
 					"from-price":          "from_price",
 					"category-ids":        "category_ids",
-					"slug":                "slug",
 					"timezone":            "timezone",
 				})
 				if err != nil {

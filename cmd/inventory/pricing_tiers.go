@@ -25,8 +25,7 @@ func pricingTiersDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int", Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
-				{Name: "product-option-id", Type: "string", Description: "Filter by option"},
-				{Name: "availability-id", Type: "string", Description: "Filter by availability"},
+				{Name: "product-id", Type: "string", Description: "Filter by parent product (via the pricing_category relation)"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
@@ -38,11 +37,8 @@ func pricingTiersDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-option-id"); v != "" {
-					p.ProductOptionId = &v
-				}
-				if v := args.FlagString("availability-id"); v != "" {
-					p.AvailabilityId = &v
+				if v := args.FlagString("product-id"); v != "" {
+					p.ProductId = &v
 				}
 				if args.FlagBool("include-trashed") {
 					t := true
@@ -82,21 +78,22 @@ func pricingTiersDefs() []CommandDef {
 			Use: "pricing-tiers create", Short: "Create a pricing tier", Kind: KindMutation,
 			Verb: "POST", Path: "/pricing-tiers", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
+			Long: "Pricing tier = headcount band on a parent PricingCategory (the named bucket like " +
+				"Adults/Children). --pricing-category-id and --amount are required; --min/--max " +
+				"describe the inclusive headcount band (--max omitted = open-ended).",
 			Flags: []FlagDef{
-				{Name: "name", Type: "string", Required: true, Description: "Tier name"},
-				{Name: "amount", Type: "int", Required: true, Description: "Price in minor units"},
-				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
-				{Name: "product-option-id", Type: "string", Required: true, Description: "Owning product option"},
-				{Name: "availability-id", Type: "string", Description: "Scope tier to a single availability"},
+				{Name: "pricing-category-id", Type: "string", Required: true, Description: "Owning PricingCategory row"},
+				{Name: "amount", Type: "int", Required: true, Description: "Price (minor units, persisted as `fare`)"},
+				{Name: "min", Type: "int", Description: "Inclusive lower bound of the headcount band"},
+				{Name: "max", Type: "int", Description: "Inclusive upper bound; omit for open-ended"},
 			},
-			ForensicFields: []string{"amount", "product-option-id", "availability-id"},
+			ForensicFields: []string{"pricing-category-id", "amount", "min", "max"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":              "name",
-					"amount":            "amount",
-					"currency":          "currency",
-					"product-option-id": "product_option_id",
-					"availability-id":   "availability_id",
+					"pricing-category-id": "pricing_category_id",
+					"amount":              "amount",
+					"min":                 "min",
+					"max":                 "max",
 				})
 				if err != nil {
 					return nil, err
@@ -115,19 +112,25 @@ func pricingTiersDefs() []CommandDef {
 			Verb: "PATCH", Path: "/pricing-tiers/{id}", Ability: invpkg.Write,
 			DryRunMode:     DryRunBody,
 			PositionalArgs: []string{"id"},
+			Long: "Update a tier. Sending --pricing-category-id reparents the tier under a " +
+				"different PricingCategory (404 if the target category doesn't exist).",
 			Flags: []FlagDef{
-				{Name: "name", Type: "string", Description: "Tier name"},
-				{Name: "amount", Type: "int", Description: "Price in minor units"},
+				{Name: "pricing-category-id", Type: "string", Description: "Reparent under a different PricingCategory"},
+				{Name: "amount", Type: "int", Description: "Price (minor units, persisted as `fare`)"},
+				{Name: "min", Type: "int", Description: "Inclusive lower bound of the headcount band"},
+				{Name: "max", Type: "int", Description: "Inclusive upper bound; omit for open-ended"},
 			},
-			ForensicFields: []string{"amount"},
+			ForensicFields: []string{"pricing-category-id", "amount", "min", "max"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":   "name",
-					"amount": "amount",
+					"pricing-category-id": "pricing_category_id",
+					"amount":              "amount",
+					"min":                 "min",
+					"max":                 "max",
 				})
 				if err != nil {
 					return nil, err

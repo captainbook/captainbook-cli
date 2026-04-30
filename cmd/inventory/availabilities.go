@@ -167,7 +167,7 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 		bulkUpdateDef("capacity",
 			"Bulk update slot capacity",
 			[]FlagDef{
-				{Name: "operator", Type: "string", Required: true, Description: "SET|INCREASE_BY|DECREASE_BY"},
+				{Name: "operator", Type: "string", Required: true, Description: "set_to|increase_by|decrease_by"},
 				{Name: "value", Type: "int", Required: true, Description: "Capacity value (or delta)"},
 			},
 			func(args RunArgs) (any, error) {

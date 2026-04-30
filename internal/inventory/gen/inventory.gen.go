@@ -72,19 +72,19 @@ func (e BookingBookingStatus) Valid() bool {
 
 // Defines values for BulkUpdateAvailabilityRequestNewValue1Operator.
 const (
-	DECREASEBY BulkUpdateAvailabilityRequestNewValue1Operator = "DECREASE_BY"
-	INCREASEBY BulkUpdateAvailabilityRequestNewValue1Operator = "INCREASE_BY"
-	SET        BulkUpdateAvailabilityRequestNewValue1Operator = "SET"
+	DecreaseBy BulkUpdateAvailabilityRequestNewValue1Operator = "decrease_by"
+	IncreaseBy BulkUpdateAvailabilityRequestNewValue1Operator = "increase_by"
+	SetTo      BulkUpdateAvailabilityRequestNewValue1Operator = "set_to"
 )
 
 // Valid indicates whether the value is a known member of the BulkUpdateAvailabilityRequestNewValue1Operator enum.
 func (e BulkUpdateAvailabilityRequestNewValue1Operator) Valid() bool {
 	switch e {
-	case DECREASEBY:
+	case DecreaseBy:
 		return true
-	case INCREASEBY:
+	case IncreaseBy:
 		return true
-	case SET:
+	case SetTo:
 		return true
 	default:
 		return false
@@ -142,11 +142,35 @@ func (e CancelBookingRequestRefundPolicy) Valid() bool {
 	}
 }
 
+// Defines values for CreateLocationRequestAttachTo.
+const (
+	CreateLocationRequestAttachToOrganisation CreateLocationRequestAttachTo = "organisation"
+	CreateLocationRequestAttachToPartner      CreateLocationRequestAttachTo = "partner"
+	CreateLocationRequestAttachToProduct      CreateLocationRequestAttachTo = "product"
+)
+
+// Valid indicates whether the value is a known member of the CreateLocationRequestAttachTo enum.
+func (e CreateLocationRequestAttachTo) Valid() bool {
+	switch e {
+	case CreateLocationRequestAttachToOrganisation:
+		return true
+	case CreateLocationRequestAttachToPartner:
+		return true
+	case CreateLocationRequestAttachToProduct:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateLocationRequestType.
 const (
-	CreateLocationRequestTypeEND     CreateLocationRequestType = "END"
-	CreateLocationRequestTypeMEETING CreateLocationRequestType = "MEETING"
-	CreateLocationRequestTypeSTART   CreateLocationRequestType = "START"
+	CreateLocationRequestTypeEND       CreateLocationRequestType = "END"
+	CreateLocationRequestTypeMEETING   CreateLocationRequestType = "MEETING"
+	CreateLocationRequestTypePRIMARY   CreateLocationRequestType = "PRIMARY"
+	CreateLocationRequestTypeSECONDARY CreateLocationRequestType = "SECONDARY"
+	CreateLocationRequestTypeSTART     CreateLocationRequestType = "START"
+	CreateLocationRequestTypeVISITED   CreateLocationRequestType = "VISITED"
 )
 
 // Valid indicates whether the value is a known member of the CreateLocationRequestType enum.
@@ -156,25 +180,13 @@ func (e CreateLocationRequestType) Valid() bool {
 		return true
 	case CreateLocationRequestTypeMEETING:
 		return true
+	case CreateLocationRequestTypePRIMARY:
+		return true
+	case CreateLocationRequestTypeSECONDARY:
+		return true
 	case CreateLocationRequestTypeSTART:
 		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for CreateProductOptionRequestStatus.
-const (
-	CreateProductOptionRequestStatusDraft     CreateProductOptionRequestStatus = "draft"
-	CreateProductOptionRequestStatusPublished CreateProductOptionRequestStatus = "published"
-)
-
-// Valid indicates whether the value is a known member of the CreateProductOptionRequestStatus enum.
-func (e CreateProductOptionRequestStatus) Valid() bool {
-	switch e {
-	case CreateProductOptionRequestStatusDraft:
-		return true
-	case CreateProductOptionRequestStatusPublished:
+	case CreateLocationRequestTypeVISITED:
 		return true
 	default:
 		return false
@@ -183,16 +195,16 @@ func (e CreateProductOptionRequestStatus) Valid() bool {
 
 // Defines values for CreateProductRequestScheduleType.
 const (
-	CreateProductRequestScheduleTypeFIXED    CreateProductRequestScheduleType = "FIXED"
-	CreateProductRequestScheduleTypeFLEXIBLE CreateProductRequestScheduleType = "FLEXIBLE"
+	CreateProductRequestScheduleTypeDate     CreateProductRequestScheduleType = "date"
+	CreateProductRequestScheduleTypeDatetime CreateProductRequestScheduleType = "datetime"
 )
 
 // Valid indicates whether the value is a known member of the CreateProductRequestScheduleType enum.
 func (e CreateProductRequestScheduleType) Valid() bool {
 	switch e {
-	case CreateProductRequestScheduleTypeFIXED:
+	case CreateProductRequestScheduleTypeDate:
 		return true
-	case CreateProductRequestScheduleTypeFLEXIBLE:
+	case CreateProductRequestScheduleTypeDatetime:
 		return true
 	default:
 		return false
@@ -277,8 +289,9 @@ func (e GiftCertificateStatus) Valid() bool {
 // Defines values for LocationType.
 const (
 	LocationTypeEND     LocationType = "END"
-	LocationTypeMEETING LocationType = "MEETING"
+	LocationTypePRIMARY LocationType = "PRIMARY"
 	LocationTypeSTART   LocationType = "START"
+	LocationTypeVISITED LocationType = "VISITED"
 )
 
 // Valid indicates whether the value is a known member of the LocationType enum.
@@ -286,9 +299,11 @@ func (e LocationType) Valid() bool {
 	switch e {
 	case LocationTypeEND:
 		return true
-	case LocationTypeMEETING:
+	case LocationTypePRIMARY:
 		return true
 	case LocationTypeSTART:
+		return true
+	case LocationTypeVISITED:
 		return true
 	default:
 		return false
@@ -339,16 +354,16 @@ func (e MutationResultSideEffectsType) Valid() bool {
 
 // Defines values for ProductScheduleType.
 const (
-	ProductScheduleTypeFIXED    ProductScheduleType = "FIXED"
-	ProductScheduleTypeFLEXIBLE ProductScheduleType = "FLEXIBLE"
+	ProductScheduleTypeDate     ProductScheduleType = "date"
+	ProductScheduleTypeDatetime ProductScheduleType = "datetime"
 )
 
 // Valid indicates whether the value is a known member of the ProductScheduleType enum.
 func (e ProductScheduleType) Valid() bool {
 	switch e {
-	case ProductScheduleTypeFIXED:
+	case ProductScheduleTypeDate:
 		return true
-	case ProductScheduleTypeFLEXIBLE:
+	case ProductScheduleTypeDatetime:
 		return true
 	default:
 		return false
@@ -357,7 +372,6 @@ func (e ProductScheduleType) Valid() bool {
 
 // Defines values for ProductStatus.
 const (
-	ProductStatusArchived  ProductStatus = "archived"
 	ProductStatusDraft     ProductStatus = "draft"
 	ProductStatusPublished ProductStatus = "published"
 )
@@ -365,8 +379,6 @@ const (
 // Valid indicates whether the value is a known member of the ProductStatus enum.
 func (e ProductStatus) Valid() bool {
 	switch e {
-	case ProductStatusArchived:
-		return true
 	case ProductStatusDraft:
 		return true
 	case ProductStatusPublished:
@@ -376,51 +388,57 @@ func (e ProductStatus) Valid() bool {
 	}
 }
 
-// Defines values for ProductOptionStatus.
-const (
-	ProductOptionStatusArchived  ProductOptionStatus = "archived"
-	ProductOptionStatusDraft     ProductOptionStatus = "draft"
-	ProductOptionStatusPublished ProductOptionStatus = "published"
-)
-
-// Valid indicates whether the value is a known member of the ProductOptionStatus enum.
-func (e ProductOptionStatus) Valid() bool {
-	switch e {
-	case ProductOptionStatusArchived:
-		return true
-	case ProductOptionStatusDraft:
-		return true
-	case ProductOptionStatusPublished:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for QuestionType.
 const (
-	QuestionTypeBoolean  QuestionType = "boolean"
-	QuestionTypeDate     QuestionType = "date"
-	QuestionTypeNumber   QuestionType = "number"
-	QuestionTypeSelect   QuestionType = "select"
-	QuestionTypeText     QuestionType = "text"
-	QuestionTypeTextarea QuestionType = "textarea"
+	QuestionTypeBirthdate     QuestionType = "birthdate"
+	QuestionTypeBoolean       QuestionType = "boolean"
+	QuestionTypeCountry       QuestionType = "country"
+	QuestionTypeDate          QuestionType = "date"
+	QuestionTypeDatetime      QuestionType = "datetime"
+	QuestionTypeDecimalNumber QuestionType = "decimal_number"
+	QuestionTypeEmail         QuestionType = "email"
+	QuestionTypeList          QuestionType = "list"
+	QuestionTypeLocationList  QuestionType = "location_list"
+	QuestionTypeLongText      QuestionType = "long_text"
+	QuestionTypeName          QuestionType = "name"
+	QuestionTypeNumber        QuestionType = "number"
+	QuestionTypePhone         QuestionType = "phone"
+	QuestionTypeShortText     QuestionType = "short_text"
+	QuestionTypeTime          QuestionType = "time"
 )
 
 // Valid indicates whether the value is a known member of the QuestionType enum.
 func (e QuestionType) Valid() bool {
 	switch e {
+	case QuestionTypeBirthdate:
+		return true
 	case QuestionTypeBoolean:
+		return true
+	case QuestionTypeCountry:
 		return true
 	case QuestionTypeDate:
 		return true
+	case QuestionTypeDatetime:
+		return true
+	case QuestionTypeDecimalNumber:
+		return true
+	case QuestionTypeEmail:
+		return true
+	case QuestionTypeList:
+		return true
+	case QuestionTypeLocationList:
+		return true
+	case QuestionTypeLongText:
+		return true
+	case QuestionTypeName:
+		return true
 	case QuestionTypeNumber:
 		return true
-	case QuestionTypeSelect:
+	case QuestionTypePhone:
 		return true
-	case QuestionTypeText:
+	case QuestionTypeShortText:
 		return true
-	case QuestionTypeTextarea:
+	case QuestionTypeTime:
 		return true
 	default:
 		return false
@@ -532,36 +550,18 @@ func (e UpdateLocationRequestType) Valid() bool {
 	}
 }
 
-// Defines values for UpdateProductOptionRequestStatus.
-const (
-	UpdateProductOptionRequestStatusDraft     UpdateProductOptionRequestStatus = "draft"
-	UpdateProductOptionRequestStatusPublished UpdateProductOptionRequestStatus = "published"
-)
-
-// Valid indicates whether the value is a known member of the UpdateProductOptionRequestStatus enum.
-func (e UpdateProductOptionRequestStatus) Valid() bool {
-	switch e {
-	case UpdateProductOptionRequestStatusDraft:
-		return true
-	case UpdateProductOptionRequestStatusPublished:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for UpdateProductRequestScheduleType.
 const (
-	FIXED    UpdateProductRequestScheduleType = "FIXED"
-	FLEXIBLE UpdateProductRequestScheduleType = "FLEXIBLE"
+	UpdateProductRequestScheduleTypeDate     UpdateProductRequestScheduleType = "date"
+	UpdateProductRequestScheduleTypeDatetime UpdateProductRequestScheduleType = "datetime"
 )
 
 // Valid indicates whether the value is a known member of the UpdateProductRequestScheduleType enum.
 func (e UpdateProductRequestScheduleType) Valid() bool {
 	switch e {
-	case FIXED:
+	case UpdateProductRequestScheduleTypeDate:
 		return true
-	case FLEXIBLE:
+	case UpdateProductRequestScheduleTypeDatetime:
 		return true
 	default:
 		return false
@@ -588,28 +588,28 @@ func (e UpdateProductRequestStatus) Valid() bool {
 
 // Defines values for UpdateQuestionRequestType.
 const (
-	Boolean  UpdateQuestionRequestType = "boolean"
-	Date     UpdateQuestionRequestType = "date"
-	Number   UpdateQuestionRequestType = "number"
-	Select   UpdateQuestionRequestType = "select"
-	Text     UpdateQuestionRequestType = "text"
-	Textarea UpdateQuestionRequestType = "textarea"
+	UpdateQuestionRequestTypeBoolean  UpdateQuestionRequestType = "boolean"
+	UpdateQuestionRequestTypeDate     UpdateQuestionRequestType = "date"
+	UpdateQuestionRequestTypeNumber   UpdateQuestionRequestType = "number"
+	UpdateQuestionRequestTypeSelect   UpdateQuestionRequestType = "select"
+	UpdateQuestionRequestTypeText     UpdateQuestionRequestType = "text"
+	UpdateQuestionRequestTypeTextarea UpdateQuestionRequestType = "textarea"
 )
 
 // Valid indicates whether the value is a known member of the UpdateQuestionRequestType enum.
 func (e UpdateQuestionRequestType) Valid() bool {
 	switch e {
-	case Boolean:
+	case UpdateQuestionRequestTypeBoolean:
 		return true
-	case Date:
+	case UpdateQuestionRequestTypeDate:
 		return true
-	case Number:
+	case UpdateQuestionRequestTypeNumber:
 		return true
-	case Select:
+	case UpdateQuestionRequestTypeSelect:
 		return true
-	case Text:
+	case UpdateQuestionRequestTypeText:
 		return true
-	case Textarea:
+	case UpdateQuestionRequestTypeTextarea:
 		return true
 	default:
 		return false
@@ -700,27 +700,6 @@ func (e ListLocationsParamsType) Valid() bool {
 	case ListLocationsParamsTypeMEETING:
 		return true
 	case ListLocationsParamsTypeSTART:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListProductOptionsParamsStatus.
-const (
-	ListProductOptionsParamsStatusArchived  ListProductOptionsParamsStatus = "archived"
-	ListProductOptionsParamsStatusDraft     ListProductOptionsParamsStatus = "draft"
-	ListProductOptionsParamsStatusPublished ListProductOptionsParamsStatus = "published"
-)
-
-// Valid indicates whether the value is a known member of the ListProductOptionsParamsStatus enum.
-func (e ListProductOptionsParamsStatus) Valid() bool {
-	switch e {
-	case ListProductOptionsParamsStatusArchived:
-		return true
-	case ListProductOptionsParamsStatusDraft:
-		return true
-	case ListProductOptionsParamsStatusPublished:
 		return true
 	default:
 		return false
@@ -824,15 +803,32 @@ type AvailableGiftCertPage struct {
 	Pagination *Pagination                `json:"pagination,omitempty"`
 }
 
-// AvailableGiftCertificate Sellable gift-cert SKU (the offering)
+// AvailableGiftCertificate Sellable gift-cert SKU (the offering). Mirrors
+// `AvailableGiftCertificateResource::toArray()`. `currency` has no
+// underlying column on `available_gift_certificates` — it always
+// serializes as null today (tenant-level currency is implied) but is
+// kept on the wire for forward compatibility. `expiration_period_months`
+// sources the `expiration_period` column, which the model accessor
+// `expiryDurationInMonths` treats as MONTHS via
+// `CarbonInterval::make($value, 'months')`. A value of -1 means
+// "never expires". `cover_image_url` is sourced from the Paperclip
+// `cover` attachment (read-only — uploads not yet supported via CLI).
 type AvailableGiftCertificate struct {
 	// Amounts Available denominations (minor units)
-	Amounts              *[]Money `json:"amounts,omitempty"`
-	CoverImageUrl        *string  `json:"cover_image_url,omitempty"`
-	Currency             *string  `json:"currency,omitempty"`
-	ExpirationPeriodDays *int     `json:"expiration_period_days,omitempty"`
-	Id                   *string  `json:"id,omitempty"`
-	Name                 *string  `json:"name,omitempty"`
+	Amounts *[]Money `json:"amounts,omitempty"`
+
+	// CoverImageUrl URL of the Paperclip `cover` attachment when uploaded; null otherwise. Read-only via the CLI.
+	CoverImageUrl *string    `json:"cover_image_url,omitempty"`
+	CreatedAt     *time.Time `json:"created_at,omitempty"`
+
+	// Currency Always null today — no column on the table; tenant-level currency is implied.
+	Currency *string `json:"currency,omitempty"`
+
+	// ExpirationPeriodMonths Sources the `expiration_period` column (months). -1 means never expires.
+	ExpirationPeriodMonths *int       `json:"expiration_period_months,omitempty"`
+	Id                     *string    `json:"id,omitempty"`
+	Name                   *string    `json:"name,omitempty"`
+	UpdatedAt              *time.Time `json:"updated_at,omitempty"`
 }
 
 // Booking defines model for Booking.
@@ -935,12 +931,12 @@ type BulkUpdateAvailabilityRequestNewValue0 struct {
 
 // BulkUpdateAvailabilityRequestNewValue1 When `setting=capacity`.
 type BulkUpdateAvailabilityRequestNewValue1 struct {
-	// Operator From `App\Enums\Inventory\CapacityOperator`. SET replaces; INCREASE_BY/DECREASE_BY are deltas.
+	// Operator From `App\Enums\Inventory\CapacityOperator`. `set_to` replaces; `increase_by`/`decrease_by` are deltas.
 	Operator BulkUpdateAvailabilityRequestNewValue1Operator `json:"operator"`
 	Value    int                                            `json:"value"`
 }
 
-// BulkUpdateAvailabilityRequestNewValue1Operator From `App\Enums\Inventory\CapacityOperator`. SET replaces; INCREASE_BY/DECREASE_BY are deltas.
+// BulkUpdateAvailabilityRequestNewValue1Operator From `App\Enums\Inventory\CapacityOperator`. `set_to` replaces; `increase_by`/`decrease_by` are deltas.
 type BulkUpdateAvailabilityRequestNewValue1Operator string
 
 // BulkUpdateAvailabilityRequestNewValue2 When `setting=pricing`. Replaces existing fares for the listed tiers; tiers omitted are left alone (the underlying service uses `replaceAll: false`).
@@ -986,15 +982,30 @@ type CancelBookingRequest struct {
 // `partial` override (CS only — operator tokens are 403 on overrides).
 type CancelBookingRequestRefundPolicy string
 
-// Category defines model for Category.
+// Category Read-only resource (no Create/Update endpoints — Phase 1B + commit
+// 9bce20074). Mirrors `CategoryResource::toArray()`. The
+// `product_categories` table only persists `id` + `name`; `slug`,
+// `description`, and `position` are surfaced because the
+// `ProductCategory` model has accessors for them, but they read as null
+// / 0 against today's schema.
 type Category struct {
-	CreatedAt    *time.Time `json:"created_at,omitempty"`
-	Description  *string    `json:"description,omitempty"`
-	Id           *string    `json:"id,omitempty"`
-	Name         *string    `json:"name,omitempty"`
-	Position     *int       `json:"position,omitempty"`
-	ProductCount *int       `json:"product_count,omitempty"`
-	Slug         *string    `json:"slug,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// Description No underlying column — null today.
+	Description *string `json:"description,omitempty"`
+	Id          *string `json:"id,omitempty"`
+
+	// Name English translation of the `name` column.
+	Name *string `json:"name,omitempty"`
+
+	// Position No underlying column — null today.
+	Position *int `json:"position,omitempty"`
+
+	// ProductCount Set only when the `products` relation is eager-loaded; otherwise null.
+	ProductCount *int `json:"product_count,omitempty"`
+
+	// Slug No underlying column — null today.
+	Slug *string `json:"slug,omitempty"`
 }
 
 // CategoryPage defines model for CategoryPage.
@@ -1004,23 +1015,22 @@ type CategoryPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
-// CreateAvailableGiftCertRequest defines model for CreateAvailableGiftCertRequest.
+// CreateAvailableGiftCertRequest Mirrors `CreateAvailableGiftCertRequest::rules()`. `currency` is
+// accepted for symmetry but not stored (no column on the table).
+// `expiration_period_months` persists to the `expiration_period`
+// column; the model treats it as MONTHS. `cover_image_url` is
+// read-only and not accepted on writes (cover assets go through the
+// Paperclip `cover` attachment, not via the CLI today).
 type CreateAvailableGiftCertRequest struct {
-	Amounts              []Money `json:"amounts"`
-	CoverImageUrl        *string `json:"cover_image_url,omitempty"`
-	Currency             string  `json:"currency"`
-	DryRun               *bool   `json:"dry_run,omitempty"`
-	ExpirationPeriodDays *int    `json:"expiration_period_days,omitempty"`
-	Name                 string  `json:"name"`
-}
+	Amounts []int `json:"amounts"`
 
-// CreateCategoryRequest defines model for CreateCategoryRequest.
-type CreateCategoryRequest struct {
-	Description *string `json:"description,omitempty"`
-	DryRun      *bool   `json:"dry_run,omitempty"`
-	Name        string  `json:"name"`
-	Position    *int    `json:"position,omitempty"`
-	Slug        *string `json:"slug,omitempty"`
+	// Currency Required for symmetry; not stored.
+	Currency string `json:"currency"`
+	DryRun   *bool  `json:"dry_run,omitempty"`
+
+	// ExpirationPeriodMonths Months. -1 means never expires.
+	ExpirationPeriodMonths *int   `json:"expiration_period_months,omitempty"`
+	Name                   string `json:"name"`
 }
 
 // CreateDiscountRequest Provide exactly one of `discounted_price` (fixed-amount) or
@@ -1045,102 +1055,178 @@ type CreateDiscountRequest struct {
 	ValidityStart   time.Time  `json:"validity_start"`
 }
 
-// CreateExtraRequest defines model for CreateExtraRequest.
+// CreateExtraRequest Mirrors `CreateExtraRequest::rules()`. The controller maps `name` →
+// `title`, `amount` → `fare`, `max_quantity` → (`maximum`,
+// `maximum_bookable`) on the row. `currency` is required for parity
+// with other create endpoints but has no `extras` column and is
+// dropped (currency is tenant-level).
 type CreateExtraRequest struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount          Money   `json:"amount"`
-	Currency        string  `json:"currency"`
-	Description     *string `json:"description,omitempty"`
-	DryRun          *bool   `json:"dry_run,omitempty"`
-	MaxQuantity     *int    `json:"max_quantity,omitempty"`
-	Name            string  `json:"name"`
-	ProductOptionId string  `json:"product_option_id"`
+	// Amount Persisted as `fare`. Minor units.
+	Amount int `json:"amount"`
+
+	// Currency Required for symmetry; not stored.
+	Currency    string  `json:"currency"`
+	Description *string `json:"description,omitempty"`
+	DryRun      *bool   `json:"dry_run,omitempty"`
+
+	// MaxQuantity When set, `maximum` becomes `custom` and the value lands in `maximum_bookable`.
+	MaxQuantity *int `json:"max_quantity,omitempty"`
+
+	// Name Persisted as the translatable `title` column.
+	Name string `json:"name"`
+
+	// ProductOptionId Persisted as the morph (`product_id`, `product_type=ProductOption`).
+	ProductOptionId string `json:"product_option_id"`
 }
 
-// CreateLocationRequest defines model for CreateLocationRequest.
+// CreateLocationRequest Mirrors `CreateLocationRequest::rules()`. Every Location must be
+// attached to an owning record; specify which kind via `attach_to`
+// (enum) and the id via `attach_to_id`. The controller resolves the
+// enum to the underlying polymorphic FQCN — clients never deal with
+// Eloquent class names. The schema column is `street_address`;
+// `address` is a derived accessor on the model. The controller prefers
+// `street_address` when supplied, otherwise falls back to `address`.
+// `timezone` and `notes` are accepted but dropped on persist (no
+// underlying columns today). 422 if `attach_to_id` doesn't resolve to
+// an existing record of the requested kind.
 type CreateLocationRequest struct {
-	Address       string                    `json:"address"`
-	DryRun        *bool                     `json:"dry_run,omitempty"`
-	GooglePlaceId *string                   `json:"google_place_id,omitempty"`
-	Latitude      *float32                  `json:"latitude,omitempty"`
-	Longitude     *float32                  `json:"longitude,omitempty"`
-	Name          string                    `json:"name"`
-	Notes         *string                   `json:"notes,omitempty"`
-	Timezone      *string                   `json:"timezone,omitempty"`
-	Type          CreateLocationRequestType `json:"type"`
+	// Address Used as `street_address` when `street_address` is not explicitly supplied.
+	Address string `json:"address"`
+
+	// AttachTo Kind of record this location belongs to. The CLI never exposes Eloquent FQCNs.
+	AttachTo CreateLocationRequestAttachTo `json:"attach_to"`
+
+	// AttachToId Id of the `attach_to` record.
+	AttachToId    string   `json:"attach_to_id"`
+	City          *string  `json:"city,omitempty"`
+	CountryCode   *string  `json:"country_code,omitempty"`
+	DryRun        *bool    `json:"dry_run,omitempty"`
+	GooglePlaceId *string  `json:"google_place_id,omitempty"`
+	Latitude      *float32 `json:"latitude,omitempty"`
+	Longitude     *float32 `json:"longitude,omitempty"`
+	Name          string   `json:"name"`
+
+	// Notes Accepted but not stored — no column.
+	Notes      *string `json:"notes,omitempty"`
+	PostalCode *string `json:"postal_code,omitempty"`
+	Region     *string `json:"region,omitempty"`
+
+	// StreetAddress Preferred; persisted directly.
+	StreetAddress *string `json:"street_address,omitempty"`
+
+	// Timezone Accepted but not stored — no column.
+	Timezone *string                   `json:"timezone,omitempty"`
+	Type     CreateLocationRequestType `json:"type"`
 }
+
+// CreateLocationRequestAttachTo Kind of record this location belongs to. The CLI never exposes Eloquent FQCNs.
+type CreateLocationRequestAttachTo string
 
 // CreateLocationRequestType defines model for CreateLocationRequest.Type.
 type CreateLocationRequestType string
 
-// CreatePricingTierRequest defines model for CreatePricingTierRequest.
+// CreatePricingTierRequest Mirrors `CreatePricingTierRequest::rules()`. The actual `pricing_tiers`
+// table has no `product_option_id`, `availability_id`, or `name` column;
+// all three are accepted as legacy aliases and ignored by the controller.
+// Tiers belong to a `PricingCategory` (the named bucket like
+// `Adults`/`Children`), which in turn belongs to a Product. `amount`
+// is persisted as the `fare` column. `currency` has no per-row column
+// and is dropped on persist.
 type CreatePricingTierRequest struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount Money `json:"amount"`
+	// Amount Persisted as the `fare` column. Minor units.
+	Amount int `json:"amount"`
 
-	// AvailabilityId Scope tier to a single availability; otherwise applies broadly
-	AvailabilityId  *string `json:"availability_id,omitempty"`
-	Currency        string  `json:"currency"`
-	DryRun          *bool   `json:"dry_run,omitempty"`
-	Name            string  `json:"name"`
-	ProductOptionId string  `json:"product_option_id"`
+	// AvailabilityId Legacy alias accepted for compat. Availability scoping is M:N via the `availability_pricing_tier` pivot, not a column. Ignored.
+	AvailabilityId *string `json:"availability_id,omitempty"`
+
+	// Currency Accepted but ignored — no per-row column.
+	Currency *string `json:"currency,omitempty"`
+	DryRun   *bool   `json:"dry_run,omitempty"`
+
+	// Max Inclusive upper bound; null = open-ended.
+	Max *int `json:"max,omitempty"`
+
+	// Min Inclusive lower bound of the headcount band.
+	Min *int `json:"min,omitempty"`
+
+	// Name Legacy alias accepted for compat — belongs on the parent `PricingCategory`, not the tier. Ignored.
+	Name *string `json:"name,omitempty"`
+
+	// PricingCategoryId Required parent `PricingCategory` row.
+	PricingCategoryId string `json:"pricing_category_id"`
+
+	// ProductOptionId Legacy alias accepted for compat. Ignored — tiers don't link to ProductOption directly.
+	ProductOptionId *string `json:"product_option_id,omitempty"`
 }
 
-// CreateProductOptionRequest defines model for CreateProductOptionRequest.
+// CreateProductOptionRequest Mirrors `CreateProductOptionRequest::rules()`. `title` is mapped onto
+// the `name` column by the controller. ProductOption has no description
+// or published/draft flag of its own — those live on the parent Product.
 type CreateProductOptionRequest struct {
-	Capacity        *int                              `json:"capacity,omitempty"`
-	Description     *string                           `json:"description,omitempty"`
-	DryRun          *bool                             `json:"dry_run,omitempty"`
-	DurationMinutes *int                              `json:"duration_minutes,omitempty"`
-	MaxAge          *int                              `json:"max_age,omitempty"`
-	MinAge          *int                              `json:"min_age,omitempty"`
-	ProductId       string                            `json:"product_id"`
-	Status          *CreateProductOptionRequestStatus `json:"status,omitempty"`
-	Title           string                            `json:"title"`
+	Capacity        *int   `json:"capacity,omitempty"`
+	DryRun          *bool  `json:"dry_run,omitempty"`
+	DurationMinutes *int   `json:"duration_minutes,omitempty"`
+	MaxAge          *int   `json:"max_age,omitempty"`
+	MinAge          *int   `json:"min_age,omitempty"`
+	ProductId       string `json:"product_id"`
+
+	// Title Persisted as the `name` column.
+	Title string `json:"title"`
 }
 
-// CreateProductOptionRequestStatus defines model for CreateProductOptionRequest.Status.
-type CreateProductOptionRequestStatus string
-
-// CreateProductRequest defines model for CreateProductRequest.
+// CreateProductRequest Mirrors `CreateProductRequest::rules()`.
 type CreateProductRequest struct {
-	CancellationPolicy *string   `json:"cancellation_policy,omitempty"`
-	Capacity           *int      `json:"capacity,omitempty"`
-	CategoryIds        *[]string `json:"category_ids,omitempty"`
-	Currency           string    `json:"currency"`
-	Description        *string   `json:"description,omitempty"`
-	DryRun             *bool     `json:"dry_run,omitempty"`
+	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
+	Capacity           *int    `json:"capacity,omitempty"`
+	CategoryIds        *[]int  `json:"category_ids,omitempty"`
+	Currency           string  `json:"currency"`
+	Description        *string `json:"description,omitempty"`
+	DryRun             *bool   `json:"dry_run,omitempty"`
 
-	// FromPrice Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	FromPrice    *Money                            `json:"from_price,omitempty"`
+	// FromPrice Minor units.
+	FromPrice *int `json:"from_price,omitempty"`
+
+	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
 	ScheduleType *CreateProductRequestScheduleType `json:"schedule_type,omitempty"`
 
-	// Slug Auto-generated if omitted
-	Slug     *string                     `json:"slug,omitempty"`
+	// Status Translates to the underlying `is_active` boolean.
 	Status   *CreateProductRequestStatus `json:"status,omitempty"`
 	Timezone *string                     `json:"timezone,omitempty"`
 	Title    string                      `json:"title"`
 }
 
-// CreateProductRequestScheduleType defines model for CreateProductRequest.ScheduleType.
+// CreateProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
 type CreateProductRequestScheduleType string
 
-// CreateProductRequestStatus defines model for CreateProductRequest.Status.
+// CreateProductRequestStatus Translates to the underlying `is_active` boolean.
 type CreateProductRequestStatus string
 
-// CreateQuestionRequest defines model for CreateQuestionRequest.
+// CreateQuestionRequest Mirrors `CreateQuestionRequest::rules()`. The controller maps
+// `label` → `question`, `required` → `is_required`, and `type` onto
+// the underlying `answer_type` enum via:
+// `text → short_text`, `textarea → long_text`, `select → list`,
+// `date → date`, `number → number`, `boolean → boolean`. The polymorphic
+// `questionable` morph is set to `(ProductOption::class, product_option_id)`.
 type CreateQuestionRequest struct {
-	DryRun *bool  `json:"dry_run,omitempty"`
-	Label  string `json:"label"`
+	DryRun *bool `json:"dry_run,omitempty"`
+
+	// Label Persisted as the `question` column.
+	Label string `json:"label"`
 
 	// Options For type=select
-	Options         *[]string                 `json:"options,omitempty"`
-	ProductOptionId string                    `json:"product_option_id"`
-	Required        *bool                     `json:"required,omitempty"`
-	Type            CreateQuestionRequestType `json:"type"`
+	Options *[]string `json:"options,omitempty"`
+
+	// ProductOptionId Persisted as `questionable_id` with `questionable_type=ProductOption`.
+	ProductOptionId string `json:"product_option_id"`
+
+	// Required Persisted as `is_required`.
+	Required *bool `json:"required,omitempty"`
+
+	// Type Mapped onto `answer_type` (see schema-level description).
+	Type CreateQuestionRequestType `json:"type"`
 }
 
-// CreateQuestionRequestType defines model for CreateQuestionRequest.Type.
+// CreateQuestionRequestType Mapped onto `answer_type` (see schema-level description).
 type CreateQuestionRequestType string
 
 // Customer First-class `Bmbltd\LaravelBookings\Models\Customer` (vendor-package
@@ -1225,7 +1311,11 @@ type Discount struct {
 	// Id integer ID
 	Id *string `json:"id,omitempty"`
 
-	// NbOffers Maximum redemptions; 0 or null = unlimited
+	// NbOffers Maximum redemptions, per CB convention (`Discount::scopeValid`):
+	// - `> 0` — positive limit, enforced via row-locked count check on apply
+	// - `-1` — explicit "unlimited"
+	// - `0` — exhausted (apply returns 409 DISCOUNT_NOT_APPLICABLE)
+	// - `null` — legacy unlimited (rows pre-feature)
 	NbOffers *int `json:"nb_offers,omitempty"`
 
 	// ProductOptionId When null, discount applies globally; when set, scoped to one product option
@@ -1290,19 +1380,35 @@ type ErrorEnvelope struct {
 	} `json:"meta"`
 }
 
-// Extra defines model for Extra.
+// Extra Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
+// `title` (translatable) and `fare`; the wire shape exposes them as
+// `name` and `amount`. The `extras` table has no `currency` column —
+// `currency` comes from the tenant default, falling back to `EUR`.
+// `max_quantity` is derived from the `maximum` discriminator and
+// `maximum_bookable` columns: `maximum=custom` → real cap;
+// `maximum=no_max` / `max_by_participant` → null in the wire response.
+// Extras link to `ProductOption` via the morphTo `product` columns
+// (`product_id` + `product_type`).
 type Extra struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount   *Money  `json:"amount,omitempty"`
+	// Amount Maps to the `fare` column.
+	Amount    *Money     `json:"amount,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// Currency Tenant currency; defaults to `EUR`.
 	Currency *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
-	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
-	Description     *string    `json:"description,omitempty"`
-	Id              *string    `json:"id,omitempty"`
-	MaxQuantity     *int       `json:"max_quantity,omitempty"`
-	Name            *string    `json:"name,omitempty"`
+	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	Id          *string    `json:"id,omitempty"`
+	MaxQuantity *int       `json:"max_quantity,omitempty"`
+
+	// Name English translation of the `title` column.
+	Name *string `json:"name,omitempty"`
+
+	// ProductOptionId Sourced from the morph `product_id` column when `product_type=ProductOption`.
 	ProductOptionId *string    `json:"product_option_id,omitempty"`
+	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 }
 
 // ExtraPage defines model for ExtraPage.
@@ -1312,24 +1418,25 @@ type ExtraPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
-// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands)
+// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands). Mirrors
+// `GiftCertificateResource::toArray()`. `recipient_email` is the
+// underlying `recipient` column; `recipient_name` is the `to` column.
+// `currency` is sourced from `tenant()->currency` (no per-row column),
+// falling back to `EUR`. `available_gift_certificate_id` references
+// the `available_gift_certificate_uuid` column.
 type GiftCertificate struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
 	Amount                     *Money  `json:"amount,omitempty"`
 	AvailableGiftCertificateId *string `json:"available_gift_certificate_id,omitempty"`
 	Code                       *string `json:"code,omitempty"`
 	Currency                   *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when the cert is voided (status maps to `void`).
-	DeletedAt      *time.Time           `json:"deleted_at,omitempty"`
-	ExpiresAt      *time.Time           `json:"expires_at,omitempty"`
-	Id             *string              `json:"id,omitempty"`
-	IssuedAt       *time.Time           `json:"issued_at,omitempty"`
-	LastUsedAt     *time.Time           `json:"last_used_at,omitempty"`
-	RecipientEmail *openapi_types.Email `json:"recipient_email,omitempty"`
-	RecipientName  *string              `json:"recipient_name,omitempty"`
-
-	// RemainingAmount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
+	DeletedAt       *time.Time             `json:"deleted_at,omitempty"`
+	ExpiresAt       *time.Time             `json:"expires_at,omitempty"`
+	Id              *string                `json:"id,omitempty"`
+	IssuedAt        *time.Time             `json:"issued_at,omitempty"`
+	RecipientEmail  *openapi_types.Email   `json:"recipient_email,omitempty"`
+	RecipientName   *string                `json:"recipient_name,omitempty"`
 	RemainingAmount *Money                 `json:"remaining_amount,omitempty"`
 	Status          *GiftCertificateStatus `json:"status,omitempty"`
 	ValidFrom       *time.Time             `json:"valid_from,omitempty"`
@@ -1382,23 +1489,33 @@ type IssueGiftCertRequest struct {
 	// SendNow If true, server emails the redemption code to `recipient_email`
 	// immediately. Default false to avoid accidental emails when the
 	// CLI / LLM intends to issue + manually verify before sending. To
-	// send a previously-issued cert, use `POST /gift-certs/{id}/resend`.
+	// send a previously-issued cert, use `POST /gift-certs/issued/{id}/resend`.
 	SendNow       *bool   `json:"send_now,omitempty"`
 	SenderMessage *string `json:"sender_message,omitempty"`
 }
 
-// Location defines model for Location.
+// Location Mirrors `LocationResource::toArray()`. The `locations` table type enum
+// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
+// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+// `address` is a derived accessor (`getAddressAttribute()` composing
+// `street_address` + city + country). `timezone` and `notes` have no
+// underlying columns and read as null today.
 type Location struct {
-	Address       *string       `json:"address,omitempty"`
-	CreatedAt     *time.Time    `json:"created_at,omitempty"`
-	GooglePlaceId *string       `json:"google_place_id,omitempty"`
-	Id            *string       `json:"id,omitempty"`
-	Latitude      *float32      `json:"latitude,omitempty"`
-	Longitude     *float32      `json:"longitude,omitempty"`
-	Name          *string       `json:"name,omitempty"`
-	Notes         *string       `json:"notes,omitempty"`
-	Timezone      *string       `json:"timezone,omitempty"`
-	Type          *LocationType `json:"type,omitempty"`
+	// Address Derived from `street_address` (+ optional city/country).
+	Address       *string    `json:"address,omitempty"`
+	CreatedAt     *time.Time `json:"created_at,omitempty"`
+	GooglePlaceId *string    `json:"google_place_id,omitempty"`
+	Id            *string    `json:"id,omitempty"`
+	Latitude      *float32   `json:"latitude,omitempty"`
+	Longitude     *float32   `json:"longitude,omitempty"`
+	Name          *string    `json:"name,omitempty"`
+
+	// Notes Always null today — no underlying column.
+	Notes *string `json:"notes,omitempty"`
+
+	// Timezone Always null today — no underlying column.
+	Timezone *string       `json:"timezone,omitempty"`
+	Type     *LocationType `json:"type,omitempty"`
 }
 
 // LocationType defines model for Location.Type.
@@ -1495,18 +1612,33 @@ type Pagination struct {
 	Limit      int     `json:"limit"`
 }
 
-// PricingTier defines model for PricingTier.
+// PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
+// has no `product_option_id`, `availability_id`, or `name` column — those
+// belong to the parent `PricingCategory` (carries `name` + `product_id`)
+// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
+// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
+// Currency is tenant-level and not stored per row; defaults to `EUR`.
 type PricingTier struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount         *Money  `json:"amount,omitempty"`
-	AvailabilityId *string `json:"availability_id,omitempty"`
-	Currency       *string `json:"currency,omitempty"`
+	// Amount Maps to the `fare` column.
+	Amount    *Money     `json:"amount,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// Currency Tenant currency; defaults to `EUR`.
+	Currency *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
-	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
-	Id              *string    `json:"id,omitempty"`
-	Name            *string    `json:"name,omitempty"`
-	ProductOptionId *string    `json:"product_option_id,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	Id        *string    `json:"id,omitempty"`
+
+	// Max Inclusive upper bound; null = open-ended.
+	Max *int `json:"max,omitempty"`
+
+	// Min Inclusive lower bound of the headcount band the tier applies to.
+	Min *int `json:"min,omitempty"`
+
+	// PricingCategoryId Parent `PricingCategory` row (carries the named bucket like `Adults`/`Children`).
+	PricingCategoryId *string    `json:"pricing_category_id,omitempty"`
+	UpdatedAt         *time.Time `json:"updated_at,omitempty"`
 }
 
 // PricingTierPage defines model for PricingTierPage.
@@ -1516,55 +1648,70 @@ type PricingTierPage struct {
 	Pagination *Pagination   `json:"pagination,omitempty"`
 }
 
-// Product defines model for Product.
+// Product Mirrors `ProductResource::toArray()`. Translatable `title` /
+// `description` are returned in English (`toArrayWithTranslations('en')`).
+// `status` is derived from the `is_active` column (`is_active` is also
+// surfaced directly for clients that prefer the canonical boolean).
 type Product struct {
-	CancellationPolicy *string    `json:"cancellation_policy,omitempty"`
-	Capacity           *int       `json:"capacity,omitempty"`
-	CategoryIds        *[]string  `json:"category_ids,omitempty"`
-	CreatedAt          *time.Time `json:"created_at,omitempty"`
-	Currency           *string    `json:"currency,omitempty"`
+	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
+	Capacity           *int    `json:"capacity,omitempty"`
+
+	// CategoryIds IDs of attached `ProductCategory` rows; empty array when the relation isn't eager-loaded.
+	CategoryIds *[]string  `json:"category_ids,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+	Currency    *string    `json:"currency,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 	Description *string    `json:"description,omitempty"`
+	FromPrice   *Money     `json:"from_price,omitempty"`
+	Id          *string    `json:"id,omitempty"`
 
-	// FromPrice Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	FromPrice    *Money               `json:"from_price,omitempty"`
-	Id           *string              `json:"id,omitempty"`
+	// IsActive Canonical boolean from the `is_active` column.
+	IsActive *bool `json:"is_active,omitempty"`
+
+	// ProductCode Tenant-supplied SKU; not auto-generated.
+	ProductCode *string `json:"product_code,omitempty"`
+
+	// ScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time. Backed by `Bmbltd\LaravelBookings\Enums\ScheduleType`.
 	ScheduleType *ProductScheduleType `json:"schedule_type,omitempty"`
-	Slug         *string              `json:"slug,omitempty"`
-	Status       *ProductStatus       `json:"status,omitempty"`
-	Timezone     *string              `json:"timezone,omitempty"`
-	Title        *string              `json:"title,omitempty"`
-	UpdatedAt    *time.Time           `json:"updated_at,omitempty"`
+
+	// Status Derived from `is_active` (`true` → published, `false` → draft). Spec previously listed an `archived` value that the implementation never returns.
+	Status    *ProductStatus `json:"status,omitempty"`
+	Timezone  *string        `json:"timezone,omitempty"`
+	Title     *string        `json:"title,omitempty"`
+	UpdatedAt *time.Time     `json:"updated_at,omitempty"`
 }
 
-// ProductScheduleType defines model for Product.ScheduleType.
+// ProductScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time. Backed by `Bmbltd\LaravelBookings\Enums\ScheduleType`.
 type ProductScheduleType string
 
-// ProductStatus defines model for Product.Status.
+// ProductStatus Derived from `is_active` (`true` → published, `false` → draft). Spec previously listed an `archived` value that the implementation never returns.
 type ProductStatus string
 
-// ProductOption defines model for ProductOption.
+// ProductOption Mirrors `ProductOptionResource::toArray()`. The underlying
+// `product_options` table column is `name`, but the wire shape exposes it
+// as `title` for symmetry with Product (the controller maps
+// `title` ↔ `name` on write). ProductOption has no `description` of its
+// own — that lives on the parent Product. ProductOption likewise has no
+// active/published flag; visibility is governed by the parent Product's
+// `is_active`.
 type ProductOption struct {
 	Capacity  *int       `json:"capacity,omitempty"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
-	DeletedAt       *time.Time           `json:"deleted_at,omitempty"`
-	Description     *string              `json:"description,omitempty"`
-	DurationMinutes *int                 `json:"duration_minutes,omitempty"`
-	Id              *string              `json:"id,omitempty"`
-	MaxAge          *int                 `json:"max_age,omitempty"`
-	MinAge          *int                 `json:"min_age,omitempty"`
-	ProductId       *string              `json:"product_id,omitempty"`
-	Status          *ProductOptionStatus `json:"status,omitempty"`
-	Title           *string              `json:"title,omitempty"`
-	UpdatedAt       *time.Time           `json:"updated_at,omitempty"`
-}
+	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	DurationMinutes *int       `json:"duration_minutes,omitempty"`
+	Id              *string    `json:"id,omitempty"`
+	MaxAge          *int       `json:"max_age,omitempty"`
+	MinAge          *int       `json:"min_age,omitempty"`
+	ProductId       *string    `json:"product_id,omitempty"`
 
-// ProductOptionStatus defines model for ProductOption.Status.
-type ProductOptionStatus string
+	// Title Sourced from the `name` column (no translatable layer).
+	Title     *string    `json:"title,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+}
 
 // ProductOptionPage defines model for ProductOptionPage.
 type ProductOptionPage struct {
@@ -1580,21 +1727,40 @@ type ProductPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
-// Question defines model for Question.
+// Question Mirrors `QuestionResource::toArray()`. Underlying columns:
+// `question` → `label`, `answer_type` → `type`, `is_required` →
+// `required`. Questions are polymorphic (morphTo `questionable`); the
+// wire shape exposes only the `ProductOption` case via
+// `product_option_id` (sourced from `questionable_id`).
+// The `questions` table has `public $timestamps = false`, so
+// `created_at` / `updated_at` are always null. `type` returns the raw
+// `answer_type` enum value (broader than the input enum).
 type Question struct {
+	// CreatedAt Always null — `Question` model has `$timestamps = false`.
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
 	// DeletedAt Set when soft-deleted; null otherwise
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	Id        *string    `json:"id,omitempty"`
-	Label     *string    `json:"label,omitempty"`
 
-	// Options For type=select
-	Options         *[]string     `json:"options,omitempty"`
-	ProductOptionId *string       `json:"product_option_id,omitempty"`
-	Required        *bool         `json:"required,omitempty"`
-	Type            *QuestionType `json:"type,omitempty"`
+	// Label Sourced from the `question` column.
+	Label *string `json:"label,omitempty"`
+
+	// Options For type=select / list
+	Options *[]string `json:"options,omitempty"`
+
+	// ProductOptionId Sourced from `questionable_id` when `questionable_type=ProductOption`; null otherwise.
+	ProductOptionId *string `json:"product_option_id,omitempty"`
+	Required        *bool   `json:"required,omitempty"`
+
+	// Type Raw `answer_type` enum value. The write API accepts a narrower input enum (text/textarea/select/date/number/boolean) which the controller maps onto these values.
+	Type *QuestionType `json:"type,omitempty"`
+
+	// UpdatedAt Always null — `Question` model has `$timestamps = false`.
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
-// QuestionType defines model for Question.Type.
+// QuestionType Raw `answer_type` enum value. The write API accepts a narrower input enum (text/textarea/select/date/number/boolean) which the controller maps onto these values.
 type QuestionType string
 
 // QuestionPage defines model for QuestionPage.
@@ -1683,28 +1849,19 @@ type UpdateAvailabilityRequest struct {
 // UpdateAvailabilityRequestStatus defines model for UpdateAvailabilityRequest.Status.
 type UpdateAvailabilityRequestStatus string
 
-// UpdateAvailableGiftCertRequest defines model for UpdateAvailableGiftCertRequest.
+// UpdateAvailableGiftCertRequest Mirrors `UpdateAvailableGiftCertRequest::rules()`. `cover_image_url`
+// is read-only (not accepted on writes).
 type UpdateAvailableGiftCertRequest struct {
-	Amounts              *[]Money `json:"amounts,omitempty"`
-	CoverImageUrl        *string  `json:"cover_image_url,omitempty"`
-	DryRun               *bool    `json:"dry_run,omitempty"`
-	ExpirationPeriodDays *int     `json:"expiration_period_days,omitempty"`
-	Name                 *string  `json:"name,omitempty"`
+	Amounts                *[]int  `json:"amounts,omitempty"`
+	DryRun                 *bool   `json:"dry_run,omitempty"`
+	ExpirationPeriodMonths *int    `json:"expiration_period_months,omitempty"`
+	Name                   *string `json:"name,omitempty"`
 }
 
-// UpdateCategoryRequest defines model for UpdateCategoryRequest.
-type UpdateCategoryRequest struct {
-	Description *string `json:"description,omitempty"`
-	DryRun      *bool   `json:"dry_run,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	Position    *int    `json:"position,omitempty"`
-	Slug        *string `json:"slug,omitempty"`
-}
-
-// UpdateExtraRequest defines model for UpdateExtraRequest.
+// UpdateExtraRequest Mirrors `UpdateExtraRequest::rules()`. Same field-to-column mappings
+// as `CreateExtraRequest`.
 type UpdateExtraRequest struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount      *Money  `json:"amount,omitempty"`
+	Amount      *int    `json:"amount,omitempty"`
 	Description *string `json:"description,omitempty"`
 	DryRun      *bool   `json:"dry_run,omitempty"`
 	MaxQuantity *int    `json:"max_quantity,omitempty"`
@@ -1723,69 +1880,87 @@ type UpdateGuestRequest struct {
 	Phone            *string                 `json:"phone,omitempty"`
 }
 
-// UpdateLocationRequest defines model for UpdateLocationRequest.
+// UpdateLocationRequest Mirrors `UpdateLocationRequest::rules()`. The controller persists only
+// `type`, `name`, `latitude`, `longitude`, `google_place_id`, `region`,
+// and (when `address` is provided) `street_address`. `timezone` and
+// `notes` are accepted but dropped on persist.
 type UpdateLocationRequest struct {
-	Address       *string                    `json:"address,omitempty"`
-	DryRun        *bool                      `json:"dry_run,omitempty"`
-	GooglePlaceId *string                    `json:"google_place_id,omitempty"`
-	Latitude      *float32                   `json:"latitude,omitempty"`
-	Longitude     *float32                   `json:"longitude,omitempty"`
-	Name          *string                    `json:"name,omitempty"`
-	Notes         *string                    `json:"notes,omitempty"`
-	Timezone      *string                    `json:"timezone,omitempty"`
-	Type          *UpdateLocationRequestType `json:"type,omitempty"`
+	// Address Persisted as `street_address` when supplied.
+	Address       *string  `json:"address,omitempty"`
+	DryRun        *bool    `json:"dry_run,omitempty"`
+	GooglePlaceId *string  `json:"google_place_id,omitempty"`
+	Latitude      *float32 `json:"latitude,omitempty"`
+	Longitude     *float32 `json:"longitude,omitempty"`
+	Name          *string  `json:"name,omitempty"`
+
+	// Notes Accepted but not stored.
+	Notes *string `json:"notes,omitempty"`
+
+	// Timezone Accepted but not stored.
+	Timezone *string `json:"timezone,omitempty"`
+
+	// Type Update enum is narrower than create — see `UpdateLocationRequest::rules()`.
+	Type *UpdateLocationRequestType `json:"type,omitempty"`
 }
 
-// UpdateLocationRequestType defines model for UpdateLocationRequest.Type.
+// UpdateLocationRequestType Update enum is narrower than create — see `UpdateLocationRequest::rules()`.
 type UpdateLocationRequestType string
 
-// UpdatePricingTierRequest defines model for UpdatePricingTierRequest.
+// UpdatePricingTierRequest Mirrors `UpdatePricingTierRequest::rules()`. `pricing_category_id`,
+// `min`, `max`, and `amount` (→ `fare`) are persisted; sending
+// `pricing_category_id` reparents the tier (404 if the target
+// category doesn't exist). `name` is accepted as a legacy alias but
+// ignored.
 type UpdatePricingTierRequest struct {
-	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount *Money  `json:"amount,omitempty"`
-	DryRun *bool   `json:"dry_run,omitempty"`
-	Name   *string `json:"name,omitempty"`
+	// Amount Persisted as `fare`. Minor units.
+	Amount *int  `json:"amount,omitempty"`
+	DryRun *bool `json:"dry_run,omitempty"`
+	Max    *int  `json:"max,omitempty"`
+	Min    *int  `json:"min,omitempty"`
+
+	// Name Legacy alias — ignored.
+	Name *string `json:"name,omitempty"`
+
+	// PricingCategoryId Reparent the tier under a different PricingCategory.
+	PricingCategoryId *string `json:"pricing_category_id,omitempty"`
 }
 
-// UpdateProductOptionRequest defines model for UpdateProductOptionRequest.
+// UpdateProductOptionRequest Mirrors `UpdateProductOptionRequest::rules()`. Same field semantics as
+// `CreateProductOptionRequest` (title → name).
 type UpdateProductOptionRequest struct {
-	Capacity        *int                              `json:"capacity,omitempty"`
-	Description     *string                           `json:"description,omitempty"`
-	DryRun          *bool                             `json:"dry_run,omitempty"`
-	DurationMinutes *int                              `json:"duration_minutes,omitempty"`
-	MaxAge          *int                              `json:"max_age,omitempty"`
-	MinAge          *int                              `json:"min_age,omitempty"`
-	Status          *UpdateProductOptionRequestStatus `json:"status,omitempty"`
-	Title           *string                           `json:"title,omitempty"`
+	Capacity        *int    `json:"capacity,omitempty"`
+	DryRun          *bool   `json:"dry_run,omitempty"`
+	DurationMinutes *int    `json:"duration_minutes,omitempty"`
+	MaxAge          *int    `json:"max_age,omitempty"`
+	MinAge          *int    `json:"min_age,omitempty"`
+	Title           *string `json:"title,omitempty"`
 }
 
-// UpdateProductOptionRequestStatus defines model for UpdateProductOptionRequest.Status.
-type UpdateProductOptionRequestStatus string
-
-// UpdateProductRequest defines model for UpdateProductRequest.
+// UpdateProductRequest Mirrors `UpdateProductRequest::rules()`.
 type UpdateProductRequest struct {
-	CancellationPolicy *string   `json:"cancellation_policy,omitempty"`
-	Capacity           *int      `json:"capacity,omitempty"`
-	CategoryIds        *[]string `json:"category_ids,omitempty"`
-	Description        *string   `json:"description,omitempty"`
-	DryRun             *bool     `json:"dry_run,omitempty"`
+	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
+	Capacity           *int    `json:"capacity,omitempty"`
+	CategoryIds        *[]int  `json:"category_ids,omitempty"`
+	Description        *string `json:"description,omitempty"`
+	DryRun             *bool   `json:"dry_run,omitempty"`
+	FromPrice          *int    `json:"from_price,omitempty"`
 
-	// FromPrice Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	FromPrice    *Money                            `json:"from_price,omitempty"`
+	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
 	ScheduleType *UpdateProductRequestScheduleType `json:"schedule_type,omitempty"`
-	Slug         *string                           `json:"slug,omitempty"`
 	Status       *UpdateProductRequestStatus       `json:"status,omitempty"`
 	Timezone     *string                           `json:"timezone,omitempty"`
 	Title        *string                           `json:"title,omitempty"`
 }
 
-// UpdateProductRequestScheduleType defines model for UpdateProductRequest.ScheduleType.
+// UpdateProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
 type UpdateProductRequestScheduleType string
 
 // UpdateProductRequestStatus defines model for UpdateProductRequest.Status.
 type UpdateProductRequestStatus string
 
-// UpdateQuestionRequest defines model for UpdateQuestionRequest.
+// UpdateQuestionRequest Mirrors `UpdateQuestionRequest::rules()`. Same `label`→`question`,
+// `required`→`is_required`, `type`→`answer_type` mappings as
+// `CreateQuestionRequest`.
 type UpdateQuestionRequest struct {
 	DryRun   *bool                      `json:"dry_run,omitempty"`
 	Label    *string                    `json:"label,omitempty"`
@@ -1921,8 +2096,16 @@ type ListBookingsParams struct {
 
 	// BookingStatus Filter by computed status. Server translates to SQL conditions on
 	// `confirmed_at`/`cancelled_at`/`expires_at` (status is an accessor,
-	// not a column).
+	// not a column). Selecting `CANCELLED` or `EXPIRED` automatically
+	// lifts CB's CancellingScope global filter so cancelled rows are
+	// visible.
 	BookingStatus *ListBookingsParamsBookingStatus `form:"booking_status,omitempty" json:"booking_status,omitempty"`
+
+	// IncludeCancelled When `true`, lift the CancellingScope global filter so cancelled
+	// bookings appear in the response. Implied by
+	// `booking_status=CANCELLED` or `booking_status=EXPIRED`. Default
+	// scope (no filter, no flag) hides cancelled rows.
+	IncludeCancelled *bool `form:"include_cancelled,omitempty" json:"include_cancelled,omitempty"`
 
 	// From Booking start date >= this
 	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
@@ -2039,54 +2222,6 @@ type ListCategoriesParams struct {
 
 	// Since ISO 8601 lower-bound on `updated_at`
 	Since *Since `form:"since,omitempty" json:"since,omitempty"`
-}
-
-// CreateCategoryParams defines parameters for CreateCategory.
-type CreateCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
-	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
-	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
-	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
-	// ad-hoc CLI invocations where the server auto-generates one.
-	//
-	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
-	// persist an idempotency row. The same key may be reused once for the
-	// real (non-dry-run) call — the dry-run is a "free" preview. If the
-	// same key is sent on two real calls, normal idempotency rules apply.
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
-}
-
-// DeleteCategoryParams defines parameters for DeleteCategory.
-type DeleteCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
-	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
-	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
-	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
-	// ad-hoc CLI invocations where the server auto-generates one.
-	//
-	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
-	// persist an idempotency row. The same key may be reused once for the
-	// real (non-dry-run) call — the dry-run is a "free" preview. If the
-	// same key is sent on two real calls, normal idempotency rules apply.
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
-}
-
-// UpdateCategoryParams defines parameters for UpdateCategory.
-type UpdateCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
-	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
-	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
-	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
-	// ad-hoc CLI invocations where the server auto-generates one.
-	//
-	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
-	// persist an idempotency row. The same key may be reused once for the
-	// real (non-dry-run) call — the dry-run is a "free" preview. If the
-	// same key is sent on two real calls, normal idempotency rules apply.
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // ListCustomersParams defines parameters for ListCustomers.
@@ -2357,6 +2492,21 @@ type UpdateAvailableGiftCertParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListIssuedGiftCertsParams defines parameters for ListIssuedGiftCerts.
+type ListIssuedGiftCertsParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor         *Cursor                          `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Status         *ListIssuedGiftCertsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	RecipientEmail *openapi_types.Email             `form:"recipient_email,omitempty" json:"recipient_email,omitempty"`
+	Code           *string                          `form:"code,omitempty" json:"code,omitempty"`
+}
+
+// ListIssuedGiftCertsParamsStatus defines parameters for ListIssuedGiftCerts.
+type ListIssuedGiftCertsParamsStatus string
+
 // IssueGiftCertParams defines parameters for IssueGiftCert.
 type IssueGiftCertParams struct {
 	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
@@ -2372,21 +2522,6 @@ type IssueGiftCertParams struct {
 	// same key is sent on two real calls, normal idempotency rules apply.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
-
-// ListIssuedGiftCertsParams defines parameters for ListIssuedGiftCerts.
-type ListIssuedGiftCertsParams struct {
-	// Limit Page size (1-200, default 50)
-	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
-
-	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
-	Cursor         *Cursor                          `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Status         *ListIssuedGiftCertsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
-	RecipientEmail *openapi_types.Email             `form:"recipient_email,omitempty" json:"recipient_email,omitempty"`
-	Code           *string                          `form:"code,omitempty" json:"code,omitempty"`
-}
-
-// ListIssuedGiftCertsParamsStatus defines parameters for ListIssuedGiftCerts.
-type ListIssuedGiftCertsParamsStatus string
 
 // ResendGiftCertJSONBody defines parameters for ResendGiftCert.
 type ResendGiftCertJSONBody struct {
@@ -2558,9 +2693,10 @@ type ListPricingTiersParams struct {
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`
-	Since           *Since  `form:"since,omitempty" json:"since,omitempty"`
-	ProductOptionId *string `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
-	AvailabilityId  *string `form:"availability_id,omitempty" json:"availability_id,omitempty"`
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
+
+	// ProductId Returns tiers belonging to this product (via the pricing_category relation).
+	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
 }
 
 // CreatePricingTierParams defines parameters for CreatePricingTier.
@@ -2643,13 +2779,9 @@ type ListProductOptionsParams struct {
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
-	Cursor    *Cursor                         `form:"cursor,omitempty" json:"cursor,omitempty"`
-	ProductId *string                         `form:"product_id,omitempty" json:"product_id,omitempty"`
-	Status    *ListProductOptionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Cursor    *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
 }
-
-// ListProductOptionsParamsStatus defines parameters for ListProductOptions.
-type ListProductOptionsParamsStatus string
 
 // CreateProductOptionParams defines parameters for CreateProductOption.
 type CreateProductOptionParams struct {
@@ -2980,12 +3112,6 @@ type ResendBookingConfirmationJSONRequestBody ResendBookingConfirmationJSONBody
 // RefundBookingJSONRequestBody defines body for RefundBooking for application/json ContentType.
 type RefundBookingJSONRequestBody = RefundBookingRequest
 
-// CreateCategoryJSONRequestBody defines body for CreateCategory for application/json ContentType.
-type CreateCategoryJSONRequestBody = CreateCategoryRequest
-
-// UpdateCategoryJSONRequestBody defines body for UpdateCategory for application/json ContentType.
-type UpdateCategoryJSONRequestBody = UpdateCategoryRequest
-
 // CreateDiscountJSONRequestBody defines body for CreateDiscount for application/json ContentType.
 type CreateDiscountJSONRequestBody = CreateDiscountRequest
 
@@ -3302,21 +3428,8 @@ type ClientInterface interface {
 	// ListCategories request
 	ListCategories(ctx context.Context, params *ListCategoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateCategoryWithBody request with any body
-	CreateCategoryWithBody(ctx context.Context, params *CreateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateCategory(ctx context.Context, params *CreateCategoryParams, body CreateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteCategory request
-	DeleteCategory(ctx context.Context, id IdPath, params *DeleteCategoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// ShowCategory request
 	ShowCategory(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// UpdateCategoryWithBody request with any body
-	UpdateCategoryWithBody(ctx context.Context, id IdPath, params *UpdateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	UpdateCategory(ctx context.Context, id IdPath, params *UpdateCategoryParams, body UpdateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCustomers request
 	ListCustomers(ctx context.Context, params *ListCustomersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3391,13 +3504,13 @@ type ClientInterface interface {
 
 	UpdateAvailableGiftCert(ctx context.Context, id IdPath, params *UpdateAvailableGiftCertParams, body UpdateAvailableGiftCertJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListIssuedGiftCerts request
+	ListIssuedGiftCerts(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// IssueGiftCertWithBody request with any body
 	IssueGiftCertWithBody(ctx context.Context, params *IssueGiftCertParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	IssueGiftCert(ctx context.Context, params *IssueGiftCertParams, body IssueGiftCertJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListIssuedGiftCerts request
-	ListIssuedGiftCerts(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ShowIssuedGiftCert request
 	ShowIssuedGiftCert(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3776,68 +3889,8 @@ func (c *Client) ListCategories(ctx context.Context, params *ListCategoriesParam
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateCategoryWithBody(ctx context.Context, params *CreateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateCategoryRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateCategory(ctx context.Context, params *CreateCategoryParams, body CreateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateCategoryRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteCategory(ctx context.Context, id IdPath, params *DeleteCategoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteCategoryRequest(c.Server, id, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) ShowCategory(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewShowCategoryRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateCategoryWithBody(ctx context.Context, id IdPath, params *UpdateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCategoryRequestWithBody(c.Server, id, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateCategory(ctx context.Context, id IdPath, params *UpdateCategoryParams, body UpdateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCategoryRequest(c.Server, id, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4172,6 +4225,18 @@ func (c *Client) UpdateAvailableGiftCert(ctx context.Context, id IdPath, params 
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListIssuedGiftCerts(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListIssuedGiftCertsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) IssueGiftCertWithBody(ctx context.Context, params *IssueGiftCertParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewIssueGiftCertRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -4186,18 +4251,6 @@ func (c *Client) IssueGiftCertWithBody(ctx context.Context, params *IssueGiftCer
 
 func (c *Client) IssueGiftCert(ctx context.Context, params *IssueGiftCertParams, body IssueGiftCertJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewIssueGiftCertRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListIssuedGiftCerts(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListIssuedGiftCertsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5298,6 +5351,22 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 
 		}
 
+		if params.IncludeCancelled != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_cancelled", *params.IncludeCancelled, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.From != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
@@ -5824,110 +5893,6 @@ func NewListCategoriesRequest(server string, params *ListCategoriesParams) (*htt
 	return req, nil
 }
 
-// NewCreateCategoryRequest calls the generic CreateCategory builder with application/json body
-func NewCreateCategoryRequest(server string, params *CreateCategoryParams, body CreateCategoryJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateCategoryRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateCategoryRequestWithBody generates requests for CreateCategory with any type of body
-func NewCreateCategoryRequestWithBody(server string, params *CreateCategoryParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/categories")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteCategoryRequest generates requests for DeleteCategory
-func NewDeleteCategoryRequest(server string, id IdPath, params *DeleteCategoryParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/categories/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
 // NewShowCategoryRequest generates requests for ShowCategory
 func NewShowCategoryRequest(server string, id IdPath) (*http.Request, error) {
 	var err error
@@ -5957,68 +5922,6 @@ func NewShowCategoryRequest(server string, id IdPath) (*http.Request, error) {
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateCategoryRequest calls the generic UpdateCategory builder with application/json body
-func NewUpdateCategoryRequest(server string, id IdPath, params *UpdateCategoryParams, body UpdateCategoryJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateCategoryRequestWithBody(server, id, params, "application/json", bodyReader)
-}
-
-// NewUpdateCategoryRequestWithBody generates requests for UpdateCategory with any type of body
-func NewUpdateCategoryRequestWithBody(server string, id IdPath, params *UpdateCategoryParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/categories/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PATCH", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
 	}
 
 	return req, nil
@@ -7288,61 +7191,6 @@ func NewUpdateAvailableGiftCertRequestWithBody(server string, id IdPath, params 
 	return req, nil
 }
 
-// NewIssueGiftCertRequest calls the generic IssueGiftCert builder with application/json body
-func NewIssueGiftCertRequest(server string, params *IssueGiftCertParams, body IssueGiftCertJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewIssueGiftCertRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewIssueGiftCertRequestWithBody generates requests for IssueGiftCert with any type of body
-func NewIssueGiftCertRequestWithBody(server string, params *IssueGiftCertParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/gift-certs/issue")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
 // NewListIssuedGiftCertsRequest generates requests for ListIssuedGiftCerts
 func NewListIssuedGiftCertsRequest(server string, params *ListIssuedGiftCertsParams) (*http.Request, error) {
 	var err error
@@ -7456,6 +7304,61 @@ func NewListIssuedGiftCertsRequest(server string, params *ListIssuedGiftCertsPar
 	return req, nil
 }
 
+// NewIssueGiftCertRequest calls the generic IssueGiftCert builder with application/json body
+func NewIssueGiftCertRequest(server string, params *IssueGiftCertParams, body IssueGiftCertJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewIssueGiftCertRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewIssueGiftCertRequestWithBody generates requests for IssueGiftCert with any type of body
+func NewIssueGiftCertRequestWithBody(server string, params *IssueGiftCertParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/gift-certs/issued")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewShowIssuedGiftCertRequest generates requests for ShowIssuedGiftCert
 func NewShowIssuedGiftCertRequest(server string, id IdPath) (*http.Request, error) {
 	var err error
@@ -7517,7 +7420,7 @@ func NewResendGiftCertRequestWithBody(server string, id IdPath, params *ResendGi
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/gift-certs/%s/resend", pathParam0)
+	operationPath := fmt.Sprintf("/gift-certs/issued/%s/resend", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -7579,7 +7482,7 @@ func NewVoidGiftCertRequestWithBody(server string, id IdPath, params *VoidGiftCe
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/gift-certs/%s/void", pathParam0)
+	operationPath := fmt.Sprintf("/gift-certs/issued/%s/void", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -8273,25 +8176,9 @@ func NewListPricingTiersRequest(server string, params *ListPricingTiersParams) (
 
 		}
 
-		if params.ProductOptionId != nil {
+		if params.ProductId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.AvailabilityId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -8651,22 +8538,6 @@ func NewListProductOptionsRequest(server string, params *ListProductOptionsParam
 		if params.ProductId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.Status != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -10171,21 +10042,8 @@ type ClientWithResponsesInterface interface {
 	// ListCategoriesWithResponse request
 	ListCategoriesWithResponse(ctx context.Context, params *ListCategoriesParams, reqEditors ...RequestEditorFn) (*ListCategoriesResponse, error)
 
-	// CreateCategoryWithBodyWithResponse request with any body
-	CreateCategoryWithBodyWithResponse(ctx context.Context, params *CreateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCategoryResponse, error)
-
-	CreateCategoryWithResponse(ctx context.Context, params *CreateCategoryParams, body CreateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCategoryResponse, error)
-
-	// DeleteCategoryWithResponse request
-	DeleteCategoryWithResponse(ctx context.Context, id IdPath, params *DeleteCategoryParams, reqEditors ...RequestEditorFn) (*DeleteCategoryResponse, error)
-
 	// ShowCategoryWithResponse request
 	ShowCategoryWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowCategoryResponse, error)
-
-	// UpdateCategoryWithBodyWithResponse request with any body
-	UpdateCategoryWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCategoryResponse, error)
-
-	UpdateCategoryWithResponse(ctx context.Context, id IdPath, params *UpdateCategoryParams, body UpdateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCategoryResponse, error)
 
 	// ListCustomersWithResponse request
 	ListCustomersWithResponse(ctx context.Context, params *ListCustomersParams, reqEditors ...RequestEditorFn) (*ListCustomersResponse, error)
@@ -10260,13 +10118,13 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAvailableGiftCertWithResponse(ctx context.Context, id IdPath, params *UpdateAvailableGiftCertParams, body UpdateAvailableGiftCertJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAvailableGiftCertResponse, error)
 
+	// ListIssuedGiftCertsWithResponse request
+	ListIssuedGiftCertsWithResponse(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*ListIssuedGiftCertsResponse, error)
+
 	// IssueGiftCertWithBodyWithResponse request with any body
 	IssueGiftCertWithBodyWithResponse(ctx context.Context, params *IssueGiftCertParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IssueGiftCertResponse, error)
 
 	IssueGiftCertWithResponse(ctx context.Context, params *IssueGiftCertParams, body IssueGiftCertJSONRequestBody, reqEditors ...RequestEditorFn) (*IssueGiftCertResponse, error)
-
-	// ListIssuedGiftCertsWithResponse request
-	ListIssuedGiftCertsWithResponse(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*ListIssuedGiftCertsResponse, error)
 
 	// ShowIssuedGiftCertWithResponse request
 	ShowIssuedGiftCertWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowIssuedGiftCertResponse, error)
@@ -10469,7 +10327,8 @@ type BulkUpdateAvailabilitiesResponse struct {
 				PayloadSummary *string                                         `json:"payload_summary,omitempty"`
 				Type           *BulkUpdateAvailabilities200DataSideEffectsType `json:"type,omitempty"`
 			} `json:"side_effects,omitempty"`
-			TotalMatched *int `json:"total_matched,omitempty"`
+			Status       *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
+			TotalMatched *int                                   `json:"total_matched,omitempty"`
 
 			// WouldApply True only when the request was a dry-run
 			WouldApply *bool `json:"would_apply,omitempty"`
@@ -10512,6 +10371,7 @@ type BulkUpdateAvailabilitiesResponse struct {
 	JSON422 *ValidationError
 }
 type BulkUpdateAvailabilities200DataSideEffectsType string
+type BulkUpdateAvailabilities200DataStatus string
 type BulkUpdateAvailabilities202DataSideEffectsType string
 type BulkUpdateAvailabilities202DataStatus string
 
@@ -10865,82 +10725,16 @@ func (r ListCategoriesResponse) StatusCode() int {
 	return 0
 }
 
-type CreateCategoryResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON201      *struct {
-		Data struct {
-			Category *Category `json:"category,omitempty"`
-
-			// Diff Before/after summary (always present on dry-run, optional on commit)
-			Diff *struct {
-				After  *map[string]interface{} `json:"after,omitempty"`
-				Before *map[string]interface{} `json:"before,omitempty"`
-			} `json:"diff,omitempty"`
-
-			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
-			SideEffects *[]struct {
-				Identifier     *string                               `json:"identifier,omitempty"`
-				PayloadSummary *string                               `json:"payload_summary,omitempty"`
-				Type           *CreateCategory201DataSideEffectsType `json:"type,omitempty"`
-			} `json:"side_effects,omitempty"`
-
-			// WouldApply True only when the request was a dry-run
-			WouldApply *bool `json:"would_apply,omitempty"`
-		} `json:"data"`
-		Meta       Meta        `json:"meta"`
-		Pagination *Pagination `json:"pagination,omitempty"`
-	}
-	JSON401 *Unauthenticated
-	JSON409 *IdempotencyConflict
-	JSON422 *ValidationError
-}
-type CreateCategory201DataSideEffectsType string
-
-// Status returns HTTPResponse.Status
-func (r CreateCategoryResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateCategoryResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type DeleteCategoryResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON401      *Unauthenticated
-	JSON404      *NotFound
-	JSON409      *ErrorEnvelope
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteCategoryResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteCategoryResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type ShowCategoryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Read-only resource (no Create/Update endpoints — Phase 1B + commit
+		// 9bce20074). Mirrors `CategoryResource::toArray()`. The
+		// `product_categories` table only persists `id` + `name`; `slug`,
+		// `description`, and `position` are surfaced because the
+		// `ProductCategory` model has accessors for them, but they read as null
+		// / 0 against today's schema.
 		Data       Category    `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -10959,35 +10753,6 @@ func (r ShowCategoryResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ShowCategoryResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type UpdateCategoryResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		// Data Common shape for mutation responses (and dry-run previews)
-		Data       MutationResult `json:"data"`
-		Meta       Meta           `json:"meta"`
-		Pagination *Pagination    `json:"pagination,omitempty"`
-	}
-	JSON401 *Unauthenticated
-	JSON404 *NotFound
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateCategoryResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateCategoryResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -11279,6 +11044,16 @@ type CreateExtraResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// Extra Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
+			// `title` (translatable) and `fare`; the wire shape exposes them as
+			// `name` and `amount`. The `extras` table has no `currency` column —
+			// `currency` comes from the tenant default, falling back to `EUR`.
+			// `max_quantity` is derived from the `maximum` discriminator and
+			// `maximum_bookable` columns: `maximum=custom` → real cap;
+			// `maximum=no_max` / `max_by_participant` → null in the wire response.
+			// Extras link to `ProductOption` via the morphTo `product` columns
+			// (`product_id` + `product_type`).
 			Extra *Extra `json:"extra,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -11344,6 +11119,15 @@ type ShowExtraResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
+		// `title` (translatable) and `fare`; the wire shape exposes them as
+		// `name` and `amount`. The `extras` table has no `currency` column —
+		// `currency` comes from the tenant default, falling back to `EUR`.
+		// `max_quantity` is derived from the `maximum` discriminator and
+		// `maximum_bookable` columns: `maximum=custom` → real cap;
+		// `maximum=no_max` / `max_by_participant` → null in the wire response.
+		// Extras link to `ProductOption` via the morphTo `product` columns
+		// (`product_id` + `product_type`).
 		Data       Extra       `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -11455,7 +11239,16 @@ type CreateAvailableGiftCertResponse struct {
 	HTTPResponse *http.Response
 	JSON201      *struct {
 		Data struct {
-			// AvailableGiftCertificate Sellable gift-cert SKU (the offering)
+			// AvailableGiftCertificate Sellable gift-cert SKU (the offering). Mirrors
+			// `AvailableGiftCertificateResource::toArray()`. `currency` has no
+			// underlying column on `available_gift_certificates` — it always
+			// serializes as null today (tenant-level currency is implied) but is
+			// kept on the wire for forward compatibility. `expiration_period_months`
+			// sources the `expiration_period` column, which the model accessor
+			// `expiryDurationInMonths` treats as MONTHS via
+			// `CarbonInterval::make($value, 'months')`. A value of -1 means
+			// "never expires". `cover_image_url` is sourced from the Paperclip
+			// `cover` attachment (read-only — uploads not yet supported via CLI).
 			AvailableGiftCertificate *AvailableGiftCertificate `json:"available_gift_certificate,omitempty"`
 
 			// Diff Before/after summary (always present on dry-run, optional on commit)
@@ -11527,7 +11320,16 @@ type ShowAvailableGiftCertResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// Data Sellable gift-cert SKU (the offering)
+		// Data Sellable gift-cert SKU (the offering). Mirrors
+		// `AvailableGiftCertificateResource::toArray()`. `currency` has no
+		// underlying column on `available_gift_certificates` — it always
+		// serializes as null today (tenant-level currency is implied) but is
+		// kept on the wire for forward compatibility. `expiration_period_months`
+		// sources the `expiration_period` column, which the model accessor
+		// `expiryDurationInMonths` treats as MONTHS via
+		// `CarbonInterval::make($value, 'months')`. A value of -1 means
+		// "never expires". `cover_image_url` is sourced from the Paperclip
+		// `cover` attachment (read-only — uploads not yet supported via CLI).
 		Data       AvailableGiftCertificate `json:"data"`
 		Meta       Meta                     `json:"meta"`
 		Pagination *Pagination              `json:"pagination,omitempty"`
@@ -11581,6 +11383,29 @@ func (r UpdateAvailableGiftCertResponse) StatusCode() int {
 	return 0
 }
 
+type ListIssuedGiftCertsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GiftCertificatePage
+	JSON401      *Unauthenticated
+}
+
+// Status returns HTTPResponse.Status
+func (r ListIssuedGiftCertsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListIssuedGiftCertsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type IssueGiftCertResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11592,7 +11417,12 @@ type IssueGiftCertResponse struct {
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
 
-			// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands)
+			// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands). Mirrors
+			// `GiftCertificateResource::toArray()`. `recipient_email` is the
+			// underlying `recipient` column; `recipient_name` is the `to` column.
+			// `currency` is sourced from `tenant()->currency` (no per-row column),
+			// falling back to `EUR`. `available_gift_certificate_id` references
+			// the `available_gift_certificate_uuid` column.
 			GiftCertificate *GiftCertificate `json:"gift_certificate,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -11630,34 +11460,16 @@ func (r IssueGiftCertResponse) StatusCode() int {
 	return 0
 }
 
-type ListIssuedGiftCertsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *GiftCertificatePage
-	JSON401      *Unauthenticated
-}
-
-// Status returns HTTPResponse.Status
-func (r ListIssuedGiftCertsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListIssuedGiftCertsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type ShowIssuedGiftCertResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// Data Issued gift-cert instance (a real cert in a customer's hands)
+		// Data Issued gift-cert instance (a real cert in a customer's hands). Mirrors
+		// `GiftCertificateResource::toArray()`. `recipient_email` is the
+		// underlying `recipient` column; `recipient_name` is the `to` column.
+		// `currency` is sourced from `tenant()->currency` (no per-row column),
+		// falling back to `EUR`. `available_gift_certificate_id` references
+		// the `available_gift_certificate_uuid` column.
 		Data       GiftCertificate `json:"data"`
 		Meta       Meta            `json:"meta"`
 		Pagination *Pagination     `json:"pagination,omitempty"`
@@ -11857,6 +11669,13 @@ type CreateLocationResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// Location Mirrors `LocationResource::toArray()`. The `locations` table type enum
+			// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
+			// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+			// `address` is a derived accessor (`getAddressAttribute()` composing
+			// `street_address` + city + country). `timezone` and `notes` have no
+			// underlying columns and read as null today.
 			Location *Location `json:"location,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -11922,6 +11741,12 @@ type ShowLocationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `LocationResource::toArray()`. The `locations` table type enum
+		// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
+		// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+		// `address` is a derived accessor (`getAddressAttribute()` composing
+		// `street_address` + city + country). `timezone` and `notes` have no
+		// underlying columns and read as null today.
 		Data       Location    `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -12060,6 +11885,13 @@ type CreatePricingTierResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
+			// has no `product_option_id`, `availability_id`, or `name` column — those
+			// belong to the parent `PricingCategory` (carries `name` + `product_id`)
+			// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
+			// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
+			// Currency is tenant-level and not stored per row; defaults to `EUR`.
 			PricingTier *PricingTier `json:"pricing_tier,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -12125,6 +11957,12 @@ type ShowPricingTierResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
+		// has no `product_option_id`, `availability_id`, or `name` column — those
+		// belong to the parent `PricingCategory` (carries `name` + `product_id`)
+		// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
+		// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
+		// Currency is tenant-level and not stored per row; defaults to `EUR`.
 		Data       PricingTier `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -12243,6 +12081,14 @@ type CreateProductOptionResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// ProductOption Mirrors `ProductOptionResource::toArray()`. The underlying
+			// `product_options` table column is `name`, but the wire shape exposes it
+			// as `title` for symmetry with Product (the controller maps
+			// `title` ↔ `name` on write). ProductOption has no `description` of its
+			// own — that lives on the parent Product. ProductOption likewise has no
+			// active/published flag; visibility is governed by the parent Product's
+			// `is_active`.
 			ProductOption *ProductOption `json:"product_option,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -12308,6 +12154,13 @@ type ShowProductOptionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `ProductOptionResource::toArray()`. The underlying
+		// `product_options` table column is `name`, but the wire shape exposes it
+		// as `title` for symmetry with Product (the controller maps
+		// `title` ↔ `name` on write). ProductOption has no `description` of its
+		// own — that lives on the parent Product. ProductOption likewise has no
+		// active/published flag; visibility is governed by the parent Product's
+		// `is_active`.
 		Data       ProductOption `json:"data"`
 		Meta       Meta          `json:"meta"`
 		Pagination *Pagination   `json:"pagination,omitempty"`
@@ -12427,6 +12280,11 @@ type CreateProductResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// Product Mirrors `ProductResource::toArray()`. Translatable `title` /
+			// `description` are returned in English (`toArrayWithTranslations('en')`).
+			// `status` is derived from the `is_active` column (`is_active` is also
+			// surfaced directly for clients that prefer the canonical boolean).
 			Product *Product `json:"product,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -12492,6 +12350,10 @@ type ShowProductResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `ProductResource::toArray()`. Translatable `title` /
+		// `description` are returned in English (`toArrayWithTranslations('en')`).
+		// `status` is derived from the `is_active` column (`is_active` is also
+		// surfaced directly for clients that prefer the canonical boolean).
 		Data       Product     `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -12683,6 +12545,15 @@ type CreateQuestionResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// Question Mirrors `QuestionResource::toArray()`. Underlying columns:
+			// `question` → `label`, `answer_type` → `type`, `is_required` →
+			// `required`. Questions are polymorphic (morphTo `questionable`); the
+			// wire shape exposes only the `ProductOption` case via
+			// `product_option_id` (sourced from `questionable_id`).
+			// The `questions` table has `public $timestamps = false`, so
+			// `created_at` / `updated_at` are always null. `type` returns the raw
+			// `answer_type` enum value (broader than the input enum).
 			Question *Question `json:"question,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -12748,6 +12619,14 @@ type ShowQuestionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `QuestionResource::toArray()`. Underlying columns:
+		// `question` → `label`, `answer_type` → `type`, `is_required` →
+		// `required`. Questions are polymorphic (morphTo `questionable`); the
+		// wire shape exposes only the `ProductOption` case via
+		// `product_option_id` (sourced from `questionable_id`).
+		// The `questions` table has `public $timestamps = false`, so
+		// `created_at` / `updated_at` are always null. `type` returns the raw
+		// `answer_type` enum value (broader than the input enum).
 		Data       Question    `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -13065,32 +12944,6 @@ func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, pa
 	return ParseListCategoriesResponse(rsp)
 }
 
-// CreateCategoryWithBodyWithResponse request with arbitrary body returning *CreateCategoryResponse
-func (c *ClientWithResponses) CreateCategoryWithBodyWithResponse(ctx context.Context, params *CreateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCategoryResponse, error) {
-	rsp, err := c.CreateCategoryWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateCategoryResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateCategoryWithResponse(ctx context.Context, params *CreateCategoryParams, body CreateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCategoryResponse, error) {
-	rsp, err := c.CreateCategory(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateCategoryResponse(rsp)
-}
-
-// DeleteCategoryWithResponse request returning *DeleteCategoryResponse
-func (c *ClientWithResponses) DeleteCategoryWithResponse(ctx context.Context, id IdPath, params *DeleteCategoryParams, reqEditors ...RequestEditorFn) (*DeleteCategoryResponse, error) {
-	rsp, err := c.DeleteCategory(ctx, id, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteCategoryResponse(rsp)
-}
-
 // ShowCategoryWithResponse request returning *ShowCategoryResponse
 func (c *ClientWithResponses) ShowCategoryWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowCategoryResponse, error) {
 	rsp, err := c.ShowCategory(ctx, id, reqEditors...)
@@ -13098,23 +12951,6 @@ func (c *ClientWithResponses) ShowCategoryWithResponse(ctx context.Context, id I
 		return nil, err
 	}
 	return ParseShowCategoryResponse(rsp)
-}
-
-// UpdateCategoryWithBodyWithResponse request with arbitrary body returning *UpdateCategoryResponse
-func (c *ClientWithResponses) UpdateCategoryWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateCategoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCategoryResponse, error) {
-	rsp, err := c.UpdateCategoryWithBody(ctx, id, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateCategoryResponse(rsp)
-}
-
-func (c *ClientWithResponses) UpdateCategoryWithResponse(ctx context.Context, id IdPath, params *UpdateCategoryParams, body UpdateCategoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateCategoryResponse, error) {
-	rsp, err := c.UpdateCategory(ctx, id, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateCategoryResponse(rsp)
 }
 
 // ListCustomersWithResponse request returning *ListCustomersResponse
@@ -13352,6 +13188,15 @@ func (c *ClientWithResponses) UpdateAvailableGiftCertWithResponse(ctx context.Co
 	return ParseUpdateAvailableGiftCertResponse(rsp)
 }
 
+// ListIssuedGiftCertsWithResponse request returning *ListIssuedGiftCertsResponse
+func (c *ClientWithResponses) ListIssuedGiftCertsWithResponse(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*ListIssuedGiftCertsResponse, error) {
+	rsp, err := c.ListIssuedGiftCerts(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListIssuedGiftCertsResponse(rsp)
+}
+
 // IssueGiftCertWithBodyWithResponse request with arbitrary body returning *IssueGiftCertResponse
 func (c *ClientWithResponses) IssueGiftCertWithBodyWithResponse(ctx context.Context, params *IssueGiftCertParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IssueGiftCertResponse, error) {
 	rsp, err := c.IssueGiftCertWithBody(ctx, params, contentType, body, reqEditors...)
@@ -13367,15 +13212,6 @@ func (c *ClientWithResponses) IssueGiftCertWithResponse(ctx context.Context, par
 		return nil, err
 	}
 	return ParseIssueGiftCertResponse(rsp)
-}
-
-// ListIssuedGiftCertsWithResponse request returning *ListIssuedGiftCertsResponse
-func (c *ClientWithResponses) ListIssuedGiftCertsWithResponse(ctx context.Context, params *ListIssuedGiftCertsParams, reqEditors ...RequestEditorFn) (*ListIssuedGiftCertsResponse, error) {
-	rsp, err := c.ListIssuedGiftCerts(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListIssuedGiftCertsResponse(rsp)
 }
 
 // ShowIssuedGiftCertWithResponse request returning *ShowIssuedGiftCertResponse
@@ -13954,7 +13790,8 @@ func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvail
 					PayloadSummary *string                                         `json:"payload_summary,omitempty"`
 					Type           *BulkUpdateAvailabilities200DataSideEffectsType `json:"type,omitempty"`
 				} `json:"side_effects,omitempty"`
-				TotalMatched *int `json:"total_matched,omitempty"`
+				Status       *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
+				TotalMatched *int                                   `json:"total_matched,omitempty"`
 
 				// WouldApply True only when the request was a dry-run
 				WouldApply *bool `json:"would_apply,omitempty"`
@@ -14556,115 +14393,6 @@ func ParseListCategoriesResponse(rsp *http.Response) (*ListCategoriesResponse, e
 	return response, nil
 }
 
-// ParseCreateCategoryResponse parses an HTTP response from a CreateCategoryWithResponse call
-func ParseCreateCategoryResponse(rsp *http.Response) (*CreateCategoryResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateCategoryResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest struct {
-			Data struct {
-				Category *Category `json:"category,omitempty"`
-
-				// Diff Before/after summary (always present on dry-run, optional on commit)
-				Diff *struct {
-					After  *map[string]interface{} `json:"after,omitempty"`
-					Before *map[string]interface{} `json:"before,omitempty"`
-				} `json:"diff,omitempty"`
-
-				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
-				SideEffects *[]struct {
-					Identifier     *string                               `json:"identifier,omitempty"`
-					PayloadSummary *string                               `json:"payload_summary,omitempty"`
-					Type           *CreateCategory201DataSideEffectsType `json:"type,omitempty"`
-				} `json:"side_effects,omitempty"`
-
-				// WouldApply True only when the request was a dry-run
-				WouldApply *bool `json:"would_apply,omitempty"`
-			} `json:"data"`
-			Meta       Meta        `json:"meta"`
-			Pagination *Pagination `json:"pagination,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthenticated
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest ValidationError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON422 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteCategoryResponse parses an HTTP response from a DeleteCategoryWithResponse call
-func ParseDeleteCategoryResponse(rsp *http.Response) (*DeleteCategoryResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteCategoryResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthenticated
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest ErrorEnvelope
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseShowCategoryResponse parses an HTTP response from a ShowCategoryWithResponse call
 func ParseShowCategoryResponse(rsp *http.Response) (*ShowCategoryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -14681,54 +14409,15 @@ func ParseShowCategoryResponse(rsp *http.Response) (*ShowCategoryResponse, error
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Read-only resource (no Create/Update endpoints — Phase 1B + commit
+			// 9bce20074). Mirrors `CategoryResource::toArray()`. The
+			// `product_categories` table only persists `id` + `name`; `slug`,
+			// `description`, and `position` are surfaced because the
+			// `ProductCategory` model has accessors for them, but they read as null
+			// / 0 against today's schema.
 			Data       Category    `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthenticated
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpdateCategoryResponse parses an HTTP response from a UpdateCategoryWithResponse call
-func ParseUpdateCategoryResponse(rsp *http.Response) (*UpdateCategoryResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdateCategoryResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// Data Common shape for mutation responses (and dry-run previews)
-			Data       MutationResult `json:"data"`
-			Meta       Meta           `json:"meta"`
-			Pagination *Pagination    `json:"pagination,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -15200,6 +14889,16 @@ func ParseCreateExtraResponse(rsp *http.Response) (*CreateExtraResponse, error) 
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// Extra Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
+				// `title` (translatable) and `fare`; the wire shape exposes them as
+				// `name` and `amount`. The `extras` table has no `currency` column —
+				// `currency` comes from the tenant default, falling back to `EUR`.
+				// `max_quantity` is derived from the `maximum` discriminator and
+				// `maximum_bookable` columns: `maximum=custom` → real cap;
+				// `maximum=no_max` / `max_by_participant` → null in the wire response.
+				// Extras link to `ProductOption` via the morphTo `product` columns
+				// (`product_id` + `product_type`).
 				Extra *Extra `json:"extra,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -15302,6 +15001,15 @@ func ParseShowExtraResponse(rsp *http.Response) (*ShowExtraResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
+			// `title` (translatable) and `fare`; the wire shape exposes them as
+			// `name` and `amount`. The `extras` table has no `currency` column —
+			// `currency` comes from the tenant default, falling back to `EUR`.
+			// `max_quantity` is derived from the `maximum` discriminator and
+			// `maximum_bookable` columns: `maximum=custom` → real cap;
+			// `maximum=no_max` / `max_by_participant` → null in the wire response.
+			// Extras link to `ProductOption` via the morphTo `product` columns
+			// (`product_id` + `product_type`).
 			Data       Extra       `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -15477,7 +15185,16 @@ func ParseCreateAvailableGiftCertResponse(rsp *http.Response) (*CreateAvailableG
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
 			Data struct {
-				// AvailableGiftCertificate Sellable gift-cert SKU (the offering)
+				// AvailableGiftCertificate Sellable gift-cert SKU (the offering). Mirrors
+				// `AvailableGiftCertificateResource::toArray()`. `currency` has no
+				// underlying column on `available_gift_certificates` — it always
+				// serializes as null today (tenant-level currency is implied) but is
+				// kept on the wire for forward compatibility. `expiration_period_months`
+				// sources the `expiration_period` column, which the model accessor
+				// `expiryDurationInMonths` treats as MONTHS via
+				// `CarbonInterval::make($value, 'months')`. A value of -1 means
+				// "never expires". `cover_image_url` is sourced from the Paperclip
+				// `cover` attachment (read-only — uploads not yet supported via CLI).
 				AvailableGiftCertificate *AvailableGiftCertificate `json:"available_gift_certificate,omitempty"`
 
 				// Diff Before/after summary (always present on dry-run, optional on commit)
@@ -15586,7 +15303,16 @@ func ParseShowAvailableGiftCertResponse(rsp *http.Response) (*ShowAvailableGiftC
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Data Sellable gift-cert SKU (the offering)
+			// Data Sellable gift-cert SKU (the offering). Mirrors
+			// `AvailableGiftCertificateResource::toArray()`. `currency` has no
+			// underlying column on `available_gift_certificates` — it always
+			// serializes as null today (tenant-level currency is implied) but is
+			// kept on the wire for forward compatibility. `expiration_period_months`
+			// sources the `expiration_period` column, which the model accessor
+			// `expiryDurationInMonths` treats as MONTHS via
+			// `CarbonInterval::make($value, 'months')`. A value of -1 means
+			// "never expires". `cover_image_url` is sourced from the Paperclip
+			// `cover` attachment (read-only — uploads not yet supported via CLI).
 			Data       AvailableGiftCertificate `json:"data"`
 			Meta       Meta                     `json:"meta"`
 			Pagination *Pagination              `json:"pagination,omitempty"`
@@ -15660,6 +15386,39 @@ func ParseUpdateAvailableGiftCertResponse(rsp *http.Response) (*UpdateAvailableG
 	return response, nil
 }
 
+// ParseListIssuedGiftCertsResponse parses an HTTP response from a ListIssuedGiftCertsWithResponse call
+func ParseListIssuedGiftCertsResponse(rsp *http.Response) (*ListIssuedGiftCertsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListIssuedGiftCertsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GiftCertificatePage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseIssueGiftCertResponse parses an HTTP response from a IssueGiftCertWithResponse call
 func ParseIssueGiftCertResponse(rsp *http.Response) (*IssueGiftCertResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -15683,7 +15442,12 @@ func ParseIssueGiftCertResponse(rsp *http.Response) (*IssueGiftCertResponse, err
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
 
-				// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands)
+				// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands). Mirrors
+				// `GiftCertificateResource::toArray()`. `recipient_email` is the
+				// underlying `recipient` column; `recipient_name` is the `to` column.
+				// `currency` is sourced from `tenant()->currency` (no per-row column),
+				// falling back to `EUR`. `available_gift_certificate_id` references
+				// the `available_gift_certificate_uuid` column.
 				GiftCertificate *GiftCertificate `json:"gift_certificate,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -15730,39 +15494,6 @@ func ParseIssueGiftCertResponse(rsp *http.Response) (*IssueGiftCertResponse, err
 	return response, nil
 }
 
-// ParseListIssuedGiftCertsResponse parses an HTTP response from a ListIssuedGiftCertsWithResponse call
-func ParseListIssuedGiftCertsResponse(rsp *http.Response) (*ListIssuedGiftCertsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListIssuedGiftCertsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest GiftCertificatePage
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthenticated
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseShowIssuedGiftCertResponse parses an HTTP response from a ShowIssuedGiftCertWithResponse call
 func ParseShowIssuedGiftCertResponse(rsp *http.Response) (*ShowIssuedGiftCertResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -15779,7 +15510,12 @@ func ParseShowIssuedGiftCertResponse(rsp *http.Response) (*ShowIssuedGiftCertRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Data Issued gift-cert instance (a real cert in a customer's hands)
+			// Data Issued gift-cert instance (a real cert in a customer's hands). Mirrors
+			// `GiftCertificateResource::toArray()`. `recipient_email` is the
+			// underlying `recipient` column; `recipient_name` is the `to` column.
+			// `currency` is sourced from `tenant()->currency` (no per-row column),
+			// falling back to `EUR`. `available_gift_certificate_id` references
+			// the `available_gift_certificate_uuid` column.
 			Data       GiftCertificate `json:"data"`
 			Meta       Meta            `json:"meta"`
 			Pagination *Pagination     `json:"pagination,omitempty"`
@@ -16103,6 +15839,13 @@ func ParseCreateLocationResponse(rsp *http.Response) (*CreateLocationResponse, e
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// Location Mirrors `LocationResource::toArray()`. The `locations` table type enum
+				// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
+				// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+				// `address` is a derived accessor (`getAddressAttribute()` composing
+				// `street_address` + city + country). `timezone` and `notes` have no
+				// underlying columns and read as null today.
 				Location *Location `json:"location,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -16205,6 +15948,12 @@ func ParseShowLocationResponse(rsp *http.Response) (*ShowLocationResponse, error
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `LocationResource::toArray()`. The `locations` table type enum
+			// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
+			// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+			// `address` is a derived accessor (`getAddressAttribute()` composing
+			// `street_address` + city + country). `timezone` and `notes` have no
+			// underlying columns and read as null today.
 			Data       Location    `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -16417,6 +16166,13 @@ func ParseCreatePricingTierResponse(rsp *http.Response) (*CreatePricingTierRespo
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
+				// has no `product_option_id`, `availability_id`, or `name` column — those
+				// belong to the parent `PricingCategory` (carries `name` + `product_id`)
+				// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
+				// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
+				// Currency is tenant-level and not stored per row; defaults to `EUR`.
 				PricingTier *PricingTier `json:"pricing_tier,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -16519,6 +16275,12 @@ func ParseShowPricingTierResponse(rsp *http.Response) (*ShowPricingTierResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
+			// has no `product_option_id`, `availability_id`, or `name` column — those
+			// belong to the parent `PricingCategory` (carries `name` + `product_id`)
+			// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
+			// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
+			// Currency is tenant-level and not stored per row; defaults to `EUR`.
 			Data       PricingTier `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -16713,6 +16475,14 @@ func ParseCreateProductOptionResponse(rsp *http.Response) (*CreateProductOptionR
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// ProductOption Mirrors `ProductOptionResource::toArray()`. The underlying
+				// `product_options` table column is `name`, but the wire shape exposes it
+				// as `title` for symmetry with Product (the controller maps
+				// `title` ↔ `name` on write). ProductOption has no `description` of its
+				// own — that lives on the parent Product. ProductOption likewise has no
+				// active/published flag; visibility is governed by the parent Product's
+				// `is_active`.
 				ProductOption *ProductOption `json:"product_option,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -16815,6 +16585,13 @@ func ParseShowProductOptionResponse(rsp *http.Response) (*ShowProductOptionRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `ProductOptionResource::toArray()`. The underlying
+			// `product_options` table column is `name`, but the wire shape exposes it
+			// as `title` for symmetry with Product (the controller maps
+			// `title` ↔ `name` on write). ProductOption has no `description` of its
+			// own — that lives on the parent Product. ProductOption likewise has no
+			// active/published flag; visibility is governed by the parent Product's
+			// `is_active`.
 			Data       ProductOption `json:"data"`
 			Meta       Meta          `json:"meta"`
 			Pagination *Pagination   `json:"pagination,omitempty"`
@@ -17016,6 +16793,11 @@ func ParseCreateProductResponse(rsp *http.Response) (*CreateProductResponse, err
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// Product Mirrors `ProductResource::toArray()`. Translatable `title` /
+				// `description` are returned in English (`toArrayWithTranslations('en')`).
+				// `status` is derived from the `is_active` column (`is_active` is also
+				// surfaced directly for clients that prefer the canonical boolean).
 				Product *Product `json:"product,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -17118,6 +16900,10 @@ func ParseShowProductResponse(rsp *http.Response) (*ShowProductResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `ProductResource::toArray()`. Translatable `title` /
+			// `description` are returned in English (`toArrayWithTranslations('en')`).
+			// `status` is derived from the `is_active` column (`is_active` is also
+			// surfaced directly for clients that prefer the canonical boolean).
 			Data       Product     `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -17434,6 +17220,15 @@ func ParseCreateQuestionResponse(rsp *http.Response) (*CreateQuestionResponse, e
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// Question Mirrors `QuestionResource::toArray()`. Underlying columns:
+				// `question` → `label`, `answer_type` → `type`, `is_required` →
+				// `required`. Questions are polymorphic (morphTo `questionable`); the
+				// wire shape exposes only the `ProductOption` case via
+				// `product_option_id` (sourced from `questionable_id`).
+				// The `questions` table has `public $timestamps = false`, so
+				// `created_at` / `updated_at` are always null. `type` returns the raw
+				// `answer_type` enum value (broader than the input enum).
 				Question *Question `json:"question,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -17536,6 +17331,14 @@ func ParseShowQuestionResponse(rsp *http.Response) (*ShowQuestionResponse, error
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `QuestionResource::toArray()`. Underlying columns:
+			// `question` → `label`, `answer_type` → `type`, `is_required` →
+			// `required`. Questions are polymorphic (morphTo `questionable`); the
+			// wire shape exposes only the `ProductOption` case via
+			// `product_option_id` (sourced from `questionable_id`).
+			// The `questions` table has `public $timestamps = false`, so
+			// `created_at` / `updated_at` are always null. `type` returns the raw
+			// `answer_type` enum value (broader than the input enum).
 			Data       Question    `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`

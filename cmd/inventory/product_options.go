@@ -22,7 +22,6 @@ func productOptionsDefs() []CommandDef {
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "string", Description: "Filter by parent product"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
-				{Name: "status", Type: "string", Description: "draft|published|archived"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				params := &gen.ListProductOptionsParams{}
@@ -38,10 +37,6 @@ func productOptionsDefs() []CommandDef {
 				if args.FlagBool("include-trashed") {
 					t := true
 					params.IncludeTrashed = &t
-				}
-				if v := args.FlagString("status"); v != "" {
-					s := gen.ListProductOptionsParamsStatus(v)
-					params.Status = &s
 				}
 				resp, err := r.Client.ListProductOptionsWithResponse(ctx, params)
 				if err != nil {
@@ -70,27 +65,25 @@ func productOptionsDefs() []CommandDef {
 			Use: "product-options create", Short: "Create a product option", Kind: KindMutation,
 			Verb: "POST", Path: "/product-options", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
+			Long: "ProductOption has no description or status of its own — those live on the " +
+				"parent Product. --title is mapped onto the underlying `name` column.",
 			Flags: []FlagDef{
-				{Name: "title", Type: "string", Required: true, Description: "Option title"},
+				{Name: "title", Type: "string", Required: true, Description: "Option title (persisted as `name`)"},
 				{Name: "product-id", Type: "string", Required: true, Description: "Parent product ID"},
-				{Name: "description", Type: "string", Description: "Option description"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
 				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
-				{Name: "status", Type: "string", Description: "draft|published"},
 			},
-			ForensicFields: []string{"capacity", "status", "product-id"},
+			ForensicFields: []string{"capacity", "product-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"title":            "title",
 					"product-id":       "product_id",
-					"description":      "description",
 					"capacity":         "capacity",
 					"duration-minutes": "duration_minutes",
 					"min-age":          "min_age",
 					"max-age":          "max_age",
-					"status":           "status",
 				})
 				if err != nil {
 					return nil, err
@@ -110,15 +103,13 @@ func productOptionsDefs() []CommandDef {
 			DryRunMode:     DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "title", Type: "string", Description: "Option title"},
-				{Name: "description", Type: "string", Description: "Option description"},
+				{Name: "title", Type: "string", Description: "Option title (persisted as `name`)"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
 				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
-				{Name: "status", Type: "string", Description: "draft|published"},
 			},
-			ForensicFields: []string{"capacity", "status"},
+			ForensicFields: []string{"capacity"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
@@ -126,12 +117,10 @@ func productOptionsDefs() []CommandDef {
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"title":            "title",
-					"description":      "description",
 					"capacity":         "capacity",
 					"duration-minutes": "duration_minutes",
 					"min-age":          "min_age",
 					"max-age":          "max_age",
-					"status":           "status",
 				})
 				if err != nil {
 					return nil, err

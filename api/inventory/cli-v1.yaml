@@ -33,7 +33,10 @@ info:
       body. The handler runs validation, authorization, and computes the
       diff, but suppresses all side effects (DB transaction rolled back,
       jobs not dispatched, mail not sent, Stripe not called). Response
-      includes `data.diff` and `data.would_apply: true`.
+      includes `data.diff` and `data.would_apply: true`. Dry-run always
+      returns `200 OK` regardless of the real-run status code — even on
+      create endpoints (which return `201 Created` for real writes),
+      because nothing was created.
     - **Pagination:** all list endpoints use forward-only cursor pagination.
       Default `limit=50`, max `200`. Backward pagination is Phase 2.
     - **Throttle:** plan-based (60 req/min on starter, 240 on ultra).
@@ -85,7 +88,7 @@ tags:
   - name: ProductOptions
     description: Product option (variant) catalog and CRUD (soft-deletable)
   - name: Categories
-    description: Product category catalog and CRUD
+    description: Product category catalog (read-only; managed centrally)
   - name: Availabilities
     description: Per-date capacity reads, single update, and async bulk update
   - name: PricingTiers
@@ -178,7 +181,7 @@ paths:
               $ref: "#/components/schemas/CreateProductRequest"
       responses:
         "201":
-          description: Created (or dry-run preview)
+          description: Created
           content:
             application/json:
               schema:
@@ -279,9 +282,6 @@ paths:
         - name: product_id
           in: query
           schema: { type: string }
-        - name: status
-          in: query
-          schema: { type: string, enum: [draft, published, archived] }
       responses:
         "200":
           description: Page of product options
@@ -305,7 +305,7 @@ paths:
               $ref: "#/components/schemas/CreateProductOptionRequest"
       responses:
         "201":
-          description: Created (or dry-run preview)
+          description: Created
           content:
             application/json:
               schema:
@@ -532,7 +532,12 @@ paths:
                                 enum: [queued]
                                 description: V1 only emits "queued"; Phase 2 will add "completed", "partially_completed"
         "200":
-          description: Dry-run preview (no jobs dispatched)
+          description: |
+            Dry-run preview (no jobs dispatched), OR no-op when the filter
+            matched zero availability rows (no audit row created, no jobs
+            queued). The no-op response carries `status: "no_op"` and
+            `bulk_update_id: null` — clients should NOT poll for completion
+            in that case.
           content:
             application/json:
               schema:
@@ -546,6 +551,9 @@ paths:
                           - type: object
                             properties:
                               total_matched: { type: integer }
+                              status:
+                                type: string
+                                enum: [preview, no_op]
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
@@ -554,18 +562,27 @@ paths:
     get:
       operationId: listPricingTiers
       summary: List pricing tiers
+      description: |
+        **Filtering:** scope by `product_id` only. `product_option_id` and
+        `availability_id` filters were dropped: pricing_categories.product_option_id
+        was renamed to product_id in 2022 (tiers scope by product, not by
+        product_option), and pricing_tiers ↔ availabilities is M:N via the
+        `availability_pricing_tier` pivot, not a direct FK on the row.
+        Re-introducing per-option or per-availability filters needs a
+        deliberate semantic call (does "tiers for an option" mean tiers
+        of the option's product? always shared across siblings?) and is
+        deferred. Listed here for clients that have a `product_id` and
+        want the full set of tiers under it.
       tags: [PricingTiers]
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/IncludeTrashed"
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Since"
-        - name: product_option_id
+        - name: product_id
           in: query
           schema: { type: string }
-        - name: availability_id
-          in: query
-          schema: { type: string }
+          description: Returns tiers belonging to this product (via the pricing_category relation).
       responses:
         "200":
           description: Page of pricing tiers
@@ -725,7 +742,7 @@ paths:
               $ref: "#/components/schemas/CreateDiscountRequest"
       responses:
         "201":
-          description: Created (or dry-run preview)
+          description: Created
           content:
             application/json:
               schema:
@@ -972,29 +989,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/GiftCertificatePage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
-
-  /gift-certs/issued/{id}:
-    get:
-      operationId: showIssuedGiftCert
-      summary: Show an issued gift certificate
-      tags: [GiftCertificates]
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      responses:
-        "200":
-          description: Issued gift cert
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/GiftCertificate" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /gift-certs/issue:
     post:
       operationId: issueGiftCert
       summary: Issue a new gift certificate
@@ -1032,7 +1026,28 @@ paths:
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
-  /gift-certs/{id}/void:
+  /gift-certs/issued/{id}:
+    get:
+      operationId: showIssuedGiftCert
+      summary: Show an issued gift certificate
+      tags: [GiftCertificates]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Issued gift cert
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/GiftCertificate" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /gift-certs/issued/{id}/void:
     post:
       operationId: voidGiftCert
       summary: Void an issued gift certificate
@@ -1066,7 +1081,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
 
-  /gift-certs/{id}/resend:
+  /gift-certs/issued/{id}/resend:
     post:
       operationId: resendGiftCert
       summary: Resend the redemption email for an issued cert
@@ -1165,8 +1180,18 @@ paths:
           description: |
             Filter by computed status. Server translates to SQL conditions on
             `confirmed_at`/`cancelled_at`/`expires_at` (status is an accessor,
-            not a column).
+            not a column). Selecting `CANCELLED` or `EXPIRED` automatically
+            lifts CB's CancellingScope global filter so cancelled rows are
+            visible.
           schema: { type: string, enum: [ON_HOLD, CONFIRMED, EXPIRED, CANCELLED] }
+        - name: include_cancelled
+          in: query
+          description: |
+            When `true`, lift the CancellingScope global filter so cancelled
+            bookings appear in the response. Implied by
+            `booking_status=CANCELLED` or `booking_status=EXPIRED`. Default
+            scope (no filter, no flag) hides cancelled rows.
+          schema: { type: boolean, default: false }
         - name: from
           in: query
           description: Booking start date >= this
@@ -1773,37 +1798,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/CategoryPage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
-    post:
-      operationId: createCategory
-      summary: Create a category
-      tags: [Categories]
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateCategoryRequest"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data:
-                        allOf:
-                          - $ref: "#/components/schemas/MutationResult"
-                          - type: object
-                            properties:
-                              category: { $ref: "#/components/schemas/Category" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "422": { $ref: "#/components/responses/ValidationError" }
-        "409": { $ref: "#/components/responses/IdempotencyConflict" }
 
   /categories/{id}:
     get:
@@ -1825,53 +1819,7 @@ paths:
                       data: { $ref: "#/components/schemas/Category" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
-    patch:
-      operationId: updateCategory
-      summary: Update a category
-      tags: [Categories]
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateCategoryRequest"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Envelope"
-                  - type: object
-                    properties:
-                      data: { $ref: "#/components/schemas/MutationResult" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "404": { $ref: "#/components/responses/NotFound" }
 
-    delete:
-      operationId: deleteCategory
-      summary: Delete a category
-      description: |
-        Hard-deletes the Category. Returns 409 if the category is still referenced by published products — detach first.
-      tags: [Categories]
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-        - $ref: "#/components/parameters/IdempotencyKey"
-      responses:
-        "204":
-          description: Deleted
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409":
-          description: Resource is still in use; detach references first
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope" 
   /locations:
     get:
       operationId: listLocations
@@ -2630,46 +2578,62 @@ components:
 
     Product:
       type: object
+      description: |
+        Mirrors `ProductResource::toArray()`. Translatable `title` /
+        `description` are returned in English (`toArrayWithTranslations('en')`).
+        `status` is derived from the `is_active` column (`is_active` is also
+        surfaced directly for clients that prefer the canonical boolean).
       properties:
-        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         id: { type: string }
-        slug: { type: string }
-        title: { type: string }
-        description: { type: string }
+        product_code: { type: string, nullable: true, description: "Tenant-supplied SKU; not auto-generated." }
+        title: { type: string, nullable: true }
+        description: { type: string, nullable: true }
         status:
           type: string
-          enum: [draft, published, archived]
+          enum: [draft, published]
+          description: "Derived from `is_active` (`true` → published, `false` → draft). Spec previously listed an `archived` value that the implementation never returns."
+        is_active: { type: boolean, description: "Canonical boolean from the `is_active` column." }
         schedule_type:
           type: string
-          enum: [FIXED, FLEXIBLE]
-        from_price: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
-        capacity: { type: integer }
-        cancellation_policy: { type: string }
+          nullable: true
+          enum: [date, datetime]
+          description: "`date` = customer picks a date only; `datetime` = customer picks a date and a starting time. Backed by `Bmbltd\\LaravelBookings\\Enums\\ScheduleType`."
+        from_price:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+        currency: { type: string, nullable: true }
+        capacity: { type: integer, nullable: true }
+        cancellation_policy: { type: string, nullable: true }
+        timezone: { type: string, nullable: true }
         category_ids:
           type: array
           items: { type: string }
-        timezone: { type: string }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
+          description: "IDs of attached `ProductCategory` rows; empty array when the relation isn't eager-loaded."
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     ProductOption:
       type: object
+      description: |
+        Mirrors `ProductOptionResource::toArray()`. The underlying
+        `product_options` table column is `name`, but the wire shape exposes it
+        as `title` for symmetry with Product (the controller maps
+        `title` ↔ `name` on write). ProductOption has no `description` of its
+        own — that lives on the parent Product. ProductOption likewise has no
+        active/published flag; visibility is governed by the parent Product's
+        `is_active`.
       properties:
-        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         id: { type: string }
         product_id: { type: string }
-        title: { type: string }
-        description: { type: string }
+        title: { type: string, nullable: true, description: "Sourced from the `name` column (no translatable layer)." }
         duration_minutes: { type: integer, nullable: true }
-        capacity: { type: integer }
+        capacity: { type: integer, nullable: true }
         min_age: { type: integer, nullable: true }
         max_age: { type: integer, nullable: true }
-        status:
-          type: string
-          enum: [draft, published, archived]
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     Availability:
       type: object
@@ -2691,14 +2655,26 @@ components:
 
     PricingTier:
       type: object
+      description: |
+        Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
+        has no `product_option_id`, `availability_id`, or `name` column — those
+        belong to the parent `PricingCategory` (carries `name` + `product_id`)
+        and to the M:N `availability_pricing_tier` pivot. Tiers describe a
+        headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
+        Currency is tenant-level and not stored per row; defaults to `EUR`.
       properties:
-        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         id: { type: string }
-        product_option_id: { type: string }
-        availability_id: { type: string, nullable: true }
-        name: { type: string }
-        amount: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
+        pricing_category_id: { type: string, nullable: true, description: "Parent `PricingCategory` row (carries the named bucket like `Adults`/`Children`)." }
+        min: { type: integer, nullable: true, description: "Inclusive lower bound of the headcount band the tier applies to." }
+        max: { type: integer, nullable: true, description: "Inclusive upper bound; null = open-ended." }
+        amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+          description: "Maps to the `fare` column."
+        currency: { type: string, description: "Tenant currency; defaults to `EUR`." }
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     Discount:
       type: object
@@ -2727,7 +2703,15 @@ components:
           maximum: 100
           nullable: true
           description: Percentage discount (0-100). Mutually exclusive with `discounted_price`.
-        nb_offers: { type: integer, description: "Maximum redemptions; 0 or null = unlimited", nullable: true }
+        nb_offers:
+          type: integer
+          nullable: true
+          description: |
+            Maximum redemptions, per CB convention (`Discount::scopeValid`):
+            - `> 0` — positive limit, enforced via row-locked count check on apply
+            - `-1` — explicit "unlimited"
+            - `0` — exhausted (apply returns 409 DISCOUNT_NOT_APPLICABLE)
+            - `null` — legacy unlimited (rows pre-feature)
         start_date: { type: string, format: date-time, nullable: true, description: "Promotional period start (advertising window)" }
         end_date: { type: string, format: date-time, nullable: true, description: "Promotional period end" }
         validity_start: { type: string, format: date-time, description: "Booking validity window start (when bookings using this discount must occur)" }
@@ -2742,37 +2726,58 @@ components:
 
     AvailableGiftCertificate:
       type: object
-      description: Sellable gift-cert SKU (the offering)
+      description: |
+        Sellable gift-cert SKU (the offering). Mirrors
+        `AvailableGiftCertificateResource::toArray()`. `currency` has no
+        underlying column on `available_gift_certificates` — it always
+        serializes as null today (tenant-level currency is implied) but is
+        kept on the wire for forward compatibility. `expiration_period_months`
+        sources the `expiration_period` column, which the model accessor
+        `expiryDurationInMonths` treats as MONTHS via
+        `CarbonInterval::make($value, 'months')`. A value of -1 means
+        "never expires". `cover_image_url` is sourced from the Paperclip
+        `cover` attachment (read-only — uploads not yet supported via CLI).
       properties:
         id: { type: string }
-        name: { type: string }
+        name: { type: string, nullable: true }
         amounts:
           type: array
           description: Available denominations (minor units)
           items: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
-        expiration_period_days: { type: integer, nullable: true }
-        cover_image_url: { type: string, format: uri, nullable: true }
+        currency: { type: string, nullable: true, description: "Always null today — no column on the table; tenant-level currency is implied." }
+        expiration_period_months: { type: integer, nullable: true, description: "Sources the `expiration_period` column (months). -1 means never expires." }
+        cover_image_url: { type: string, format: uri, nullable: true, description: "URL of the Paperclip `cover` attachment when uploaded; null otherwise. Read-only via the CLI." }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     GiftCertificate:
       type: object
-      description: Issued gift-cert instance (a real cert in a customer's hands)
+      description: |
+        Issued gift-cert instance (a real cert in a customer's hands). Mirrors
+        `GiftCertificateResource::toArray()`. `recipient_email` is the
+        underlying `recipient` column; `recipient_name` is the `to` column.
+        `currency` is sourced from `tenant()->currency` (no per-row column),
+        falling back to `EUR`. `available_gift_certificate_id` references
+        the `available_gift_certificate_uuid` column.
       properties:
         id: { type: string }
-        available_gift_certificate_id: { type: string }
-        code: { type: string }
-        recipient_email: { type: string, format: email }
-        recipient_name: { type: string }
-        amount: { $ref: "#/components/schemas/Money" }
-        remaining_amount: { $ref: "#/components/schemas/Money" }
+        available_gift_certificate_id: { type: string, nullable: true }
+        code: { type: string, nullable: true }
+        recipient_email: { type: string, format: email, nullable: true }
+        recipient_name: { type: string, nullable: true }
+        amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+        remaining_amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
         currency: { type: string }
-        valid_from: { type: string, format: date-time }
+        valid_from: { type: string, format: date-time, nullable: true }
         expires_at: { type: string, format: date-time, nullable: true }
         status:
           type: string
           enum: [active, redeemed, partial, void, expired]
-        issued_at: { type: string, format: date-time }
-        last_used_at: { type: string, format: date-time, nullable: true }
+        issued_at: { type: string, format: date-time, nullable: true }
         deleted_at:
           type: string
           format: date-time
@@ -2962,31 +2967,59 @@ components:
 
     Extra:
       type: object
+      description: |
+        Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
+        `title` (translatable) and `fare`; the wire shape exposes them as
+        `name` and `amount`. The `extras` table has no `currency` column —
+        `currency` comes from the tenant default, falling back to `EUR`.
+        `max_quantity` is derived from the `maximum` discriminator and
+        `maximum_bookable` columns: `maximum=custom` → real cap;
+        `maximum=no_max` / `max_by_participant` → null in the wire response.
+        Extras link to `ProductOption` via the morphTo `product` columns
+        (`product_id` + `product_type`).
       properties:
-        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         id: { type: string }
-        product_option_id: { type: string }
-        name: { type: string }
-        description: { type: string }
-        amount: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
+        product_option_id: { type: string, nullable: true, description: "Sourced from the morph `product_id` column when `product_type=ProductOption`." }
+        name: { type: string, nullable: true, description: "English translation of the `title` column." }
+        description: { type: string, nullable: true }
+        amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+          description: "Maps to the `fare` column."
+        currency: { type: string, description: "Tenant currency; defaults to `EUR`." }
         max_quantity: { type: integer, nullable: true }
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     Question:
       type: object
+      description: |
+        Mirrors `QuestionResource::toArray()`. Underlying columns:
+        `question` → `label`, `answer_type` → `type`, `is_required` →
+        `required`. Questions are polymorphic (morphTo `questionable`); the
+        wire shape exposes only the `ProductOption` case via
+        `product_option_id` (sourced from `questionable_id`).
+        The `questions` table has `public $timestamps = false`, so
+        `created_at` / `updated_at` are always null. `type` returns the raw
+        `answer_type` enum value (broader than the input enum).
       properties:
-        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         id: { type: string }
-        product_option_id: { type: string }
-        label: { type: string }
+        product_option_id: { type: string, nullable: true, description: "Sourced from `questionable_id` when `questionable_type=ProductOption`; null otherwise." }
+        label: { type: string, nullable: true, description: "Sourced from the `question` column." }
         type:
           type: string
-          enum: [text, textarea, select, date, number, boolean]
+          nullable: true
+          enum: [short_text, long_text, number, decimal_number, boolean, date, datetime, time, list, country, location_list, name, email, phone, birthdate]
+          description: "Raw `answer_type` enum value. The write API accepts a narrower input enum (text/textarea/select/date/number/boolean) which the controller maps onto these values."
         required: { type: boolean }
         options:
           type: array
           items: { type: string }
-          description: For type=select
+          description: For type=select / list
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
+        created_at: { type: string, format: date-time, nullable: true, description: "Always null — `Question` model has `$timestamps = false`." }
+        updated_at: { type: string, format: date-time, nullable: true, description: "Always null — `Question` model has `$timestamps = false`." }
 
     UpdateAvailabilityRequest:
       type: object
@@ -3030,8 +3063,8 @@ components:
                 value: { type: integer, minimum: 0 }
                 operator:
                   type: string
-                  enum: [SET, INCREASE_BY, DECREASE_BY]
-                  description: From `App\Enums\Inventory\CapacityOperator`. SET replaces; INCREASE_BY/DECREASE_BY are deltas.
+                  enum: [set_to, increase_by, decrease_by]
+                  description: From `App\Enums\Inventory\CapacityOperator`. `set_to` replaces; `increase_by`/`decrease_by` are deltas.
               description: "When `setting=capacity`."
             - title: PricingValue
               type: object
@@ -3101,7 +3134,7 @@ components:
             If true, server emails the redemption code to `recipient_email`
             immediately. Default false to avoid accidental emails when the
             CLI / LLM intends to issue + manually verify before sending. To
-            send a previously-issued cert, use `POST /gift-certs/{id}/resend`.
+            send a previously-issued cert, use `POST /gift-certs/issued/{id}/resend`.
         sender_message: { type: string, maxLength: 1000, nullable: true }
         dry_run: { type: boolean, default: false }
 
@@ -3274,30 +3307,45 @@ components:
 
     Category:
       type: object
+      description: |
+        Read-only resource (no Create/Update endpoints — Phase 1B + commit
+        9bce20074). Mirrors `CategoryResource::toArray()`. The
+        `product_categories` table only persists `id` + `name`; `slug`,
+        `description`, and `position` are surfaced because the
+        `ProductCategory` model has accessors for them, but they read as null
+        / 0 against today's schema.
       properties:
         id: { type: string }
-        name: { type: string }
-        slug: { type: string }
-        description: { type: string, nullable: true }
-        position: { type: integer }
-        product_count: { type: integer }
-        created_at: { type: string, format: date-time }
+        name: { type: string, nullable: true, description: "English translation of the `name` column." }
+        slug: { type: string, nullable: true, description: "No underlying column — null today." }
+        description: { type: string, nullable: true, description: "No underlying column — null today." }
+        position: { type: integer, nullable: true, description: "No underlying column — null today." }
+        product_count: { type: integer, nullable: true, description: "Set only when the `products` relation is eager-loaded; otherwise null." }
+        created_at: { type: string, format: date-time, nullable: true }
 
     Location:
       type: object
+      description: |
+        Mirrors `LocationResource::toArray()`. The `locations` table type enum
+        is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
+        the latter exists only as a `Location::TYPE_SECONDARY` constant).
+        `address` is a derived accessor (`getAddressAttribute()` composing
+        `street_address` + city + country). `timezone` and `notes` have no
+        underlying columns and read as null today.
       properties:
         id: { type: string }
         type:
           type: string
-          enum: [START, END, MEETING]
-        name: { type: string }
-        address: { type: string }
+          nullable: true
+          enum: [PRIMARY, START, END, VISITED]
+        name: { type: string, nullable: true }
+        address: { type: string, nullable: true, description: "Derived from `street_address` (+ optional city/country)." }
         latitude: { type: number, format: float, nullable: true }
         longitude: { type: number, format: float, nullable: true }
         google_place_id: { type: string, nullable: true }
-        timezone: { type: string }
-        notes: { type: string, nullable: true }
-        created_at: { type: string, format: date-time }
+        timezone: { type: string, nullable: true, description: "Always null today — no underlying column." }
+        notes: { type: string, nullable: true, description: "Always null today — no underlying column." }
+        created_at: { type: string, format: date-time, nullable: true }
 
     Media:
       type: object
@@ -3346,129 +3394,168 @@ components:
     CreateProductRequest:
       type: object
       required: [title, currency]
+      description: |
+        Mirrors `CreateProductRequest::rules()`.
       properties:
         title: { type: string, maxLength: 200 }
-        slug: { type: string, description: "Auto-generated if omitted" }
-        description: { type: string }
+        description: { type: string, nullable: true }
         status:
           type: string
           enum: [draft, published]
           default: draft
+          description: "Translates to the underlying `is_active` boolean."
         schedule_type:
           type: string
-          enum: [FIXED, FLEXIBLE]
-          default: FIXED
-        from_price: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
-        capacity: { type: integer }
-        cancellation_policy: { type: string }
+          enum: [date, datetime]
+          description: "`date` for date-only products; `datetime` for products with a starting time."
+        from_price: { type: integer, minimum: 0, nullable: true, description: "Minor units." }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        capacity: { type: integer, minimum: 0, nullable: true }
+        cancellation_policy: { type: string, nullable: true }
         category_ids:
           type: array
-          items: { type: string }
-        timezone: { type: string }
+          items: { type: integer }
+        timezone: { type: string, maxLength: 64, nullable: true }
         dry_run: { type: boolean, default: false }
 
     UpdateProductRequest:
       type: object
+      description: |
+        Mirrors `UpdateProductRequest::rules()`.
       properties:
         title: { type: string, maxLength: 200 }
-        slug: { type: string }
-        description: { type: string }
+        description: { type: string, nullable: true }
         status:
           type: string
           enum: [draft, published]
         schedule_type:
           type: string
-          enum: [FIXED, FLEXIBLE]
-        from_price: { $ref: "#/components/schemas/Money" }
-        capacity: { type: integer }
-        cancellation_policy: { type: string }
+          enum: [date, datetime]
+          description: "`date` for date-only products; `datetime` for products with a starting time."
+        from_price: { type: integer, minimum: 0, nullable: true }
+        capacity: { type: integer, minimum: 0, nullable: true }
+        cancellation_policy: { type: string, nullable: true }
         category_ids:
           type: array
-          items: { type: string }
-        timezone: { type: string }
+          items: { type: integer }
+        timezone: { type: string, maxLength: 64, nullable: true }
         dry_run: { type: boolean, default: false }
 
     CreateProductOptionRequest:
       type: object
       required: [product_id, title]
+      description: |
+        Mirrors `CreateProductOptionRequest::rules()`. `title` is mapped onto
+        the `name` column by the controller. ProductOption has no description
+        or published/draft flag of its own — those live on the parent Product.
       properties:
         product_id: { type: string }
-        title: { type: string, maxLength: 200 }
-        description: { type: string }
-        duration_minutes: { type: integer, nullable: true }
-        capacity: { type: integer }
-        min_age: { type: integer, nullable: true }
-        max_age: { type: integer, nullable: true }
-        status:
-          type: string
-          enum: [draft, published]
-          default: draft
+        title: { type: string, maxLength: 200, description: "Persisted as the `name` column." }
+        duration_minutes: { type: integer, minimum: 0, nullable: true }
+        capacity: { type: integer, minimum: 0, nullable: true }
+        min_age: { type: integer, minimum: 0, nullable: true }
+        max_age: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
     UpdateProductOptionRequest:
       type: object
+      description: |
+        Mirrors `UpdateProductOptionRequest::rules()`. Same field semantics as
+        `CreateProductOptionRequest` (title → name).
       properties:
         title: { type: string, maxLength: 200 }
-        description: { type: string }
-        duration_minutes: { type: integer, nullable: true }
-        capacity: { type: integer }
-        min_age: { type: integer, nullable: true }
-        max_age: { type: integer, nullable: true }
-        status:
-          type: string
-          enum: [draft, published]
+        duration_minutes: { type: integer, minimum: 0, nullable: true }
+        capacity: { type: integer, minimum: 0, nullable: true }
+        min_age: { type: integer, minimum: 0, nullable: true }
+        max_age: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
     CreatePricingTierRequest:
       type: object
-      required: [product_option_id, name, amount, currency]
+      required: [pricing_category_id, amount]
+      description: |
+        Mirrors `CreatePricingTierRequest::rules()`. The actual `pricing_tiers`
+        table has no `product_option_id`, `availability_id`, or `name` column;
+        all three are accepted as legacy aliases and ignored by the controller.
+        Tiers belong to a `PricingCategory` (the named bucket like
+        `Adults`/`Children`), which in turn belongs to a Product. `amount`
+        is persisted as the `fare` column. `currency` has no per-row column
+        and is dropped on persist.
       properties:
-        product_option_id: { type: string }
-        availability_id: { type: string, nullable: true, description: "Scope tier to a single availability; otherwise applies broadly" }
-        name: { type: string, maxLength: 100 }
-        amount: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
+        pricing_category_id: { type: string, description: "Required parent `PricingCategory` row." }
+        min: { type: integer, minimum: 0, description: "Inclusive lower bound of the headcount band." }
+        max: { type: integer, minimum: 0, nullable: true, description: "Inclusive upper bound; null = open-ended." }
+        amount: { type: integer, minimum: 0, description: "Persisted as the `fare` column. Minor units." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Accepted but ignored — no per-row column." }
+        name: { type: string, maxLength: 100, description: "Legacy alias accepted for compat — belongs on the parent `PricingCategory`, not the tier. Ignored." }
+        product_option_id: { type: string, nullable: true, description: "Legacy alias accepted for compat. Ignored — tiers don't link to ProductOption directly." }
+        availability_id: { type: string, nullable: true, description: "Legacy alias accepted for compat. Availability scoping is M:N via the `availability_pricing_tier` pivot, not a column. Ignored." }
         dry_run: { type: boolean, default: false }
 
     UpdatePricingTierRequest:
       type: object
+      description: |
+        Mirrors `UpdatePricingTierRequest::rules()`. `pricing_category_id`,
+        `min`, `max`, and `amount` (→ `fare`) are persisted; sending
+        `pricing_category_id` reparents the tier (404 if the target
+        category doesn't exist). `name` is accepted as a legacy alias but
+        ignored.
       properties:
-        name: { type: string, maxLength: 100 }
-        amount: { $ref: "#/components/schemas/Money" }
+        pricing_category_id: { type: string, description: "Reparent the tier under a different PricingCategory." }
+        min: { type: integer, minimum: 0 }
+        max: { type: integer, minimum: 0, nullable: true }
+        amount: { type: integer, minimum: 0, description: "Persisted as `fare`. Minor units." }
+        name: { type: string, maxLength: 100, description: "Legacy alias — ignored." }
         dry_run: { type: boolean, default: false }
 
     CreateExtraRequest:
       type: object
       required: [product_option_id, name, amount, currency]
+      description: |
+        Mirrors `CreateExtraRequest::rules()`. The controller maps `name` →
+        `title`, `amount` → `fare`, `max_quantity` → (`maximum`,
+        `maximum_bookable`) on the row. `currency` is required for parity
+        with other create endpoints but has no `extras` column and is
+        dropped (currency is tenant-level).
       properties:
-        product_option_id: { type: string }
-        name: { type: string, maxLength: 200 }
-        description: { type: string }
-        amount: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
-        max_quantity: { type: integer, nullable: true }
+        product_option_id: { type: string, description: "Persisted as the morph (`product_id`, `product_type=ProductOption`)." }
+        name: { type: string, maxLength: 200, description: "Persisted as the translatable `title` column." }
+        description: { type: string, nullable: true }
+        amount: { type: integer, minimum: 0, description: "Persisted as `fare`. Minor units." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Required for symmetry; not stored." }
+        max_quantity: { type: integer, minimum: 0, nullable: true, description: "When set, `maximum` becomes `custom` and the value lands in `maximum_bookable`." }
         dry_run: { type: boolean, default: false }
 
     UpdateExtraRequest:
       type: object
+      description: |
+        Mirrors `UpdateExtraRequest::rules()`. Same field-to-column mappings
+        as `CreateExtraRequest`.
       properties:
         name: { type: string, maxLength: 200 }
-        description: { type: string }
-        amount: { $ref: "#/components/schemas/Money" }
-        max_quantity: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        amount: { type: integer, minimum: 0 }
+        max_quantity: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
     CreateQuestionRequest:
       type: object
       required: [product_option_id, label, type]
+      description: |
+        Mirrors `CreateQuestionRequest::rules()`. The controller maps
+        `label` → `question`, `required` → `is_required`, and `type` onto
+        the underlying `answer_type` enum via:
+        `text → short_text`, `textarea → long_text`, `select → list`,
+        `date → date`, `number → number`, `boolean → boolean`. The polymorphic
+        `questionable` morph is set to `(ProductOption::class, product_option_id)`.
       properties:
-        product_option_id: { type: string }
-        label: { type: string, maxLength: 200 }
+        product_option_id: { type: string, description: "Persisted as `questionable_id` with `questionable_type=ProductOption`." }
+        label: { type: string, maxLength: 200, description: "Persisted as the `question` column." }
         type:
           type: string
           enum: [text, textarea, select, date, number, boolean]
-        required: { type: boolean, default: false }
+          description: "Mapped onto `answer_type` (see schema-level description)."
+        required: { type: boolean, default: false, description: "Persisted as `is_required`." }
         options:
           type: array
           items: { type: string }
@@ -3477,6 +3564,10 @@ components:
 
     UpdateQuestionRequest:
       type: object
+      description: |
+        Mirrors `UpdateQuestionRequest::rules()`. Same `label`→`question`,
+        `required`→`is_required`, `type`→`answer_type` mappings as
+        `CreateQuestionRequest`.
       properties:
         label: { type: string, maxLength: 200 }
         type:
@@ -3491,74 +3582,91 @@ components:
     CreateAvailableGiftCertRequest:
       type: object
       required: [name, amounts, currency]
+      description: |
+        Mirrors `CreateAvailableGiftCertRequest::rules()`. `currency` is
+        accepted for symmetry but not stored (no column on the table).
+        `expiration_period_months` persists to the `expiration_period`
+        column; the model treats it as MONTHS. `cover_image_url` is
+        read-only and not accepted on writes (cover assets go through the
+        Paperclip `cover` attachment, not via the CLI today).
       properties:
         name: { type: string, maxLength: 200 }
         amounts:
           type: array
           minItems: 1
-          items: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
-        expiration_period_days: { type: integer, nullable: true }
-        cover_image_url: { type: string, format: uri, nullable: true }
+          items: { type: integer, minimum: 0, description: "Minor units." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Required for symmetry; not stored." }
+        expiration_period_months: { type: integer, nullable: true, description: "Months. -1 means never expires." }
         dry_run: { type: boolean, default: false }
 
     UpdateAvailableGiftCertRequest:
       type: object
+      description: |
+        Mirrors `UpdateAvailableGiftCertRequest::rules()`. `cover_image_url`
+        is read-only (not accepted on writes).
       properties:
         name: { type: string, maxLength: 200 }
         amounts:
           type: array
-          items: { $ref: "#/components/schemas/Money" }
-        expiration_period_days: { type: integer, nullable: true }
-        cover_image_url: { type: string, format: uri, nullable: true }
-        dry_run: { type: boolean, default: false }
-
-    CreateCategoryRequest:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string, maxLength: 200 }
-        slug: { type: string }
-        description: { type: string, nullable: true }
-        position: { type: integer }
-        dry_run: { type: boolean, default: false }
-
-    UpdateCategoryRequest:
-      type: object
-      properties:
-        name: { type: string, maxLength: 200 }
-        slug: { type: string }
-        description: { type: string, nullable: true }
-        position: { type: integer }
+          minItems: 1
+          items: { type: integer, minimum: 0 }
+        expiration_period_months: { type: integer, nullable: true }
         dry_run: { type: boolean, default: false }
 
     CreateLocationRequest:
       type: object
-      required: [type, name, address]
+      required: [type, name, address, attach_to, attach_to_id]
+      description: |
+        Mirrors `CreateLocationRequest::rules()`. Every Location must be
+        attached to an owning record; specify which kind via `attach_to`
+        (enum) and the id via `attach_to_id`. The controller resolves the
+        enum to the underlying polymorphic FQCN — clients never deal with
+        Eloquent class names. The schema column is `street_address`;
+        `address` is a derived accessor on the model. The controller prefers
+        `street_address` when supplied, otherwise falls back to `address`.
+        `timezone` and `notes` are accepted but dropped on persist (no
+        underlying columns today). 422 if `attach_to_id` doesn't resolve to
+        an existing record of the requested kind.
       properties:
         type:
           type: string
-          enum: [START, END, MEETING]
+          enum: [START, END, MEETING, PRIMARY, SECONDARY, VISITED]
         name: { type: string, maxLength: 200 }
-        address: { type: string }
+        address: { type: string, description: "Used as `street_address` when `street_address` is not explicitly supplied." }
+        street_address: { type: string, description: "Preferred; persisted directly." }
+        city: { type: string }
+        country_code: { type: string, minLength: 2, maxLength: 2 }
+        postal_code: { type: string, nullable: true }
+        region: { type: string, nullable: true }
         latitude: { type: number, format: float, nullable: true }
         longitude: { type: number, format: float, nullable: true }
         google_place_id: { type: string, nullable: true }
-        timezone: { type: string }
-        notes: { type: string, nullable: true }
+        timezone: { type: string, maxLength: 64, nullable: true, description: "Accepted but not stored — no column." }
+        notes: { type: string, nullable: true, description: "Accepted but not stored — no column." }
+        attach_to:
+          type: string
+          enum: [product, organisation, partner]
+          description: "Kind of record this location belongs to. The CLI never exposes Eloquent FQCNs."
+        attach_to_id: { type: string, description: "Id of the `attach_to` record." }
         dry_run: { type: boolean, default: false }
 
     UpdateLocationRequest:
       type: object
+      description: |
+        Mirrors `UpdateLocationRequest::rules()`. The controller persists only
+        `type`, `name`, `latitude`, `longitude`, `google_place_id`, `region`,
+        and (when `address` is provided) `street_address`. `timezone` and
+        `notes` are accepted but dropped on persist.
       properties:
         type:
           type: string
           enum: [START, END, MEETING]
+          description: "Update enum is narrower than create — see `UpdateLocationRequest::rules()`."
         name: { type: string, maxLength: 200 }
-        address: { type: string }
+        address: { type: string, description: "Persisted as `street_address` when supplied." }
         latitude: { type: number, format: float, nullable: true }
         longitude: { type: number, format: float, nullable: true }
         google_place_id: { type: string, nullable: true }
-        timezone: { type: string }
-        notes: { type: string, nullable: true }
+        timezone: { type: string, maxLength: 64, nullable: true, description: "Accepted but not stored." }
+        notes: { type: string, nullable: true, description: "Accepted but not stored." }
         dry_run: { type: boolean, default: false }

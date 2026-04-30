@@ -57,17 +57,15 @@ func giftCertificatesDefs() []CommandDef {
 				{Name: "name", Type: "string", Required: true, Description: "Template name"},
 				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
 				{Name: "amounts", Type: "intSlice", Required: true, Description: "Allowed denominations (minor units, comma-separated)"},
-				{Name: "cover-image-url", Type: "string", Description: "Cover image URL"},
-				{Name: "expiration-period-days", Type: "int", Description: "Days until expiry once issued"},
+				{Name: "expiration-period-months", Type: "int", Description: "Months until expiry; -1 = never expires"},
 			},
-			ForensicFields: []string{"amounts", "expiration-period-days"},
+			ForensicFields: []string{"amounts", "expiration-period-months"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":                   "name",
-					"currency":               "currency",
-					"amounts":                "amounts",
-					"cover-image-url":        "cover_image_url",
-					"expiration-period-days": "expiration_period_days",
+					"name":                     "name",
+					"currency":                 "currency",
+					"amounts":                  "amounts",
+					"expiration-period-months": "expiration_period_months",
 				})
 				if err != nil {
 					return nil, err
@@ -107,20 +105,18 @@ func giftCertificatesDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "name", Type: "string", Description: "Template name"},
 				{Name: "amounts", Type: "intSlice", Description: "Allowed denominations (minor units, comma-separated)"},
-				{Name: "cover-image-url", Type: "string", Description: "Cover image URL"},
-				{Name: "expiration-period-days", Type: "int", Description: "Days until expiry once issued"},
+				{Name: "expiration-period-months", Type: "int", Description: "Months until expiry; -1 = never expires"},
 			},
-			ForensicFields: []string{"amounts", "expiration-period-days"},
+			ForensicFields: []string{"amounts", "expiration-period-months"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":                   "name",
-					"amounts":                "amounts",
-					"cover-image-url":        "cover_image_url",
-					"expiration-period-days": "expiration_period_days",
+					"name":                     "name",
+					"amounts":                  "amounts",
+					"expiration-period-months": "expiration_period_months",
 				})
 				if err != nil {
 					return nil, err
@@ -211,7 +207,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates issue", Short: "Issue a gift cert from a template",
-			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issue",
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issued",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			Flags: []FlagDef{
 				{Name: "available-gift-certificate-id", Type: "string", Required: true, Description: "Source SKU template"},
@@ -247,7 +243,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates void <id>", Short: "Void an issued gift cert",
-			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/{id}/void",
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issued/{id}/void",
 			Ability:    invpkg.Write, // Spec line 2312: gift-certs void is cli:write.
 			DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
@@ -279,7 +275,7 @@ func giftCertificatesDefs() []CommandDef {
 		},
 		{
 			Use: "gift-certificates resend <id>", Short: "Resend a gift cert email",
-			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/{id}/resend",
+			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issued/{id}/resend",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
