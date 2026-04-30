@@ -32,6 +32,7 @@ func bookingsDefs() []CommandDef {
 				{Name: "customer-email", Type: "string", Description: "Filter by customer email"},
 				{Name: "reference", Type: "string", Description: "Filter by booking reference"},
 				{Name: "product-option-id", Type: "string", Description: "Filter by product option"},
+				{Name: "include-cancelled", Type: "bool", Description: "Lift the CancellingScope filter so cancelled bookings appear alongside active ones"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListBookingsParams{}
@@ -71,6 +72,10 @@ func bookingsDefs() []CommandDef {
 				}
 				if v := args.FlagString("product-option-id"); v != "" {
 					p.ProductOptionId = &v
+				}
+				if args.FlagBool("include-cancelled") {
+					t := true
+					p.IncludeCancelled = &t
 				}
 				resp, err := r.Client.ListBookingsWithResponse(ctx, p)
 				if err != nil {
@@ -131,7 +136,12 @@ func bookingsDefs() []CommandDef {
 				{Name: "reason", Type: "string", Required: true, Description: "Cancellation reason"},
 				{Name: "refund-policy", Type: "string", Required: true, Description: "auto|none|full|partial (spec: required; CS-only for non-auto)"},
 				{Name: "refund-amount", Type: "int", Description: "Refund amount in minor units (only with partial)"},
-				{Name: "notify-customer", Type: "bool", Description: "Notify customer of cancellation"},
+				// Server's CancelBookingRequest defaults notify_customer to TRUE.
+				// Mirror that default at the cobra layer so --help reads "(default
+				// true)"; we only emit notify_customer in the body when the user
+				// explicitly sets the flag, so omitting still yields the server
+				// default. Pass --notify-customer=false to suppress the email.
+				{Name: "notify-customer", Type: "bool", Default: true, Description: "Notify customer of cancellation (server default true)"},
 			},
 			ForensicFields: []string{"reason", "refund-policy", "refund-amount", "notify-customer"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
