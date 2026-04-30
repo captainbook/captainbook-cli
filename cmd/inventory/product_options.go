@@ -66,24 +66,25 @@ func productOptionsDefs() []CommandDef {
 			Verb: "POST", Path: "/product-options", Ability: invpkg.Write,
 			DryRunMode: DryRunBody,
 			Long: "ProductOption has no description or status of its own — those live on the " +
-				"parent Product. --title is mapped onto the underlying `name` column.",
+				"parent Product. --title is mapped onto the underlying `name` column. " +
+				"--option-code is auto-generated from the title slug when omitted.",
 			Flags: []FlagDef{
 				{Name: "title", Type: "string", Required: true, Description: "Option title (persisted as `name`)"},
 				{Name: "product-id", Type: "string", Required: true, Description: "Parent product ID"},
+				{Name: "option-code", Type: "string", Description: "Tenant-supplied SKU (auto-generated from title when omitted)"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
-				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
 				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
 			},
-			ForensicFields: []string{"capacity", "product-id"},
+			ForensicFields: []string{"capacity", "product-id", "option-code"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"title":            "title",
-					"product-id":       "product_id",
-					"capacity":         "capacity",
-					"duration-minutes": "duration_minutes",
-					"min-age":          "min_age",
-					"max-age":          "max_age",
+					"title":       "title",
+					"product-id":  "product_id",
+					"option-code": "option_code",
+					"capacity":    "capacity",
+					"min-age":     "min_age",
+					"max-age":     "max_age",
 				})
 				if err != nil {
 					return nil, err
@@ -104,23 +105,23 @@ func productOptionsDefs() []CommandDef {
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
 				{Name: "title", Type: "string", Description: "Option title (persisted as `name`)"},
+				{Name: "option-code", Type: "string", Description: "Tenant-supplied SKU"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
-				{Name: "duration-minutes", Type: "int", Description: "Activity duration in minutes"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},
 				{Name: "max-age", Type: "int", Description: "Maximum allowed guest age"},
 			},
-			ForensicFields: []string{"capacity"},
+			ForensicFields: []string{"capacity", "option-code"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"title":            "title",
-					"capacity":         "capacity",
-					"duration-minutes": "duration_minutes",
-					"min-age":          "min_age",
-					"max-age":          "max_age",
+					"title":       "title",
+					"option-code": "option_code",
+					"capacity":    "capacity",
+					"min-age":     "min_age",
+					"max-age":     "max_age",
 				})
 				if err != nil {
 					return nil, err

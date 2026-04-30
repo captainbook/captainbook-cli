@@ -1172,39 +1172,94 @@ type CreatePricingTierRequest struct {
 }
 
 // CreateProductOptionRequest Mirrors `CreateProductOptionRequest::rules()`. `title` is mapped onto
-// the `name` column by the controller. ProductOption has no description
-// or published/draft flag of its own — those live on the parent Product.
+// the `name` column by the controller. `option_code` is optional —
+// when omitted, the server auto-generates one from the title slug plus
+// a random suffix. ProductOption has no description or published/draft
+// flag of its own — those live on the parent Product.
 type CreateProductOptionRequest struct {
-	Capacity        *int   `json:"capacity,omitempty"`
-	DryRun          *bool  `json:"dry_run,omitempty"`
-	DurationMinutes *int   `json:"duration_minutes,omitempty"`
-	MaxAge          *int   `json:"max_age,omitempty"`
-	MinAge          *int   `json:"min_age,omitempty"`
-	ProductId       string `json:"product_id"`
+	Capacity *int  `json:"capacity,omitempty"`
+	DryRun   *bool `json:"dry_run,omitempty"`
+	MaxAge   *int  `json:"max_age,omitempty"`
+	MinAge   *int  `json:"min_age,omitempty"`
+
+	// OptionCode Tenant-supplied SKU. Auto-generated from title when omitted.
+	OptionCode *string `json:"option_code,omitempty"`
+	ProductId  string  `json:"product_id"`
 
 	// Title Persisted as the `name` column.
 	Title string `json:"title"`
 }
 
-// CreateProductRequest Mirrors `CreateProductRequest::rules()`.
+// CreateProductRequest Mirrors `CreateProductRequest::rules()`. `product_code` is optional —
+// when omitted, the server auto-generates one from the title slug plus
+// a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). Translatable rich-text
+// fields (`description`, `instructions`, `requirements`, `inclusions`,
+// `exclusions`) accept bare strings; the server wraps them into the
+// `{"en": "..."}` HasTranslations bag.
 type CreateProductRequest struct {
+	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
-	Capacity           *int    `json:"capacity,omitempty"`
-	CategoryIds        *[]int  `json:"category_ids,omitempty"`
-	Currency           string  `json:"currency"`
-	Description        *string `json:"description,omitempty"`
-	DryRun             *bool   `json:"dry_run,omitempty"`
+
+	// CancellationPolicyLink External URL with the policy. Mutually exclusive with `cancellation_policy`.
+	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
+	Capacity               *int    `json:"capacity,omitempty"`
+	CategoryIds            *[]int  `json:"category_ids,omitempty"`
+	Currency               string  `json:"currency"`
+	Description            *string `json:"description,omitempty"`
+
+	// Displayable Whether the product is shown in widgets / catalog.
+	Displayable *bool `json:"displayable,omitempty"`
+	DryRun      *bool `json:"dry_run,omitempty"`
+
+	// Exclusions Rich text — what's not included. Translatable.
+	Exclusions *string `json:"exclusions,omitempty"`
 
 	// FromPrice Minor units.
 	FromPrice *int `json:"from_price,omitempty"`
 
+	// FromPriceLabel Caption shown next to `from_price` (e.g., `From €50/person`).
+	FromPriceLabel *string `json:"from_price_label,omitempty"`
+
+	// Inclusions Rich text — what's included. Translatable.
+	Inclusions *string `json:"inclusions,omitempty"`
+
+	// Instructions Rich text shown to confirmed customers. Translatable.
+	Instructions *string `json:"instructions,omitempty"`
+
+	// IsPricedPerPerson `true` = price applies per traveler; `false` = price applies per group/booking. Implicitly forced to `true` when `is_private=false`.
+	IsPricedPerPerson *bool `json:"is_priced_per_person,omitempty"`
+
+	// IsPrivate `true` = a single party books the whole experience (private); `false` = multiple parties share the slot (shared). When `false`, `is_priced_per_person` is forced to `true` and `use_alternate_tier_pricing` to `false` regardless of what the caller supplied.
+	IsPrivate *bool `json:"is_private,omitempty"`
+
+	// IsTierPriced Whether quantity-based pricing tiers apply.
+	IsTierPriced *bool `json:"is_tier_priced,omitempty"`
+
+	// Locale Default content locale for this product (e.g., `en`).
+	Locale *string `json:"locale,omitempty"`
+
+	// MustValidateCancellationPolicy Customer must explicitly accept the cancellation policy at checkout. When `false`, both `cancellation_policy` and `cancellation_policy_link` are nulled regardless of what the caller supplied — set `true` to retain a policy.
+	MustValidateCancellationPolicy *bool `json:"must_validate_cancellation_policy,omitempty"`
+
+	// ProductCode Tenant-supplied SKU. Auto-generated from title when omitted.
+	ProductCode *string `json:"product_code,omitempty"`
+
+	// Requirements Rich text — what the customer needs. Translatable.
+	Requirements *string `json:"requirements,omitempty"`
+
 	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
 	ScheduleType *CreateProductRequestScheduleType `json:"schedule_type,omitempty"`
+
+	// ShowLastTier Whether the last tier is displayed in customer-facing pricing.
+	ShowLastTier *bool `json:"show_last_tier,omitempty"`
 
 	// Status Translates to the underlying `is_active` boolean.
 	Status   *CreateProductRequestStatus `json:"status,omitempty"`
 	Timezone *string                     `json:"timezone,omitempty"`
 	Title    string                      `json:"title"`
+
+	// UseAlternateTierPricing Alternate tier-pricing rendering / calculation. Implicitly forced to `false` when `is_private=false`.
+	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
 
 // CreateProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
@@ -1506,9 +1561,10 @@ type IssueGiftCertRequest struct {
 	SenderMessage *string `json:"sender_message,omitempty"`
 }
 
-// Location Mirrors `LocationResource::toArray()`. The `locations` table type enum
-// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
-// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+// Location Mirrors `LocationResource::toArray()`. The `locations.type` column is
+// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
+// `MEETING` — earlier spec drafts listed it but it was never a valid
+// value; the column write would silently coerce to NULL).
 // `address` is a derived accessor (`getAddressAttribute()` composing
 // `street_address` + city + country). `timezone` and `notes` have no
 // underlying columns and read as null today.
@@ -1660,13 +1716,19 @@ type PricingTierPage struct {
 	Pagination *Pagination   `json:"pagination,omitempty"`
 }
 
-// Product Mirrors `ProductResource::toArray()`. Translatable `title` /
-// `description` are returned in English (`toArrayWithTranslations('en')`).
-// `status` is derived from the `is_active` column (`is_active` is also
-// surfaced directly for clients that prefer the canonical boolean).
+// Product Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+// `exclusions`) are returned in English via
+// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+// (`is_active` is also surfaced directly for clients that prefer the
+// canonical boolean).
 type Product struct {
+	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link` in the UI.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
-	Capacity           *int    `json:"capacity,omitempty"`
+
+	// CancellationPolicyLink External URL with the policy. Mutually exclusive with `cancellation_policy` in the UI.
+	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
+	Capacity               *int    `json:"capacity,omitempty"`
 
 	// CategoryIds IDs of attached `ProductCategory` rows; empty array when the relation isn't eager-loaded.
 	CategoryIds *[]string  `json:"category_ids,omitempty"`
@@ -1676,29 +1738,68 @@ type Product struct {
 	// DeletedAt Set when soft-deleted; null otherwise
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 	Description *string    `json:"description,omitempty"`
-	FromPrice   *Money     `json:"from_price,omitempty"`
-	Id          *string    `json:"id,omitempty"`
+
+	// Displayable Whether the product is shown in widgets / catalog.
+	Displayable *bool `json:"displayable,omitempty"`
+
+	// Exclusions Translatable rich-text — what's not included.
+	Exclusions *string `json:"exclusions,omitempty"`
+	FromPrice  *Money  `json:"from_price,omitempty"`
+
+	// FromPriceLabel Caption shown next to `from_price` (e.g., `From €50/person`).
+	FromPriceLabel *string `json:"from_price_label,omitempty"`
+	Id             *string `json:"id,omitempty"`
+
+	// Inclusions Translatable rich-text — what's included.
+	Inclusions *string `json:"inclusions,omitempty"`
+
+	// Instructions Translatable rich-text shown to confirmed customers.
+	Instructions *string `json:"instructions,omitempty"`
 
 	// IsActive Canonical boolean from the `is_active` column.
 	IsActive *bool `json:"is_active,omitempty"`
 
-	// ProductCode Tenant-supplied SKU; not auto-generated.
+	// IsPricedPerPerson `true` = price applies per traveler; `false` = price applies per group/booking.
+	IsPricedPerPerson *bool `json:"is_priced_per_person,omitempty"`
+
+	// IsPrivate `true` = private (a single party books the whole experience); `false` = shared (multiple parties share the slot).
+	IsPrivate *bool `json:"is_private,omitempty"`
+
+	// IsTierPriced Whether pricing tiers (qty-based pricing) apply.
+	IsTierPriced *bool `json:"is_tier_priced,omitempty"`
+
+	// Locale Default content locale for this product.
+	Locale *string `json:"locale,omitempty"`
+
+	// MustValidateCancellationPolicy Customer must explicitly accept the cancellation policy at checkout.
+	MustValidateCancellationPolicy *bool `json:"must_validate_cancellation_policy,omitempty"`
+
+	// ProductCode Tenant-supplied SKU. Auto-generated when `CreateProductRequest` omits it.
 	ProductCode *string `json:"product_code,omitempty"`
 
-	// ScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time. Backed by `Bmbltd\LaravelBookings\Enums\ScheduleType`.
+	// Requirements Translatable rich-text — what the customer needs to bring / know.
+	Requirements *string `json:"requirements,omitempty"`
+
+	// ScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time.
 	ScheduleType *ProductScheduleType `json:"schedule_type,omitempty"`
 
-	// Status Derived from `is_active` (`true` → published, `false` → draft). Spec previously listed an `archived` value that the implementation never returns.
+	// ShowLastTier Whether the last tier is displayed in customer-facing pricing.
+	ShowLastTier *bool `json:"show_last_tier,omitempty"`
+
+	// Status Derived from `is_active` (`true` → published, `false` → draft).
 	Status    *ProductStatus `json:"status,omitempty"`
 	Timezone  *string        `json:"timezone,omitempty"`
 	Title     *string        `json:"title,omitempty"`
 	UpdatedAt *time.Time     `json:"updated_at,omitempty"`
+
+	// UseAlternateTierPricing Alternate tier-pricing rendering / calculation.
+	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
 
-// ProductScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time. Backed by `Bmbltd\LaravelBookings\Enums\ScheduleType`.
+// ProductScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time.
 type ProductScheduleType string
 
-// ProductStatus Derived from `is_active` (`true` → published, `false` → draft). Spec previously listed an `archived` value that the implementation never returns.
+// ProductStatus Derived from `is_active` (`true` → published, `false` → draft).
 type ProductStatus string
 
 // ProductOption Mirrors `ProductOptionResource::toArray()`. The underlying
@@ -1713,12 +1814,11 @@ type ProductOption struct {
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
-	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
-	DurationMinutes *int       `json:"duration_minutes,omitempty"`
-	Id              *string    `json:"id,omitempty"`
-	MaxAge          *int       `json:"max_age,omitempty"`
-	MinAge          *int       `json:"min_age,omitempty"`
-	ProductId       *string    `json:"product_id,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	Id        *string    `json:"id,omitempty"`
+	MaxAge    *int       `json:"max_age,omitempty"`
+	MinAge    *int       `json:"min_age,omitempty"`
+	ProductId *string    `json:"product_id,omitempty"`
 
 	// Title Sourced from the `name` column (no translatable layer).
 	Title     *string    `json:"title,omitempty"`
@@ -1909,13 +2009,11 @@ type UpdateLocationRequest struct {
 	Notes *string `json:"notes,omitempty"`
 
 	// Timezone Accepted but not stored.
-	Timezone *string `json:"timezone,omitempty"`
-
-	// Type Same vocabulary as create.
-	Type *UpdateLocationRequestType `json:"type,omitempty"`
+	Timezone *string                    `json:"timezone,omitempty"`
+	Type     *UpdateLocationRequestType `json:"type,omitempty"`
 }
 
-// UpdateLocationRequestType Same vocabulary as create.
+// UpdateLocationRequestType defines model for UpdateLocationRequest.Type.
 type UpdateLocationRequestType string
 
 // UpdatePricingTierRequest Mirrors `UpdatePricingTierRequest::rules()`. `pricing_category_id`,
@@ -1940,28 +2038,47 @@ type UpdatePricingTierRequest struct {
 // UpdateProductOptionRequest Mirrors `UpdateProductOptionRequest::rules()`. Same field semantics as
 // `CreateProductOptionRequest` (title → name).
 type UpdateProductOptionRequest struct {
-	Capacity        *int    `json:"capacity,omitempty"`
-	DryRun          *bool   `json:"dry_run,omitempty"`
-	DurationMinutes *int    `json:"duration_minutes,omitempty"`
-	MaxAge          *int    `json:"max_age,omitempty"`
-	MinAge          *int    `json:"min_age,omitempty"`
-	Title           *string `json:"title,omitempty"`
+	Capacity   *int    `json:"capacity,omitempty"`
+	DryRun     *bool   `json:"dry_run,omitempty"`
+	MaxAge     *int    `json:"max_age,omitempty"`
+	MinAge     *int    `json:"min_age,omitempty"`
+	OptionCode *string `json:"option_code,omitempty"`
+	Title      *string `json:"title,omitempty"`
 }
 
-// UpdateProductRequest Mirrors `UpdateProductRequest::rules()`.
+// UpdateProductRequest Mirrors `UpdateProductRequest::rules()`. Same field semantics as
+// `CreateProductRequest`. Every field is optional — only supplied
+// keys are updated.
 type UpdateProductRequest struct {
-	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
-	Capacity           *int    `json:"capacity,omitempty"`
-	CategoryIds        *[]int  `json:"category_ids,omitempty"`
-	Description        *string `json:"description,omitempty"`
-	DryRun             *bool   `json:"dry_run,omitempty"`
-	FromPrice          *int    `json:"from_price,omitempty"`
+	CancellationPolicy     *string `json:"cancellation_policy,omitempty"`
+	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
+	Capacity               *int    `json:"capacity,omitempty"`
+	CategoryIds            *[]int  `json:"category_ids,omitempty"`
+	Description            *string `json:"description,omitempty"`
+	Displayable            *bool   `json:"displayable,omitempty"`
+	DryRun                 *bool   `json:"dry_run,omitempty"`
+	Exclusions             *string `json:"exclusions,omitempty"`
+	FromPrice              *int    `json:"from_price,omitempty"`
+	FromPriceLabel         *string `json:"from_price_label,omitempty"`
+	Inclusions             *string `json:"inclusions,omitempty"`
+	Instructions           *string `json:"instructions,omitempty"`
+	IsPricedPerPerson      *bool   `json:"is_priced_per_person,omitempty"`
+
+	// IsPrivate Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and seven inventory recompute jobs are dispatched. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description.
+	IsPrivate                      *bool   `json:"is_private,omitempty"`
+	IsTierPriced                   *bool   `json:"is_tier_priced,omitempty"`
+	Locale                         *string `json:"locale,omitempty"`
+	MustValidateCancellationPolicy *bool   `json:"must_validate_cancellation_policy,omitempty"`
+	ProductCode                    *string `json:"product_code,omitempty"`
+	Requirements                   *string `json:"requirements,omitempty"`
 
 	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
-	ScheduleType *UpdateProductRequestScheduleType `json:"schedule_type,omitempty"`
-	Status       *UpdateProductRequestStatus       `json:"status,omitempty"`
-	Timezone     *string                           `json:"timezone,omitempty"`
-	Title        *string                           `json:"title,omitempty"`
+	ScheduleType            *UpdateProductRequestScheduleType `json:"schedule_type,omitempty"`
+	ShowLastTier            *bool                             `json:"show_last_tier,omitempty"`
+	Status                  *UpdateProductRequestStatus       `json:"status,omitempty"`
+	Timezone                *string                           `json:"timezone,omitempty"`
+	Title                   *string                           `json:"title,omitempty"`
+	UseAlternateTierPricing *bool                             `json:"use_alternate_tier_pricing,omitempty"`
 }
 
 // UpdateProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
@@ -11682,9 +11799,10 @@ type CreateLocationResponse struct {
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
 
-			// Location Mirrors `LocationResource::toArray()`. The `locations` table type enum
-			// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
-			// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+			// Location Mirrors `LocationResource::toArray()`. The `locations.type` column is
+			// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
+			// `MEETING` — earlier spec drafts listed it but it was never a valid
+			// value; the column write would silently coerce to NULL).
 			// `address` is a derived accessor (`getAddressAttribute()` composing
 			// `street_address` + city + country). `timezone` and `notes` have no
 			// underlying columns and read as null today.
@@ -11753,9 +11871,10 @@ type ShowLocationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// Data Mirrors `LocationResource::toArray()`. The `locations` table type enum
-		// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
-		// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+		// Data Mirrors `LocationResource::toArray()`. The `locations.type` column is
+		// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
+		// `MEETING` — earlier spec drafts listed it but it was never a valid
+		// value; the column write would silently coerce to NULL).
 		// `address` is a derived accessor (`getAddressAttribute()` composing
 		// `street_address` + city + country). `timezone` and `notes` have no
 		// underlying columns and read as null today.
@@ -12293,10 +12412,12 @@ type CreateProductResponse struct {
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
 
-			// Product Mirrors `ProductResource::toArray()`. Translatable `title` /
-			// `description` are returned in English (`toArrayWithTranslations('en')`).
-			// `status` is derived from the `is_active` column (`is_active` is also
-			// surfaced directly for clients that prefer the canonical boolean).
+			// Product Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+			// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+			// `exclusions`) are returned in English via
+			// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+			// (`is_active` is also surfaced directly for clients that prefer the
+			// canonical boolean).
 			Product *Product `json:"product,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -12362,10 +12483,12 @@ type ShowProductResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// Data Mirrors `ProductResource::toArray()`. Translatable `title` /
-		// `description` are returned in English (`toArrayWithTranslations('en')`).
-		// `status` is derived from the `is_active` column (`is_active` is also
-		// surfaced directly for clients that prefer the canonical boolean).
+		// Data Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+		// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+		// `exclusions`) are returned in English via
+		// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+		// (`is_active` is also surfaced directly for clients that prefer the
+		// canonical boolean).
 		Data       Product     `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -15852,9 +15975,10 @@ func ParseCreateLocationResponse(rsp *http.Response) (*CreateLocationResponse, e
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
 
-				// Location Mirrors `LocationResource::toArray()`. The `locations` table type enum
-				// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
-				// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+				// Location Mirrors `LocationResource::toArray()`. The `locations.type` column is
+				// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
+				// `MEETING` — earlier spec drafts listed it but it was never a valid
+				// value; the column write would silently coerce to NULL).
 				// `address` is a derived accessor (`getAddressAttribute()` composing
 				// `street_address` + city + country). `timezone` and `notes` have no
 				// underlying columns and read as null today.
@@ -15960,9 +16084,10 @@ func ParseShowLocationResponse(rsp *http.Response) (*ShowLocationResponse, error
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Data Mirrors `LocationResource::toArray()`. The `locations` table type enum
-			// is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
-			// the latter exists only as a `Location::TYPE_SECONDARY` constant).
+			// Data Mirrors `LocationResource::toArray()`. The `locations.type` column is
+			// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
+			// `MEETING` — earlier spec drafts listed it but it was never a valid
+			// value; the column write would silently coerce to NULL).
 			// `address` is a derived accessor (`getAddressAttribute()` composing
 			// `street_address` + city + country). `timezone` and `notes` have no
 			// underlying columns and read as null today.
@@ -16806,10 +16931,12 @@ func ParseCreateProductResponse(rsp *http.Response) (*CreateProductResponse, err
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
 
-				// Product Mirrors `ProductResource::toArray()`. Translatable `title` /
-				// `description` are returned in English (`toArrayWithTranslations('en')`).
-				// `status` is derived from the `is_active` column (`is_active` is also
-				// surfaced directly for clients that prefer the canonical boolean).
+				// Product Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+				// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+				// `exclusions`) are returned in English via
+				// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+				// (`is_active` is also surfaced directly for clients that prefer the
+				// canonical boolean).
 				Product *Product `json:"product,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -16912,10 +17039,12 @@ func ParseShowProductResponse(rsp *http.Response) (*ShowProductResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Data Mirrors `ProductResource::toArray()`. Translatable `title` /
-			// `description` are returned in English (`toArrayWithTranslations('en')`).
-			// `status` is derived from the `is_active` column (`is_active` is also
-			// surfaced directly for clients that prefer the canonical boolean).
+			// Data Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+			// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+			// `exclusions`) are returned in English via
+			// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+			// (`is_active` is also surfaced directly for clients that prefer the
+			// canonical boolean).
 			Data       Product     `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`

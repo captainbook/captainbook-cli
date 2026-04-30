@@ -170,6 +170,25 @@ paths:
     post:
       operationId: createProduct
       summary: Create a product
+      description: |
+        Creates a Product and mirrors the supplier-side metadata to
+        `central_products` via `App\Observers\ProductObserver`. The
+        controller enforces the same implicit-override rules the Livewire
+        form runs (see `app/Livewire/Product/Edit.php::update()`):
+
+        - When `must_validate_cancellation_policy` is `false` (default), both
+          `cancellation_policy` and `cancellation_policy_link` are nulled,
+          even if the caller supplied them. Set
+          `must_validate_cancellation_policy: true` to retain the policy
+          fields.
+        - When `is_private` is `false`, `is_priced_per_person` is forced to
+          `true` and `use_alternate_tier_pricing` to `false`. Shared
+          experiences must price per traveler.
+
+        After persistence the controller calls `Product::updateCanBeSold()`
+        which re-derives the `can_be_sold` column. New products have no
+        Availabilities yet, so the inventory cascade jobs that fire on
+        update do not run on create.
       tags: [Products]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -244,6 +263,42 @@ paths:
     patch:
       operationId: updateProduct
       summary: Update a product
+      description: |
+        Updates the Product and runs the same side-effect chain the Livewire
+        form does in `app/Livewire/Product/Edit.php::update()`. The whole
+        flow runs inside a single DB transaction; partial failures roll back.
+
+        **Implicit overrides** (applied before persistence — same rules as
+        `POST /products`):
+
+        - `must_validate_cancellation_policy=false` → both
+          `cancellation_policy` and `cancellation_policy_link` are nulled.
+        - Effective `is_private=false` → `is_priced_per_person` is forced
+          to `true` and `use_alternate_tier_pricing` to `false`.
+
+        **Cascading side effects** (only fire when the relevant input
+        actually changed; under dry-run they're surfaced via the
+        `MutationResult.side_effects` array rather than executed):
+
+        - `is_private` toggled — every Availability of every related
+          ProductOption is bulk-updated to match, then dispatches
+          `UpdateBookedQuantityJob`, `UpdateCumulativeCapacityJob`,
+          `UpdateIsFullyBookedJob`, `UpdateIsOpenForBookingJob`,
+          `UpdateAvailableResourcesCountJob`,
+          `UpdateMaxHostableGuestsNumberJob`, and `UpdateVacanciesJob`
+          per chunk of 1000 Availabilities.
+        - `schedule_type` switched to `date` — Availability `from`/`to`
+          windows are collapsed to full-day spans and any
+          `resourceables` rows for the related ProductOptions are deleted
+          (DATE products are inherently resource-less).
+        - `capacity` changed (only when the `ProductLevelCapacity` feature
+          flag is on) — cascades to all options, then to all future
+          Availabilities, and re-runs the inventory derivation jobs.
+          Deferred via `defer()` so the response returns before the heavy
+          fan-out runs.
+
+        Finally, `Product::updateCanBeSold()` re-derives the canonical
+        `can_be_sold` column, matching the UI flow.
       tags: [Products]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -2579,31 +2634,47 @@ components:
     Product:
       type: object
       description: |
-        Mirrors `ProductResource::toArray()`. Translatable `title` /
-        `description` are returned in English (`toArrayWithTranslations('en')`).
-        `status` is derived from the `is_active` column (`is_active` is also
-        surfaced directly for clients that prefer the canonical boolean).
+        Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+        (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+        `exclusions`) are returned in English via
+        `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+        (`is_active` is also surfaced directly for clients that prefer the
+        canonical boolean).
       properties:
         id: { type: string }
-        product_code: { type: string, nullable: true, description: "Tenant-supplied SKU; not auto-generated." }
+        product_code: { type: string, nullable: true, description: "Tenant-supplied SKU. Auto-generated when `CreateProductRequest` omits it." }
         title: { type: string, nullable: true }
         description: { type: string, nullable: true }
+        instructions: { type: string, nullable: true, description: "Translatable rich-text shown to confirmed customers." }
+        requirements: { type: string, nullable: true, description: "Translatable rich-text — what the customer needs to bring / know." }
+        inclusions: { type: string, nullable: true, description: "Translatable rich-text — what's included." }
+        exclusions: { type: string, nullable: true, description: "Translatable rich-text — what's not included." }
         status:
           type: string
           enum: [draft, published]
-          description: "Derived from `is_active` (`true` → published, `false` → draft). Spec previously listed an `archived` value that the implementation never returns."
+          description: "Derived from `is_active` (`true` → published, `false` → draft)."
         is_active: { type: boolean, description: "Canonical boolean from the `is_active` column." }
+        is_private: { type: boolean, nullable: true, description: "`true` = private (a single party books the whole experience); `false` = shared (multiple parties share the slot)." }
+        is_priced_per_person: { type: boolean, nullable: true, description: "`true` = price applies per traveler; `false` = price applies per group/booking." }
+        is_tier_priced: { type: boolean, nullable: true, description: "Whether pricing tiers (qty-based pricing) apply." }
+        use_alternate_tier_pricing: { type: boolean, nullable: true, description: "Alternate tier-pricing rendering / calculation." }
+        show_last_tier: { type: boolean, nullable: true, description: "Whether the last tier is displayed in customer-facing pricing." }
+        displayable: { type: boolean, nullable: true, description: "Whether the product is shown in widgets / catalog." }
+        must_validate_cancellation_policy: { type: boolean, nullable: true, description: "Customer must explicitly accept the cancellation policy at checkout." }
         schedule_type:
           type: string
           nullable: true
           enum: [date, datetime]
-          description: "`date` = customer picks a date only; `datetime` = customer picks a date and a starting time. Backed by `Bmbltd\\LaravelBookings\\Enums\\ScheduleType`."
+          description: "`date` = customer picks a date only; `datetime` = customer picks a date and a starting time."
         from_price:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
+        from_price_label: { type: string, nullable: true, description: "Caption shown next to `from_price` (e.g., `From €50/person`)." }
         currency: { type: string, nullable: true }
         capacity: { type: integer, nullable: true }
-        cancellation_policy: { type: string, nullable: true }
+        cancellation_policy: { type: string, nullable: true, description: "Inline policy text. Mutually exclusive with `cancellation_policy_link` in the UI." }
+        cancellation_policy_link: { type: string, format: uri, nullable: true, description: "External URL with the policy. Mutually exclusive with `cancellation_policy` in the UI." }
+        locale: { type: string, nullable: true, description: "Default content locale for this product." }
         timezone: { type: string, nullable: true }
         category_ids:
           type: array
@@ -2627,7 +2698,6 @@ components:
         id: { type: string }
         product_id: { type: string }
         title: { type: string, nullable: true, description: "Sourced from the `name` column (no translatable layer)." }
-        duration_minutes: { type: integer, nullable: true }
         capacity: { type: integer, nullable: true }
         min_age: { type: integer, nullable: true }
         max_age: { type: integer, nullable: true }
@@ -3326,9 +3396,10 @@ components:
     Location:
       type: object
       description: |
-        Mirrors `LocationResource::toArray()`. The `locations` table type enum
-        is `PRIMARY|START|END|VISITED` (no `MEETING`/`SECONDARY` columns —
-        the latter exists only as a `Location::TYPE_SECONDARY` constant).
+        Mirrors `LocationResource::toArray()`. The `locations.type` column is
+        a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
+        `MEETING` — earlier spec drafts listed it but it was never a valid
+        value; the column write would silently coerce to NULL).
         `address` is a derived accessor (`getAddressAttribute()` composing
         `street_address` + city + country). `timezone` and `notes` have no
         underlying columns and read as null today.
@@ -3395,10 +3466,20 @@ components:
       type: object
       required: [title, currency]
       description: |
-        Mirrors `CreateProductRequest::rules()`.
+        Mirrors `CreateProductRequest::rules()`. `product_code` is optional —
+        when omitted, the server auto-generates one from the title slug plus
+        a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). Translatable rich-text
+        fields (`description`, `instructions`, `requirements`, `inclusions`,
+        `exclusions`) accept bare strings; the server wraps them into the
+        `{"en": "..."}` HasTranslations bag.
       properties:
         title: { type: string, maxLength: 200 }
+        product_code: { type: string, maxLength: 50, nullable: true, description: "Tenant-supplied SKU. Auto-generated from title when omitted." }
         description: { type: string, nullable: true }
+        instructions: { type: string, nullable: true, description: "Rich text shown to confirmed customers. Translatable." }
+        requirements: { type: string, nullable: true, description: "Rich text — what the customer needs. Translatable." }
+        inclusions: { type: string, nullable: true, description: "Rich text — what's included. Translatable." }
+        exclusions: { type: string, nullable: true, description: "Rich text — what's not included. Translatable." }
         status:
           type: string
           enum: [draft, published]
@@ -3408,10 +3489,20 @@ components:
           type: string
           enum: [date, datetime]
           description: "`date` for date-only products; `datetime` for products with a starting time."
+        is_private: { type: boolean, default: false, description: "`true` = a single party books the whole experience (private); `false` = multiple parties share the slot (shared). When `false`, `is_priced_per_person` is forced to `true` and `use_alternate_tier_pricing` to `false` regardless of what the caller supplied." }
+        is_priced_per_person: { type: boolean, default: true, description: "`true` = price applies per traveler; `false` = price applies per group/booking. Implicitly forced to `true` when `is_private=false`." }
+        is_tier_priced: { type: boolean, default: false, description: "Whether quantity-based pricing tiers apply." }
+        use_alternate_tier_pricing: { type: boolean, default: false, description: "Alternate tier-pricing rendering / calculation. Implicitly forced to `false` when `is_private=false`." }
+        show_last_tier: { type: boolean, default: false, description: "Whether the last tier is displayed in customer-facing pricing." }
+        displayable: { type: boolean, default: true, description: "Whether the product is shown in widgets / catalog." }
+        must_validate_cancellation_policy: { type: boolean, default: false, description: "Customer must explicitly accept the cancellation policy at checkout. When `false`, both `cancellation_policy` and `cancellation_policy_link` are nulled regardless of what the caller supplied — set `true` to retain a policy." }
         from_price: { type: integer, minimum: 0, nullable: true, description: "Minor units." }
+        from_price_label: { type: string, maxLength: 255, nullable: true, description: "Caption shown next to `from_price` (e.g., `From €50/person`)." }
         currency: { type: string, minLength: 3, maxLength: 3 }
         capacity: { type: integer, minimum: 0, nullable: true }
-        cancellation_policy: { type: string, nullable: true }
+        cancellation_policy: { type: string, nullable: true, description: "Inline policy text. Mutually exclusive with `cancellation_policy_link`." }
+        cancellation_policy_link: { type: string, format: uri, maxLength: 500, nullable: true, description: "External URL with the policy. Mutually exclusive with `cancellation_policy`." }
+        locale: { type: string, maxLength: 10, nullable: true, description: "Default content locale for this product (e.g., `en`)." }
         category_ids:
           type: array
           items: { type: integer }
@@ -3421,10 +3512,17 @@ components:
     UpdateProductRequest:
       type: object
       description: |
-        Mirrors `UpdateProductRequest::rules()`.
+        Mirrors `UpdateProductRequest::rules()`. Same field semantics as
+        `CreateProductRequest`. Every field is optional — only supplied
+        keys are updated.
       properties:
         title: { type: string, maxLength: 200 }
+        product_code: { type: string, maxLength: 50 }
         description: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        requirements: { type: string, nullable: true }
+        inclusions: { type: string, nullable: true }
+        exclusions: { type: string, nullable: true }
         status:
           type: string
           enum: [draft, published]
@@ -3432,9 +3530,19 @@ components:
           type: string
           enum: [date, datetime]
           description: "`date` for date-only products; `datetime` for products with a starting time."
+        is_private: { type: boolean, description: "Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and seven inventory recompute jobs are dispatched. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description." }
+        is_priced_per_person: { type: boolean }
+        is_tier_priced: { type: boolean }
+        use_alternate_tier_pricing: { type: boolean }
+        show_last_tier: { type: boolean }
+        displayable: { type: boolean }
+        must_validate_cancellation_policy: { type: boolean }
         from_price: { type: integer, minimum: 0, nullable: true }
+        from_price_label: { type: string, maxLength: 255, nullable: true }
         capacity: { type: integer, minimum: 0, nullable: true }
         cancellation_policy: { type: string, nullable: true }
+        cancellation_policy_link: { type: string, format: uri, maxLength: 500, nullable: true }
+        locale: { type: string, maxLength: 10, nullable: true }
         category_ids:
           type: array
           items: { type: integer }
@@ -3446,12 +3554,14 @@ components:
       required: [product_id, title]
       description: |
         Mirrors `CreateProductOptionRequest::rules()`. `title` is mapped onto
-        the `name` column by the controller. ProductOption has no description
-        or published/draft flag of its own — those live on the parent Product.
+        the `name` column by the controller. `option_code` is optional —
+        when omitted, the server auto-generates one from the title slug plus
+        a random suffix. ProductOption has no description or published/draft
+        flag of its own — those live on the parent Product.
       properties:
         product_id: { type: string }
         title: { type: string, maxLength: 200, description: "Persisted as the `name` column." }
-        duration_minutes: { type: integer, minimum: 0, nullable: true }
+        option_code: { type: string, maxLength: 50, nullable: true, description: "Tenant-supplied SKU. Auto-generated from title when omitted." }
         capacity: { type: integer, minimum: 0, nullable: true }
         min_age: { type: integer, minimum: 0, nullable: true }
         max_age: { type: integer, minimum: 0, nullable: true }
@@ -3464,7 +3574,7 @@ components:
         `CreateProductOptionRequest` (title → name).
       properties:
         title: { type: string, maxLength: 200 }
-        duration_minutes: { type: integer, minimum: 0, nullable: true }
+        option_code: { type: string, maxLength: 50 }
         capacity: { type: integer, minimum: 0, nullable: true }
         min_age: { type: integer, minimum: 0, nullable: true }
         max_age: { type: integer, minimum: 0, nullable: true }
@@ -3661,7 +3771,6 @@ components:
         type:
           type: string
           enum: [PRIMARY, START, END, VISITED, SECONDARY]
-          description: "Same vocabulary as create."
         name: { type: string, maxLength: 200 }
         address: { type: string, description: "Persisted as `street_address` when supplied." }
         latitude: { type: number, format: float, nullable: true }
