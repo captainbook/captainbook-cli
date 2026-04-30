@@ -13,7 +13,8 @@ import (
 // delete.
 //
 // Locations are start / end / meeting points referenced by products. Type
-// enum (START|END|MEETING) lives on both list filter and create/update body.
+// enum (PRIMARY|START|END|VISITED|SECONDARY) lives on both list filter and
+// create/update body.
 //
 // Per spec: deleteLocation has NO dry-run (Params carries only IdempotencyKey,
 // no body). Returns 409 if the location is still referenced by published
@@ -26,7 +27,7 @@ func locationsDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int", Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
-				{Name: "type", Type: "string", Description: "START|END|MEETING"},
+				{Name: "type", Type: "string", Description: "PRIMARY|START|END|VISITED|SECONDARY"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -79,7 +80,7 @@ func locationsDefs() []CommandDef {
 				"never exposes Eloquent FQCNs. --address is used as street_address when " +
 				"--street-address isn't supplied.",
 			Flags: []FlagDef{
-				{Name: "type", Type: "string", Required: true, Description: "START|END|MEETING|PRIMARY|SECONDARY|VISITED"},
+				{Name: "type", Type: "string", Required: true, Description: "PRIMARY|START|END|VISITED|SECONDARY"},
 				{Name: "name", Type: "string", Required: true, Description: "Location name"},
 				{Name: "address", Type: "string", Required: true, Description: "Postal address (used as street_address fallback)"},
 				{Name: "attach-to", Type: "string", Required: true, Description: "product|organisation|partner"},
@@ -128,10 +129,8 @@ func locationsDefs() []CommandDef {
 			Use: "locations update <id>", Short: "Update a location", Kind: KindMutation,
 			Verb: "PATCH", Path: "/locations/{id}", Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
-			Long: "Update enum is narrower than create — only START|END|MEETING are allowed " +
-				"per UpdateLocationRequest::rules() in the spec.",
 			Flags: []FlagDef{
-				{Name: "type", Type: "string", Description: "START|END|MEETING"},
+				{Name: "type", Type: "string", Description: "PRIMARY|START|END|VISITED|SECONDARY"},
 				{Name: "name", Type: "string", Description: "Location name"},
 				{Name: "address", Type: "string", Description: "Postal address (persisted as street_address)"},
 				{Name: "latitude", Type: "float", Description: "Latitude (decimal)"},

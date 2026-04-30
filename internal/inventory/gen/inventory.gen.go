@@ -166,7 +166,6 @@ func (e CreateLocationRequestAttachTo) Valid() bool {
 // Defines values for CreateLocationRequestType.
 const (
 	CreateLocationRequestTypeEND       CreateLocationRequestType = "END"
-	CreateLocationRequestTypeMEETING   CreateLocationRequestType = "MEETING"
 	CreateLocationRequestTypePRIMARY   CreateLocationRequestType = "PRIMARY"
 	CreateLocationRequestTypeSECONDARY CreateLocationRequestType = "SECONDARY"
 	CreateLocationRequestTypeSTART     CreateLocationRequestType = "START"
@@ -177,8 +176,6 @@ const (
 func (e CreateLocationRequestType) Valid() bool {
 	switch e {
 	case CreateLocationRequestTypeEND:
-		return true
-	case CreateLocationRequestTypeMEETING:
 		return true
 	case CreateLocationRequestTypePRIMARY:
 		return true
@@ -288,10 +285,11 @@ func (e GiftCertificateStatus) Valid() bool {
 
 // Defines values for LocationType.
 const (
-	LocationTypeEND     LocationType = "END"
-	LocationTypePRIMARY LocationType = "PRIMARY"
-	LocationTypeSTART   LocationType = "START"
-	LocationTypeVISITED LocationType = "VISITED"
+	LocationTypeEND       LocationType = "END"
+	LocationTypePRIMARY   LocationType = "PRIMARY"
+	LocationTypeSECONDARY LocationType = "SECONDARY"
+	LocationTypeSTART     LocationType = "START"
+	LocationTypeVISITED   LocationType = "VISITED"
 )
 
 // Valid indicates whether the value is a known member of the LocationType enum.
@@ -300,6 +298,8 @@ func (e LocationType) Valid() bool {
 	case LocationTypeEND:
 		return true
 	case LocationTypePRIMARY:
+		return true
+	case LocationTypeSECONDARY:
 		return true
 	case LocationTypeSTART:
 		return true
@@ -531,9 +531,11 @@ func (e UpdateAvailabilityRequestStatus) Valid() bool {
 
 // Defines values for UpdateLocationRequestType.
 const (
-	UpdateLocationRequestTypeEND     UpdateLocationRequestType = "END"
-	UpdateLocationRequestTypeMEETING UpdateLocationRequestType = "MEETING"
-	UpdateLocationRequestTypeSTART   UpdateLocationRequestType = "START"
+	UpdateLocationRequestTypeEND       UpdateLocationRequestType = "END"
+	UpdateLocationRequestTypePRIMARY   UpdateLocationRequestType = "PRIMARY"
+	UpdateLocationRequestTypeSECONDARY UpdateLocationRequestType = "SECONDARY"
+	UpdateLocationRequestTypeSTART     UpdateLocationRequestType = "START"
+	UpdateLocationRequestTypeVISITED   UpdateLocationRequestType = "VISITED"
 )
 
 // Valid indicates whether the value is a known member of the UpdateLocationRequestType enum.
@@ -541,9 +543,13 @@ func (e UpdateLocationRequestType) Valid() bool {
 	switch e {
 	case UpdateLocationRequestTypeEND:
 		return true
-	case UpdateLocationRequestTypeMEETING:
+	case UpdateLocationRequestTypePRIMARY:
+		return true
+	case UpdateLocationRequestTypeSECONDARY:
 		return true
 	case UpdateLocationRequestTypeSTART:
+		return true
+	case UpdateLocationRequestTypeVISITED:
 		return true
 	default:
 		return false
@@ -687,9 +693,11 @@ func (e ListIssuedGiftCertsParamsStatus) Valid() bool {
 
 // Defines values for ListLocationsParamsType.
 const (
-	ListLocationsParamsTypeEND     ListLocationsParamsType = "END"
-	ListLocationsParamsTypeMEETING ListLocationsParamsType = "MEETING"
-	ListLocationsParamsTypeSTART   ListLocationsParamsType = "START"
+	ListLocationsParamsTypeEND       ListLocationsParamsType = "END"
+	ListLocationsParamsTypePRIMARY   ListLocationsParamsType = "PRIMARY"
+	ListLocationsParamsTypeSECONDARY ListLocationsParamsType = "SECONDARY"
+	ListLocationsParamsTypeSTART     ListLocationsParamsType = "START"
+	ListLocationsParamsTypeVISITED   ListLocationsParamsType = "VISITED"
 )
 
 // Valid indicates whether the value is a known member of the ListLocationsParamsType enum.
@@ -697,9 +705,13 @@ func (e ListLocationsParamsType) Valid() bool {
 	switch e {
 	case ListLocationsParamsTypeEND:
 		return true
-	case ListLocationsParamsTypeMEETING:
+	case ListLocationsParamsTypePRIMARY:
+		return true
+	case ListLocationsParamsTypeSECONDARY:
 		return true
 	case ListLocationsParamsTypeSTART:
+		return true
+	case ListLocationsParamsTypeVISITED:
 		return true
 	default:
 		return false
@@ -1899,11 +1911,11 @@ type UpdateLocationRequest struct {
 	// Timezone Accepted but not stored.
 	Timezone *string `json:"timezone,omitempty"`
 
-	// Type Update enum is narrower than create — see `UpdateLocationRequest::rules()`.
+	// Type Same vocabulary as create.
 	Type *UpdateLocationRequestType `json:"type,omitempty"`
 }
 
-// UpdateLocationRequestType Update enum is narrower than create — see `UpdateLocationRequest::rules()`.
+// UpdateLocationRequestType Same vocabulary as create.
 type UpdateLocationRequestType string
 
 // UpdatePricingTierRequest Mirrors `UpdatePricingTierRequest::rules()`. `pricing_category_id`,

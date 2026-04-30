@@ -1831,7 +1831,7 @@ paths:
         - $ref: "#/components/parameters/Since"
         - name: type
           in: query
-          schema: { type: string, enum: [START, END, MEETING] }
+          schema: { type: string, enum: [PRIMARY, START, END, VISITED, SECONDARY] }
       responses:
         "200":
           description: Page of locations
@@ -3337,7 +3337,7 @@ components:
         type:
           type: string
           nullable: true
-          enum: [PRIMARY, START, END, VISITED]
+          enum: [PRIMARY, START, END, VISITED, SECONDARY]
         name: { type: string, nullable: true }
         address: { type: string, nullable: true, description: "Derived from `street_address` (+ optional city/country)." }
         latitude: { type: number, format: float, nullable: true }
@@ -3630,7 +3630,7 @@ components:
       properties:
         type:
           type: string
-          enum: [START, END, MEETING, PRIMARY, SECONDARY, VISITED]
+          enum: [PRIMARY, START, END, VISITED, SECONDARY]
         name: { type: string, maxLength: 200 }
         address: { type: string, description: "Used as `street_address` when `street_address` is not explicitly supplied." }
         street_address: { type: string, description: "Preferred; persisted directly." }
@@ -3660,8 +3660,8 @@ components:
       properties:
         type:
           type: string
-          enum: [START, END, MEETING]
-          description: "Update enum is narrower than create — see `UpdateLocationRequest::rules()`."
+          enum: [PRIMARY, START, END, VISITED, SECONDARY]
+          description: "Same vocabulary as create."
         name: { type: string, maxLength: 200 }
         address: { type: string, description: "Persisted as `street_address` when supplied." }
         latitude: { type: number, format: float, nullable: true }
