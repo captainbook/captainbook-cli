@@ -137,7 +137,7 @@ func availabilitiesDefs() []CommandDef {
 			},
 		},
 		{
-			Use: "availabilities create-rule", Short: "Generate availabilities from a recurrence rule",
+			Use: "create-rule", Short: "Generate availabilities from a recurrence rule",
 			Kind: KindMutation, Verb: "POST", Path: "/availability-rules",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			Long: "One-shot generator: takes a weekday-based recurrence rule and dispatches " +
