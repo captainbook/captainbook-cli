@@ -1,14 +1,15 @@
 # Availabilities
 
-An `Availability` is the per-date instance of a `ProductOption`: capacity for a given date, current bookable status, start/end times, and the active pricing tier set. Read endpoints answer "what's bookable on May 5?". The single PATCH endpoint edits one row. The async **bulk-update** endpoint operates on every row matching `(product_option_id, from, to)` and is split into five subcommands by setting.
+An `Availability` is the per-date instance of a `ProductOption`: capacity for a given date, current bookable status, start/end times, and the active pricing tier set. Read endpoints answer "what's bookable on May 5?". The PATCH endpoint edits one row. The **bulk-update** endpoint async-edits every row matching `(product_option_id, from, to)` and is split into five subcommands by setting. The **create-rule** endpoint generates Availability rows from a recurrence pattern (the same job the dashboard's recurrence picker dispatches).
 
 ## Endpoints
 
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory availabilities list` | GET /availabilities | `cli:read` | n/a |
-| `inventory availabilities show <id>` | GET /availabilities/{id} | `cli:read` | n/a |
+| `inventory availabilities get <id>` | GET /availabilities/{id} | `cli:read` | n/a |
 | `inventory availabilities update <id>` | PATCH /availabilities/{id} | `cli:write` | body |
+| `inventory availabilities create-rule` | POST /availability-rules | `cli:write` | body |
 | `inventory availabilities bulk-update capacity` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update booking-status` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update pricing` | POST /availabilities/bulk-update | `cli:write` | body |
@@ -51,7 +52,7 @@ Intent: weather-driven seasonal capacity bump for `po_88`.
 ceebee inventory availabilities bulk-update capacity \
   --product-option-id po_88 \
   --from 2026-05-01 --to 2026-06-01 \
-  --value 18 --operator SET
+  --value 18 --operator set_to
 ```
 
 Returns `202 Accepted`. Stdout has the JSON envelope (with `bulk_update_id`, `total_matched`, `status: queued`); stderr has the grep-able signal:
@@ -60,7 +61,7 @@ Returns `202 Accepted`. Stdout has the JSON envelope (with `bulk_update_id`, `to
 BULK_UPDATE_ACCEPTED bulk_update_id=018f5e2d-9a14-7c12-bb03-77a8c7c2e5ab
 ```
 
-`--operator` accepts `SET`, `INCREASE_BY`, `DECREASE_BY`. Exit code 0 means *queued*, not *applied*.
+`--operator` accepts `set_to`, `increase_by`, `decrease_by` (lowercase per server enum). Exit code 0 means *queued*, not *applied*.
 
 ### 4. Bulk-update booking status (close the calendar)
 
@@ -102,6 +103,31 @@ ceebee inventory availabilities bulk-update start-time \
 ```
 
 `start-time` and `end-time` subcommands take both fields plus optional `--day-count` for multi-day tours.
+
+### 7. Generate Availabilities from a recurrence (NEW)
+
+Intent: every Saturday 2pm–6pm and every Wednesday 8am–6pm, May–August, on product option 47.
+
+```bash
+# Saturdays
+ceebee inventory availabilities create-rule \
+  --product-option-id 47 \
+  --start-date 2026-05-01 --end-date 2026-08-31 \
+  --weekdays 6 --start-time 14:00 --end-time 18:00 \
+  --dry-run                                # preview first
+
+# Wednesdays
+ceebee inventory availabilities create-rule \
+  --product-option-id 47 \
+  --start-date 2026-05-01 --end-date 2026-08-31 \
+  --weekdays 3 --start-time 08:00 --end-time 18:00
+```
+
+`--weekdays` uses PHP's `format('w')` convention: **Sunday=0 … Saturday=6**. Pass multiple weekdays as a comma-separated list (`--weekdays 3,6`). The rule itself is NOT stored — it's a one-shot generator that fans out via `CreateBatchAvailabilityJob`. Once dispatched, materialized rows are queryable via `availabilities list`.
+
+**Dry-run** returns 200 + `total_matched` + `status: preview`. **Real** returns 202 + `status: queued` + `bulk_update_id`. **No-op** (zero weekday matches in the date range): 200 + `status: no_op` (nothing dispatched).
+
+For `date`-type products, `--start-time`/`--end-time` are ignored (slots span full days). For `datetime` products both are required. `--add-days-count` extends the `to` timestamp for multi-day events.
 
 ## Pitfalls
 

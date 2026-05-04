@@ -7,7 +7,7 @@ Products are the top of the inventory hierarchy: a Product is "a thing the tenan
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory products list` | GET /products | `cli:read` | n/a |
-| `inventory products show <id>` | GET /products/{id} | `cli:read` | n/a |
+| `inventory products get <id>` | GET /products/{id} | `cli:read` | n/a |
 | `inventory products create` | POST /products | `cli:write` | body |
 | `inventory products update <id>` | PATCH /products/{id} | `cli:write` | body |
 | `inventory products delete <id>` | DELETE /products/{id} | `cli:write` | none |
@@ -17,76 +17,101 @@ Products are the top of the inventory hierarchy: a Product is "a thing the tenan
 
 ### 1. List published products in a category
 
-Intent: find every active product tagged `kayaking`.
-
 ```bash
-ceebee inventory products list --status published --category kayaking --limit 100
+ceebee inventory products list --category 18 --include-trashed=false --limit 100
 ```
 
-Returns a table of `{id, title, status, schedule_type, from_price, currency, updated_at}`. Cursor-paginate with `--cursor "<pagination.cursor_next>"`.
+Returns `{id, title, status, schedule_type, from_price, currency, is_private, ...}`. Cursor-paginate with `--cursor "<pagination.cursor_next>"`. Note: `--status` query filter is no longer in spec — published-vs-draft is exposed via `is_active` on the read response.
 
 ### 2. Show one product, machine-readable
 
-Intent: feed the product detail into a downstream script.
-
 ```bash
-ceebee inventory products show prod_42 --format json
+ceebee inventory products get 42 --format json
 ```
 
-The envelope has `meta`, `data` (the full Product). Includes timezone, cancellation policy, currency.
+The envelope has `meta`, `data` (the full Product). Includes timezone, cancellation policy, currency, all the new bool toggles, and rich-text fields.
 
-### 3. Create a draft product (preview first)
-
-Intent: stage a new "Sunset Snorkeling" tour as a draft, but verify the payload before committing.
+### 3. Create a SHARED experience (default — multiple parties per slot)
 
 ```bash
 ceebee inventory products create \
   --title "Sunset Snorkeling" \
-  --currency EUR \
-  --from-price 7500 \
+  --currency EUR --timezone "Europe/Athens" \
+  --schedule-type datetime --status published \
+  --is-private=false --is-priced-per-person \
+  --from-price 7500 --from-price-label "From €75 per person" \
   --capacity 12 \
-  --schedule-type FIXED \
-  --status draft \
+  --description "<p>Group snorkel tour with sunset views.</p>" \
+  --inclusions "<p>Mask, fins, guide.</p>" \
+  --must-validate-cancellation-policy \
+  --cancellation-policy "Free cancellation up to 24h before."
+```
+
+When `--is-private=false`, the server forces `is_priced_per_person=true` and `use_alternate_tier_pricing=false` regardless of what you sent — that's the rule for shared experiences.
+
+### 4. Create a PRIVATE experience (one party books the whole slot)
+
+```bash
+ceebee inventory products create \
+  --title "Private Sunset Sail" \
+  --currency EUR --timezone "Europe/Athens" \
+  --schedule-type datetime --status published \
+  --is-private --capacity 8 \
+  --from-price 35000 --from-price-label "From €350 per group" \
+  --description "<p>Charter the boat for your party.</p>" \
+  --must-validate-cancellation-policy \
+  --cancellation-policy-link "https://your-policy.example.com"
+```
+
+Use `--cancellation-policy-link` for an external policy URL (mutually exclusive with `--cancellation-policy`).
+
+### 5. Update title + price together
+
+```bash
+ceebee inventory products update 42 \
+  --title "Sunset Snorkeling — Premium" \
+  --from-price 9500 \
+  --is-private \
   --dry-run
 ```
 
-`--from-price 7500` = €75.00. Dry-run prints a colored diff (no row created); idempotency row is NOT consumed. Drop `--dry-run` to commit.
+Switching `--is-private` cascades 7 inventory recompute jobs per 1000 availabilities — under `--dry-run` those appear in `MutationResult.side_effects` so an agent can preview the blast radius before committing.
 
-### 4. Update title + price together
-
-Intent: rebrand and reprice an existing product in one atomic call.
+### 6. Soft-delete then restore
 
 ```bash
-ceebee inventory products update prod_42 \
-  --title "Sunset Snorkeling — Premium" \
-  --from-price 9500
+ceebee inventory products delete 42       # 204; deleted_at set
+ceebee inventory products list --include-trashed   # find it again
+ceebee inventory products restore 42       # 200; deleted_at cleared
 ```
 
-Default `--format json` returns `{ "data": { "diff": {...}, "would_apply": false } }`-shaped result with the applied changes. Add `--dry-run` to preview without committing.
+Delete does NOT support `--dry-run` server-side.
 
-### 5. Soft-delete then restore
+### 7. Schedule type semantics
 
-Intent: pull a product offline temporarily.
-
-```bash
-ceebee inventory products delete prod_42       # 204; deleted_at set
-ceebee inventory products list --include-trashed   # to find it again
-ceebee inventory products restore prod_42       # 200; deleted_at cleared
-```
-
-Delete does NOT support `--dry-run` server-side. Use `--include-trashed` on `list` to surface soft-deleted rows.
+`--schedule-type date` means customer picks a date only (whole-day slots). `--schedule-type datetime` means customer picks a date and a starting time. Switching from `datetime` to `date` cascades: existing Availability `from`/`to` windows collapse to full-day spans, and `resourceables` rows for the option are deleted (date products don't bind resources).
 
 ## Pitfalls
 
 - ⚠️ **Cascade on delete:** `Product::$cascadeDeletes = ['options']` — soft-deleting a Product cascades to its `ProductOption`s, and each option in turn cascades to its `virtualProductOption` and `discount`. **`PricingTier`s and `Availability` rows are NOT cascaded** — clean those up separately or restore later may leave orphans visible.
-- ⚠️ **`delete` has no server dry-run.** The CLI rejects `--dry-run` on `products delete` at parse time. To preview cascade impact, fetch the option count first: `ceebee inventory product-options list --product-id prod_42 --format json | jq '.data | length'`.
-- ⚠️ **Translatable fields are English-only on read.** `title` and `description` are Spatie-translatable on the server, but the CLI returns the English translation only. Multi-language editing is not in V1.
-- ⚠️ **`from_price` is a denormalized hint**, not the price applied at booking. Real prices live on `PricingTier`s attached to `Availability`s. Updating `from_price` does not re-price existing availabilities.
+- ⚠️ **`delete` has no server dry-run.** The CLI rejects `--dry-run` on `products delete` at parse time. To preview cascade impact, fetch the option count first: `ceebee inventory product-options list --product-id 42 --format json | jq '.data | length'`.
+- ⚠️ **Implicit-override traps:**
+  - `--must-validate-cancellation-policy=false` (default) silently nulls **both** `--cancellation-policy` AND `--cancellation-policy-link`. Set the flag to `true` to retain a policy.
+  - `--is-private=false` forces `is_priced_per_person=true` and `use_alternate_tier_pricing=false`, regardless of what you sent.
+- ⚠️ **`--inclusions` / `--exclusions`:** spec says "rich text" but the dashboard treats these as plain bullet lists. HTML you send round-trips on read but renders literally to customers. Send plain text until the spec gets clarified.
+- ⚠️ **`--product-code` auto-generated** from the title slug + random suffix when omitted (e.g. `SUNSET-SNORKELING-AB12CD`). Pass explicitly to control the SKU.
+- ⚠️ **`--category-ids` is integer**, not string. The flag is `intSlice`. Comma-separate: `--category-ids "18,87,7"`.
+- ⚠️ **Known server bug:** `--category-ids` on POST/PATCH may return 404 even when categories exist. Workaround: create the product without categories then PATCH `--category-ids` afterwards (still 404 today; tracked).
+- ⚠️ **Translatable fields are English-only on read.** `title`, `description`, `instructions`, `requirements`, `inclusions`, `exclusions` are translatable on the server, but the CLI returns the English translation only. Multi-language editing is not in V1.
+- ⚠️ **`from_price` is a denormalized hint**, not the price applied at booking. Real prices live on `PricingTier`s under `PricingCategory`s. Updating `from_price` does not re-price existing availabilities.
 
 ## See also
 
 - [product-options.md](product-options.md) — variants under a Product.
-- [pricing-tiers.md](pricing-tiers.md) — fares attached to options/availabilities.
-- [availabilities.md](availabilities.md) — per-date capacity rendered from a product option.
+- [pricing-categories.md](pricing-categories.md) — Adult / Child / Senior buckets (parent of tiers).
+- [pricing-tiers.md](pricing-tiers.md) — fares per headcount band.
+- [availabilities.md](availabilities.md) — per-date capacity + `create-rule` recurrence generator.
+- [resources.md](resources.md) — physical inventory (boats, guides) bound to a product option.
+- [locations.md](locations.md) — start / end / waypoints attached to a product.
 - [media.md](media.md) — product images and PDFs.
-- [categories.md](categories.md) — `category_ids[]` on create/update.
+- [categories.md](categories.md) — read-only catalog tags.

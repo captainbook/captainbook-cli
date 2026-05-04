@@ -16,9 +16,9 @@ Two distinct resources live under `gift-certificates`:
 | `inventory gift-certificates delete-available <id>` | DELETE /gift-certs/available/{id} | `cli:write` | none |
 | `inventory gift-certificates list-issued` | GET /gift-certs/issued | `cli:read` | n/a |
 | `inventory gift-certificates get-issued <id>` | GET /gift-certs/issued/{id} | `cli:read` | n/a |
-| `inventory gift-certificates issue` | POST /gift-certs/issue | `cli:write` | body |
-| `inventory gift-certificates void <id>` | POST /gift-certs/{id}/void | `cli:write` | body |
-| `inventory gift-certificates resend <id>` | POST /gift-certs/{id}/resend | `cli:write` | body |
+| `inventory gift-certificates issue` | POST /gift-certs/issued | `cli:write` | body |
+| `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:write` | body |
+| `inventory gift-certificates resend <id>` | POST /gift-certs/issued/{id}/resend | `cli:write` | body |
 
 ## Worked examples
 

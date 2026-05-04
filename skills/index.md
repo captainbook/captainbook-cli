@@ -227,19 +227,22 @@ When the dry-run column says **none**, sending `--dry-run` from the CLI errors l
 ## Resource directory
 
 - [auth.md](auth.md) — `whoami`, token / ability probing.
-- [products.md](products.md) — Products CRUD + restore.
-- [product-options.md](product-options.md) — Product Options CRUD + restore.
-- [availabilities.md](availabilities.md) — Per-date capacity + the 5 bulk-update subcommands.
-- [pricing-tiers.md](pricing-tiers.md) — Pricing tiers (data-loss-adjacent delete).
+- [products.md](products.md) — Products CRUD + restore. Private vs shared, rich text, cancellation policy.
+- [product-options.md](product-options.md) — Product Options CRUD + restore. Auto-generated option codes.
+- [availabilities.md](availabilities.md) — Per-date capacity + 5 bulk-update subcommands + recurrence rule generator (`create-rule`).
+- [pricing-categories.md](pricing-categories.md) — Adult/Child/Senior buckets (parent of tiers). REQUIRED before creating tiers.
+- [pricing-tiers.md](pricing-tiers.md) — Pricing tiers under a category (data-loss-adjacent delete).
+- [resources.md](resources.md) — Physical inventory (boats, guides, equipment) bound to a product option via attach/detach.
+- [locations.md](locations.md) — Start / end / primary / secondary points attached to products.
 - [discounts.md](discounts.md) — Discount catalog, apply, soft-delete-as-cancel.
 - [gift-certificates.md](gift-certificates.md) — Sellable SKUs + issued instances.
-- [bookings.md](bookings.md) — Read, cancel, refund, comp.
+- [bookings.md](bookings.md) — Read, cancel, refund, comp, transactions, resend-confirmation.
 - [transactions.md](transactions.md) — Read-only ledger.
 - [customers.md](customers.md) — Customer catalog.
 - [guests.md](guests.md) — Per-booking guest reads + edits (Greek passport workflow).
 - [extras.md](extras.md) — Add-ons CRUD + restore.
 - [questions.md](questions.md) — Booking questions CRUD + restore.
-- [categories.md](categories.md) — Product categories CRUD.
+- [categories.md](categories.md) — Read-only product category catalog (platform-managed).
 - [media.md](media.md) — Product images + documents.
 - [notifications.md](notifications.md) — Booking confirmation resend.
 

@@ -1,70 +1,59 @@
 # Categories
 
-A `Category` groups Products in the catalog ("Tours", "Classes", "Equipment"). Many-to-many with Products via `category_ids[]` on the Product. CRUD with **hard-delete** (FK-protected).
+A `Category` groups Products in the catalog ("Tours", "Classes", "Equipment"). Many-to-many with Products via `category_ids[]` on the Product.
+
+**Read-only at the tenant level.** Categories are managed centrally by the CaptainBook platform — tenants and the CLI cannot create, update, or delete them. The catalog is curated to keep the public taxonomy consistent across all tenants.
 
 ## Endpoints
 
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory categories list` | GET /categories | `cli:read` | n/a |
-| `inventory categories show <id>` | GET /categories/{id} | `cli:read` | n/a |
-| `inventory categories create` | POST /categories | `cli:write` | body |
-| `inventory categories update <id>` | PATCH /categories/{id} | `cli:write` | body |
-| `inventory categories delete <id>` | DELETE /categories/{id} | `cli:write` | none |
+| `inventory categories get <id>` | GET /categories/{id} | `cli:read` | n/a |
 
 ## Worked examples
 
-### 1. List all categories
+### 1. List the full catalog
 
 ```bash
 ceebee inventory categories list --limit 200
 ```
 
-Returns `{id, name, slug, position, updated_at}`.
+Returns `{id, name, slug, description, position, product_count, created_at}`. `slug`, `description`, and `position` may read as `null` / `0` against today's schema (the `product_categories` table only persists `id` + `name`; the model has accessors for the others but they're stubs).
 
-### 2. Create a new "Workshops" category
-
-```bash
-ceebee inventory categories create \
-  --name "Workshops" \
-  --slug workshops \
-  --position 5 \
-  --dry-run
-```
-
-### 3. Rename a category
+### 2. Find category IDs for a target audience
 
 ```bash
-ceebee inventory categories update cat_42 --name "Tours and Excursions"
+ceebee inventory categories list --format json \
+  | jq -r '.data[] | select(.name | test("walking|culinary|sailing"; "i")) | "\(.id)\t\(.name)"'
 ```
 
-The slug is NOT auto-updated when the name changes — pass `--slug` explicitly if you want the URL to follow.
+Use the integer IDs in `products create --category-ids "18,87,7"` to attach a product to multiple buckets.
 
-### 4. PREVIEW deletion (FK check)
-
-Intent: confirm no products still reference `cat_old`.
+### 3. Inspect one category
 
 ```bash
-ceebee inventory categories delete cat_old 2>&1 | head -5
+ceebee inventory categories get 18 --format json
 ```
 
-If any published product references the category, server returns `409 RESOURCE_IN_USE`. Detach references first via `products update <id> --category-ids …` (the new array, with `cat_old` omitted).
+`product_count` is set only when the `products` relation is eager-loaded by the controller; otherwise null.
 
-### 5. List products attached to a category, before deleting it
+### 4. List products attached to a category
 
 ```bash
-ceebee inventory products list --category workshops --format json | jq '.data[] | {id, title}'
+ceebee inventory products list --category 18 --format json \
+  | jq '.data[] | {id, title, status}'
 ```
 
-Use this output to decide whether to detach or delete one-by-one.
+Useful for "what does this category currently hold?" reviews.
 
 ## Pitfalls
 
-- ⚠️ **HARD delete with FK guard.** No soft-delete for categories. Server returns `409 RESOURCE_IN_USE` (with stable `code` field) if any published Product references the category. Detach references via Product `update --category-ids` first, or accept the 409 as a "not safe to delete" signal.
-- ⚠️ **No server-side dry-run on delete.** CLI rejects `--dry-run`. The 409 itself is the dry-run substitute — the call fails fast and idempotently when not safe.
-- ⚠️ **No restore endpoint.** Once deleted, a category is gone (hard delete). Re-create with `categories create` if needed; existing Products that referenced the deleted category will need their `category_ids[]` re-set.
-- ⚠️ **Renaming the name does not change the slug.** Customer-facing URLs rely on slug — be deliberate about updating both together.
+- ⚠️ **No write operations.** `categories create / update / delete` do not exist. The gen client carries the methods (the spec previously had them) but they're intentionally not bound at the CLI layer. Looking for a way to "add a category" is a wrong-tool sign — escalate to platform.
+- ⚠️ **`category_ids[]` is integer, not string.** When passing to `products create` / `update`, use `--category-ids "18,87,7"` (kebab-case flag, intSlice). The spec previously typed these as strings; the new contract is integers.
+- ⚠️ **`slug` / `description` / `position` may be null.** Their underlying columns don't exist on `product_categories` today — model accessors return null. Don't rely on these fields for filtering or display.
+- ⚠️ **`category_ids` on `products create` may 404.** If passing categories at create time fails with "not found", create the product without categories then PATCH `--category-ids` afterwards (a known server-side resolver bug — see PR #5 server-team list).
 
 ## See also
 
-- [products.md](products.md) — `--category-ids[]` attaches/detaches.
+- [products.md](products.md) — `--category-ids[]` attaches a product to one or more categories.

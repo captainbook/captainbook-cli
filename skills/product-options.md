@@ -35,35 +35,33 @@ ceebee inventory product-options show po_88 --format json
 
 ### 3. Create a new variant with a dry-run preview
 
-Intent: add a "Sunset" variant under `prod_42`.
+Intent: add a "Sunset" variant under product 42.
 
 ```bash
 ceebee inventory product-options create \
-  --product-id prod_42 \
+  --product-id 42 \
   --title "Sunset" \
   --capacity 8 \
-  --status draft \
   --dry-run
 ```
 
-Drop `--dry-run` to commit. Idempotency-key auto-minted, printed to stderr.
+Drop `--dry-run` to commit. Idempotency-key auto-minted, printed to stderr. `--option-code` is auto-generated from the title slug if omitted (e.g. `SUNSET-AB12CD`); pass explicitly to control the SKU.
 
-### 4. Archive an option (without deleting)
-
-Intent: stop selling without losing historical data.
+### 4. Update capacity / age limits
 
 ```bash
-ceebee inventory product-options update po_88 --status archived
+ceebee inventory product-options update 88 \
+  --capacity 12 --min-age 14 --max-age 65
 ```
 
-Archived options stop appearing in customer-facing widgets but stay readable in the CLI and keep their history.
+Note: ProductOption has no `description` or `status` of its own — those live on the parent Product. The `--title` flag is mapped to the underlying `name` column server-side.
 
 ### 5. Soft-delete + restore round-trip
 
 ```bash
-ceebee inventory product-options delete po_88                      # 204
-ceebee inventory product-options list --product-id prod_42 --include-trashed
-ceebee inventory product-options restore po_88                     # 200
+ceebee inventory product-options delete 88                       # 204
+ceebee inventory product-options list --product-id 42 --include-trashed
+ceebee inventory product-options restore 88                      # 200
 ```
 
 ## Pitfalls
