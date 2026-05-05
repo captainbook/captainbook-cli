@@ -1,0 +1,29 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "bk_01H8XYZA",
+      "booking_status": "CONFIRMED",
+      "currency": "EUR",
+      "total_amount": 9000,
+      "paid_amount": 9000,
+      "refunded_amount": 0,
+      "cancelled_at": null,
+      "updated_at": "2026-04-20T12:00:00Z"
+    },
+    "after": {
+      "id": "bk_01H8XYZA",
+      "booking_status": "CANCELLED",
+      "currency": "EUR",
+      "total_amount": 9000,
+      "paid_amount": 9000,
+      "refunded_amount": 9000,
+      "cancelled_at": "2026-04-27T10:00:00Z",
+      "updated_at": "2026-04-27T10:00:00Z"
+    }
+  },
+  "side_effects": [
+    {"type": "stripe", "identifier": "refund:re_3PqXYZ", "payload_summary": "amount: 9000 EUR"},
+    {"type": "mail", "identifier": "BookingCancelledMail", "payload_summary": "to: customer@example.com"}
+  ]
+}

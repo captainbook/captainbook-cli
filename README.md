@@ -7,8 +7,9 @@
 </p>
 
 <p align="center">
-  CLI for the CaptainBook Statistics API.<br>
-  Query revenue, bookings, products, resources, customers, channels, occupancy, extras, discounts, gift certificates, and dashboard summary from the command line.
+  CLI for the CaptainBook API.<br>
+  Read statistics, manage inventory, run customer-success operations.<br>
+  Built for agents (Claude Code &amp; co.) — idempotent, dry-runnable, audited.
 </p>
 
 ## Install
@@ -44,62 +45,59 @@ make build
 ### Environment variables
 
 ```bash
-export CEEBEE_API_URL=https://your-instance.captainbook.io
+export CEEBEE_API_URL=https://your-tenant.captainbook.io
 export CEEBEE_API_TOKEN=your-bearer-token
 ```
 
 ### Config profiles
 
 ```bash
-ceebee config add production --url https://your-instance.captainbook.io --token your-bearer-token
-ceebee config add staging --url https://staging.captainbook.io --token staging-token
+ceebee config add production --url https://your-tenant.captainbook.io --token your-bearer-token
+ceebee config add staging    --url https://staging.captainbook.io     --token staging-token
 ceebee config use production
 ceebee config list
 ```
 
-Profiles are stored at `~/.ceebee/config.yaml` with 0600 permissions.
+Profiles are stored at `~/.ceebee/config.yaml` with `0600` permissions.
 
 **Resolution order:**
 - Explicit `--profile <name>` always wins — env vars are ignored.
-- Without `--profile`, `CEEBEE_API_URL` / `CEEBEE_API_TOKEN` override the default profile (partial overrides are allowed).
+- Without `--profile`, `CEEBEE_API_URL` / `CEEBEE_API_TOKEN` override the default profile (partial overrides allowed).
 
 Run with `--verbose` to see which source was used (`profile:sandbox`, `env`, or `env+profile:sandbox`).
 
-## Usage
+### Token abilities
+
+The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` with a Sanctum bearer token carrying one or more abilities:
+
+- `cli:read` — list / show / get
+- `cli:write` — create / update / delete / restore / attach / detach
+- `cli:cs` — customer-success ops (`bookings refund`, `bookings comp`, `bookings resend-confirmation`)
+
+Inspect what your token has:
 
 ```bash
-# Dashboard overview
-ceebee stats summary
-
-# Revenue for the last 30 days (default)
-ceebee stats revenue
-
-# Bookings for a specific period
-ceebee stats bookings --from 2026-03-01 --to 2026-03-24
-
-# Top 5 products by revenue as a table
-ceebee stats products --sort-by revenue --limit 5 --format table
-
-# Revenue compared to previous period
-ceebee stats revenue --from 2026-03-01 --to 2026-03-24 --compare previous
-
-# Revenue compared to same period last year
-ceebee stats revenue --from 2026-03-01 --to 2026-03-24 --compare year-ago
-
-# CSV export
-ceebee stats bookings --format csv > bookings.csv
-
-# Filter by business unit
-ceebee stats revenue --business-unit-id 42
-
-# Use a specific profile
-ceebee stats summary --profile staging
-
-# Debug output
-ceebee stats revenue --verbose
+ceebee inventory whoami
 ```
 
-## Endpoints
+## Two namespaces
+
+```text
+ceebee stats …       # read-only analytics over revenue, bookings, customers, channels
+ceebee inventory …   # read+write: products, options, pricing, availabilities, bookings, …
+ceebee audit …       # local-only mutation audit log (~/.ceebee/audit.jsonl)
+```
+
+### `ceebee stats` — analytics
+
+```bash
+ceebee stats summary                                       # dashboard overview
+ceebee stats revenue --from 2026-03-01 --to 2026-03-24
+ceebee stats bookings --format csv > bookings.csv
+ceebee stats products --sort-by revenue --limit 5 --format table
+ceebee stats revenue --compare year-ago
+ceebee stats summary --business-unit-id 42
+```
 
 | Command | Description |
 |---|---|
@@ -115,13 +113,90 @@ ceebee stats revenue --verbose
 | `stats discounts` | Discount code usage statistics |
 | `stats gift-certs` | Gift certificate issuance and redemption |
 
-Run `ceebee stats <endpoint> --help` for endpoint-specific flags.
+### `ceebee inventory` — read + write
+
+The inventory namespace covers 90+ endpoints across 18 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
+
+```bash
+# Read
+ceebee inventory products list --status published
+ceebee inventory products get 42 --format json
+
+# Write — private experience
+ceebee inventory products create \
+  --title "Sunset Sail" --currency EUR --schedule-type datetime \
+  --status published --is-private --capacity 8 --from-price 35000
+
+# Write — recurrence rule
+ceebee inventory availabilities create-rule \
+  --product-option-id 47 \
+  --start-date 2026-05-01 --end-date 2026-08-31 \
+  --weekdays 6 --start-time 14:00 --end-time 18:00
+
+# Write — attach a boat to a product option
+ceebee inventory resources create --name "Oceanis 449" --type Sailboat --category asset --capacity 8
+ceebee inventory resources attach 47 --resource-id 2
+
+# Customer-success
+ceebee inventory bookings cancel <booking-id> --reason "weather" --refund-policy full
+ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id> \
+  --recipient-email alex@example.com --recipient-name "Alex Doe" --amount 10000
+```
+
+| Resource | Verbs available |
+|---|---|
+| `whoami` | get |
+| `products` | list, get, create, update, delete, restore |
+| `product-options` | list, get, create, update, delete, restore |
+| `availabilities` | list, get, update, **bulk-update** (capacity / booking-status / pricing / start-time / end-time), **create-rule** |
+| `pricing-categories` | list, get, create, update, delete, restore |
+| `pricing-tiers` | list, get, create, update, delete, restore |
+| `resources` | list, get, create, update, delete, restore, **attach**, **detach** |
+| `locations` | list, get, create, update, delete |
+| `bookings` | list, get, transactions, cancel, refund, comp, resend-confirmation |
+| `transactions` | list, get |
+| `customers` | list, get |
+| `guests` | list, get, update |
+| `extras` | list, get, create, update, delete, restore |
+| `questions` | list, get, create, update, delete, restore |
+| `discounts` | list, get, create, delete, apply, restore |
+| `gift-certificates` | list-available, get-available, create-available, update-available, delete-available, list-issued, get-issued, issue, void, resend |
+| `media` | list, upload, delete |
+| `categories` | list, get *(read-only)* |
+| `notifications` | resend |
+
+Run `ceebee inventory <resource> --help` for full flag listings. See [skills/index.md](skills/index.md) for agent-facing cookbooks per resource.
+
+### `ceebee audit` — local mutation log
+
+Every successful mutation appends to `~/.ceebee/audit.jsonl` with the idempotency key, body sha256, ability used, dry-run flag, status code, duration, and a forensic summary of the relevant fields.
+
+```bash
+ceebee audit list --limit 20         # newest-first
+ceebee audit show <idempotency-key>  # full row by idempotency key
+```
+
+Used to answer "who ran what against which tenant when?" without any server round-trip.
 
 ## Output formats
 
-- **`json`** (default) — Full API response envelope (meta, data, series, comparison)
-- **`table`** — Human-readable ASCII table
-- **`csv`** — Header row + data rows
+- **`json`** (default for mutations) — full API response envelope (`meta`, `data`)
+- **`table`** (default for reads) — human-readable ASCII
+- **`csv`** — header + rows
+
+Override with `--format <json|table|csv>` on any command.
+
+## Dry-run
+
+Most mutations support `--dry-run` and return a colored diff envelope (`{ would_apply: true, diff: { before, after } }`) without persisting. The CLI rejects `--dry-run` at parse time on endpoints where the server doesn't support it (e.g. `products delete`, `media upload`), with a typed error and exit code 1.
+
+```bash
+ceebee inventory products update 42 --title "New title" --dry-run
+```
+
+## Idempotency
+
+UUIDv7 is auto-minted per call and sent as the `Idempotency-Key` header. Override with `--idempotency-key <uuid>` to replay a specific call (server returns the cached original response). Retries within an invocation reuse the same key automatically.
 
 ## Shell completions
 
@@ -141,7 +216,7 @@ ceebee completion fish | source
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | CLI usage error (unknown flag, missing subcommand) |
+| 1 | CLI usage error (unknown flag, missing subcommand, dry-run not supported) |
 | 10 | Authentication failed (401) |
 | 11 | Access denied (403) |
 | 12 | Validation error (422) |
@@ -155,16 +230,20 @@ ceebee completion fish | source
 ## Development
 
 ```bash
-make build      # Build binary
-make test       # Run tests
-make lint       # Run go vet
-make build-all  # Cross-compile all platforms
-make clean      # Remove binaries
+make build           # Build binary
+make test            # Run tests
+make codegen         # Regenerate OpenAPI client from api/inventory/cli-v1.yaml
+make codegen-check   # Fail if generated code is out of sync
+make lint            # Run go vet
+make build-all       # Cross-compile all platforms
+make clean           # Remove binaries
 ```
+
+The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. Three CI-enforced spec-drift tests catch flag/JSON-key drift, enum-token drift, and idempotency-key threading regressions.
 
 ## AI agents
 
-See [skills.md](skills.md) for agent-facing documentation.
+The agent-facing entry point is **[skills/index.md](skills/index.md)** — start there for a global tour and per-resource cookbooks. Each cookbook covers worked examples, side-effect maps, and pitfalls specific to that resource.
 
 ## License
 

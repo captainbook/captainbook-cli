@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	cmdinventory "github.com/captainbook/captainbook-cli/cmd/inventory"
 	"github.com/captainbook/captainbook-cli/internal/api"
+	"github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/spf13/cobra"
 )
 
@@ -29,10 +31,18 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&profileName, "profile", "", "Config profile to use")
 	rootCmd.PersistentFlags().StringVarP(&formatFlag, "format", "f", "json", "Output format: json, table, csv")
 
+	// Note: cobra runs only the FIRST non-nil PersistentPreRun in the
+	// command chain. Cmd() under cmd/inventory installs its own (lazy
+	// runner construction), so any mirror-into-globals here would be
+	// shadowed and never fire. cmd/inventory/inventory.go reads --profile
+	// / --verbose directly via cobra's inherited flagset.
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(statsCmd())
 	rootCmd.AddCommand(configCmd())
+	rootCmd.AddCommand(auditCmd())
 	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(cmdinventory.Cmd())
 }
 
 var versionCmd = &cobra.Command{
@@ -43,7 +53,11 @@ var versionCmd = &cobra.Command{
 	},
 }
 
-// Execute runs the root command.
+// Execute runs the root command. The error path renders, in order of
+// precedence: typed exit errors (api.ExitError) → typed inventory errors that
+// implement inventory.UserMessenger → fallback to err.Error(). UserMessenger
+// support means inventory typed errors (IdempotencyConflictError, etc.) print
+// their crisp UserMessage to stderr instead of the developer-facing Error().
 func Execute() {
 	rootCmd.SilenceErrors = true
 	rootCmd.SilenceUsage = true
@@ -52,6 +66,11 @@ func Execute() {
 		if errors.As(err, &exitErr) {
 			fmt.Fprintln(os.Stderr, exitErr.Err)
 			os.Exit(exitErr.Code)
+		}
+		var um inventory.UserMessenger
+		if errors.As(err, &um) {
+			fmt.Fprintln(os.Stderr, um.UserMessage())
+			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

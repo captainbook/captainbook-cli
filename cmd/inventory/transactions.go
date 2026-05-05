@@ -1,0 +1,100 @@
+package inventory
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
+	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
+)
+
+// transactionsDefs declares transactions: list, get.
+//
+// Transactions are read-only at the CLI level — refunds happen via the
+// `bookings refund` command, which mints a refund transaction server-side.
+func transactionsDefs() []CommandDef {
+	return []CommandDef{
+		{
+			Use: "transactions list", Short: "List transactions", Kind: KindRead,
+			Verb: "GET", Path: "/transactions", Ability: invpkg.Read,
+			// NOTE: --status is intentionally NOT exposed. The spec's
+			// listTransactions query parameter accepts
+			// [pending,succeeded,failed,partial], but the Transaction
+			// schema's status enum is [succeeded] with the description
+			// "Always `succeeded` — failed payments don't produce a row at
+			// all." Filtering by anything other than `succeeded` is
+			// guaranteed zero results, and `succeeded` filters everything,
+			// so the flag is a no-op trap. Filed as a server-team issue;
+			// re-add the flag when the schema gains real status semantics.
+			Flags: []FlagDef{
+				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "type", Type: "string", Description: "charge|refund|comp"},
+				{Name: "from", Type: "string", Description: "Transaction created_at >= ISO 8601"},
+				{Name: "to", Type: "string", Description: "Transaction created_at <= ISO 8601"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+			},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				p := &gen.ListTransactionsParams{}
+				if v := args.FlagInt("limit"); v != 0 {
+					p.Limit = &v
+				}
+				if v := args.FlagString("cursor"); v != "" {
+					p.Cursor = &v
+				}
+				if v := args.FlagString("type"); v != "" {
+					t := gen.ListTransactionsParamsType(v)
+					p.Type = &t
+				}
+				if v := args.FlagString("from"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--from: invalid RFC3339 timestamp: %w", err)
+					}
+					p.From = &t
+				}
+				if v := args.FlagString("to"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--to: invalid RFC3339 timestamp: %w", err)
+					}
+					p.To = &t
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
+				}
+				resp, err := r.Client.ListTransactionsWithResponse(ctx, p)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Transaction", "")
+			},
+		},
+		{
+			Use: "transactions get <id>", Short: "Show one transaction", Kind: KindRead,
+			Verb: "GET", Path: "/transactions/{id}", Ability: invpkg.Read,
+			PositionalArgs: []string{"id"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.ShowTransactionWithResponse(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Transaction", id)
+			},
+		},
+	}
+}
+
+// timeParseDate is shared by bookings.go (parseDate) — defined here so
+// transactions.go owns the time import.
+func timeParseDate(s string) (time.Time, error) {
+	return time.Parse("2006-01-02", s)
+}

@@ -1,0 +1,12 @@
+# oapi-codegen config for the Inventory CLI v1 client.
+# Generated output: inventory.gen.go (types + ClientWithResponses).
+# Do not edit the generated file; edit this config and run `make codegen`.
+
+package: gen
+output: internal/inventory/gen/inventory.gen.go
+generate:
+  models: true
+  client: true
+  embedded-spec: false
+output-options:
+  skip-prune: true

@@ -1,0 +1,6 @@
+Dry-run preview for Guest g_88 (would_apply: true):
+
+  - dietary:   (unset)  →  "vegetarian"
+  - passport:  "AA1234567"  →  "AB7654321"
+
+Run without --dry-run to apply.

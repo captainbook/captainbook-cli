@@ -1,0 +1,5 @@
+Dry-run preview for ProductOption po_17 (would_apply: true):
+
+  - capacity:  8  →  12
+
+Run without --dry-run to apply.

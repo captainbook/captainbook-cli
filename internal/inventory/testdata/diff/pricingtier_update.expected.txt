@@ -1,0 +1,5 @@
+Dry-run preview for PricingTier tier_42 (would_apply: true):
+
+  - amount:  € 45.00  →  € 50.00
+
+Run without --dry-run to apply.

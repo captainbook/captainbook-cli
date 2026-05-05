@@ -1,0 +1,21 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {},
+    "after": {
+      "id": "7",
+      "code": "SUMMER2026",
+      "product_option_id": null,
+      "discount_pct": 15,
+      "discounted_price": null,
+      "nb_offers": 100,
+      "auto_apply": false,
+      "start_date": "2026-06-01T00:00:00Z",
+      "end_date": "2026-08-31T23:59:59Z",
+      "validity_start": "2026-06-01T00:00:00Z",
+      "validity_end": "2026-09-30T23:59:59Z",
+      "discount_text": "Summer special",
+      "created_at": "2026-04-27T10:00:00Z"
+    }
+  }
+}

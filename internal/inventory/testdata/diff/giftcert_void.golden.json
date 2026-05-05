@@ -1,0 +1,28 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "gc_01H8AAAA",
+      "code": "GIFT-DEMO-1234",
+      "status": "active",
+      "amount": 5000,
+      "remaining_amount": 5000,
+      "currency": "EUR",
+      "void_reason": null,
+      "deleted_at": null
+    },
+    "after": {
+      "id": "gc_01H8AAAA",
+      "code": "GIFT-DEMO-1234",
+      "status": "void",
+      "amount": 5000,
+      "remaining_amount": 0,
+      "currency": "EUR",
+      "void_reason": "Issued in error",
+      "deleted_at": "2026-04-27T11:00:00Z"
+    }
+  },
+  "side_effects": [
+    {"type": "mail", "identifier": "GiftCertVoidedMail", "payload_summary": "to: alice@example.com"}
+  ]
+}

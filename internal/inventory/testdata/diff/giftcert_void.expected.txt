@@ -1,0 +1,11 @@
+Dry-run preview for GiftCertificate gc_01H8AAAA (would_apply: true):
+
+  - status:            "active"  →  "void"
+  - remaining_amount:  € 50.00  →  € 0.00
+  - void_reason:       (unset)  →  "Issued in error"
+  - deleted_at:        (unset)  →  2026-04-27 11:00 UTC
+
+Side effects (would run on apply):
+  - mail GiftCertVoidedMail: to: alice@example.com
+
+Run without --dry-run to apply.

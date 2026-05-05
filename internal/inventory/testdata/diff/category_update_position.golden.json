@@ -1,0 +1,17 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "cat_5",
+      "name": "Day tours",
+      "slug": "day-tours",
+      "position": 1
+    },
+    "after": {
+      "id": "cat_5",
+      "name": "Day tours",
+      "slug": "day-tours",
+      "position": 3
+    }
+  }
+}

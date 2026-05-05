@@ -1,0 +1,21 @@
+{
+  "would_apply": true,
+  "diff": {
+    "before": {
+      "id": "99",
+      "title": "Hidden Cove Kayak",
+      "status": "draft",
+      "currency": "EUR",
+      "published_at": null,
+      "updated_at": "2026-03-15T08:00:00Z"
+    },
+    "after": {
+      "id": "99",
+      "title": "Hidden Cove Kayak",
+      "status": "published",
+      "currency": "EUR",
+      "published_at": "2026-04-27T09:00:00Z",
+      "updated_at": "2026-04-27T09:00:00Z"
+    }
+  }
+}

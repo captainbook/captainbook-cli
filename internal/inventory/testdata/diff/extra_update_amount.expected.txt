@@ -1,0 +1,5 @@
+Dry-run preview for Extra extra_3 (would_apply: true):
+
+  - amount:  1500  →  2000
+
+Run without --dry-run to apply.
