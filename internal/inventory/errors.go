@@ -266,6 +266,55 @@ func (e *ResourceInUseError) UserMessage() string {
 }
 
 // -----------------------------------------------------------------------------
+// 9b. AvailabilityHasConfirmedBookingError — AVAILABILITY_HAS_CONFIRMED_BOOKING, 409
+//
+// Returned by `DELETE /availabilities/{id}` and `POST
+// /availabilities/bulk-delete` when one or more matched rows have a
+// confirmed Booking attached. The two endpoints surface different
+// `details` shapes:
+//
+//   - single delete: { availability_id: "<echoes path id>" }
+//   - bulk delete:   { total_blocked: <count>,
+//                      sample_availability_ids: [<up to 20 ids>] }
+//
+// We accept both into one struct so callers don't need to distinguish:
+// AvailabilityID is set only on the single-delete path; TotalBlocked +
+// SampleAvailabilityIDs are set only on the bulk-delete path.
+// -----------------------------------------------------------------------------
+
+type AvailabilityHasConfirmedBookingError struct {
+	AvailabilityID        string
+	TotalBlocked          int64
+	SampleAvailabilityIDs []string
+}
+
+func (e *AvailabilityHasConfirmedBookingError) Error() string {
+	if e.AvailabilityID != "" {
+		return fmt.Sprintf("AVAILABILITY_HAS_CONFIRMED_BOOKING: availability=%s", e.AvailabilityID)
+	}
+	return fmt.Sprintf("AVAILABILITY_HAS_CONFIRMED_BOOKING: total_blocked=%d", e.TotalBlocked)
+}
+
+func (e *AvailabilityHasConfirmedBookingError) UserMessage() string {
+	if e.AvailabilityID != "" {
+		return fmt.Sprintf(
+			"availability %s cannot be deleted: it has a confirmed booking. Cancel or move the booking first.",
+			e.AvailabilityID,
+		)
+	}
+	if len(e.SampleAvailabilityIDs) == 0 {
+		return fmt.Sprintf(
+			"%d availability rows in the matched range have confirmed bookings; entire bulk-delete rejected. Cancel/move the bookings or narrow the range.",
+			e.TotalBlocked,
+		)
+	}
+	return fmt.Sprintf(
+		"%d availability rows in the matched range have confirmed bookings; entire bulk-delete rejected. Sample blocking ids (up to 20): %s. Cancel/move the bookings or narrow the range.",
+		e.TotalBlocked, strings.Join(e.SampleAvailabilityIDs, ", "),
+	)
+}
+
+// -----------------------------------------------------------------------------
 // 10. PayloadTooLargeError — PAYLOAD_TOO_LARGE, 413 (multipart upload)
 //
 // Spec: 10 MiB cap by default; tenant plans may raise. ActualBytes/MaxBytes
@@ -495,6 +544,17 @@ func init() {
 			rt, _ := decodeStringField(env.Error.Details, "resource_type")
 			rel, _ := decodeStringField(env.Error.Details, "related_type")
 			return &ResourceInUseError{ResourceType: rt, RelatedType: rel}
+		},
+
+		"AVAILABILITY_HAS_CONFIRMED_BOOKING": func(status int, env errorEnvelope) error {
+			availabilityID, _ := decodeStringField(env.Error.Details, "availability_id")
+			totalBlocked, _ := decodeIntField(env.Error.Details, "total_blocked")
+			sampleIDs, _ := decodeStringSliceField(env.Error.Details, "sample_availability_ids")
+			return &AvailabilityHasConfirmedBookingError{
+				AvailabilityID:        availabilityID,
+				TotalBlocked:          totalBlocked,
+				SampleAvailabilityIDs: sampleIDs,
+			}
 		},
 
 		"PAYLOAD_TOO_LARGE": func(status int, env errorEnvelope) error {
