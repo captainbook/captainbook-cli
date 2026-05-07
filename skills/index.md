@@ -183,11 +183,13 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory product-options delete <id>` | DELETE /product-options/{id} | `cli:write` | none |
 | `inventory product-options restore <id>` | POST /product-options/{id}/restore | `cli:write` | body |
 | `inventory availabilities update <id>` | PATCH /availabilities/{id} | `cli:write` | body |
+| `inventory availabilities delete <id>` | DELETE /availabilities/{id} | `cli:write` | body |
 | `inventory availabilities bulk-update capacity` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update booking-status` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update pricing` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update start-time` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update end-time` | POST /availabilities/bulk-update | `cli:write` | body |
+| `inventory availabilities bulk-delete` | POST /availabilities/bulk-delete | `cli:write` | body |
 | `inventory pricing-tiers create` | POST /pricing-tiers | `cli:write` | body |
 | `inventory pricing-tiers update <id>` | PATCH /pricing-tiers/{id} | `cli:write` | body |
 | `inventory pricing-tiers delete <id>` | DELETE /pricing-tiers/{id} | `cli:write` | none |
@@ -229,7 +231,7 @@ When the dry-run column says **none**, sending `--dry-run` from the CLI errors l
 - [auth.md](auth.md) — `whoami`, token / ability probing.
 - [products.md](products.md) — Products CRUD + restore. Private vs shared, rich text, cancellation policy.
 - [product-options.md](product-options.md) — Product Options CRUD + restore. Auto-generated option codes.
-- [availabilities.md](availabilities.md) — Per-date capacity + 5 bulk-update subcommands + recurrence rule generator (`create-rule`).
+- [availabilities.md](availabilities.md) — Per-date capacity + 5 bulk-update subcommands + delete / bulk-delete + recurrence rule generator (`create-rule`).
 - [pricing-categories.md](pricing-categories.md) — Adult/Child/Senior buckets (parent of tiers). REQUIRED before creating tiers.
 - [pricing-tiers.md](pricing-tiers.md) — Pricing tiers under a category (data-loss-adjacent delete).
 - [resources.md](resources.md) — Physical inventory (boats, guides, equipment) bound to a product option via attach/detach.

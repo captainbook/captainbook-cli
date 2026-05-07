@@ -1,9 +1,12 @@
 package inventory
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -25,7 +28,93 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 	}
 	bindCommands(parent, availabilitiesDefs(), runner)
 	parent.AddCommand(bulkUpdateCmd(runner))
+	bindCommands(parent, []CommandDef{bulkDeleteDef()}, runner)
 	return parent
+}
+
+// bulkDeleteDef is the synchronous `availabilities bulk-delete` command.
+// Mirrors the bulk-update filter shape (product_option_id + half-open
+// [from, to)) but the response carries `total_deleted` directly — there's
+// no async job, no stderr signal, no polling. 409
+// AVAILABILITY_HAS_CONFIRMED_BOOKING aborts the entire request before any
+// row is touched.
+func bulkDeleteDef() CommandDef {
+	return CommandDef{
+		Use: "bulk-delete", Short: "Bulk soft-delete availabilities across a date range (synchronous)",
+		Kind: KindMutation, Verb: "POST", Path: "/availabilities/bulk-delete",
+		Ability: invpkg.Write, DryRunMode: DryRunBody,
+		Long: "Soft-deletes every availability of one product option in [from, to). " +
+			"Synchronous — response carries `total_deleted`. 409 " +
+			"AVAILABILITY_HAS_CONFIRMED_BOOKING is returned if any matched row has " +
+			"a confirmed Booking attached (entire request rejected, no rows touched); " +
+			"`error.details.total_blocked` + `sample_availability_ids` (up to 20) " +
+			"identify the blockers. The confirmed-booking precheck runs even on " +
+			"--dry-run.",
+		Flags: []FlagDef{
+			{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option ID"},
+			{Name: "from", Type: "string", Required: true, Description: "Date range start (YYYY-MM-DD)"},
+			{Name: "to", Type: "string", Required: true, Description: "Date range end (YYYY-MM-DD)"},
+		},
+		ForensicFields: []string{"product-option-id", "from", "to"},
+		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+			from, err := parseDate(args.FlagString("from"))
+			if err != nil {
+				return nil, fmt.Errorf("--from: %w", err)
+			}
+			to, err := parseDate(args.FlagString("to"))
+			if err != nil {
+				return nil, fmt.Errorf("--to: %w", err)
+			}
+			// Mirror bulk-update: start with --data (if any) as the base,
+			// then overlay typed fields. Typed flags always WIN so the
+			// body shape stays correct even if --data tries to override
+			// them.
+			body := map[string]any{}
+			if len(args.RawData) > 0 {
+				if err := json.Unmarshal(args.RawData, &body); err != nil {
+					return nil, fmt.Errorf("--data: invalid JSON: %w", err)
+				}
+			}
+			body["product_option_id"] = args.FlagString("product-option-id")
+			body["from"] = from.Format("2006-01-02")
+			body["to"] = to.Format("2006-01-02")
+			if args.DryRun {
+				body["dry_run"] = true
+			}
+			raw, err := json.Marshal(body)
+			if err != nil {
+				return nil, err
+			}
+			resp, err := r.Client.BulkDeleteAvailabilitiesWithBodyWithResponse(ctx, &gen.BulkDeleteAvailabilitiesParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(raw))
+			if err != nil {
+				return &RunResult{WireBody: raw}, err
+			}
+			res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
+			if res != nil {
+				res.WireBody = raw
+			}
+			return res, perr
+		},
+	}
+}
+
+// dryRunBodyEditor returns a RequestEditorFn that attaches a JSON body to
+// a request the gen client built without one. Used by `availabilities
+// delete <id>` to send `{"dry_run": true}` on the DELETE — the spec
+// supports a dry-run body but doesn't formally declare a requestBody, so
+// codegen produces no *WithBody variant. Without this we couldn't preview
+// the soft-delete (or trigger the 409 confirmed-booking precheck) before
+// committing.
+func dryRunBodyEditor(body []byte) gen.RequestEditorFn {
+	return func(_ context.Context, req *http.Request) error {
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(body)), nil
+		}
+		req.ContentLength = int64(len(body))
+		req.Header.Set("Content-Type", "application/json")
+		return nil
+	}
 }
 
 // availabilitiesDefs returns the regular (non-bulk-update) command tree.
@@ -183,13 +272,63 @@ func availabilitiesDefs() []CommandDef {
 				return res, err
 			},
 		},
-		// NOTE: no restore command. Per spec, Availability is NOT a
-		// soft-deletable resource: the schema has no `deleted_at` property,
-		// the list endpoint has no `?include_trashed=` parameter, and there
-		// is no /availabilities/{id}/restore operation. Earlier scaffolding
-		// added a restore command that PATCH'd the update endpoint with an
-		// empty body — a no-op that misled users (and Claude Code) into
-		// thinking soft-delete recovery was supported. Removed.
+		{
+			Use: "delete <id>", Short: "Soft-delete one availability", Kind: KindMutation,
+			Verb: "DELETE", Path: "/availabilities/{id}", Ability: invpkg.Write,
+			DryRunMode: DryRunBody, PositionalArgs: []string{"id"},
+			Long: "Soft-deletes the availability (sets deleted_at). 409 " +
+				"AVAILABILITY_HAS_CONFIRMED_BOOKING is returned if any confirmed " +
+				"Booking is attached — cancel or move the bookings first. The " +
+				"confirmed-booking precheck runs even on --dry-run. For multi-row " +
+				"deletes spanning a date range, use `bulk-delete`.",
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				// Spec doesn't declare a requestBody for DELETE but the
+				// server reads `dry_run: true` from a JSON body. On real
+				// delete we send no body at all (matches the 204 contract);
+				// on dry-run we attach the body via reqEditor so audit
+				// body_sha256 reflects what hit the wire. --data, if
+				// supplied, is overlaid on the dry-run body so users can
+				// push debug fields onto the wire (matches every other
+				// mutation closure). On a real delete --data is ignored
+				// because the spec does not accept a body there.
+				var wireBody []byte
+				editors := []gen.RequestEditorFn{}
+				if args.DryRun {
+					body := map[string]any{}
+					if len(args.RawData) > 0 {
+						if err := json.Unmarshal(args.RawData, &body); err != nil {
+							return nil, fmt.Errorf("--data: invalid JSON: %w", err)
+						}
+					}
+					body["dry_run"] = true
+					raw, mErr := json.Marshal(body)
+					if mErr != nil {
+						return nil, mErr
+					}
+					wireBody = raw
+					editors = append(editors, dryRunBodyEditor(wireBody))
+				}
+				resp, err := r.Client.DeleteAvailabilityWithResponse(ctx, id, &gen.DeleteAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, editors...)
+				if err != nil {
+					return &RunResult{WireBody: wireBody}, err
+				}
+				res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
+				if res != nil {
+					res.WireBody = wireBody
+				}
+				return res, perr
+			},
+		},
+		// NOTE: no restore command. The spec exposes DELETE (soft-delete via
+		// `deleted_at`) and `bulk-delete`, but the Availability schema does
+		// NOT surface `deleted_at`, the list endpoint has no
+		// `?include_trashed=` parameter, and there is no
+		// /availabilities/{id}/restore operation. There's currently no
+		// supported way to undo a soft-delete from the CLI.
 	}
 }
 

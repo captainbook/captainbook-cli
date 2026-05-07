@@ -96,6 +96,24 @@ func TestUserMessages(t *testing.T) {
 			wantMessage: "category cannot be deleted: product still references it",
 		},
 		{
+			name:        "AvailabilityHasConfirmedBookingError_single",
+			err:         &AvailabilityHasConfirmedBookingError{AvailabilityID: "av_42"},
+			wantError:   "AVAILABILITY_HAS_CONFIRMED_BOOKING: availability=av_42",
+			wantMessage: "availability av_42 cannot be deleted: it has a confirmed booking. Cancel or move the booking first.",
+		},
+		{
+			name:        "AvailabilityHasConfirmedBookingError_bulk_with_sample",
+			err:         &AvailabilityHasConfirmedBookingError{TotalBlocked: 7, SampleAvailabilityIDs: []string{"av_1", "av_2", "av_3"}},
+			wantError:   "AVAILABILITY_HAS_CONFIRMED_BOOKING: total_blocked=7",
+			wantMessage: "7 availability rows in the matched range have confirmed bookings; entire bulk-delete rejected. Sample blocking ids (up to 20): av_1, av_2, av_3. Cancel/move the bookings or narrow the range.",
+		},
+		{
+			name:        "AvailabilityHasConfirmedBookingError_bulk_no_sample",
+			err:         &AvailabilityHasConfirmedBookingError{TotalBlocked: 3},
+			wantError:   "AVAILABILITY_HAS_CONFIRMED_BOOKING: total_blocked=3",
+			wantMessage: "3 availability rows in the matched range have confirmed bookings; entire bulk-delete rejected. Cancel/move the bookings or narrow the range.",
+		},
+		{
 			name:        "PayloadTooLargeError",
 			err:         &PayloadTooLargeError{ActualBytes: 12 * 1024 * 1024, MaxBytes: 10 * 1024 * 1024},
 			wantError:   "PAYLOAD_TOO_LARGE: actual=12582912 max=10485760",
@@ -394,6 +412,49 @@ func TestParseError(t *testing.T) {
 				}
 				if e.ResourceType != "category" || e.RelatedType != "product" {
 					t.Errorf("wrong fields: %+v", e)
+				}
+			},
+		},
+		{
+			name:   "AVAILABILITY_HAS_CONFIRMED_BOOKING (single delete shape)",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"AVAILABILITY_HAS_CONFIRMED_BOOKING","message":"row has confirmed booking","retriable":false,
+				"details":{"availability_id":"av_42"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *AvailabilityHasConfirmedBookingError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *AvailabilityHasConfirmedBookingError, got %T", err)
+				}
+				if e.AvailabilityID != "av_42" {
+					t.Errorf("wrong AvailabilityID: %q", e.AvailabilityID)
+				}
+				if e.TotalBlocked != 0 || len(e.SampleAvailabilityIDs) != 0 {
+					t.Errorf("bulk fields should be unset on single-delete shape: %+v", e)
+				}
+			},
+		},
+		{
+			name:   "AVAILABILITY_HAS_CONFIRMED_BOOKING (bulk delete shape)",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"AVAILABILITY_HAS_CONFIRMED_BOOKING","message":"7 rows have confirmed bookings","retriable":false,
+				"details":{"total_blocked":7,"sample_availability_ids":["av_1","av_2","av_3"]}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *AvailabilityHasConfirmedBookingError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *AvailabilityHasConfirmedBookingError, got %T", err)
+				}
+				if e.AvailabilityID != "" {
+					t.Errorf("single-delete field should be unset on bulk shape: %q", e.AvailabilityID)
+				}
+				if e.TotalBlocked != 7 {
+					t.Errorf("wrong TotalBlocked: %d", e.TotalBlocked)
+				}
+				if len(e.SampleAvailabilityIDs) != 3 {
+					t.Errorf("wrong sample ids: %v", e.SampleAvailabilityIDs)
 				}
 			},
 		},

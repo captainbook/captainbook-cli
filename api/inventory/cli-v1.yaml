@@ -524,6 +524,50 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      operationId: deleteAvailability
+      summary: Delete a single availability row
+      description: |
+        Soft-deletes the availability (sets `deleted_at`). The row remains in
+        the database; list endpoints exclude it by default. Returns 409
+        `AVAILABILITY_HAS_CONFIRMED_BOOKING` if any confirmed Booking is
+        attached to this availability — cancel or move the bookings first.
+
+        For multi-row deletes spanning a date range, use
+        `POST /availabilities/bulk-delete`.
+
+        Dry-run (`dry_run: true` in the JSON body) returns 200 with
+        `would_apply: true` and the row in `diff.before`; no row is deleted.
+        The 409 confirmed-booking precheck still runs in dry-run.
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Deleted
+        "200":
+          description: Dry-run preview (no row deleted)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            Idempotency conflict, OR
+            `AVAILABILITY_HAS_CONFIRMED_BOOKING` — the availability has at
+            least one confirmed Booking attached. `error.details.availability_id`
+            echoes the path id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /availability-rules:
     post:
@@ -688,6 +732,84 @@ paths:
                                 enum: [preview, no_op]
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /availabilities/bulk-delete:
+    post:
+      operationId: bulkDeleteAvailabilities
+      summary: Bulk soft-delete availabilities across a date range (synchronous)
+      description: |
+        Soft-deletes every availability of one ProductOption inside
+        `[from, to)` in a single UPDATE on `deleted_at`. Synchronous — the
+        response carries the actual `total_deleted` count, no polling
+        required.
+
+        **All-or-nothing on confirmed bookings.** Before any rows are
+        touched, the server scans the matched range for availabilities with
+        a confirmed Booking attached. If any are found the entire request
+        is rejected with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` and
+        `error.details` carries `total_blocked` plus a sample of up to 20
+        availability ids. Operator must cancel/move those bookings or
+        narrow the range and retry.
+
+        **Cascade caveat.** Soft-delete is a single bulk UPDATE that
+        bypasses model events, so the `Availability → pricingTiers`
+        cascade does NOT run. This is intentional: pricing tiers are M:N
+        with availabilities, so cascading from one row would soft-delete
+        tier rows still referenced by other availabilities.
+
+        **No-op:** if the filter matches zero rows, returns 200 with
+        `total_deleted: 0` and `status: "no_op"`.
+
+        **Dry-run:** returns 200 with `total_matched`, `status: "preview"`
+        and no side effects. The 409 confirmed-booking precheck still runs.
+      tags: [Availabilities]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkDeleteAvailabilityRequest"
+      responses:
+        "200":
+          description: |
+            Deleted (real call), no-op (zero matches), or dry-run preview.
+            `data.status` differentiates: `deleted` | `no_op` | `preview`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              total_matched:
+                                type: integer
+                                description: Number of rows the filter matched (present on dry-run).
+                              total_deleted:
+                                type: integer
+                                description: Number of rows soft-deleted (present on real call / no-op).
+                              status:
+                                type: string
+                                enum: [preview, no_op, deleted]
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409":
+          description: |
+            Idempotency conflict, OR
+            `AVAILABILITY_HAS_CONFIRMED_BOOKING` — at least one row in the
+            matched range has a confirmed Booking. `error.details` carries
+            `total_blocked` (count) and `sample_availability_ids` (up to 20
+            ids). No rows are deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "422": { $ref: "#/components/responses/ValidationError" }
 
   /pricing-categories:
@@ -3659,6 +3781,20 @@ components:
                 end_time: { type: string, example: "11:30" }
                 day_count: { type: integer, default: 0, description: "Days the activity spans (for multi-day tours)" }
               description: "When `setting=start_time` or `setting=end_time`."
+        dry_run: { type: boolean, default: false }
+
+    BulkDeleteAvailabilityRequest:
+      type: object
+      required: [product_option_id, from, to]
+      description: |
+        Filter shape mirrors `BulkUpdateAvailabilityRequest` so a CLI flow
+        that previewed a date-range change can reuse the same payload to
+        delete instead. Range is half-open: rows where `from >= from AND
+        from < to` are matched.
+      properties:
+        product_option_id: { type: string }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
         dry_run: { type: boolean, default: false }
 
     CreateDiscountRequest:

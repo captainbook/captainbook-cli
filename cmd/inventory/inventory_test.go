@@ -173,7 +173,7 @@ func TestEnumFlagGate_RejectsInvalidValue(t *testing.T) {
 	})
 
 	def := CommandDef{
-		Use:  "list", Kind: KindRead, Verb: "GET", Path: "/transactions",
+		Use: "list", Kind: KindRead, Verb: "GET", Path: "/transactions",
 		Ability: invpkg.Read,
 		Flags: []FlagDef{
 			{Name: "type", Type: "string", Description: "charge|refund|comp"},
@@ -217,7 +217,7 @@ func TestEnumFlagGate_AcceptsValidValue(t *testing.T) {
 	})
 
 	def := CommandDef{
-		Use:  "list", Kind: KindRead, Verb: "GET", Path: "/transactions",
+		Use: "list", Kind: KindRead, Verb: "GET", Path: "/transactions",
 		Ability: invpkg.Read,
 		Flags: []FlagDef{
 			{Name: "type", Type: "string", Description: "charge|refund|comp"},
@@ -363,18 +363,19 @@ func TestJSONBodyFromArgs_DryRunInjection(t *testing.T) {
 // typed error.
 func TestErrorCode_Mapping(t *testing.T) {
 	cases := map[string]error{
-		"UNAUTHENTICATED":         &invpkg.AuthError{},
-		"NOT_FOUND":               &invpkg.NotFoundError{},
-		"VALIDATION_FAILED":       &invpkg.ValidationError{},
-		"IDEMPOTENCY_CONFLICT":    &invpkg.IdempotencyConflictError{},
-		"IDEMPOTENCY_IN_PROGRESS": &invpkg.IdempotencyInProgressError{},
-		"IDEMPOTENCY_UNKNOWN":     &invpkg.IdempotencyUnknownError{},
-		"DISCOUNT_NOT_APPLICABLE": &invpkg.DiscountNotApplicableError{},
-		"RESOURCE_IN_USE":         &invpkg.ResourceInUseError{},
-		"PAYLOAD_TOO_LARGE":       &invpkg.PayloadTooLargeError{},
-		"UNSUPPORTED_MEDIA_TYPE":  &invpkg.UnsupportedMediaTypeError{},
-		"RATE_LIMITED":            &invpkg.RateLimitError{},
-		"INTERNAL_ERROR":          &invpkg.ServerError{},
+		"UNAUTHENTICATED":                    &invpkg.AuthError{},
+		"NOT_FOUND":                          &invpkg.NotFoundError{},
+		"VALIDATION_FAILED":                  &invpkg.ValidationError{},
+		"IDEMPOTENCY_CONFLICT":               &invpkg.IdempotencyConflictError{},
+		"IDEMPOTENCY_IN_PROGRESS":            &invpkg.IdempotencyInProgressError{},
+		"IDEMPOTENCY_UNKNOWN":                &invpkg.IdempotencyUnknownError{},
+		"DISCOUNT_NOT_APPLICABLE":            &invpkg.DiscountNotApplicableError{},
+		"RESOURCE_IN_USE":                    &invpkg.ResourceInUseError{},
+		"AVAILABILITY_HAS_CONFIRMED_BOOKING": &invpkg.AvailabilityHasConfirmedBookingError{},
+		"PAYLOAD_TOO_LARGE":                  &invpkg.PayloadTooLargeError{},
+		"UNSUPPORTED_MEDIA_TYPE":             &invpkg.UnsupportedMediaTypeError{},
+		"RATE_LIMITED":                       &invpkg.RateLimitError{},
+		"INTERNAL_ERROR":                     &invpkg.ServerError{},
 	}
 	for want, err := range cases {
 		got := errorCode(err)
