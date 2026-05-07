@@ -1,6 +1,6 @@
 # Availabilities
 
-An `Availability` is the per-date instance of a `ProductOption`: capacity for a given date, current bookable status, start/end times, and the active pricing tier set. Read endpoints answer "what's bookable on May 5?". The PATCH endpoint edits one row. The **bulk-update** endpoint async-edits every row matching `(product_option_id, from, to)` and is split into five subcommands by setting. The **create-rule** endpoint generates Availability rows from a recurrence pattern (the same job the dashboard's recurrence picker dispatches).
+An `Availability` is the per-date instance of a `ProductOption`: capacity for a given date, current bookable status, start/end times, and the active pricing tier set. Read endpoints answer "what's bookable on May 5?". The PATCH endpoint edits one row. The **bulk-update** endpoint async-edits every row matching `(product_option_id, from, to)` and is split into five subcommands by setting. The **delete** / **bulk-delete** endpoints soft-delete rows; both reject the request with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` if any matched row carries a confirmed booking. The **create-rule** endpoint generates Availability rows from a recurrence pattern (the same job the dashboard's recurrence picker dispatches).
 
 ## Endpoints
 
@@ -9,14 +9,18 @@ An `Availability` is the per-date instance of a `ProductOption`: capacity for a 
 | `inventory availabilities list` | GET /availabilities | `cli:read` | n/a |
 | `inventory availabilities get <id>` | GET /availabilities/{id} | `cli:read` | n/a |
 | `inventory availabilities update <id>` | PATCH /availabilities/{id} | `cli:write` | body |
+| `inventory availabilities delete <id>` | DELETE /availabilities/{id} | `cli:write` | body |
 | `inventory availabilities create-rule` | POST /availability-rules | `cli:write` | body |
 | `inventory availabilities bulk-update capacity` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update booking-status` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update pricing` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update start-time` | POST /availabilities/bulk-update | `cli:write` | body |
 | `inventory availabilities bulk-update end-time` | POST /availabilities/bulk-update | `cli:write` | body |
+| `inventory availabilities bulk-delete` | POST /availabilities/bulk-delete | `cli:write` | body |
 
 `bulk-update` is split into five subcommands because the underlying `BulkAvailabilityUpdateJob` only handles one setting per call. To change capacity AND bookable status across a date range, run two commands.
+
+`bulk-delete` is **synchronous** (unlike `bulk-update`) — the response carries `total_deleted` directly, no `BULK_UPDATE_ACCEPTED` signal, no polling.
 
 ## Worked examples
 
@@ -104,7 +108,36 @@ ceebee inventory availabilities bulk-update start-time \
 
 `start-time` and `end-time` subcommands take both fields plus optional `--day-count` for multi-day tours.
 
-### 7. Generate Availabilities from a recurrence (NEW)
+### 7. Soft-delete a single date
+
+Intent: pull May 5 off the calendar entirely (e.g. private buyout cancelled).
+
+```bash
+ceebee inventory availabilities delete av_2026_05_05_po88 --dry-run
+# 200 + would_apply + diff.before for the row; nothing deleted yet
+ceebee inventory availabilities delete av_2026_05_05_po88
+# 204 No Content
+```
+
+If the row has a confirmed Booking attached, both calls return 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` (the precheck runs even on `--dry-run`). Cancel or move the booking first, then retry.
+
+### 8. Bulk soft-delete across a date range (synchronous)
+
+Intent: rip every August slot off `po_88` because the venue closed for the month.
+
+```bash
+ceebee inventory availabilities bulk-delete \
+  --product-option-id po_88 \
+  --from 2026-08-01 --to 2026-09-01 \
+  --dry-run
+# 200 + status: "preview" + total_matched: <N>
+```
+
+Drop `--dry-run` to commit. The response carries `status: "deleted"` and `total_deleted: <N>` — synchronous, no `BULK_UPDATE_ACCEPTED` signal, no polling. If any matched row has a confirmed booking, the entire request is rejected with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` (no rows touched); `error.details.total_blocked` plus `sample_availability_ids` (up to 20) identify the blockers — narrow the range or cancel/move the bookings before retrying.
+
+The cascade `Availability → pricingTiers` does NOT run on `bulk-delete` (the server uses a single bulk UPDATE that bypasses model events). This is intentional: pricing tiers are M:N with availabilities, so cascading from one row would soft-delete tier rows still referenced by other availabilities.
+
+### 9. Generate Availabilities from a recurrence (NEW)
 
 Intent: every Saturday 2pm–6pm and every Wednesday 8am–6pm, May–August, on product option 47.
 
@@ -136,6 +169,8 @@ For `date`-type products, `--start-time`/`--end-time` are ignored (slots span fu
 - ⚠️ **Date range is half-open `[from, to)`.** `--from 2026-05-01 --to 2026-06-01` matches every May date, NOT June 1.
 - ⚠️ **Timezone:** dates are interpreted in the tenant's `Organisation.timezone`. A rule for "all of August in tenant TZ" is not the same as "all of August UTC" — server uses tenant TZ.
 - ⚠️ **Pricing bulk-update is additive, not replacive.** Tiers omitted from `--fare` keep their existing fares. To zero out a tier across a range, include it explicitly with the new amount.
+- ⚠️ **Delete / bulk-delete are blocked by confirmed bookings.** Both endpoints precheck for `AVAILABILITY_HAS_CONFIRMED_BOOKING` (409) **including in dry-run**. `bulk-delete` is all-or-nothing — one blocker rejects the entire range, and `error.details.sample_availability_ids` returns up to 20 ids to investigate. Cancel/move the bookings or narrow the range, then retry.
+- ⚠️ **Soft-delete is one-way from the CLI.** Availability has no `restore` endpoint and the schema doesn't surface `deleted_at`. A `delete` / `bulk-delete` mistake is recoverable only via DB intervention by ops.
 
 ## See also
 

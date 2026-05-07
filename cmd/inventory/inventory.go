@@ -517,6 +517,8 @@ func errorCode(err error) string {
 		return "DISCOUNT_NOT_APPLICABLE"
 	case *invpkg.ResourceInUseError:
 		return "RESOURCE_IN_USE"
+	case *invpkg.AvailabilityHasConfirmedBookingError:
+		return "AVAILABILITY_HAS_CONFIRMED_BOOKING"
 	case *invpkg.PayloadTooLargeError:
 		return "PAYLOAD_TOO_LARGE"
 	case *invpkg.UnsupportedMediaTypeError:
