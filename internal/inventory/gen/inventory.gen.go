@@ -1172,6 +1172,17 @@ type BookingPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+// BulkDeleteAvailabilityRequest Filter shape mirrors `BulkUpdateAvailabilityRequest` so a CLI flow
+// that previewed a date-range change can reuse the same payload to
+// delete instead. Range is half-open: rows where `from >= from AND
+// from < to` are matched.
+type BulkDeleteAvailabilityRequest struct {
+	DryRun          *bool              `json:"dry_run,omitempty"`
+	From            openapi_types.Date `json:"from"`
+	ProductOptionId string             `json:"product_option_id"`
+	To              openapi_types.Date `json:"to"`
+}
+
 // BulkUpdateAvailabilityRequest Single setting per request — the underlying `BulkAvailabilityUpdateJob`
 // only handles one setting at a time. To change multiple settings (e.g.
 // capacity AND bookable status), make multiple calls. Server fan-outs
@@ -2570,8 +2581,40 @@ type ListAvailabilitiesParams struct {
 	HasCapacity     *bool               `form:"has_capacity,omitempty" json:"has_capacity,omitempty"`
 }
 
+// BulkDeleteAvailabilitiesParams defines parameters for BulkDeleteAvailabilities.
+type BulkDeleteAvailabilitiesParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // BulkUpdateAvailabilitiesParams defines parameters for BulkUpdateAvailabilities.
 type BulkUpdateAvailabilitiesParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DeleteAvailabilityParams defines parameters for DeleteAvailability.
+type DeleteAvailabilityParams struct {
 	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
 	// body return the original response. Conflicting body returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
@@ -3828,6 +3871,9 @@ type ListTransactionsParamsStatus string
 // ListTransactionsParamsType defines parameters for ListTransactions.
 type ListTransactionsParamsType string
 
+// BulkDeleteAvailabilitiesJSONRequestBody defines body for BulkDeleteAvailabilities for application/json ContentType.
+type BulkDeleteAvailabilitiesJSONRequestBody = BulkDeleteAvailabilityRequest
+
 // BulkUpdateAvailabilitiesJSONRequestBody defines body for BulkUpdateAvailabilities for application/json ContentType.
 type BulkUpdateAvailabilitiesJSONRequestBody = BulkUpdateAvailabilityRequest
 
@@ -4135,10 +4181,18 @@ type ClientInterface interface {
 	// ListAvailabilities request
 	ListAvailabilities(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// BulkDeleteAvailabilitiesWithBody request with any body
+	BulkDeleteAvailabilitiesWithBody(ctx context.Context, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	BulkDeleteAvailabilities(ctx context.Context, params *BulkDeleteAvailabilitiesParams, body BulkDeleteAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// BulkUpdateAvailabilitiesWithBody request with any body
 	BulkUpdateAvailabilitiesWithBody(ctx context.Context, params *BulkUpdateAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	BulkUpdateAvailabilities(ctx context.Context, params *BulkUpdateAvailabilitiesParams, body BulkUpdateAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteAvailability request
+	DeleteAvailability(ctx context.Context, id IdPath, params *DeleteAvailabilityParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ShowAvailability request
 	ShowAvailability(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4494,6 +4548,30 @@ func (c *Client) ListAvailabilities(ctx context.Context, params *ListAvailabilit
 	return c.Client.Do(req)
 }
 
+func (c *Client) BulkDeleteAvailabilitiesWithBody(ctx context.Context, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkDeleteAvailabilitiesRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkDeleteAvailabilities(ctx context.Context, params *BulkDeleteAvailabilitiesParams, body BulkDeleteAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkDeleteAvailabilitiesRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) BulkUpdateAvailabilitiesWithBody(ctx context.Context, params *BulkUpdateAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBulkUpdateAvailabilitiesRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -4508,6 +4586,18 @@ func (c *Client) BulkUpdateAvailabilitiesWithBody(ctx context.Context, params *B
 
 func (c *Client) BulkUpdateAvailabilities(ctx context.Context, params *BulkUpdateAvailabilitiesParams, body BulkUpdateAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBulkUpdateAvailabilitiesRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteAvailability(ctx context.Context, id IdPath, params *DeleteAvailabilityParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteAvailabilityRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6175,6 +6265,61 @@ func NewListAvailabilitiesRequest(server string, params *ListAvailabilitiesParam
 	return req, nil
 }
 
+// NewBulkDeleteAvailabilitiesRequest calls the generic BulkDeleteAvailabilities builder with application/json body
+func NewBulkDeleteAvailabilitiesRequest(server string, params *BulkDeleteAvailabilitiesParams, body BulkDeleteAvailabilitiesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewBulkDeleteAvailabilitiesRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewBulkDeleteAvailabilitiesRequestWithBody generates requests for BulkDeleteAvailabilities with any type of body
+func NewBulkDeleteAvailabilitiesRequestWithBody(server string, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/availabilities/bulk-delete")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewBulkUpdateAvailabilitiesRequest calls the generic BulkUpdateAvailabilities builder with application/json body
 func NewBulkUpdateAvailabilitiesRequest(server string, params *BulkUpdateAvailabilitiesParams, body BulkUpdateAvailabilitiesJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -6211,6 +6356,55 @@ func NewBulkUpdateAvailabilitiesRequestWithBody(server string, params *BulkUpdat
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeleteAvailabilityRequest generates requests for DeleteAvailability
+func NewDeleteAvailabilityRequest(server string, id IdPath, params *DeleteAvailabilityParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/availabilities/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	if params != nil {
 
@@ -11955,10 +12149,18 @@ type ClientWithResponsesInterface interface {
 	// ListAvailabilitiesWithResponse request
 	ListAvailabilitiesWithResponse(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*ListAvailabilitiesResponse, error)
 
+	// BulkDeleteAvailabilitiesWithBodyWithResponse request with any body
+	BulkDeleteAvailabilitiesWithBodyWithResponse(ctx context.Context, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteAvailabilitiesResponse, error)
+
+	BulkDeleteAvailabilitiesWithResponse(ctx context.Context, params *BulkDeleteAvailabilitiesParams, body BulkDeleteAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteAvailabilitiesResponse, error)
+
 	// BulkUpdateAvailabilitiesWithBodyWithResponse request with any body
 	BulkUpdateAvailabilitiesWithBodyWithResponse(ctx context.Context, params *BulkUpdateAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkUpdateAvailabilitiesResponse, error)
 
 	BulkUpdateAvailabilitiesWithResponse(ctx context.Context, params *BulkUpdateAvailabilitiesParams, body BulkUpdateAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkUpdateAvailabilitiesResponse, error)
+
+	// DeleteAvailabilityWithResponse request
+	DeleteAvailabilityWithResponse(ctx context.Context, id IdPath, params *DeleteAvailabilityParams, reqEditors ...RequestEditorFn) (*DeleteAvailabilityResponse, error)
 
 	// ShowAvailabilityWithResponse request
 	ShowAvailabilityWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowAvailabilityResponse, error)
@@ -12325,6 +12527,60 @@ func (r ListAvailabilitiesResponse) StatusCode() int {
 	return 0
 }
 
+type BulkDeleteAvailabilitiesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                         `json:"identifier,omitempty"`
+				PayloadSummary *string                                         `json:"payload_summary,omitempty"`
+				Type           *BulkDeleteAvailabilities200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+			Status *BulkDeleteAvailabilities200DataStatus `json:"status,omitempty"`
+
+			// TotalDeleted Number of rows soft-deleted (present on real call / no-op).
+			TotalDeleted *int `json:"total_deleted,omitempty"`
+
+			// TotalMatched Number of rows the filter matched (present on dry-run).
+			TotalMatched *int `json:"total_matched,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
+}
+type BulkDeleteAvailabilities200DataSideEffectsType string
+type BulkDeleteAvailabilities200DataStatus string
+
+// Status returns HTTPResponse.Status
+func (r BulkDeleteAvailabilitiesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BulkDeleteAvailabilitiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type BulkUpdateAvailabilitiesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12400,6 +12656,36 @@ func (r BulkUpdateAvailabilitiesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r BulkUpdateAvailabilitiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteAvailabilityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteAvailabilityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteAvailabilityResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -15339,6 +15625,23 @@ func (c *ClientWithResponses) ListAvailabilitiesWithResponse(ctx context.Context
 	return ParseListAvailabilitiesResponse(rsp)
 }
 
+// BulkDeleteAvailabilitiesWithBodyWithResponse request with arbitrary body returning *BulkDeleteAvailabilitiesResponse
+func (c *ClientWithResponses) BulkDeleteAvailabilitiesWithBodyWithResponse(ctx context.Context, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteAvailabilitiesResponse, error) {
+	rsp, err := c.BulkDeleteAvailabilitiesWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkDeleteAvailabilitiesResponse(rsp)
+}
+
+func (c *ClientWithResponses) BulkDeleteAvailabilitiesWithResponse(ctx context.Context, params *BulkDeleteAvailabilitiesParams, body BulkDeleteAvailabilitiesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteAvailabilitiesResponse, error) {
+	rsp, err := c.BulkDeleteAvailabilities(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkDeleteAvailabilitiesResponse(rsp)
+}
+
 // BulkUpdateAvailabilitiesWithBodyWithResponse request with arbitrary body returning *BulkUpdateAvailabilitiesResponse
 func (c *ClientWithResponses) BulkUpdateAvailabilitiesWithBodyWithResponse(ctx context.Context, params *BulkUpdateAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkUpdateAvailabilitiesResponse, error) {
 	rsp, err := c.BulkUpdateAvailabilitiesWithBody(ctx, params, contentType, body, reqEditors...)
@@ -15354,6 +15657,15 @@ func (c *ClientWithResponses) BulkUpdateAvailabilitiesWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseBulkUpdateAvailabilitiesResponse(rsp)
+}
+
+// DeleteAvailabilityWithResponse request returning *DeleteAvailabilityResponse
+func (c *ClientWithResponses) DeleteAvailabilityWithResponse(ctx context.Context, id IdPath, params *DeleteAvailabilityParams, reqEditors ...RequestEditorFn) (*DeleteAvailabilityResponse, error) {
+	rsp, err := c.DeleteAvailability(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteAvailabilityResponse(rsp)
 }
 
 // ShowAvailabilityWithResponse request returning *ShowAvailabilityResponse
@@ -16486,6 +16798,80 @@ func ParseListAvailabilitiesResponse(rsp *http.Response) (*ListAvailabilitiesRes
 	return response, nil
 }
 
+// ParseBulkDeleteAvailabilitiesResponse parses an HTTP response from a BulkDeleteAvailabilitiesWithResponse call
+func ParseBulkDeleteAvailabilitiesResponse(rsp *http.Response) (*BulkDeleteAvailabilitiesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &BulkDeleteAvailabilitiesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                         `json:"identifier,omitempty"`
+					PayloadSummary *string                                         `json:"payload_summary,omitempty"`
+					Type           *BulkDeleteAvailabilities200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+				Status *BulkDeleteAvailabilities200DataStatus `json:"status,omitempty"`
+
+				// TotalDeleted Number of rows soft-deleted (present on real call / no-op).
+				TotalDeleted *int `json:"total_deleted,omitempty"`
+
+				// TotalMatched Number of rows the filter matched (present on dry-run).
+				TotalMatched *int `json:"total_matched,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBulkUpdateAvailabilitiesResponse parses an HTTP response from a BulkUpdateAvailabilitiesWithResponse call
 func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvailabilitiesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -16585,6 +16971,58 @@ func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvail
 			return nil, err
 		}
 		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteAvailabilityResponse parses an HTTP response from a DeleteAvailabilityWithResponse call
+func ParseDeleteAvailabilityResponse(rsp *http.Response) (*DeleteAvailabilityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteAvailabilityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	}
 
