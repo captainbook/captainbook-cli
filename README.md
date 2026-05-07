@@ -148,7 +148,7 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `whoami` | get |
 | `products` | list, get, create, update, delete, restore |
 | `product-options` | list, get, create, update, delete, restore |
-| `availabilities` | list, get, update, **bulk-update** (capacity / booking-status / pricing / start-time / end-time), **create-rule** |
+| `availabilities` | list, get, update, delete, **bulk-update** (capacity / booking-status / pricing / start-time / end-time), **bulk-delete**, **create-rule** |
 | `pricing-categories` | list, get, create, update, delete, restore |
 | `pricing-tiers` | list, get, create, update, delete, restore |
 | `resources` | list, get, create, update, delete, restore, **attach**, **detach** |
