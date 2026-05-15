@@ -2862,7 +2862,7 @@ components:
         | Ability     | Required for                                                           |
         | ----------- | ---------------------------------------------------------------------- |
         | `cli:read`  | Always granted alongside read endpoints; not enforced explicitly.      |
-        | `cli:write` | Mutating endpoints: availabilities update / bulk-update, discounts CRUD + apply, gift-certs issue / void / resend, guest update. |
+        | `cli:write` | Mutating endpoints: availabilities update / delete / bulk-update / bulk-delete, discounts CRUD + apply, gift-certs issue / void / resend, guest update. |
         | `cli:cs`    | CS-only sensitive ops: booking comp, booking refund, confirmation resend. Issued only to CS engineers. |
 
         Recommended issuance: a dedicated `cli:read` token for scripted
@@ -3111,7 +3111,8 @@ components:
             UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED,
             IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_UNKNOWN,
             BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
-            REFUND_AMOUNT_EXCEEDS_CHARGE, RATE_LIMITED, INTERNAL_ERROR.
+            REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
+            AVAILABILITY_HAS_CONFIRMED_BOOKING, RATE_LIMITED, INTERNAL_ERROR.
         message:
           type: string
         hint:
@@ -3159,7 +3160,7 @@ components:
           type: object
           properties:
             user_id: { type: integer }
-            email: { type: string, format: email }
+            email: { type: string, description: "Read-only — not validated as RFC-5322. Some legacy/imported rows carry malformed emails." }
             name: { type: string }
             is_cs: { type: boolean }
         tenant:
@@ -3184,10 +3185,13 @@ components:
     Product:
       type: object
       description: |
-        Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+        Mirrors `ProductResource::toArray()`. Translatable text fields
         (`title`, `description`, `instructions`, `requirements`, `inclusions`,
         `exclusions`) are returned in English via
-        `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+        `toArrayWithTranslations('en')`. `description`, `instructions`, and
+        `requirements` are rich-text (HTML accepted). `inclusions` and
+        `exclusions` are plain text — the dashboard renders them as a bullet
+        list, splitting on newlines. `status` is derived from `is_active`
         (`is_active` is also surfaced directly for clients that prefer the
         canonical boolean).
       properties:
@@ -3197,8 +3201,8 @@ components:
         description: { type: string, nullable: true }
         instructions: { type: string, nullable: true, description: "Translatable rich-text shown to confirmed customers." }
         requirements: { type: string, nullable: true, description: "Translatable rich-text — what the customer needs to bring / know." }
-        inclusions: { type: string, nullable: true, description: "Translatable rich-text — what's included." }
-        exclusions: { type: string, nullable: true, description: "Translatable rich-text — what's not included." }
+        inclusions: { type: string, nullable: true, description: "Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — HTML/Markdown will render literally on the customer site, and the server rejects payloads containing HTML tags with 422." }
+        exclusions: { type: string, nullable: true, description: "Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — HTML/Markdown will render literally on the customer site, and the server rejects payloads containing HTML tags with 422." }
         status:
           type: string
           enum: [draft, published]
@@ -3431,7 +3435,7 @@ components:
         id: { type: string }
         available_gift_certificate_id: { type: string, nullable: true }
         code: { type: string, nullable: true }
-        recipient_email: { type: string, format: email, nullable: true }
+        recipient_email: { type: string, nullable: true, description: "Read-only — not validated as RFC-5322. Some legacy/imported rows carry malformed emails." }
         recipient_name: { type: string, nullable: true }
         amount:
           allOf: [{ $ref: "#/components/schemas/Money" }]
@@ -3469,7 +3473,7 @@ components:
       properties:
         id: { type: string, description: "UUID" }
         name: { type: string }
-        email: { type: string, format: email, nullable: true }
+        email: { type: string, nullable: true, description: "Read-only — not validated as RFC-5322. Some legacy/imported rows carry malformed emails." }
         phone: { type: string, nullable: true }
         zip_code: { type: string, nullable: true }
         country: { type: string, nullable: true, description: "ISO 3166-1 alpha-2" }
@@ -3481,7 +3485,7 @@ components:
             Customer's preferred locales in priority order.
             `Customer::preferredLocale()` returns `locales->first()` (defaulting
             to 'en' if empty).
-        secondary_email: { type: string, format: email, nullable: true, description: "Secondary contact email; receives notifications alongside `email`" }
+        secondary_email: { type: string, nullable: true, description: "Secondary contact email; receives notifications alongside `email`. Read-only — not validated as RFC-5322." }
         stripe_id: { type: string, nullable: true, description: "Stripe customer ID; nullable if never charged" }
         extra_attributes:
           type: object
@@ -3521,7 +3525,7 @@ components:
           properties:
             id: { type: string }
             name: { type: string }
-            email: { type: string, format: email }
+            email: { type: string, nullable: true, description: "Read-only — not validated as RFC-5322. Sourced from the linked Customer; legacy/imported rows (channel imports, manual walk-ins) commonly have no email and serialize as null. Generated clients must not assume RFC-5322 conformance." }
             phone: { type: string, nullable: true }
         guests:
           type: array
@@ -3624,7 +3628,7 @@ components:
         id: { type: string }
         booking_id: { type: string }
         name: { type: string }
-        email: { type: string, format: email, nullable: true }
+        email: { type: string, nullable: true, description: "Read-only — not validated as RFC-5322. Sourced from the linked Customer; legacy/imported rows can carry malformed emails." }
         phone: { type: string, nullable: true }
         passport: { type: string, nullable: true }
         dob: { type: string, format: date, nullable: true }
@@ -3696,6 +3700,20 @@ components:
         status:
           type: string
           enum: [available, blocked, cancelled]
+        dry_run: { type: boolean, default: false }
+
+    BulkDeleteAvailabilityRequest:
+      type: object
+      required: [product_option_id, from, to]
+      description: |
+        Filter shape mirrors `BulkUpdateAvailabilityRequest` so a CLI flow
+        that previewed a date-range change can reuse the same payload to
+        delete instead. Range is half-open: rows where `from >= from AND
+        from < to` are matched.
+      properties:
+        product_option_id: { type: string }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
         dry_run: { type: boolean, default: false }
 
     CreateAvailabilityRuleRequest:
@@ -3783,20 +3801,6 @@ components:
               description: "When `setting=start_time` or `setting=end_time`."
         dry_run: { type: boolean, default: false }
 
-    BulkDeleteAvailabilityRequest:
-      type: object
-      required: [product_option_id, from, to]
-      description: |
-        Filter shape mirrors `BulkUpdateAvailabilityRequest` so a CLI flow
-        that previewed a date-range change can reuse the same payload to
-        delete instead. Range is half-open: rows where `from >= from AND
-        from < to` are matched.
-      properties:
-        product_option_id: { type: string }
-        from: { type: string, format: date }
-        to: { type: string, format: date }
-        dry_run: { type: boolean, default: false }
-
     CreateDiscountRequest:
       type: object
       required: [code, validity_start]
@@ -3854,10 +3858,17 @@ components:
         notify_customer: { type: boolean, default: true }
         refund_policy:
           type: string
-          enum: [auto, none, full, partial]
+          enum: [none, full, partial]
           description: |
-            `auto` applies the product's cancellation policy. `none`, `full`,
-            `partial` override (CS only — operator tokens are 403 on overrides).
+            `none`, `full`, `partial` override the product's cancellation
+            policy (CS only — operator tokens are 403 on overrides). All
+            three are CS-attributed in the audit log.
+
+            `auto` is **not yet supported** in V1: `Product.cancellation_policy`
+            is a free-text human description, and there is no machine policy
+            engine to derive a refund amount from it. Callers that pass
+            `auto` receive `422 POLICY_AUTO_NOT_READY`. `auto` will be
+            re-added to this enum once the structured policy engine ships.
         refund_amount:
           $ref: "#/components/schemas/Money"
           description: Required when refund_policy=partial
@@ -4149,17 +4160,21 @@ components:
         a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). `description` is
         optional on the wire but is materialized as `{"en": ""}` server-side
         when omitted, because `central_products.description` is NOT NULL.
-        Translatable rich-text fields (`description`, `instructions`,
+        Translatable text fields (`description`, `instructions`,
         `requirements`, `inclusions`, `exclusions`) accept bare strings;
         the server wraps them into the `{"en": "..."}` HasTranslations bag.
+        `description`, `instructions`, and `requirements` are rich-text
+        (HTML accepted). `inclusions` and `exclusions` are plain text — the
+        server rejects payloads containing HTML tags with 422; use a newline
+        between each bullet item.
       properties:
         title: { type: string, maxLength: 200 }
         product_code: { type: string, maxLength: 50, nullable: true, description: "Tenant-supplied SKU. Auto-generated from title when omitted." }
         description: { type: string, nullable: true, description: "Defaults to empty string server-side when omitted (central_products.description is NOT NULL)." }
         instructions: { type: string, nullable: true, description: "Rich text shown to confirmed customers. Translatable." }
         requirements: { type: string, nullable: true, description: "Rich text — what the customer needs. Translatable." }
-        inclusions: { type: string, nullable: true, description: "Rich text — what's included. Translatable." }
-        exclusions: { type: string, nullable: true, description: "Rich text — what's not included. Translatable." }
+        inclusions: { type: string, nullable: true, description: "Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422." }
+        exclusions: { type: string, nullable: true, description: "Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422." }
         status:
           type: string
           enum: [draft, published]
@@ -4201,8 +4216,8 @@ components:
         description: { type: string, nullable: true }
         instructions: { type: string, nullable: true }
         requirements: { type: string, nullable: true }
-        inclusions: { type: string, nullable: true }
-        exclusions: { type: string, nullable: true }
+        inclusions: { type: string, nullable: true, description: "Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422." }
+        exclusions: { type: string, nullable: true, description: "Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422." }
         status:
           type: string
           enum: [draft, published]

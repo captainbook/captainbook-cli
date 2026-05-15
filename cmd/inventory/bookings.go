@@ -134,7 +134,7 @@ func bookingsDefs() []CommandDef {
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
 				{Name: "reason", Type: "string", Required: true, Description: "Cancellation reason"},
-				{Name: "refund-policy", Type: "string", Required: true, Description: "auto|none|full|partial (spec: required; CS-only for non-auto)"},
+				{Name: "refund-policy", Type: "string", Required: true, Description: "none|full|partial (spec: required; CS-only for overrides)"},
 				{Name: "refund-amount", Type: "int", Description: "Refund amount in minor units (only with partial)"},
 				// Server's CancelBookingRequest defaults notify_customer to TRUE.
 				// Mirror that default at the cobra layer so --help reads "(default

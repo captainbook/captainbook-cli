@@ -120,7 +120,6 @@ func (e BulkUpdateAvailabilityRequestSetting) Valid() bool {
 
 // Defines values for CancelBookingRequestRefundPolicy.
 const (
-	CancelBookingRequestRefundPolicyAuto    CancelBookingRequestRefundPolicy = "auto"
 	CancelBookingRequestRefundPolicyFull    CancelBookingRequestRefundPolicy = "full"
 	CancelBookingRequestRefundPolicyNone    CancelBookingRequestRefundPolicy = "none"
 	CancelBookingRequestRefundPolicyPartial CancelBookingRequestRefundPolicy = "partial"
@@ -129,8 +128,6 @@ const (
 // Valid indicates whether the value is a known member of the CancelBookingRequestRefundPolicy enum.
 func (e CancelBookingRequestRefundPolicy) Valid() bool {
 	switch e {
-	case CancelBookingRequestRefundPolicyAuto:
-		return true
 	case CancelBookingRequestRefundPolicyFull:
 		return true
 	case CancelBookingRequestRefundPolicyNone:
@@ -1119,10 +1116,11 @@ type Booking struct {
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
 	Currency    *string    `json:"currency,omitempty"`
 	Customer    *struct {
-		Email *openapi_types.Email `json:"email,omitempty"`
-		Id    *string              `json:"id,omitempty"`
-		Name  *string              `json:"name,omitempty"`
-		Phone *string              `json:"phone,omitempty"`
+		// Email Read-only — not validated as RFC-5322. Sourced from the linked Customer; legacy/imported rows (channel imports, manual walk-ins) commonly have no email and serialize as null. Generated clients must not assume RFC-5322 conformance.
+		Email *string `json:"email,omitempty"`
+		Id    *string `json:"id,omitempty"`
+		Name  *string `json:"name,omitempty"`
+		Phone *string `json:"phone,omitempty"`
 	} `json:"customer,omitempty"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 
@@ -1248,13 +1246,27 @@ type CancelBookingRequest struct {
 	// RefundAmount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
 	RefundAmount *Money `json:"refund_amount,omitempty"`
 
-	// RefundPolicy `auto` applies the product's cancellation policy. `none`, `full`,
-	// `partial` override (CS only — operator tokens are 403 on overrides).
+	// RefundPolicy `none`, `full`, `partial` override the product's cancellation
+	// policy (CS only — operator tokens are 403 on overrides). All
+	// three are CS-attributed in the audit log.
+	//
+	// `auto` is **not yet supported** in V1: `Product.cancellation_policy`
+	// is a free-text human description, and there is no machine policy
+	// engine to derive a refund amount from it. Callers that pass
+	// `auto` receive `422 POLICY_AUTO_NOT_READY`. `auto` will be
+	// re-added to this enum once the structured policy engine ships.
 	RefundPolicy CancelBookingRequestRefundPolicy `json:"refund_policy"`
 }
 
-// CancelBookingRequestRefundPolicy `auto` applies the product's cancellation policy. `none`, `full`,
-// `partial` override (CS only — operator tokens are 403 on overrides).
+// CancelBookingRequestRefundPolicy `none`, `full`, `partial` override the product's cancellation
+// policy (CS only — operator tokens are 403 on overrides). All
+// three are CS-attributed in the audit log.
+//
+// `auto` is **not yet supported** in V1: `Product.cancellation_policy`
+// is a free-text human description, and there is no machine policy
+// engine to derive a refund amount from it. Callers that pass
+// `auto` receive `422 POLICY_AUTO_NOT_READY`. `auto` will be
+// re-added to this enum once the structured policy engine ships.
 type CancelBookingRequestRefundPolicy string
 
 // Category Read-only resource (no Create/Update endpoints — Phase 1B + commit
@@ -1489,9 +1501,13 @@ type CreateProductOptionRequest struct {
 // a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). `description` is
 // optional on the wire but is materialized as `{"en": ""}` server-side
 // when omitted, because `central_products.description` is NOT NULL.
-// Translatable rich-text fields (`description`, `instructions`,
+// Translatable text fields (`description`, `instructions`,
 // `requirements`, `inclusions`, `exclusions`) accept bare strings;
 // the server wraps them into the `{"en": "..."}` HasTranslations bag.
+// `description`, `instructions`, and `requirements` are rich-text
+// (HTML accepted). `inclusions` and `exclusions` are plain text — the
+// server rejects payloads containing HTML tags with 422; use a newline
+// between each bullet item.
 type CreateProductRequest struct {
 	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
@@ -1509,7 +1525,7 @@ type CreateProductRequest struct {
 	Displayable *bool `json:"displayable,omitempty"`
 	DryRun      *bool `json:"dry_run,omitempty"`
 
-	// Exclusions Rich text — what's not included. Translatable.
+	// Exclusions Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422.
 	Exclusions *string `json:"exclusions,omitempty"`
 
 	// FromPrice Minor units.
@@ -1518,7 +1534,7 @@ type CreateProductRequest struct {
 	// FromPriceLabel Caption shown next to `from_price` (e.g., `From €50/person`).
 	FromPriceLabel *string `json:"from_price_label,omitempty"`
 
-	// Inclusions Rich text — what's included. Translatable.
+	// Inclusions Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422.
 	Inclusions *string `json:"inclusions,omitempty"`
 
 	// Instructions Rich text shown to confirmed customers. Translatable.
@@ -1620,8 +1636,10 @@ type Customer struct {
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
-	DeletedAt *time.Time           `json:"deleted_at,omitempty"`
-	Email     *openapi_types.Email `json:"email,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+
+	// Email Read-only — not validated as RFC-5322. Some legacy/imported rows carry malformed emails.
+	Email *string `json:"email,omitempty"`
 
 	// ExtraAttributes Schemaless attributes (Spatie `SchemalessAttributes` cast)
 	ExtraAttributes *map[string]interface{} `json:"extra_attributes,omitempty"`
@@ -1639,8 +1657,8 @@ type Customer struct {
 	Notes *string `json:"notes,omitempty"`
 	Phone *string `json:"phone,omitempty"`
 
-	// SecondaryEmail Secondary contact email; receives notifications alongside `email`
-	SecondaryEmail *openapi_types.Email `json:"secondary_email,omitempty"`
+	// SecondaryEmail Secondary contact email; receives notifications alongside `email`. Read-only — not validated as RFC-5322.
+	SecondaryEmail *string `json:"secondary_email,omitempty"`
 
 	// StripeId Stripe customer ID; nullable if never charged
 	StripeId  *string    `json:"stripe_id,omitempty"`
@@ -1733,7 +1751,8 @@ type Error struct {
 	// UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED,
 	// IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_UNKNOWN,
 	// BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
-	// REFUND_AMOUNT_EXCEEDS_CHARGE, RATE_LIMITED, INTERNAL_ERROR.
+	// REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
+	// AVAILABILITY_HAS_CONFIRMED_BOOKING, RATE_LIMITED, INTERNAL_ERROR.
 	Code string `json:"code"`
 
 	// Details Per-field validation errors or domain-specific context
@@ -1811,11 +1830,13 @@ type GiftCertificate struct {
 	Currency                   *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when the cert is voided (status maps to `void`).
-	DeletedAt       *time.Time             `json:"deleted_at,omitempty"`
-	ExpiresAt       *time.Time             `json:"expires_at,omitempty"`
-	Id              *string                `json:"id,omitempty"`
-	IssuedAt        *time.Time             `json:"issued_at,omitempty"`
-	RecipientEmail  *openapi_types.Email   `json:"recipient_email,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Id        *string    `json:"id,omitempty"`
+	IssuedAt  *time.Time `json:"issued_at,omitempty"`
+
+	// RecipientEmail Read-only — not validated as RFC-5322. Some legacy/imported rows carry malformed emails.
+	RecipientEmail  *string                `json:"recipient_email,omitempty"`
 	RecipientName   *string                `json:"recipient_name,omitempty"`
 	RemainingAmount *Money                 `json:"remaining_amount,omitempty"`
 	Status          *GiftCertificateStatus `json:"status,omitempty"`
@@ -1842,11 +1863,13 @@ type Guest struct {
 	CustomAttributes *map[string]interface{} `json:"custom_attributes,omitempty"`
 	Dietary          *string                 `json:"dietary,omitempty"`
 	Dob              *openapi_types.Date     `json:"dob,omitempty"`
-	Email            *openapi_types.Email    `json:"email,omitempty"`
-	Id               *string                 `json:"id,omitempty"`
-	Name             *string                 `json:"name,omitempty"`
-	Passport         *string                 `json:"passport,omitempty"`
-	Phone            *string                 `json:"phone,omitempty"`
+
+	// Email Read-only — not validated as RFC-5322. Sourced from the linked Customer; legacy/imported rows can carry malformed emails.
+	Email    *string `json:"email,omitempty"`
+	Id       *string `json:"id,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	Passport *string `json:"passport,omitempty"`
+	Phone    *string `json:"phone,omitempty"`
 }
 
 // GuestPage defines model for GuestPage.
@@ -2059,10 +2082,13 @@ type PricingTierPage struct {
 	Pagination *Pagination   `json:"pagination,omitempty"`
 }
 
-// Product Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+// Product Mirrors `ProductResource::toArray()`. Translatable text fields
 // (`title`, `description`, `instructions`, `requirements`, `inclusions`,
 // `exclusions`) are returned in English via
-// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+// `requirements` are rich-text (HTML accepted). `inclusions` and
+// `exclusions` are plain text — the dashboard renders them as a bullet
+// list, splitting on newlines. `status` is derived from `is_active`
 // (`is_active` is also surfaced directly for clients that prefer the
 // canonical boolean).
 type Product struct {
@@ -2085,7 +2111,7 @@ type Product struct {
 	// Displayable Whether the product is shown in widgets / catalog.
 	Displayable *bool `json:"displayable,omitempty"`
 
-	// Exclusions Translatable rich-text — what's not included.
+	// Exclusions Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — HTML/Markdown will render literally on the customer site, and the server rejects payloads containing HTML tags with 422.
 	Exclusions *string `json:"exclusions,omitempty"`
 	FromPrice  *Money  `json:"from_price,omitempty"`
 
@@ -2093,7 +2119,7 @@ type Product struct {
 	FromPriceLabel *string `json:"from_price_label,omitempty"`
 	Id             *string `json:"id,omitempty"`
 
-	// Inclusions Translatable rich-text — what's included.
+	// Inclusions Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — HTML/Markdown will render literally on the customer site, and the server rejects payloads containing HTML tags with 422.
 	Inclusions *string `json:"inclusions,omitempty"`
 
 	// Instructions Translatable rich-text shown to confirmed customers.
@@ -2445,12 +2471,16 @@ type UpdateProductRequest struct {
 	Description            *string `json:"description,omitempty"`
 	Displayable            *bool   `json:"displayable,omitempty"`
 	DryRun                 *bool   `json:"dry_run,omitempty"`
-	Exclusions             *string `json:"exclusions,omitempty"`
-	FromPrice              *int    `json:"from_price,omitempty"`
-	FromPriceLabel         *string `json:"from_price_label,omitempty"`
-	Inclusions             *string `json:"inclusions,omitempty"`
-	Instructions           *string `json:"instructions,omitempty"`
-	IsPricedPerPerson      *bool   `json:"is_priced_per_person,omitempty"`
+
+	// Exclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422.
+	Exclusions     *string `json:"exclusions,omitempty"`
+	FromPrice      *int    `json:"from_price,omitempty"`
+	FromPriceLabel *string `json:"from_price_label,omitempty"`
+
+	// Inclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422.
+	Inclusions        *string `json:"inclusions,omitempty"`
+	Instructions      *string `json:"instructions,omitempty"`
+	IsPricedPerPerson *bool   `json:"is_priced_per_person,omitempty"`
 
 	// IsPrivate Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and seven inventory recompute jobs are dispatched. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description.
 	IsPrivate                      *bool   `json:"is_private,omitempty"`
@@ -2505,10 +2535,11 @@ type UpdateResourceRequestCategory string
 // WhoamiData defines model for WhoamiData.
 type WhoamiData struct {
 	Actor *struct {
-		Email  *openapi_types.Email `json:"email,omitempty"`
-		IsCs   *bool                `json:"is_cs,omitempty"`
-		Name   *string              `json:"name,omitempty"`
-		UserId *int                 `json:"user_id,omitempty"`
+		// Email Read-only — not validated as RFC-5322. Some legacy/imported rows carry malformed emails.
+		Email  *string `json:"email,omitempty"`
+		IsCs   *bool   `json:"is_cs,omitempty"`
+		Name   *string `json:"name,omitempty"`
+		UserId *int    `json:"user_id,omitempty"`
 	} `json:"actor,omitempty"`
 	Tenant *struct {
 		Currency *string `json:"currency,omitempty"`
@@ -14913,10 +14944,13 @@ type CreateProductResponse struct {
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
 
-			// Product Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+			// Product Mirrors `ProductResource::toArray()`. Translatable text fields
 			// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
 			// `exclusions`) are returned in English via
-			// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+			// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+			// `requirements` are rich-text (HTML accepted). `inclusions` and
+			// `exclusions` are plain text — the dashboard renders them as a bullet
+			// list, splitting on newlines. `status` is derived from `is_active`
 			// (`is_active` is also surfaced directly for clients that prefer the
 			// canonical boolean).
 			Product *Product `json:"product,omitempty"`
@@ -14984,10 +15018,13 @@ type ShowProductResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// Data Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+		// Data Mirrors `ProductResource::toArray()`. Translatable text fields
 		// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
 		// `exclusions`) are returned in English via
-		// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+		// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+		// `requirements` are rich-text (HTML accepted). `inclusions` and
+		// `exclusions` are plain text — the dashboard renders them as a bullet
+		// list, splitting on newlines. `status` is derived from `is_active`
 		// (`is_active` is also surfaced directly for clients that prefer the
 		// canonical boolean).
 		Data       Product     `json:"data"`
@@ -20469,10 +20506,13 @@ func ParseCreateProductResponse(rsp *http.Response) (*CreateProductResponse, err
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
 
-				// Product Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+				// Product Mirrors `ProductResource::toArray()`. Translatable text fields
 				// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
 				// `exclusions`) are returned in English via
-				// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+				// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+				// `requirements` are rich-text (HTML accepted). `inclusions` and
+				// `exclusions` are plain text — the dashboard renders them as a bullet
+				// list, splitting on newlines. `status` is derived from `is_active`
 				// (`is_active` is also surfaced directly for clients that prefer the
 				// canonical boolean).
 				Product *Product `json:"product,omitempty"`
@@ -20577,10 +20617,13 @@ func ParseShowProductResponse(rsp *http.Response) (*ShowProductResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Data Mirrors `ProductResource::toArray()`. Translatable rich-text fields
+			// Data Mirrors `ProductResource::toArray()`. Translatable text fields
 			// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
 			// `exclusions`) are returned in English via
-			// `toArrayWithTranslations('en')`. `status` is derived from `is_active`
+			// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+			// `requirements` are rich-text (HTML accepted). `inclusions` and
+			// `exclusions` are plain text — the dashboard renders them as a bullet
+			// list, splitting on newlines. `status` is derived from `is_active`
 			// (`is_active` is also surfaced directly for clients that prefer the
 			// canonical boolean).
 			Data       Product     `json:"data"`
