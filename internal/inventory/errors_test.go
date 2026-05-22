@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+func int64Ptr(n int64) *int64 { return &n }
+
 // TestUserMessages walks every typed error in the taxonomy and asserts both
 // the developer-facing Error() and user-facing UserMessage() outputs. Adding
 // a new typed error: append a row here.
@@ -112,6 +114,39 @@ func TestUserMessages(t *testing.T) {
 			err:         &AvailabilityHasConfirmedBookingError{TotalBlocked: 3},
 			wantError:   "AVAILABILITY_HAS_CONFIRMED_BOOKING: total_blocked=3",
 			wantMessage: "3 availability rows in the matched range have confirmed bookings; entire bulk-delete rejected. Cancel/move the bookings or narrow the range.",
+		},
+		{
+			name:        "WorkflowNotEditableError_with_status_and_hint",
+			err:         &WorkflowNotEditableError{Status: "active", Hint: "Deactivate first."},
+			wantError:   "WORKFLOW_NOT_EDITABLE: status=active",
+			wantMessage: "workflow is not editable (current status: active). Trigger and step writes require status ∈ {DRAFT, PAUSED}. Run `workflows deactivate <id>` first, or use shell PATCH (name/description/notify_on_fail/max_credits_per_run) which is allowed on ACTIVE.\n  hint: Deactivate first.",
+		},
+		{
+			name:        "WorkflowNotEditableError_bare",
+			err:         &WorkflowNotEditableError{},
+			wantError:   "WORKFLOW_NOT_EDITABLE",
+			wantMessage: "workflow is not editable. Trigger and step writes require status ∈ {DRAFT, PAUSED}. Run `workflows deactivate <id>` first, or use shell PATCH (name/description/notify_on_fail/max_credits_per_run) which is allowed on ACTIVE.",
+		},
+		{
+			name: "WorkflowNotActivatableError_with_failures",
+			err: &WorkflowNotActivatableError{
+				Hint: "Fix the validation errors below and try activating again.",
+				Errors: []WorkflowActivationFailure{
+					{Code: "NO_TRIGGER", Message: "Workflow has no trigger step."},
+					{Code: "INVALID_STEP_CONFIG", Message: "Step config invalid.", StepID: int64Ptr(42)},
+				},
+			},
+			wantError: "WORKFLOW_NOT_ACTIVATABLE (2 failures)",
+			wantMessage: "workflow cannot be activated:\n" +
+				"  - NO_TRIGGER: Workflow has no trigger step.\n" +
+				"  - INVALID_STEP_CONFIG (step 42): Step config invalid.\n" +
+				"  hint: Fix the validation errors below and try activating again.",
+		},
+		{
+			name:        "WorkflowNotActivatableError_empty",
+			err:         &WorkflowNotActivatableError{Hint: "see logs"},
+			wantError:   "WORKFLOW_NOT_ACTIVATABLE (0 failures)",
+			wantMessage: "workflow cannot be activated\n  hint: see logs",
 		},
 		{
 			name:        "PayloadTooLargeError",
@@ -455,6 +490,75 @@ func TestParseError(t *testing.T) {
 				}
 				if len(e.SampleAvailabilityIDs) != 3 {
 					t.Errorf("wrong sample ids: %v", e.SampleAvailabilityIDs)
+				}
+			},
+		},
+		{
+			name:   "WORKFLOW_NOT_EDITABLE carries status + hint",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"WORKFLOW_NOT_EDITABLE","message":"not editable","hint":"Deactivate first.","retriable":false,
+				"details":{"status":"active"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *WorkflowNotEditableError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *WorkflowNotEditableError, got %T", err)
+				}
+				if e.Status != "active" {
+					t.Errorf("wrong Status: %q", e.Status)
+				}
+				if e.Hint != "Deactivate first." {
+					t.Errorf("wrong Hint: %q", e.Hint)
+				}
+			},
+		},
+		{
+			name:   "WORKFLOW_NOT_EDITABLE tolerates alternate workflow_status key",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"WORKFLOW_NOT_EDITABLE","message":"x","retriable":false,
+				"details":{"workflow_status":"active"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *WorkflowNotEditableError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *WorkflowNotEditableError, got %T", err)
+				}
+				if e.Status != "active" {
+					t.Errorf("wrong Status from workflow_status fallback: %q", e.Status)
+				}
+			},
+		},
+		{
+			name:   "WORKFLOW_NOT_ACTIVATABLE extracts errors[] with step_id",
+			status: 422,
+			body: `{"meta":{},"error":{
+				"code":"WORKFLOW_NOT_ACTIVATABLE",
+				"message":"Workflow cannot be activated.",
+				"hint":"Fix the validation errors below and try activating again.",
+				"retriable":false,
+				"details":{"errors":[
+					{"code":"NO_TRIGGER","message":"Workflow has no trigger step."},
+					{"code":"INVALID_STEP_CONFIG","message":"Step config invalid.","step_id":42}
+				]}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *WorkflowNotActivatableError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *WorkflowNotActivatableError, got %T", err)
+				}
+				if len(e.Errors) != 2 {
+					t.Fatalf("want 2 failures, got %d: %+v", len(e.Errors), e.Errors)
+				}
+				if e.Errors[0].Code != "NO_TRIGGER" || e.Errors[0].StepID != nil {
+					t.Errorf("first failure mis-decoded: %+v", e.Errors[0])
+				}
+				if e.Errors[1].Code != "INVALID_STEP_CONFIG" || e.Errors[1].StepID == nil || *e.Errors[1].StepID != 42 {
+					t.Errorf("second failure mis-decoded: %+v", e.Errors[1])
+				}
+				if e.Hint == "" {
+					t.Error("Hint dropped")
 				}
 			},
 		},

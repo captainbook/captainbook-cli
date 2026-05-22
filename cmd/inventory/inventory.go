@@ -519,6 +519,10 @@ func errorCode(err error) string {
 		return "RESOURCE_IN_USE"
 	case *invpkg.AvailabilityHasConfirmedBookingError:
 		return "AVAILABILITY_HAS_CONFIRMED_BOOKING"
+	case *invpkg.WorkflowNotEditableError:
+		return "WORKFLOW_NOT_EDITABLE"
+	case *invpkg.WorkflowNotActivatableError:
+		return "WORKFLOW_NOT_ACTIVATABLE"
 	case *invpkg.PayloadTooLargeError:
 		return "PAYLOAD_TOO_LARGE"
 	case *invpkg.UnsupportedMediaTypeError:
