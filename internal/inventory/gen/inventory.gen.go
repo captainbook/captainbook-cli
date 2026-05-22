@@ -319,6 +319,138 @@ func (e CreateResourceRequestCategory) Valid() bool {
 	}
 }
 
+// Defines values for CreateWorkflowStepRequestBranchType.
+const (
+	CreateWorkflowStepRequestBranchTypeFalse CreateWorkflowStepRequestBranchType = "false"
+	CreateWorkflowStepRequestBranchTypeTrue  CreateWorkflowStepRequestBranchType = "true"
+)
+
+// Valid indicates whether the value is a known member of the CreateWorkflowStepRequestBranchType enum.
+func (e CreateWorkflowStepRequestBranchType) Valid() bool {
+	switch e {
+	case CreateWorkflowStepRequestBranchTypeFalse:
+		return true
+	case CreateWorkflowStepRequestBranchTypeTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateWorkflowStepRequestConditionType.
+const (
+	CreateWorkflowStepRequestConditionTypeFilter     CreateWorkflowStepRequestConditionType = "filter"
+	CreateWorkflowStepRequestConditionTypeValueCheck CreateWorkflowStepRequestConditionType = "value_check"
+)
+
+// Valid indicates whether the value is a known member of the CreateWorkflowStepRequestConditionType enum.
+func (e CreateWorkflowStepRequestConditionType) Valid() bool {
+	switch e {
+	case CreateWorkflowStepRequestConditionTypeFilter:
+		return true
+	case CreateWorkflowStepRequestConditionTypeValueCheck:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateWorkflowStepRequestStepType.
+const (
+	CreateWorkflowStepRequestStepTypeAction     CreateWorkflowStepRequestStepType = "action"
+	CreateWorkflowStepRequestStepTypeCondition  CreateWorkflowStepRequestStepType = "condition"
+	CreateWorkflowStepRequestStepTypeDelay      CreateWorkflowStepRequestStepType = "delay"
+	CreateWorkflowStepRequestStepTypeDelayUntil CreateWorkflowStepRequestStepType = "delay_until"
+	CreateWorkflowStepRequestStepTypeLoop       CreateWorkflowStepRequestStepType = "loop"
+)
+
+// Valid indicates whether the value is a known member of the CreateWorkflowStepRequestStepType enum.
+func (e CreateWorkflowStepRequestStepType) Valid() bool {
+	switch e {
+	case CreateWorkflowStepRequestStepTypeAction:
+		return true
+	case CreateWorkflowStepRequestStepTypeCondition:
+		return true
+	case CreateWorkflowStepRequestStepTypeDelay:
+		return true
+	case CreateWorkflowStepRequestStepTypeDelayUntil:
+		return true
+	case CreateWorkflowStepRequestStepTypeLoop:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateWorkflowTriggerRequestActionType.
+const (
+	AbandonedBooking                     CreateWorkflowTriggerRequestActionType = "abandoned_booking"
+	AllMandatoryQuestionsAnswered        CreateWorkflowTriggerRequestActionType = "all_mandatory_questions_answered"
+	AuxiliaryResourceAttachedToBooking   CreateWorkflowTriggerRequestActionType = "auxiliary_resource_attached_to_booking"
+	AuxiliaryResourceDetachedFromBooking CreateWorkflowTriggerRequestActionType = "auxiliary_resource_detached_from_booking"
+	BookingCancelled                     CreateWorkflowTriggerRequestActionType = "booking_cancelled"
+	BookingChanged                       CreateWorkflowTriggerRequestActionType = "booking_changed"
+	BookingConfirmed                     CreateWorkflowTriggerRequestActionType = "booking_confirmed"
+	BookingRescheduled                   CreateWorkflowTriggerRequestActionType = "booking_rescheduled"
+	BookingResourceAttached              CreateWorkflowTriggerRequestActionType = "booking_resource_attached"
+	BookingResourceDetached              CreateWorkflowTriggerRequestActionType = "booking_resource_detached"
+	BookingTransactionProcessed          CreateWorkflowTriggerRequestActionType = "booking_transaction_processed"
+	CustomAttributeUpdated               CreateWorkflowTriggerRequestActionType = "custom_attribute_updated"
+	CustomerCreated                      CreateWorkflowTriggerRequestActionType = "customer_created"
+	DiaryNotesUpdated                    CreateWorkflowTriggerRequestActionType = "diary_notes_updated"
+	DocumentsSignedComplete              CreateWorkflowTriggerRequestActionType = "documents_signed_complete"
+	ScheduledTime                        CreateWorkflowTriggerRequestActionType = "scheduled_time"
+	UnknownBookingCancellation           CreateWorkflowTriggerRequestActionType = "unknown_booking_cancellation"
+	WaitlistJoined                       CreateWorkflowTriggerRequestActionType = "waitlist_joined"
+	Webhook                              CreateWorkflowTriggerRequestActionType = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the CreateWorkflowTriggerRequestActionType enum.
+func (e CreateWorkflowTriggerRequestActionType) Valid() bool {
+	switch e {
+	case AbandonedBooking:
+		return true
+	case AllMandatoryQuestionsAnswered:
+		return true
+	case AuxiliaryResourceAttachedToBooking:
+		return true
+	case AuxiliaryResourceDetachedFromBooking:
+		return true
+	case BookingCancelled:
+		return true
+	case BookingChanged:
+		return true
+	case BookingConfirmed:
+		return true
+	case BookingRescheduled:
+		return true
+	case BookingResourceAttached:
+		return true
+	case BookingResourceDetached:
+		return true
+	case BookingTransactionProcessed:
+		return true
+	case CustomAttributeUpdated:
+		return true
+	case CustomerCreated:
+		return true
+	case DiaryNotesUpdated:
+		return true
+	case DocumentsSignedComplete:
+		return true
+	case ScheduledTime:
+		return true
+	case UnknownBookingCancellation:
+		return true
+	case WaitlistJoined:
+		return true
+	case Webhook:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GiftCertificateStatus.
 const (
 	GiftCertificateStatusActive   GiftCertificateStatus = "active"
@@ -817,6 +949,159 @@ func (e UpdateResourceRequestCategory) Valid() bool {
 	}
 }
 
+// Defines values for WorkflowStatus.
+const (
+	WorkflowStatusActive WorkflowStatus = "active"
+	WorkflowStatusDraft  WorkflowStatus = "draft"
+	WorkflowStatusPaused WorkflowStatus = "paused"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowStatus enum.
+func (e WorkflowStatus) Valid() bool {
+	switch e {
+	case WorkflowStatusActive:
+		return true
+	case WorkflowStatusDraft:
+		return true
+	case WorkflowStatusPaused:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkflowExecutionFailReason.
+const (
+	WorkflowDeletedMidRun WorkflowExecutionFailReason = "workflow_deleted_mid_run"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowExecutionFailReason enum.
+func (e WorkflowExecutionFailReason) Valid() bool {
+	switch e {
+	case WorkflowDeletedMidRun:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkflowExecutionStatus.
+const (
+	WorkflowExecutionStatusCompleted WorkflowExecutionStatus = "completed"
+	WorkflowExecutionStatusFailed    WorkflowExecutionStatus = "failed"
+	WorkflowExecutionStatusPending   WorkflowExecutionStatus = "pending"
+	WorkflowExecutionStatusRunning   WorkflowExecutionStatus = "running"
+	WorkflowExecutionStatusWaiting   WorkflowExecutionStatus = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowExecutionStatus enum.
+func (e WorkflowExecutionStatus) Valid() bool {
+	switch e {
+	case WorkflowExecutionStatusCompleted:
+		return true
+	case WorkflowExecutionStatusFailed:
+		return true
+	case WorkflowExecutionStatusPending:
+		return true
+	case WorkflowExecutionStatusRunning:
+		return true
+	case WorkflowExecutionStatusWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkflowExecutionLogStatus.
+const (
+	WorkflowExecutionLogStatusCompleted WorkflowExecutionLogStatus = "completed"
+	WorkflowExecutionLogStatusFailed    WorkflowExecutionLogStatus = "failed"
+	WorkflowExecutionLogStatusPending   WorkflowExecutionLogStatus = "pending"
+	WorkflowExecutionLogStatusRunning   WorkflowExecutionLogStatus = "running"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowExecutionLogStatus enum.
+func (e WorkflowExecutionLogStatus) Valid() bool {
+	switch e {
+	case WorkflowExecutionLogStatusCompleted:
+		return true
+	case WorkflowExecutionLogStatusFailed:
+		return true
+	case WorkflowExecutionLogStatusPending:
+		return true
+	case WorkflowExecutionLogStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkflowStepBranchType.
+const (
+	WorkflowStepBranchTypeFalse WorkflowStepBranchType = "false"
+	WorkflowStepBranchTypeTrue  WorkflowStepBranchType = "true"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowStepBranchType enum.
+func (e WorkflowStepBranchType) Valid() bool {
+	switch e {
+	case WorkflowStepBranchTypeFalse:
+		return true
+	case WorkflowStepBranchTypeTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkflowStepConditionType.
+const (
+	WorkflowStepConditionTypeFilter     WorkflowStepConditionType = "filter"
+	WorkflowStepConditionTypeValueCheck WorkflowStepConditionType = "value_check"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowStepConditionType enum.
+func (e WorkflowStepConditionType) Valid() bool {
+	switch e {
+	case WorkflowStepConditionTypeFilter:
+		return true
+	case WorkflowStepConditionTypeValueCheck:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkflowStepStepType.
+const (
+	WorkflowStepStepTypeAction     WorkflowStepStepType = "action"
+	WorkflowStepStepTypeCondition  WorkflowStepStepType = "condition"
+	WorkflowStepStepTypeDelay      WorkflowStepStepType = "delay"
+	WorkflowStepStepTypeDelayUntil WorkflowStepStepType = "delay_until"
+	WorkflowStepStepTypeLoop       WorkflowStepStepType = "loop"
+	WorkflowStepStepTypeTrigger    WorkflowStepStepType = "trigger"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowStepStepType enum.
+func (e WorkflowStepStepType) Valid() bool {
+	switch e {
+	case WorkflowStepStepTypeAction:
+		return true
+	case WorkflowStepStepTypeCondition:
+		return true
+	case WorkflowStepStepTypeDelay:
+		return true
+	case WorkflowStepStepTypeDelayUntil:
+		return true
+	case WorkflowStepStepTypeLoop:
+		return true
+	case WorkflowStepStepTypeTrigger:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListBookingsParamsBookingStatus.
 const (
 	ListBookingsParamsBookingStatusCANCELLED ListBookingsParamsBookingStatus = "CANCELLED"
@@ -861,25 +1146,25 @@ func (e ResendBookingConfirmationJSONBodyChannel) Valid() bool {
 
 // Defines values for ListIssuedGiftCertsParamsStatus.
 const (
-	Active   ListIssuedGiftCertsParamsStatus = "active"
-	Expired  ListIssuedGiftCertsParamsStatus = "expired"
-	Partial  ListIssuedGiftCertsParamsStatus = "partial"
-	Redeemed ListIssuedGiftCertsParamsStatus = "redeemed"
-	Void     ListIssuedGiftCertsParamsStatus = "void"
+	ListIssuedGiftCertsParamsStatusActive   ListIssuedGiftCertsParamsStatus = "active"
+	ListIssuedGiftCertsParamsStatusExpired  ListIssuedGiftCertsParamsStatus = "expired"
+	ListIssuedGiftCertsParamsStatusPartial  ListIssuedGiftCertsParamsStatus = "partial"
+	ListIssuedGiftCertsParamsStatusRedeemed ListIssuedGiftCertsParamsStatus = "redeemed"
+	ListIssuedGiftCertsParamsStatusVoid     ListIssuedGiftCertsParamsStatus = "void"
 )
 
 // Valid indicates whether the value is a known member of the ListIssuedGiftCertsParamsStatus enum.
 func (e ListIssuedGiftCertsParamsStatus) Valid() bool {
 	switch e {
-	case Active:
+	case ListIssuedGiftCertsParamsStatusActive:
 		return true
-	case Expired:
+	case ListIssuedGiftCertsParamsStatusExpired:
 		return true
-	case Partial:
+	case ListIssuedGiftCertsParamsStatusPartial:
 		return true
-	case Redeemed:
+	case ListIssuedGiftCertsParamsStatusRedeemed:
 		return true
-	case Void:
+	case ListIssuedGiftCertsParamsStatusVoid:
 		return true
 	default:
 		return false
@@ -915,19 +1200,19 @@ func (e ListLocationsParamsType) Valid() bool {
 
 // Defines values for ListProductsParamsStatus.
 const (
-	ListProductsParamsStatusArchived  ListProductsParamsStatus = "archived"
-	ListProductsParamsStatusDraft     ListProductsParamsStatus = "draft"
-	ListProductsParamsStatusPublished ListProductsParamsStatus = "published"
+	Archived  ListProductsParamsStatus = "archived"
+	Draft     ListProductsParamsStatus = "draft"
+	Published ListProductsParamsStatus = "published"
 )
 
 // Valid indicates whether the value is a known member of the ListProductsParamsStatus enum.
 func (e ListProductsParamsStatus) Valid() bool {
 	switch e {
-	case ListProductsParamsStatusArchived:
+	case Archived:
 		return true
-	case ListProductsParamsStatusDraft:
+	case Draft:
 		return true
-	case ListProductsParamsStatusPublished:
+	case Published:
 		return true
 	default:
 		return false
@@ -997,6 +1282,54 @@ func (e ListTransactionsParamsType) Valid() bool {
 	case ListTransactionsParamsTypeComp:
 		return true
 	case ListTransactionsParamsTypeRefund:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWorkflowExecutionsParamsStatus.
+const (
+	Completed ListWorkflowExecutionsParamsStatus = "completed"
+	Failed    ListWorkflowExecutionsParamsStatus = "failed"
+	Pending   ListWorkflowExecutionsParamsStatus = "pending"
+	Running   ListWorkflowExecutionsParamsStatus = "running"
+	Waiting   ListWorkflowExecutionsParamsStatus = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the ListWorkflowExecutionsParamsStatus enum.
+func (e ListWorkflowExecutionsParamsStatus) Valid() bool {
+	switch e {
+	case Completed:
+		return true
+	case Failed:
+		return true
+	case Pending:
+		return true
+	case Running:
+		return true
+	case Waiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWorkflowsParamsStatus.
+const (
+	ListWorkflowsParamsStatusActive ListWorkflowsParamsStatus = "active"
+	ListWorkflowsParamsStatusDraft  ListWorkflowsParamsStatus = "draft"
+	ListWorkflowsParamsStatusPaused ListWorkflowsParamsStatus = "paused"
+)
+
+// Valid indicates whether the value is a known member of the ListWorkflowsParamsStatus enum.
+func (e ListWorkflowsParamsStatus) Valid() bool {
+	switch e {
+	case ListWorkflowsParamsStatusActive:
+		return true
+	case ListWorkflowsParamsStatusDraft:
+		return true
+	case ListWorkflowsParamsStatusPaused:
 		return true
 	default:
 		return false
@@ -1624,6 +1957,87 @@ type CreateResourceRequest struct {
 
 // CreateResourceRequestCategory defines model for CreateResourceRequest.Category.
 type CreateResourceRequestCategory string
+
+// CreateWorkflowRequest Mirrors `CreateWorkflowRequest::rules()`. The workflow is created
+// in DRAFT status — there is no way to skip straight to ACTIVE. Add
+// trigger + steps, then POST /activate.
+type CreateWorkflowRequest struct {
+	// BusinessUnitId Defaults to the calling user's current_business_unit_id when omitted.
+	BusinessUnitId *int    `json:"business_unit_id,omitempty"`
+	Description    *string `json:"description,omitempty"`
+	DryRun         *bool   `json:"dry_run,omitempty"`
+
+	// MaxCreditsPerRun Defaults to 50 when omitted.
+	MaxCreditsPerRun *int   `json:"max_credits_per_run,omitempty"`
+	Name             string `json:"name"`
+	NotifyOnFail     *bool  `json:"notify_on_fail,omitempty"`
+}
+
+// CreateWorkflowStepRequest Mirrors `CreateWorkflowStepRequest::rules()`. step_type=TRIGGER
+// is REJECTED here — use POST /workflows/{id}/trigger for the
+// trigger singleton.
+//
+// `action_type` is required for ACTION/DELAY/DELAY_UNTIL/LOOP step
+// types; `condition_type` is required for CONDITION step type. The
+// `config` shape depends on the resolved action — see the relevant
+// class's `rules()`.
+//
+// `parent_step_id` (when set) must reference a step in the same
+// workflow; cross-workflow refs return 422. When parent_step_id is
+// set, `branch_type` is required (true/false for condition children;
+// true for loop children).
+type CreateWorkflowStepRequest struct {
+	// ActionType Required for ACTION/DELAY/DELAY_UNTIL/LOOP. See ActionType enum for values.
+	ActionType *string `json:"action_type,omitempty"`
+
+	// BranchType Required when parent_step_id is set.
+	BranchType *CreateWorkflowStepRequestBranchType `json:"branch_type,omitempty"`
+
+	// ConditionType Required for CONDITION step_type.
+	ConditionType *CreateWorkflowStepRequestConditionType `json:"condition_type,omitempty"`
+	Config        *map[string]interface{}                 `json:"config,omitempty"`
+	DryRun        *bool                                   `json:"dry_run,omitempty"`
+	Order         int                                     `json:"order"`
+	ParentStepId  *int                                    `json:"parent_step_id,omitempty"`
+	StepType      CreateWorkflowStepRequestStepType       `json:"step_type"`
+}
+
+// CreateWorkflowStepRequestBranchType Required when parent_step_id is set.
+type CreateWorkflowStepRequestBranchType string
+
+// CreateWorkflowStepRequestConditionType Required for CONDITION step_type.
+type CreateWorkflowStepRequestConditionType string
+
+// CreateWorkflowStepRequestStepType defines model for CreateWorkflowStepRequest.StepType.
+type CreateWorkflowStepRequestStepType string
+
+// CreateWorkflowTriggerRequest Mirrors `CreateWorkflowTriggerRequest::rules()`. The `config`
+// shape depends on `action_type` — see
+// app/Workflows/Triggers/*.php and each trigger's `rules()`.
+//
+// Example for SCHEDULED_TIME (weekly):
+// ```json
+//
+//	{
+//	  "action_type": "scheduled_time",
+//	  "config": {
+//	    "frequency": "weekly",
+//	    "time": "09:00",
+//	    "weekly_days": ["monday", "wednesday"]
+//	  }
+//	}
+//
+// ```
+type CreateWorkflowTriggerRequest struct {
+	ActionType CreateWorkflowTriggerRequestActionType `json:"action_type"`
+
+	// Config Validated against the resolved trigger's rules() schema.
+	Config *map[string]interface{} `json:"config,omitempty"`
+	DryRun *bool                   `json:"dry_run,omitempty"`
+}
+
+// CreateWorkflowTriggerRequestActionType defines model for CreateWorkflowTriggerRequest.ActionType.
+type CreateWorkflowTriggerRequestActionType string
 
 // Customer First-class `Bmbltd\LaravelBookings\Models\Customer` (vendor-package
 // model used by the bookings engine). Soft-deletable, business-unit-scoped,
@@ -2532,6 +2946,32 @@ type UpdateResourceRequest struct {
 // UpdateResourceRequestCategory defines model for UpdateResourceRequest.Category.
 type UpdateResourceRequestCategory string
 
+// UpdateWorkflowRequest Updates the workflow shell. All fields are optional; only
+// passed-in fields are updated. Shell PATCH is allowed on ACTIVE
+// workflows because these fields don't affect the executor.
+type UpdateWorkflowRequest struct {
+	Description      *string `json:"description,omitempty"`
+	DryRun           *bool   `json:"dry_run,omitempty"`
+	MaxCreditsPerRun *int    `json:"max_credits_per_run,omitempty"`
+	Name             *string `json:"name,omitempty"`
+	NotifyOnFail     *bool   `json:"notify_on_fail,omitempty"`
+}
+
+// UpdateWorkflowStepRequest Step PATCH only updates the config payload. parent_step_id,
+// branch_type, order, step_type, and action_type are immutable
+// post-create — to move or reshape a step, delete and re-create.
+type UpdateWorkflowStepRequest struct {
+	Config map[string]interface{} `json:"config"`
+	DryRun *bool                  `json:"dry_run,omitempty"`
+}
+
+// UpdateWorkflowTriggerRequest Replaces the trigger's `config`. `action_type` is immutable —
+// to change it, call POST /trigger (which atomically replaces).
+type UpdateWorkflowTriggerRequest struct {
+	Config map[string]interface{} `json:"config"`
+	DryRun *bool                  `json:"dry_run,omitempty"`
+}
+
 // WhoamiData defines model for WhoamiData.
 type WhoamiData struct {
 	Actor *struct {
@@ -2553,6 +2993,175 @@ type WhoamiData struct {
 		Name      *string    `json:"name,omitempty"`
 	} `json:"token,omitempty"`
 }
+
+// Workflow A workflow definition. Returned shape from /workflows/{id} embeds
+// `trigger` (singleton step with step_type=TRIGGER, may be null) and
+// `steps` (non-trigger steps, sorted by `order`, may be empty). List
+// endpoint returns the same shape; eager-loads steps so the
+// embedded counts are accurate.
+//
+// `status` controls editability: DRAFT and PAUSED accept step/trigger
+// writes; ACTIVE rejects them with 409 WORKFLOW_NOT_EDITABLE.
+//
+// `deleted_at` is non-null when the workflow has been soft-deleted —
+// use ?include_trashed=true on list/show to see trashed rows.
+type Workflow struct {
+	BusinessUnitId  *int       `json:"business_unit_id,omitempty"`
+	CreatedAt       *time.Time `json:"created_at,omitempty"`
+	CreatedByUserId *int       `json:"created_by_user_id,omitempty"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	Description     *string    `json:"description,omitempty"`
+
+	// Id UUID
+	Id            *string    `json:"id,omitempty"`
+	LastFailedRun *time.Time `json:"last_failed_run,omitempty"`
+
+	// MaxCreditsPerRun Per-execution credit ceiling. Activation rejects with
+	// CREDIT_LIMIT_EXCEEDED when sum(step.creditsCost()) exceeds
+	// this. Null means unbounded.
+	MaxCreditsPerRun *int            `json:"max_credits_per_run,omitempty"`
+	Name             *string         `json:"name,omitempty"`
+	NotifyOnFail     *bool           `json:"notify_on_fail,omitempty"`
+	Status           *WorkflowStatus `json:"status,omitempty"`
+
+	// Steps Non-trigger steps, sorted by `order`.
+	Steps      *[]WorkflowStep `json:"steps,omitempty"`
+	StepsCount *int            `json:"steps_count,omitempty"`
+
+	// Trigger Singleton TRIGGER step. Null when no trigger has been set.
+	Trigger   *WorkflowStep `json:"trigger,omitempty"`
+	UpdatedAt *time.Time    `json:"updated_at,omitempty"`
+}
+
+// WorkflowStatus defines model for Workflow.Status.
+type WorkflowStatus string
+
+// WorkflowExecution A single run of a workflow. The workflow_id FK is nullable —
+// force-deleting the parent workflow sets it to null, preserving the
+// audit trail via the tenant_id column. The `fail_reason` enum
+// carries structural failure causes (e.g. workflow_deleted_mid_run);
+// per-step exception details live in WorkflowExecutionLog.
+//
+// Show endpoint also returns `failed_log`: the first
+// WorkflowExecutionLog row with status=failed, so support can debug
+// without a second /logs round-trip.
+type WorkflowExecution struct {
+	CompletedAt      *time.Time `json:"completed_at,omitempty"`
+	CreatedAt        *time.Time `json:"created_at,omitempty"`
+	CreditsCost      *int       `json:"credits_cost,omitempty"`
+	CurrentStepOrder *int       `json:"current_step_order,omitempty"`
+
+	// FailReason Categorized structural fail reason. Per-step exception messages live in WorkflowExecutionLog.error_message.
+	FailReason *WorkflowExecutionFailReason `json:"fail_reason,omitempty"`
+
+	// FailedLog Embedded only on /workflow-executions/{id} (single-show).
+	FailedLog *WorkflowExecutionLog `json:"failed_log,omitempty"`
+	Id        *int                  `json:"id,omitempty"`
+
+	// ResumeAt When the execution is in WAITING status, the wall-clock time at which it should resume.
+	ResumeAt  *time.Time               `json:"resume_at,omitempty"`
+	StartedAt *time.Time               `json:"started_at,omitempty"`
+	Status    *WorkflowExecutionStatus `json:"status,omitempty"`
+
+	// TriggerData Trigger payload at the moment the execution was created.
+	TriggerData *map[string]interface{} `json:"trigger_data,omitempty"`
+	UpdatedAt   *time.Time              `json:"updated_at,omitempty"`
+
+	// WorkflowId Null when the parent workflow has been force-deleted.
+	WorkflowId *string `json:"workflow_id,omitempty"`
+}
+
+// WorkflowExecutionFailReason Categorized structural fail reason. Per-step exception messages live in WorkflowExecutionLog.error_message.
+type WorkflowExecutionFailReason string
+
+// WorkflowExecutionStatus defines model for WorkflowExecution.Status.
+type WorkflowExecutionStatus string
+
+// WorkflowExecutionLog Per-step record of an execution. One row per step attempt — loops
+// produce one row per (step, item) pair. Error context lives here,
+// not on WorkflowExecution.
+type WorkflowExecutionLog struct {
+	CreatedAt     *time.Time                  `json:"created_at,omitempty"`
+	CreditsCost   *int                        `json:"credits_cost,omitempty"`
+	ErrorMessage  *string                     `json:"error_message,omitempty"`
+	ExceptionType *string                     `json:"exception_type,omitempty"`
+	ExecutedAt    *time.Time                  `json:"executed_at,omitempty"`
+	ExecutionId   *int                        `json:"execution_id,omitempty"`
+	Id            *int                        `json:"id,omitempty"`
+	InputData     *map[string]interface{}     `json:"input_data,omitempty"`
+	OutputData    *map[string]interface{}     `json:"output_data,omitempty"`
+	Status        *WorkflowExecutionLogStatus `json:"status,omitempty"`
+	StepId        *int                        `json:"step_id,omitempty"`
+}
+
+// WorkflowExecutionLogStatus defines model for WorkflowExecutionLog.Status.
+type WorkflowExecutionLogStatus string
+
+// WorkflowExecutionLogPage defines model for WorkflowExecutionLogPage.
+type WorkflowExecutionLogPage struct {
+	Data       *[]WorkflowExecutionLog `json:"data,omitempty"`
+	Meta       *Meta                   `json:"meta,omitempty"`
+	Pagination *Pagination             `json:"pagination,omitempty"`
+}
+
+// WorkflowExecutionPage defines model for WorkflowExecutionPage.
+type WorkflowExecutionPage struct {
+	Data       *[]WorkflowExecution `json:"data,omitempty"`
+	Meta       *Meta                `json:"meta,omitempty"`
+	Pagination *Pagination          `json:"pagination,omitempty"`
+}
+
+// WorkflowPage defines model for WorkflowPage.
+type WorkflowPage struct {
+	Data       *[]Workflow `json:"data,omitempty"`
+	Meta       *Meta       `json:"meta,omitempty"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+}
+
+// WorkflowStep A single step row. `step_type` discriminates the shape: TRIGGER
+// steps live under the workflow's `trigger`; ACTION/CONDITION/
+// DELAY/DELAY_UNTIL/LOOP steps live under `steps[]`. `parent_step_id`
+// and `branch_type` form the tree used by conditions and loops:
+// children of a CONDITION step are marked branch_type=true|false to
+// distinguish the then/else branches; LOOP children use branch_type=true.
+type WorkflowStep struct {
+	// ActionType For TRIGGER steps: matches TriggerType (booking_confirmed,
+	// scheduled_time, …). For ACTION steps: matches ActionType
+	// (send_notification, charge_card_on_file, …). Null for
+	// CONDITION steps (use condition_type instead).
+	ActionType *string `json:"action_type,omitempty"`
+
+	// BranchType Branch tag for CONDITION children (true/false) or LOOP children (true).
+	BranchType    *WorkflowStepBranchType    `json:"branch_type,omitempty"`
+	ConditionType *WorkflowStepConditionType `json:"condition_type,omitempty"`
+
+	// Config Action-type-specific config. Validated against the resolved
+	// action's `rules()` schema at write time and again at
+	// execution time. See app/Workflows/Actions/*.php for the
+	// per-action shape.
+	Config    *map[string]interface{} `json:"config,omitempty"`
+	CreatedAt *time.Time              `json:"created_at,omitempty"`
+	DeletedAt *time.Time              `json:"deleted_at,omitempty"`
+	Id        *int                    `json:"id,omitempty"`
+	Order     *int                    `json:"order,omitempty"`
+
+	// ParentStepId Parent step in the tree (CONDITION/LOOP children).
+	ParentStepId *int                  `json:"parent_step_id,omitempty"`
+	StepType     *WorkflowStepStepType `json:"step_type,omitempty"`
+	UpdatedAt    *time.Time            `json:"updated_at,omitempty"`
+
+	// WorkflowId UUID
+	WorkflowId *string `json:"workflow_id,omitempty"`
+}
+
+// WorkflowStepBranchType Branch tag for CONDITION children (true/false) or LOOP children (true).
+type WorkflowStepBranchType string
+
+// WorkflowStepConditionType defines model for WorkflowStep.ConditionType.
+type WorkflowStepConditionType string
+
+// WorkflowStepStepType defines model for WorkflowStep.StepType.
+type WorkflowStepStepType string
 
 // Cursor defines model for Cursor.
 type Cursor = string
@@ -3902,6 +4511,263 @@ type ListTransactionsParamsStatus string
 // ListTransactionsParamsType defines parameters for ListTransactions.
 type ListTransactionsParamsType string
 
+// ListWorkflowExecutionsParams defines parameters for ListWorkflowExecutions.
+type ListWorkflowExecutionsParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor     *Cursor                             `form:"cursor,omitempty" json:"cursor,omitempty"`
+	WorkflowId *string                             `form:"workflow_id,omitempty" json:"workflow_id,omitempty"`
+	Status     *ListWorkflowExecutionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	FailReason *string                             `form:"fail_reason,omitempty" json:"fail_reason,omitempty"`
+	DateFrom   *time.Time                          `form:"date_from,omitempty" json:"date_from,omitempty"`
+	DateTo     *time.Time                          `form:"date_to,omitempty" json:"date_to,omitempty"`
+}
+
+// ListWorkflowExecutionsParamsStatus defines parameters for ListWorkflowExecutions.
+type ListWorkflowExecutionsParamsStatus string
+
+// ListWorkflowExecutionLogsParams defines parameters for ListWorkflowExecutionLogs.
+type ListWorkflowExecutionLogsParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	StepId *int    `form:"step_id,omitempty" json:"step_id,omitempty"`
+}
+
+// ListWorkflowsParams defines parameters for ListWorkflows.
+type ListWorkflowsParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`
+	Since  *Since                     `form:"since,omitempty" json:"since,omitempty"`
+	Status *ListWorkflowsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// ListWorkflowsParamsStatus defines parameters for ListWorkflows.
+type ListWorkflowsParamsStatus string
+
+// CreateWorkflowParams defines parameters for CreateWorkflow.
+type CreateWorkflowParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DestroyWorkflowJSONBody defines parameters for DestroyWorkflow.
+type DestroyWorkflowJSONBody struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+}
+
+// DestroyWorkflowParams defines parameters for DestroyWorkflow.
+type DestroyWorkflowParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ShowWorkflowParams defines parameters for ShowWorkflow.
+type ShowWorkflowParams struct {
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+}
+
+// UpdateWorkflowParams defines parameters for UpdateWorkflow.
+type UpdateWorkflowParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ActivateWorkflowJSONBody defines parameters for ActivateWorkflow.
+type ActivateWorkflowJSONBody struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+}
+
+// ActivateWorkflowParams defines parameters for ActivateWorkflow.
+type ActivateWorkflowParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DeactivateWorkflowJSONBody defines parameters for DeactivateWorkflow.
+type DeactivateWorkflowJSONBody struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+}
+
+// DeactivateWorkflowParams defines parameters for DeactivateWorkflow.
+type DeactivateWorkflowParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RestoreWorkflowJSONBody defines parameters for RestoreWorkflow.
+type RestoreWorkflowJSONBody struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+}
+
+// RestoreWorkflowParams defines parameters for RestoreWorkflow.
+type RestoreWorkflowParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateWorkflowStepParams defines parameters for CreateWorkflowStep.
+type CreateWorkflowStepParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DestroyWorkflowStepJSONBody defines parameters for DestroyWorkflowStep.
+type DestroyWorkflowStepJSONBody struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+}
+
+// DestroyWorkflowStepParams defines parameters for DestroyWorkflowStep.
+type DestroyWorkflowStepParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateWorkflowStepParams defines parameters for UpdateWorkflowStep.
+type UpdateWorkflowStepParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateWorkflowTriggerParams defines parameters for UpdateWorkflowTrigger.
+type UpdateWorkflowTriggerParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateWorkflowTriggerParams defines parameters for CreateWorkflowTrigger.
+type CreateWorkflowTriggerParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // BulkDeleteAvailabilitiesJSONRequestBody defines body for BulkDeleteAvailabilities for application/json ContentType.
 type BulkDeleteAvailabilitiesJSONRequestBody = BulkDeleteAvailabilityRequest
 
@@ -4021,6 +4887,39 @@ type CreateResourceJSONRequestBody = CreateResourceRequest
 
 // UpdateResourceJSONRequestBody defines body for UpdateResource for application/json ContentType.
 type UpdateResourceJSONRequestBody = UpdateResourceRequest
+
+// CreateWorkflowJSONRequestBody defines body for CreateWorkflow for application/json ContentType.
+type CreateWorkflowJSONRequestBody = CreateWorkflowRequest
+
+// DestroyWorkflowJSONRequestBody defines body for DestroyWorkflow for application/json ContentType.
+type DestroyWorkflowJSONRequestBody DestroyWorkflowJSONBody
+
+// UpdateWorkflowJSONRequestBody defines body for UpdateWorkflow for application/json ContentType.
+type UpdateWorkflowJSONRequestBody = UpdateWorkflowRequest
+
+// ActivateWorkflowJSONRequestBody defines body for ActivateWorkflow for application/json ContentType.
+type ActivateWorkflowJSONRequestBody ActivateWorkflowJSONBody
+
+// DeactivateWorkflowJSONRequestBody defines body for DeactivateWorkflow for application/json ContentType.
+type DeactivateWorkflowJSONRequestBody DeactivateWorkflowJSONBody
+
+// RestoreWorkflowJSONRequestBody defines body for RestoreWorkflow for application/json ContentType.
+type RestoreWorkflowJSONRequestBody RestoreWorkflowJSONBody
+
+// CreateWorkflowStepJSONRequestBody defines body for CreateWorkflowStep for application/json ContentType.
+type CreateWorkflowStepJSONRequestBody = CreateWorkflowStepRequest
+
+// DestroyWorkflowStepJSONRequestBody defines body for DestroyWorkflowStep for application/json ContentType.
+type DestroyWorkflowStepJSONRequestBody DestroyWorkflowStepJSONBody
+
+// UpdateWorkflowStepJSONRequestBody defines body for UpdateWorkflowStep for application/json ContentType.
+type UpdateWorkflowStepJSONRequestBody = UpdateWorkflowStepRequest
+
+// UpdateWorkflowTriggerJSONRequestBody defines body for UpdateWorkflowTrigger for application/json ContentType.
+type UpdateWorkflowTriggerJSONRequestBody = UpdateWorkflowTriggerRequest
+
+// CreateWorkflowTriggerJSONRequestBody defines body for CreateWorkflowTrigger for application/json ContentType.
+type CreateWorkflowTriggerJSONRequestBody = CreateWorkflowTriggerRequest
 
 // AsBulkUpdateAvailabilityRequestNewValue0 returns the union data inside the BulkUpdateAvailabilityRequest_NewValue as a BulkUpdateAvailabilityRequestNewValue0
 func (t BulkUpdateAvailabilityRequest_NewValue) AsBulkUpdateAvailabilityRequestNewValue0() (BulkUpdateAvailabilityRequestNewValue0, error) {
@@ -4565,6 +5464,76 @@ type ClientInterface interface {
 
 	// Whoami request
 	Whoami(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkflowExecutions request
+	ListWorkflowExecutions(ctx context.Context, params *ListWorkflowExecutionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShowWorkflowExecution request
+	ShowWorkflowExecution(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkflowExecutionLogs request
+	ListWorkflowExecutionLogs(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkflows request
+	ListWorkflows(ctx context.Context, params *ListWorkflowsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWorkflowWithBody request with any body
+	CreateWorkflowWithBody(ctx context.Context, params *CreateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateWorkflow(ctx context.Context, params *CreateWorkflowParams, body CreateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DestroyWorkflowWithBody request with any body
+	DestroyWorkflowWithBody(ctx context.Context, id IdPath, params *DestroyWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DestroyWorkflow(ctx context.Context, id IdPath, params *DestroyWorkflowParams, body DestroyWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShowWorkflow request
+	ShowWorkflow(ctx context.Context, id IdPath, params *ShowWorkflowParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWorkflowWithBody request with any body
+	UpdateWorkflowWithBody(ctx context.Context, id IdPath, params *UpdateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateWorkflow(ctx context.Context, id IdPath, params *UpdateWorkflowParams, body UpdateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ActivateWorkflowWithBody request with any body
+	ActivateWorkflowWithBody(ctx context.Context, id IdPath, params *ActivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ActivateWorkflow(ctx context.Context, id IdPath, params *ActivateWorkflowParams, body ActivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeactivateWorkflowWithBody request with any body
+	DeactivateWorkflowWithBody(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DeactivateWorkflow(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, body DeactivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreWorkflowWithBody request with any body
+	RestoreWorkflowWithBody(ctx context.Context, id IdPath, params *RestoreWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	RestoreWorkflow(ctx context.Context, id IdPath, params *RestoreWorkflowParams, body RestoreWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWorkflowStepWithBody request with any body
+	CreateWorkflowStepWithBody(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateWorkflowStep(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, body CreateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DestroyWorkflowStepWithBody request with any body
+	DestroyWorkflowStepWithBody(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DestroyWorkflowStep(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, body DestroyWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWorkflowStepWithBody request with any body
+	UpdateWorkflowStepWithBody(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateWorkflowStep(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, body UpdateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWorkflowTriggerWithBody request with any body
+	UpdateWorkflowTriggerWithBody(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateWorkflowTrigger(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, body UpdateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWorkflowTriggerWithBody request with any body
+	CreateWorkflowTriggerWithBody(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateWorkflowTrigger(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, body CreateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListAvailabilities(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6141,6 +7110,330 @@ func (c *Client) ShowTransaction(ctx context.Context, id IdPath, reqEditors ...R
 
 func (c *Client) Whoami(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewWhoamiRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkflowExecutions(ctx context.Context, params *ListWorkflowExecutionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkflowExecutionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ShowWorkflowExecution(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowWorkflowExecutionRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkflowExecutionLogs(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkflowExecutionLogsRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkflows(ctx context.Context, params *ListWorkflowsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkflowsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkflowWithBody(ctx context.Context, params *CreateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkflowRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkflow(ctx context.Context, params *CreateWorkflowParams, body CreateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkflowRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DestroyWorkflowWithBody(ctx context.Context, id IdPath, params *DestroyWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDestroyWorkflowRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DestroyWorkflow(ctx context.Context, id IdPath, params *DestroyWorkflowParams, body DestroyWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDestroyWorkflowRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ShowWorkflow(ctx context.Context, id IdPath, params *ShowWorkflowParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowWorkflowRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkflowWithBody(ctx context.Context, id IdPath, params *UpdateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkflowRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkflow(ctx context.Context, id IdPath, params *UpdateWorkflowParams, body UpdateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkflowRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ActivateWorkflowWithBody(ctx context.Context, id IdPath, params *ActivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewActivateWorkflowRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ActivateWorkflow(ctx context.Context, id IdPath, params *ActivateWorkflowParams, body ActivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewActivateWorkflowRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeactivateWorkflowWithBody(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeactivateWorkflowRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeactivateWorkflow(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, body DeactivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeactivateWorkflowRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RestoreWorkflowWithBody(ctx context.Context, id IdPath, params *RestoreWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreWorkflowRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RestoreWorkflow(ctx context.Context, id IdPath, params *RestoreWorkflowParams, body RestoreWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreWorkflowRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkflowStepWithBody(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkflowStepRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkflowStep(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, body CreateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkflowStepRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DestroyWorkflowStepWithBody(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDestroyWorkflowStepRequestWithBody(c.Server, id, stepId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DestroyWorkflowStep(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, body DestroyWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDestroyWorkflowStepRequest(c.Server, id, stepId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkflowStepWithBody(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkflowStepRequestWithBody(c.Server, id, stepId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkflowStep(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, body UpdateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkflowStepRequest(c.Server, id, stepId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkflowTriggerWithBody(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkflowTriggerRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkflowTrigger(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, body UpdateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkflowTriggerRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkflowTriggerWithBody(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkflowTriggerRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkflowTrigger(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, body CreateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkflowTriggerRequest(c.Server, id, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -12134,6 +13427,1131 @@ func NewWhoamiRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListWorkflowExecutionsRequest generates requests for ListWorkflowExecutions
+func NewListWorkflowExecutionsRequest(server string, params *ListWorkflowExecutionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflow-executions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.WorkflowId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "workflow_id", *params.WorkflowId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.FailReason != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "fail_reason", *params.FailReason, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.DateFrom != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "date_from", *params.DateFrom, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.DateTo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "date_to", *params.DateTo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewShowWorkflowExecutionRequest generates requests for ShowWorkflowExecution
+func NewShowWorkflowExecutionRequest(server string, id int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflow-executions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListWorkflowExecutionLogsRequest generates requests for ListWorkflowExecutionLogs
+func NewListWorkflowExecutionLogsRequest(server string, id int, params *ListWorkflowExecutionLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflow-executions/%s/logs", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.StepId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "step_id", *params.StepId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListWorkflowsRequest generates requests for ListWorkflows
+func NewListWorkflowsRequest(server string, params *ListWorkflowsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateWorkflowRequest calls the generic CreateWorkflow builder with application/json body
+func NewCreateWorkflowRequest(server string, params *CreateWorkflowParams, body CreateWorkflowJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateWorkflowRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateWorkflowRequestWithBody generates requests for CreateWorkflow with any type of body
+func NewCreateWorkflowRequestWithBody(server string, params *CreateWorkflowParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDestroyWorkflowRequest calls the generic DestroyWorkflow builder with application/json body
+func NewDestroyWorkflowRequest(server string, id IdPath, params *DestroyWorkflowParams, body DestroyWorkflowJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDestroyWorkflowRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDestroyWorkflowRequestWithBody generates requests for DestroyWorkflow with any type of body
+func NewDestroyWorkflowRequestWithBody(server string, id IdPath, params *DestroyWorkflowParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewShowWorkflowRequest generates requests for ShowWorkflow
+func NewShowWorkflowRequest(server string, id IdPath, params *ShowWorkflowParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateWorkflowRequest calls the generic UpdateWorkflow builder with application/json body
+func NewUpdateWorkflowRequest(server string, id IdPath, params *UpdateWorkflowParams, body UpdateWorkflowJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateWorkflowRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUpdateWorkflowRequestWithBody generates requests for UpdateWorkflow with any type of body
+func NewUpdateWorkflowRequestWithBody(server string, id IdPath, params *UpdateWorkflowParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewActivateWorkflowRequest calls the generic ActivateWorkflow builder with application/json body
+func NewActivateWorkflowRequest(server string, id IdPath, params *ActivateWorkflowParams, body ActivateWorkflowJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewActivateWorkflowRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewActivateWorkflowRequestWithBody generates requests for ActivateWorkflow with any type of body
+func NewActivateWorkflowRequestWithBody(server string, id IdPath, params *ActivateWorkflowParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/activate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDeactivateWorkflowRequest calls the generic DeactivateWorkflow builder with application/json body
+func NewDeactivateWorkflowRequest(server string, id IdPath, params *DeactivateWorkflowParams, body DeactivateWorkflowJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeactivateWorkflowRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDeactivateWorkflowRequestWithBody generates requests for DeactivateWorkflow with any type of body
+func NewDeactivateWorkflowRequestWithBody(server string, id IdPath, params *DeactivateWorkflowParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/deactivate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRestoreWorkflowRequest calls the generic RestoreWorkflow builder with application/json body
+func NewRestoreWorkflowRequest(server string, id IdPath, params *RestoreWorkflowParams, body RestoreWorkflowJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRestoreWorkflowRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewRestoreWorkflowRequestWithBody generates requests for RestoreWorkflow with any type of body
+func NewRestoreWorkflowRequestWithBody(server string, id IdPath, params *RestoreWorkflowParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/restore", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCreateWorkflowStepRequest calls the generic CreateWorkflowStep builder with application/json body
+func NewCreateWorkflowStepRequest(server string, id IdPath, params *CreateWorkflowStepParams, body CreateWorkflowStepJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateWorkflowStepRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewCreateWorkflowStepRequestWithBody generates requests for CreateWorkflowStep with any type of body
+func NewCreateWorkflowStepRequestWithBody(server string, id IdPath, params *CreateWorkflowStepParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/steps", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDestroyWorkflowStepRequest calls the generic DestroyWorkflowStep builder with application/json body
+func NewDestroyWorkflowStepRequest(server string, id IdPath, stepId int, params *DestroyWorkflowStepParams, body DestroyWorkflowStepJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDestroyWorkflowStepRequestWithBody(server, id, stepId, params, "application/json", bodyReader)
+}
+
+// NewDestroyWorkflowStepRequestWithBody generates requests for DestroyWorkflowStep with any type of body
+func NewDestroyWorkflowStepRequestWithBody(server string, id IdPath, stepId int, params *DestroyWorkflowStepParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "stepId", stepId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/steps/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewUpdateWorkflowStepRequest calls the generic UpdateWorkflowStep builder with application/json body
+func NewUpdateWorkflowStepRequest(server string, id IdPath, stepId int, params *UpdateWorkflowStepParams, body UpdateWorkflowStepJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateWorkflowStepRequestWithBody(server, id, stepId, params, "application/json", bodyReader)
+}
+
+// NewUpdateWorkflowStepRequestWithBody generates requests for UpdateWorkflowStep with any type of body
+func NewUpdateWorkflowStepRequestWithBody(server string, id IdPath, stepId int, params *UpdateWorkflowStepParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "stepId", stepId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/steps/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewUpdateWorkflowTriggerRequest calls the generic UpdateWorkflowTrigger builder with application/json body
+func NewUpdateWorkflowTriggerRequest(server string, id IdPath, params *UpdateWorkflowTriggerParams, body UpdateWorkflowTriggerJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateWorkflowTriggerRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUpdateWorkflowTriggerRequestWithBody generates requests for UpdateWorkflowTrigger with any type of body
+func NewUpdateWorkflowTriggerRequestWithBody(server string, id IdPath, params *UpdateWorkflowTriggerParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/trigger", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCreateWorkflowTriggerRequest calls the generic CreateWorkflowTrigger builder with application/json body
+func NewCreateWorkflowTriggerRequest(server string, id IdPath, params *CreateWorkflowTriggerParams, body CreateWorkflowTriggerJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateWorkflowTriggerRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewCreateWorkflowTriggerRequestWithBody generates requests for CreateWorkflowTrigger with any type of body
+func NewCreateWorkflowTriggerRequestWithBody(server string, id IdPath, params *CreateWorkflowTriggerParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflows/%s/trigger", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -12533,6 +14951,76 @@ type ClientWithResponsesInterface interface {
 
 	// WhoamiWithResponse request
 	WhoamiWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WhoamiResponse, error)
+
+	// ListWorkflowExecutionsWithResponse request
+	ListWorkflowExecutionsWithResponse(ctx context.Context, params *ListWorkflowExecutionsParams, reqEditors ...RequestEditorFn) (*ListWorkflowExecutionsResponse, error)
+
+	// ShowWorkflowExecutionWithResponse request
+	ShowWorkflowExecutionWithResponse(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*ShowWorkflowExecutionResponse, error)
+
+	// ListWorkflowExecutionLogsWithResponse request
+	ListWorkflowExecutionLogsWithResponse(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*ListWorkflowExecutionLogsResponse, error)
+
+	// ListWorkflowsWithResponse request
+	ListWorkflowsWithResponse(ctx context.Context, params *ListWorkflowsParams, reqEditors ...RequestEditorFn) (*ListWorkflowsResponse, error)
+
+	// CreateWorkflowWithBodyWithResponse request with any body
+	CreateWorkflowWithBodyWithResponse(ctx context.Context, params *CreateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkflowResponse, error)
+
+	CreateWorkflowWithResponse(ctx context.Context, params *CreateWorkflowParams, body CreateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkflowResponse, error)
+
+	// DestroyWorkflowWithBodyWithResponse request with any body
+	DestroyWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *DestroyWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DestroyWorkflowResponse, error)
+
+	DestroyWorkflowWithResponse(ctx context.Context, id IdPath, params *DestroyWorkflowParams, body DestroyWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*DestroyWorkflowResponse, error)
+
+	// ShowWorkflowWithResponse request
+	ShowWorkflowWithResponse(ctx context.Context, id IdPath, params *ShowWorkflowParams, reqEditors ...RequestEditorFn) (*ShowWorkflowResponse, error)
+
+	// UpdateWorkflowWithBodyWithResponse request with any body
+	UpdateWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkflowResponse, error)
+
+	UpdateWorkflowWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowParams, body UpdateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkflowResponse, error)
+
+	// ActivateWorkflowWithBodyWithResponse request with any body
+	ActivateWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *ActivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ActivateWorkflowResponse, error)
+
+	ActivateWorkflowWithResponse(ctx context.Context, id IdPath, params *ActivateWorkflowParams, body ActivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*ActivateWorkflowResponse, error)
+
+	// DeactivateWorkflowWithBodyWithResponse request with any body
+	DeactivateWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeactivateWorkflowResponse, error)
+
+	DeactivateWorkflowWithResponse(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, body DeactivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*DeactivateWorkflowResponse, error)
+
+	// RestoreWorkflowWithBodyWithResponse request with any body
+	RestoreWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *RestoreWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RestoreWorkflowResponse, error)
+
+	RestoreWorkflowWithResponse(ctx context.Context, id IdPath, params *RestoreWorkflowParams, body RestoreWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*RestoreWorkflowResponse, error)
+
+	// CreateWorkflowStepWithBodyWithResponse request with any body
+	CreateWorkflowStepWithBodyWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkflowStepResponse, error)
+
+	CreateWorkflowStepWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, body CreateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkflowStepResponse, error)
+
+	// DestroyWorkflowStepWithBodyWithResponse request with any body
+	DestroyWorkflowStepWithBodyWithResponse(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DestroyWorkflowStepResponse, error)
+
+	DestroyWorkflowStepWithResponse(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, body DestroyWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*DestroyWorkflowStepResponse, error)
+
+	// UpdateWorkflowStepWithBodyWithResponse request with any body
+	UpdateWorkflowStepWithBodyWithResponse(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkflowStepResponse, error)
+
+	UpdateWorkflowStepWithResponse(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, body UpdateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkflowStepResponse, error)
+
+	// UpdateWorkflowTriggerWithBodyWithResponse request with any body
+	UpdateWorkflowTriggerWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkflowTriggerResponse, error)
+
+	UpdateWorkflowTriggerWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, body UpdateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkflowTriggerResponse, error)
+
+	// CreateWorkflowTriggerWithBodyWithResponse request with any body
+	CreateWorkflowTriggerWithBodyWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkflowTriggerResponse, error)
+
+	CreateWorkflowTriggerWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, body CreateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkflowTriggerResponse, error)
 }
 
 type ListAvailabilitiesResponse struct {
@@ -15653,6 +18141,566 @@ func (r WhoamiResponse) StatusCode() int {
 	return 0
 }
 
+type ListWorkflowExecutionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *WorkflowExecutionPage
+	JSON401      *Unauthenticated
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkflowExecutionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkflowExecutionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ShowWorkflowExecutionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data A single run of a workflow. The workflow_id FK is nullable —
+		// force-deleting the parent workflow sets it to null, preserving the
+		// audit trail via the tenant_id column. The `fail_reason` enum
+		// carries structural failure causes (e.g. workflow_deleted_mid_run);
+		// per-step exception details live in WorkflowExecutionLog.
+		//
+		// Show endpoint also returns `failed_log`: the first
+		// WorkflowExecutionLog row with status=failed, so support can debug
+		// without a second /logs round-trip.
+		Data       WorkflowExecution `json:"data"`
+		Meta       Meta              `json:"meta"`
+		Pagination *Pagination       `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ShowWorkflowExecutionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShowWorkflowExecutionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListWorkflowExecutionLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *WorkflowExecutionLogPage
+	JSON401      *Unauthenticated
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkflowExecutionLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkflowExecutionLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListWorkflowsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *WorkflowPage
+	JSON401      *Unauthenticated
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkflowsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkflowsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// Id UUID
+			Id *string `json:"id,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                               `json:"identifier,omitempty"`
+				PayloadSummary *string                               `json:"payload_summary,omitempty"`
+				Type           *CreateWorkflow201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+type CreateWorkflow201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DestroyWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+}
+
+// Status returns HTTPResponse.Status
+func (r DestroyWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DestroyWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ShowWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data A workflow definition. Returned shape from /workflows/{id} embeds
+		// `trigger` (singleton step with step_type=TRIGGER, may be null) and
+		// `steps` (non-trigger steps, sorted by `order`, may be empty). List
+		// endpoint returns the same shape; eager-loads steps so the
+		// embedded counts are accurate.
+		//
+		// `status` controls editability: DRAFT and PAUSED accept step/trigger
+		// writes; ACTIVE rejects them with 409 WORKFLOW_NOT_EDITABLE.
+		//
+		// `deleted_at` is non-null when the workflow has been soft-deleted —
+		// use ?include_trashed=true on list/show to see trashed rows.
+		Data       Workflow    `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ShowWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShowWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ActivateWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ErrorEnvelope
+}
+
+// Status returns HTTPResponse.Status
+func (r ActivateWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ActivateWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeactivateWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+}
+
+// Status returns HTTPResponse.Status
+func (r DeactivateWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeactivateWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RestoreWorkflowResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+}
+
+// Status returns HTTPResponse.Status
+func (r RestoreWorkflowResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RestoreWorkflowResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateWorkflowStepResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+			Id *int `json:"id,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                   `json:"identifier,omitempty"`
+				PayloadSummary *string                                   `json:"payload_summary,omitempty"`
+				Type           *CreateWorkflowStep201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
+}
+type CreateWorkflowStep201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateWorkflowStepResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateWorkflowStepResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DestroyWorkflowStepResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+}
+
+// Status returns HTTPResponse.Status
+func (r DestroyWorkflowStepResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DestroyWorkflowStepResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateWorkflowStepResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWorkflowStepResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWorkflowStepResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateWorkflowTriggerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWorkflowTriggerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWorkflowTriggerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateWorkflowTriggerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+			Id *int `json:"id,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                      `json:"identifier,omitempty"`
+				PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+				Type           *CreateWorkflowTrigger200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON201 *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+			Id *int `json:"id,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                      `json:"identifier,omitempty"`
+				PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+				Type           *CreateWorkflowTrigger201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
+}
+type CreateWorkflowTrigger200DataSideEffectsType string
+type CreateWorkflowTrigger201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateWorkflowTriggerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateWorkflowTriggerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ListAvailabilitiesWithResponse request returning *ListAvailabilitiesResponse
 func (c *ClientWithResponses) ListAvailabilitiesWithResponse(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*ListAvailabilitiesResponse, error) {
 	rsp, err := c.ListAvailabilities(ctx, params, reqEditors...)
@@ -16800,6 +19848,238 @@ func (c *ClientWithResponses) WhoamiWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseWhoamiResponse(rsp)
+}
+
+// ListWorkflowExecutionsWithResponse request returning *ListWorkflowExecutionsResponse
+func (c *ClientWithResponses) ListWorkflowExecutionsWithResponse(ctx context.Context, params *ListWorkflowExecutionsParams, reqEditors ...RequestEditorFn) (*ListWorkflowExecutionsResponse, error) {
+	rsp, err := c.ListWorkflowExecutions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkflowExecutionsResponse(rsp)
+}
+
+// ShowWorkflowExecutionWithResponse request returning *ShowWorkflowExecutionResponse
+func (c *ClientWithResponses) ShowWorkflowExecutionWithResponse(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*ShowWorkflowExecutionResponse, error) {
+	rsp, err := c.ShowWorkflowExecution(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShowWorkflowExecutionResponse(rsp)
+}
+
+// ListWorkflowExecutionLogsWithResponse request returning *ListWorkflowExecutionLogsResponse
+func (c *ClientWithResponses) ListWorkflowExecutionLogsWithResponse(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*ListWorkflowExecutionLogsResponse, error) {
+	rsp, err := c.ListWorkflowExecutionLogs(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkflowExecutionLogsResponse(rsp)
+}
+
+// ListWorkflowsWithResponse request returning *ListWorkflowsResponse
+func (c *ClientWithResponses) ListWorkflowsWithResponse(ctx context.Context, params *ListWorkflowsParams, reqEditors ...RequestEditorFn) (*ListWorkflowsResponse, error) {
+	rsp, err := c.ListWorkflows(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkflowsResponse(rsp)
+}
+
+// CreateWorkflowWithBodyWithResponse request with arbitrary body returning *CreateWorkflowResponse
+func (c *ClientWithResponses) CreateWorkflowWithBodyWithResponse(ctx context.Context, params *CreateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkflowResponse, error) {
+	rsp, err := c.CreateWorkflowWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkflowResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateWorkflowWithResponse(ctx context.Context, params *CreateWorkflowParams, body CreateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkflowResponse, error) {
+	rsp, err := c.CreateWorkflow(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkflowResponse(rsp)
+}
+
+// DestroyWorkflowWithBodyWithResponse request with arbitrary body returning *DestroyWorkflowResponse
+func (c *ClientWithResponses) DestroyWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *DestroyWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DestroyWorkflowResponse, error) {
+	rsp, err := c.DestroyWorkflowWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDestroyWorkflowResponse(rsp)
+}
+
+func (c *ClientWithResponses) DestroyWorkflowWithResponse(ctx context.Context, id IdPath, params *DestroyWorkflowParams, body DestroyWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*DestroyWorkflowResponse, error) {
+	rsp, err := c.DestroyWorkflow(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDestroyWorkflowResponse(rsp)
+}
+
+// ShowWorkflowWithResponse request returning *ShowWorkflowResponse
+func (c *ClientWithResponses) ShowWorkflowWithResponse(ctx context.Context, id IdPath, params *ShowWorkflowParams, reqEditors ...RequestEditorFn) (*ShowWorkflowResponse, error) {
+	rsp, err := c.ShowWorkflow(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShowWorkflowResponse(rsp)
+}
+
+// UpdateWorkflowWithBodyWithResponse request with arbitrary body returning *UpdateWorkflowResponse
+func (c *ClientWithResponses) UpdateWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkflowResponse, error) {
+	rsp, err := c.UpdateWorkflowWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkflowResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateWorkflowWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowParams, body UpdateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkflowResponse, error) {
+	rsp, err := c.UpdateWorkflow(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkflowResponse(rsp)
+}
+
+// ActivateWorkflowWithBodyWithResponse request with arbitrary body returning *ActivateWorkflowResponse
+func (c *ClientWithResponses) ActivateWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *ActivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ActivateWorkflowResponse, error) {
+	rsp, err := c.ActivateWorkflowWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseActivateWorkflowResponse(rsp)
+}
+
+func (c *ClientWithResponses) ActivateWorkflowWithResponse(ctx context.Context, id IdPath, params *ActivateWorkflowParams, body ActivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*ActivateWorkflowResponse, error) {
+	rsp, err := c.ActivateWorkflow(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseActivateWorkflowResponse(rsp)
+}
+
+// DeactivateWorkflowWithBodyWithResponse request with arbitrary body returning *DeactivateWorkflowResponse
+func (c *ClientWithResponses) DeactivateWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeactivateWorkflowResponse, error) {
+	rsp, err := c.DeactivateWorkflowWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeactivateWorkflowResponse(rsp)
+}
+
+func (c *ClientWithResponses) DeactivateWorkflowWithResponse(ctx context.Context, id IdPath, params *DeactivateWorkflowParams, body DeactivateWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*DeactivateWorkflowResponse, error) {
+	rsp, err := c.DeactivateWorkflow(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeactivateWorkflowResponse(rsp)
+}
+
+// RestoreWorkflowWithBodyWithResponse request with arbitrary body returning *RestoreWorkflowResponse
+func (c *ClientWithResponses) RestoreWorkflowWithBodyWithResponse(ctx context.Context, id IdPath, params *RestoreWorkflowParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RestoreWorkflowResponse, error) {
+	rsp, err := c.RestoreWorkflowWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRestoreWorkflowResponse(rsp)
+}
+
+func (c *ClientWithResponses) RestoreWorkflowWithResponse(ctx context.Context, id IdPath, params *RestoreWorkflowParams, body RestoreWorkflowJSONRequestBody, reqEditors ...RequestEditorFn) (*RestoreWorkflowResponse, error) {
+	rsp, err := c.RestoreWorkflow(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRestoreWorkflowResponse(rsp)
+}
+
+// CreateWorkflowStepWithBodyWithResponse request with arbitrary body returning *CreateWorkflowStepResponse
+func (c *ClientWithResponses) CreateWorkflowStepWithBodyWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkflowStepResponse, error) {
+	rsp, err := c.CreateWorkflowStepWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkflowStepResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateWorkflowStepWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowStepParams, body CreateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkflowStepResponse, error) {
+	rsp, err := c.CreateWorkflowStep(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkflowStepResponse(rsp)
+}
+
+// DestroyWorkflowStepWithBodyWithResponse request with arbitrary body returning *DestroyWorkflowStepResponse
+func (c *ClientWithResponses) DestroyWorkflowStepWithBodyWithResponse(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DestroyWorkflowStepResponse, error) {
+	rsp, err := c.DestroyWorkflowStepWithBody(ctx, id, stepId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDestroyWorkflowStepResponse(rsp)
+}
+
+func (c *ClientWithResponses) DestroyWorkflowStepWithResponse(ctx context.Context, id IdPath, stepId int, params *DestroyWorkflowStepParams, body DestroyWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*DestroyWorkflowStepResponse, error) {
+	rsp, err := c.DestroyWorkflowStep(ctx, id, stepId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDestroyWorkflowStepResponse(rsp)
+}
+
+// UpdateWorkflowStepWithBodyWithResponse request with arbitrary body returning *UpdateWorkflowStepResponse
+func (c *ClientWithResponses) UpdateWorkflowStepWithBodyWithResponse(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkflowStepResponse, error) {
+	rsp, err := c.UpdateWorkflowStepWithBody(ctx, id, stepId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkflowStepResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateWorkflowStepWithResponse(ctx context.Context, id IdPath, stepId int, params *UpdateWorkflowStepParams, body UpdateWorkflowStepJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkflowStepResponse, error) {
+	rsp, err := c.UpdateWorkflowStep(ctx, id, stepId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkflowStepResponse(rsp)
+}
+
+// UpdateWorkflowTriggerWithBodyWithResponse request with arbitrary body returning *UpdateWorkflowTriggerResponse
+func (c *ClientWithResponses) UpdateWorkflowTriggerWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkflowTriggerResponse, error) {
+	rsp, err := c.UpdateWorkflowTriggerWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkflowTriggerResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateWorkflowTriggerWithResponse(ctx context.Context, id IdPath, params *UpdateWorkflowTriggerParams, body UpdateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkflowTriggerResponse, error) {
+	rsp, err := c.UpdateWorkflowTrigger(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkflowTriggerResponse(rsp)
+}
+
+// CreateWorkflowTriggerWithBodyWithResponse request with arbitrary body returning *CreateWorkflowTriggerResponse
+func (c *ClientWithResponses) CreateWorkflowTriggerWithBodyWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkflowTriggerResponse, error) {
+	rsp, err := c.CreateWorkflowTriggerWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkflowTriggerResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateWorkflowTriggerWithResponse(ctx context.Context, id IdPath, params *CreateWorkflowTriggerParams, body CreateWorkflowTriggerJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkflowTriggerResponse, error) {
+	rsp, err := c.CreateWorkflowTrigger(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkflowTriggerResponse(rsp)
 }
 
 // ParseListAvailabilitiesResponse parses an HTTP response from a ListAvailabilitiesWithResponse call
@@ -21587,6 +24867,926 @@ func ParseWhoamiResponse(rsp *http.Response) (*WhoamiResponse, error) {
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkflowExecutionsResponse parses an HTTP response from a ListWorkflowExecutionsWithResponse call
+func ParseListWorkflowExecutionsResponse(rsp *http.Response) (*ListWorkflowExecutionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkflowExecutionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkflowExecutionPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShowWorkflowExecutionResponse parses an HTTP response from a ShowWorkflowExecutionWithResponse call
+func ParseShowWorkflowExecutionResponse(rsp *http.Response) (*ShowWorkflowExecutionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShowWorkflowExecutionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data A single run of a workflow. The workflow_id FK is nullable —
+			// force-deleting the parent workflow sets it to null, preserving the
+			// audit trail via the tenant_id column. The `fail_reason` enum
+			// carries structural failure causes (e.g. workflow_deleted_mid_run);
+			// per-step exception details live in WorkflowExecutionLog.
+			//
+			// Show endpoint also returns `failed_log`: the first
+			// WorkflowExecutionLog row with status=failed, so support can debug
+			// without a second /logs round-trip.
+			Data       WorkflowExecution `json:"data"`
+			Meta       Meta              `json:"meta"`
+			Pagination *Pagination       `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkflowExecutionLogsResponse parses an HTTP response from a ListWorkflowExecutionLogsWithResponse call
+func ParseListWorkflowExecutionLogsResponse(rsp *http.Response) (*ListWorkflowExecutionLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkflowExecutionLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkflowExecutionLogPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkflowsResponse parses an HTTP response from a ListWorkflowsWithResponse call
+func ParseListWorkflowsResponse(rsp *http.Response) (*ListWorkflowsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkflowsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkflowPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateWorkflowResponse parses an HTTP response from a CreateWorkflowWithResponse call
+func ParseCreateWorkflowResponse(rsp *http.Response) (*CreateWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// Id UUID
+				Id *string `json:"id,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                               `json:"identifier,omitempty"`
+					PayloadSummary *string                               `json:"payload_summary,omitempty"`
+					Type           *CreateWorkflow201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDestroyWorkflowResponse parses an HTTP response from a DestroyWorkflowWithResponse call
+func ParseDestroyWorkflowResponse(rsp *http.Response) (*DestroyWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DestroyWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShowWorkflowResponse parses an HTTP response from a ShowWorkflowWithResponse call
+func ParseShowWorkflowResponse(rsp *http.Response) (*ShowWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShowWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data A workflow definition. Returned shape from /workflows/{id} embeds
+			// `trigger` (singleton step with step_type=TRIGGER, may be null) and
+			// `steps` (non-trigger steps, sorted by `order`, may be empty). List
+			// endpoint returns the same shape; eager-loads steps so the
+			// embedded counts are accurate.
+			//
+			// `status` controls editability: DRAFT and PAUSED accept step/trigger
+			// writes; ACTIVE rejects them with 409 WORKFLOW_NOT_EDITABLE.
+			//
+			// `deleted_at` is non-null when the workflow has been soft-deleted —
+			// use ?include_trashed=true on list/show to see trashed rows.
+			Data       Workflow    `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateWorkflowResponse parses an HTTP response from a UpdateWorkflowWithResponse call
+func ParseUpdateWorkflowResponse(rsp *http.Response) (*UpdateWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseActivateWorkflowResponse parses an HTTP response from a ActivateWorkflowWithResponse call
+func ParseActivateWorkflowResponse(rsp *http.Response) (*ActivateWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ActivateWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeactivateWorkflowResponse parses an HTTP response from a DeactivateWorkflowWithResponse call
+func ParseDeactivateWorkflowResponse(rsp *http.Response) (*DeactivateWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeactivateWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRestoreWorkflowResponse parses an HTTP response from a RestoreWorkflowWithResponse call
+func ParseRestoreWorkflowResponse(rsp *http.Response) (*RestoreWorkflowResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RestoreWorkflowResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateWorkflowStepResponse parses an HTTP response from a CreateWorkflowStepWithResponse call
+func ParseCreateWorkflowStepResponse(rsp *http.Response) (*CreateWorkflowStepResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateWorkflowStepResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+				Id *int `json:"id,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                   `json:"identifier,omitempty"`
+					PayloadSummary *string                                   `json:"payload_summary,omitempty"`
+					Type           *CreateWorkflowStep201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDestroyWorkflowStepResponse parses an HTTP response from a DestroyWorkflowStepWithResponse call
+func ParseDestroyWorkflowStepResponse(rsp *http.Response) (*DestroyWorkflowStepResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DestroyWorkflowStepResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateWorkflowStepResponse parses an HTTP response from a UpdateWorkflowStepWithResponse call
+func ParseUpdateWorkflowStepResponse(rsp *http.Response) (*UpdateWorkflowStepResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateWorkflowStepResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateWorkflowTriggerResponse parses an HTTP response from a UpdateWorkflowTriggerWithResponse call
+func ParseUpdateWorkflowTriggerResponse(rsp *http.Response) (*UpdateWorkflowTriggerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateWorkflowTriggerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateWorkflowTriggerResponse parses an HTTP response from a CreateWorkflowTriggerWithResponse call
+func ParseCreateWorkflowTriggerResponse(rsp *http.Response) (*CreateWorkflowTriggerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateWorkflowTriggerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+				Id *int `json:"id,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                      `json:"identifier,omitempty"`
+					PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+					Type           *CreateWorkflowTrigger200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+				Id *int `json:"id,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                      `json:"identifier,omitempty"`
+					PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+					Type           *CreateWorkflowTrigger201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
