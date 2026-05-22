@@ -164,6 +164,8 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `media` | list, upload, delete |
 | `categories` | list, get *(read-only)* |
 | `notifications` | resend |
+| `workflows` | list, get, create, update, delete, restore, **activate**, **deactivate**, **trigger** (create / update), **steps** (create / update / delete) |
+| `workflow-executions` | list, get, logs *(read-only)* |
 
 Run `ceebee inventory <resource> --help` for full flag listings. See [skills/index.md](skills/index.md) for agent-facing cookbooks per resource.
 
