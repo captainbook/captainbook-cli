@@ -336,9 +336,11 @@ func workflowsTriggerCmd(runner *Runner) *cobra.Command {
 			Kind: KindMutation, Verb: "PATCH", Path: "/workflows/{id}/trigger",
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id"},
 			Long: "Replaces the trigger's `config`. action_type is immutable here — run " +
-				"`trigger create` to atomically replace. 404 if no trigger exists yet.",
+				"`trigger create` to atomically replace. 404 if no trigger exists yet. " +
+				"Supply config via --config (typed flag) OR --data (whole-body JSON, " +
+				"useful for `trigger get | jq .config | trigger update --data @-` round-trips).",
 			Flags: []FlagDef{
-				{Name: "config", Type: "string", Required: true, Description: "JSON object (literal or @file.json)"},
+				{Name: "config", Type: "string", Description: "JSON object (literal or @file.json); optional if --data carries config"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
@@ -347,6 +349,9 @@ func workflowsTriggerCmd(runner *Runner) *cobra.Command {
 				}
 				body, err := triggerOrStepBody(args, nil)
 				if err != nil {
+					return nil, err
+				}
+				if err := requireBodyKey(body, "config", "--config or --data must supply the trigger `config` field"); err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateWorkflowTriggerWithBodyWithResponse(ctx, id, &gen.UpdateWorkflowTriggerParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -423,9 +428,10 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id", "step-id"},
 			Long: "Updates only the step's `config` payload. parent_step_id, branch_type, " +
 				"order, step_type, action_type, and condition_type are immutable post-create — " +
-				"delete and re-create to move or reshape.",
+				"delete and re-create to move or reshape. Supply config via --config (typed " +
+				"flag) OR --data (whole-body JSON, useful for read-modify-write loops).",
 			Flags: []FlagDef{
-				{Name: "config", Type: "string", Required: true, Description: "JSON object (literal or @file.json)"},
+				{Name: "config", Type: "string", Description: "JSON object (literal or @file.json); optional if --data carries config"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				workflowID, stepID, err := workflowStepArgs(args)
@@ -434,6 +440,9 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 				}
 				body, err := triggerOrStepBody(args, nil)
 				if err != nil {
+					return nil, err
+				}
+				if err := requireBodyKey(body, "config", "--config or --data must supply the step `config` field"); err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateWorkflowStepWithBodyWithResponse(ctx, workflowID, stepID, &gen.UpdateWorkflowStepParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -669,6 +678,30 @@ func triggerOrStepBody(args RunArgs, fieldMap map[string]string) ([]byte, error)
 		body["dry_run"] = true
 	}
 	return json.Marshal(body)
+}
+
+// requireBodyKey returns an error when the assembled body is missing a
+// field that the server requires. Used by trigger/step update closures
+// where we accept config from either --config or --data and want to
+// fail-fast client-side instead of round-tripping a 422.
+//
+// Takes the marshaled body bytes (what triggerOrStepBody returns) and
+// re-decodes — slightly redundant but keeps the API simple for closures
+// that already have the bytes in hand. A nil JSON value (`"config":null`)
+// counts as missing.
+func requireBodyKey(body []byte, key, msg string) error {
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		// If the body doesn't round-trip as a map we'd have failed
+		// earlier in triggerOrStepBody. Surface the unmarshal error
+		// rather than silently passing.
+		return fmt.Errorf("validating request body: %w", err)
+	}
+	v, ok := m[key]
+	if !ok || v == nil {
+		return fmt.Errorf("%s", msg)
+	}
+	return nil
 }
 
 // workflowStepArgs unpacks the (workflow-id, step-id) positional pair for
