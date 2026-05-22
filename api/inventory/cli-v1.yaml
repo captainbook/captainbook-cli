@@ -1962,7 +1962,7 @@ paths:
         - $ref: "#/components/parameters/IncludeTrashed"
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Since"
-        - name: product_option_id
+        - name: product_id
           in: query
           schema: { type: string }
       responses:
@@ -3647,11 +3647,11 @@ components:
         `max_quantity` is derived from the `maximum` discriminator and
         `maximum_bookable` columns: `maximum=custom` → real cap;
         `maximum=no_max` / `max_by_participant` → null in the wire response.
-        Extras link to `ProductOption` via the morphTo `product` columns
+        Extras link to `Product` via the morphTo `product` columns
         (`product_id` + `product_type`).
       properties:
         id: { type: string }
-        product_option_id: { type: string, nullable: true, description: "Sourced from the morph `product_id` column when `product_type=ProductOption`." }
+        product_id: { type: string, nullable: true, description: "Sourced from the morph `product_id` column when `product_type=Product`." }
         name: { type: string, nullable: true, description: "English translation of the `title` column." }
         description: { type: string, nullable: true }
         amount:
@@ -4349,7 +4349,7 @@ components:
 
     CreateExtraRequest:
       type: object
-      required: [product_option_id, name, amount, currency]
+      required: [product_id, name, amount, currency]
       description: |
         Mirrors `CreateExtraRequest::rules()`. The controller maps `name` →
         `title`, `amount` → `fare`, `max_quantity` → (`maximum`,
@@ -4357,7 +4357,7 @@ components:
         with other create endpoints but has no `extras` column and is
         dropped (currency is tenant-level).
       properties:
-        product_option_id: { type: string, description: "Persisted as the morph (`product_id`, `product_type=ProductOption`)." }
+        product_id: { type: string, description: "Persisted as the morph (`product_id`, `product_type=Product`)." }
         name: { type: string, maxLength: 200, description: "Persisted as the translatable `title` column." }
         description: { type: string, nullable: true }
         amount: { type: integer, minimum: 0, description: "Persisted as `fare`. Minor units." }
