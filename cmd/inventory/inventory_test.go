@@ -787,6 +787,42 @@ func TestTryParseDataID_PascalCaseFallback(t *testing.T) {
 			resourceType: "",
 			want:         "",
 		},
+		{
+			// Workflow trigger/step create responses return numeric ids.
+			// Pre-fix, tryParseDataID typed ID as string and these IDs
+			// dropped silently from audit.response_id.
+			name:         "direct numeric id",
+			body:         `{"data":{"id":13}}`,
+			resourceType: "WorkflowTrigger",
+			want:         "13",
+		},
+		{
+			name:         "nested numeric id under snake_cased key",
+			body:         `{"data":{"workflow_step":{"id":42}}}`,
+			resourceType: "WorkflowStep",
+			want:         "42",
+		},
+		{
+			// Preserve precision for IDs beyond float64's safe integer
+			// range (2^53). Without json.RawMessage the digits would
+			// silently round.
+			name:         "large int64 id",
+			body:         `{"data":{"id":9007199254740993}}`,
+			resourceType: "WorkflowStep",
+			want:         "9007199254740993",
+		},
+		{
+			name:         "null id falls through to nested lookup",
+			body:         `{"data":{"id":null,"workflow_step":{"id":7}}}`,
+			resourceType: "WorkflowStep",
+			want:         "7",
+		},
+		{
+			name:         "object id is not extracted as scalar",
+			body:         `{"data":{"id":{"nested":"yes"}}}`,
+			resourceType: "Product",
+			want:         "",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
