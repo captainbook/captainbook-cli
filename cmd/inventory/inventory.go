@@ -1062,6 +1062,8 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(makeResourceParent("locations", "Manage locations (start, end, meeting points)", locationsDefs(), sharedRunner))
 	cmd.AddCommand(mediaCmd(sharedRunner))
 	cmd.AddCommand(makeResourceParent("notifications", "Send notifications", notificationsDefs(), sharedRunner))
+	cmd.AddCommand(workflowsCmd(sharedRunner))
+	cmd.AddCommand(workflowExecutionsCmd(sharedRunner))
 
 	return cmd
 }
