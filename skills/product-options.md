@@ -1,6 +1,6 @@
 # Product Options
 
-A `ProductOption` is a variant of a `Product` — "Half-day tour" vs "Full-day tour", "Group A" vs "Group B". Pricing tiers, availabilities, extras, and questions all hang off ProductOptions, not Products directly. Soft-deletable.
+A `ProductOption` is a variant of a `Product` — "Half-day tour" vs "Full-day tour", "Group A" vs "Group B". Pricing tiers, availabilities, and questions hang off ProductOptions; extras attach to `Product`. Soft-deletable.
 
 ## Endpoints
 
@@ -76,4 +76,5 @@ ceebee inventory product-options restore 88                      # 200
 - [products.md](products.md) — parent resource.
 - [pricing-tiers.md](pricing-tiers.md) — tiers reference an option.
 - [availabilities.md](availabilities.md) — per-date capacity tied to an option.
-- [extras.md](extras.md), [questions.md](questions.md) — child catalogs filtered by `--product-option-id`.
+- [extras.md](extras.md) — child catalog filtered by `--product-id` (Product-scoped).
+- [questions.md](questions.md) — child catalog filtered by `--product-option-id`.

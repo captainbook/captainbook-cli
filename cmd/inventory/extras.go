@@ -18,7 +18,7 @@ func extrasDefs() []CommandDef {
 			Verb: "GET", Path: "/extras", Ability: invpkg.Read,
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "product-option-id", Type: "string", Description: "Filter by option"},
+				{Name: "product-id", Type: "string", Description: "Filter by product"},
 				{Name: "include-trashed", Type: "bool"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
@@ -30,8 +30,8 @@ func extrasDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-option-id"); v != "" {
-					p.ProductOptionId = &v
+				if v := args.FlagString("product-id"); v != "" {
+					p.ProductId = &v
 				}
 				if args.FlagBool("include-trashed") {
 					t := true
@@ -74,19 +74,19 @@ func extrasDefs() []CommandDef {
 				{Name: "name", Type: "string", Required: true, Description: "Extra name"},
 				{Name: "amount", Type: "int", Required: true, Description: "Price in minor units"},
 				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
-				{Name: "product-option-id", Type: "string", Required: true, Description: "Owning product option"},
+				{Name: "product-id", Type: "string", Required: true, Description: "Owning product"},
 				{Name: "description", Type: "string", Description: "Extra description"},
 				{Name: "max-quantity", Type: "int", Description: "Maximum purchasable per booking"},
 			},
-			ForensicFields: []string{"amount", "max-quantity", "product-option-id"},
+			ForensicFields: []string{"amount", "max-quantity", "product-id"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":              "name",
-					"amount":            "amount",
-					"currency":          "currency",
-					"product-option-id": "product_option_id",
-					"description":       "description",
-					"max-quantity":      "max_quantity",
+					"name":         "name",
+					"amount":       "amount",
+					"currency":     "currency",
+					"product-id":   "product_id",
+					"description":  "description",
+					"max-quantity": "max_quantity",
 				})
 				if err != nil {
 					return nil, err

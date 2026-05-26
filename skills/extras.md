@@ -1,6 +1,6 @@
 # Extras
 
-An `Extra` is an add-on or upsell tied to a `ProductOption` — equipment rental, photo package, transport. Customers pick extras at checkout. CRUD with soft-delete + restore. No cascade on delete.
+An `Extra` is an add-on or upsell tied to a `Product` — equipment rental, photo package, transport. Customers pick extras at checkout. CRUD with soft-delete + restore. No cascade on delete.
 
 ## Endpoints
 
@@ -15,19 +15,19 @@ An `Extra` is an add-on or upsell tied to a `ProductOption` — equipment rental
 
 ## Worked examples
 
-### 1. List extras for one option
+### 1. List extras for one product
 
 ```bash
-ceebee inventory extras list --product-option-id po_88
+ceebee inventory extras list --product-id pr_88
 ```
 
-Returns table of `{id, product_option_id, name, amount, max_quantity, updated_at}`.
+Returns table of `{id, product_id, name, amount, max_quantity, updated_at}`.
 
 ### 2. Create a "Wetsuit rental" extra at €15
 
 ```bash
 ceebee inventory extras create \
-  --product-option-id po_88 \
+  --product-id pr_88 \
   --name "Wetsuit rental" \
   --amount 1500 \
   --currency EUR \
@@ -53,7 +53,7 @@ Inspect the diffs, then re-run without `--dry-run`.
 
 ```bash
 ceebee inventory extras delete ex_42        # 204
-ceebee inventory extras list --include-trashed --product-option-id po_88
+ceebee inventory extras list --include-trashed --product-id pr_88
 ceebee inventory extras restore ex_42       # 200
 ```
 
@@ -72,5 +72,5 @@ ceebee inventory extras list --since "2026-04-20T00:00:00Z"
 
 ## See also
 
-- [product-options.md](product-options.md) — Extras hang off `ProductOption`.
+- [products.md](products.md) — Extras hang off `Product`.
 - [questions.md](questions.md) — sibling catalog (asked at checkout).

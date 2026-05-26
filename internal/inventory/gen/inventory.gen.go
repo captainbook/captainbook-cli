@@ -1378,8 +1378,8 @@ type CreateExtraRequest struct {
 	// Name Persisted as the translatable `title` column.
 	Name string `json:"name"`
 
-	// ProductOptionId Persisted as the morph (`product_id`, `product_type=ProductOption`).
-	ProductOptionId string `json:"product_option_id"`
+	// ProductId Persisted as the morph (`product_id`, `product_type=Product`).
+	ProductId string `json:"product_id"`
 }
 
 // CreateLocationRequest Mirrors `CreateLocationRequest::rules()`. Every Location must be
@@ -1786,7 +1786,7 @@ type ErrorEnvelope struct {
 // `max_quantity` is derived from the `maximum` discriminator and
 // `maximum_bookable` columns: `maximum=custom` → real cap;
 // `maximum=no_max` / `max_by_participant` → null in the wire response.
-// Extras link to `ProductOption` via the morphTo `product` columns
+// Extras link to `Product` via the morphTo `product` columns
 // (`product_id` + `product_type`).
 type Extra struct {
 	// Amount Maps to the `fare` column.
@@ -1805,9 +1805,9 @@ type Extra struct {
 	// Name English translation of the `title` column.
 	Name *string `json:"name,omitempty"`
 
-	// ProductOptionId Sourced from the morph `product_id` column when `product_type=ProductOption`.
-	ProductOptionId *string    `json:"product_option_id,omitempty"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	// ProductId Sourced from the morph `product_id` column when `product_type=Product`.
+	ProductId *string    `json:"product_id,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 // ExtraPage defines model for ExtraPage.
@@ -2971,8 +2971,8 @@ type ListExtrasParams struct {
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`
-	Since           *Since  `form:"since,omitempty" json:"since,omitempty"`
-	ProductOptionId *string `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+	Since     *Since  `form:"since,omitempty" json:"since,omitempty"`
+	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
 }
 
 // CreateExtraParams defines parameters for CreateExtra.
@@ -7978,9 +7978,9 @@ func NewListExtrasRequest(server string, params *ListExtrasParams) (*http.Reques
 
 		}
 
-		if params.ProductOptionId != nil {
+		if params.ProductId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -13469,7 +13469,7 @@ type CreateExtraResponse struct {
 			// `max_quantity` is derived from the `maximum` discriminator and
 			// `maximum_bookable` columns: `maximum=custom` → real cap;
 			// `maximum=no_max` / `max_by_participant` → null in the wire response.
-			// Extras link to `ProductOption` via the morphTo `product` columns
+			// Extras link to `Product` via the morphTo `product` columns
 			// (`product_id` + `product_type`).
 			Extra *Extra `json:"extra,omitempty"`
 
@@ -13543,7 +13543,7 @@ type ShowExtraResponse struct {
 		// `max_quantity` is derived from the `maximum` discriminator and
 		// `maximum_bookable` columns: `maximum=custom` → real cap;
 		// `maximum=no_max` / `max_by_participant` → null in the wire response.
-		// Extras link to `ProductOption` via the morphTo `product` columns
+		// Extras link to `Product` via the morphTo `product` columns
 		// (`product_id` + `product_type`).
 		Data       Extra       `json:"data"`
 		Meta       Meta        `json:"meta"`
@@ -18212,7 +18212,7 @@ func ParseCreateExtraResponse(rsp *http.Response) (*CreateExtraResponse, error) 
 				// `max_quantity` is derived from the `maximum` discriminator and
 				// `maximum_bookable` columns: `maximum=custom` → real cap;
 				// `maximum=no_max` / `max_by_participant` → null in the wire response.
-				// Extras link to `ProductOption` via the morphTo `product` columns
+				// Extras link to `Product` via the morphTo `product` columns
 				// (`product_id` + `product_type`).
 				Extra *Extra `json:"extra,omitempty"`
 
@@ -18323,7 +18323,7 @@ func ParseShowExtraResponse(rsp *http.Response) (*ShowExtraResponse, error) {
 			// `max_quantity` is derived from the `maximum` discriminator and
 			// `maximum_bookable` columns: `maximum=custom` → real cap;
 			// `maximum=no_max` / `max_by_participant` → null in the wire response.
-			// Extras link to `ProductOption` via the morphTo `product` columns
+			// Extras link to `Product` via the morphTo `product` columns
 			// (`product_id` + `product_type`).
 			Data       Extra       `json:"data"`
 			Meta       Meta        `json:"meta"`
