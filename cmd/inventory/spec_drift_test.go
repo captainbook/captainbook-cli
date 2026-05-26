@@ -192,12 +192,22 @@ func parseFlagsLit(e ast.Expr) []flagLit {
 }
 
 // parseRunFieldMap walks a Run func literal's body, finds the first call
-// to JSONBodyFromArgs (or to plain map[string]string{...}), and extracts
-// the flag-name → json-key map.
+// to a body-builder helper that takes a flag-name → json-key map, and
+// extracts the map. Recognized helpers:
+//   - JSONBodyFromArgs(args, dryRun, fieldMap)              // arg[2]
+//   - triggerOrStepBody(args, fieldMap)                     // arg[1]
+//
+// New helpers must be registered here, otherwise their field maps
+// silently skip TestSpecDrift_FieldMapKeysExistInSpec.
 func parseRunFieldMap(e ast.Expr) map[string]string {
 	fl, ok := e.(*ast.FuncLit)
 	if !ok {
 		return nil
+	}
+	// Helper name → index of the field-map arg in the call's Args slice.
+	helpers := map[string]int{
+		"JSONBodyFromArgs":  2,
+		"triggerOrStepBody": 1,
 	}
 	var found map[string]string
 	ast.Inspect(fl.Body, func(n ast.Node) bool {
@@ -209,14 +219,20 @@ func parseRunFieldMap(e ast.Expr) map[string]string {
 			return true
 		}
 		ident, ok := ce.Fun.(*ast.Ident)
-		if !ok || ident.Name != "JSONBodyFromArgs" {
-			return true
-		}
-		if len(ce.Args) < 3 {
-			return true
-		}
-		mapLit, ok := ce.Args[2].(*ast.CompositeLit)
 		if !ok {
+			return true
+		}
+		mapArgIdx, ok := helpers[ident.Name]
+		if !ok {
+			return true
+		}
+		if len(ce.Args) <= mapArgIdx {
+			return true
+		}
+		mapLit, ok := ce.Args[mapArgIdx].(*ast.CompositeLit)
+		if !ok {
+			// nil literal (Ident "nil") or a non-literal expression — no
+			// statically-checkable field map. Treat as empty.
 			return true
 		}
 		out := map[string]string{}

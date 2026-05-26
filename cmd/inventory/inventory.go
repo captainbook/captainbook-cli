@@ -519,6 +519,10 @@ func errorCode(err error) string {
 		return "RESOURCE_IN_USE"
 	case *invpkg.AvailabilityHasConfirmedBookingError:
 		return "AVAILABILITY_HAS_CONFIRMED_BOOKING"
+	case *invpkg.WorkflowNotEditableError:
+		return "WORKFLOW_NOT_EDITABLE"
+	case *invpkg.WorkflowNotActivatableError:
+		return "WORKFLOW_NOT_ACTIVATABLE"
 	case *invpkg.PayloadTooLargeError:
 		return "PAYLOAD_TOO_LARGE"
 	case *invpkg.UnsupportedMediaTypeError:
@@ -899,11 +903,17 @@ func tryParseDataID(body []byte, resourceType string) string {
 	if len(env.Data) == 0 {
 		return ""
 	}
+	// ID is json.RawMessage (not string) so numeric IDs decode too. The
+	// workflow surface returns numeric integer IDs for trigger/step
+	// create responses; UUID resources return strings. Both shapes must
+	// land in audit.response_id intact.
 	var direct struct {
-		ID string `json:"id"`
+		ID json.RawMessage `json:"id"`
 	}
-	if err := json.Unmarshal(env.Data, &direct); err == nil && direct.ID != "" {
-		return direct.ID
+	if err := json.Unmarshal(env.Data, &direct); err == nil {
+		if s := rawJSONIDToString(direct.ID); s != "" {
+			return s
+		}
 	}
 	if resourceType == "" {
 		return ""
@@ -922,12 +932,39 @@ func tryParseDataID(body []byte, resourceType string) string {
 		return ""
 	}
 	var inner struct {
-		ID string `json:"id"`
+		ID json.RawMessage `json:"id"`
 	}
 	if err := json.Unmarshal(raw, &inner); err != nil {
 		return ""
 	}
-	return inner.ID
+	return rawJSONIDToString(inner.ID)
+}
+
+// rawJSONIDToString converts a raw JSON id value to its string form,
+// preserving precision for large int64s that JSON-decoding through any
+// would lossily round-trip via float64. Strings come back unquoted;
+// numbers come back as their literal digits; null / empty / objects /
+// arrays return "".
+func rawJSONIDToString(raw json.RawMessage) string {
+	s := strings.TrimSpace(string(raw))
+	if s == "" || s == "null" {
+		return ""
+	}
+	// Strings: "abc" → abc (let json.Unmarshal handle escape sequences).
+	if s[0] == '"' {
+		var unq string
+		if err := json.Unmarshal(raw, &unq); err != nil {
+			return ""
+		}
+		return unq
+	}
+	// Objects / arrays: not a usable scalar id.
+	if s[0] == '{' || s[0] == '[' {
+		return ""
+	}
+	// Numbers (or bare tokens like `true`/`false` which we'd rather
+	// return as their literal form than silently drop) — return as-is.
+	return s
 }
 
 // pascalToSnake converts "ProductOption" → "product_option",
@@ -1058,6 +1095,8 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(makeResourceParent("locations", "Manage locations (start, end, meeting points)", locationsDefs(), sharedRunner))
 	cmd.AddCommand(mediaCmd(sharedRunner))
 	cmd.AddCommand(makeResourceParent("notifications", "Send notifications", notificationsDefs(), sharedRunner))
+	cmd.AddCommand(workflowsCmd(sharedRunner))
+	cmd.AddCommand(workflowExecutionsCmd(sharedRunner))
 
 	return cmd
 }

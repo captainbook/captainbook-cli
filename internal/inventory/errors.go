@@ -315,6 +315,102 @@ func (e *AvailabilityHasConfirmedBookingError) UserMessage() string {
 }
 
 // -----------------------------------------------------------------------------
+// 9c. WorkflowNotEditableError — WORKFLOW_NOT_EDITABLE, 409
+//
+// Returned by every /workflows/{id}/trigger and /workflows/{id}/steps* write
+// when workflow.status=ACTIVE. The shell-only PATCH /workflows/{id} is NOT
+// gated (those fields don't affect the executor). Carries the workflow's
+// current status when the server includes it in details so the user knows
+// whether to deactivate or accept that the workflow is already running.
+// -----------------------------------------------------------------------------
+
+type WorkflowNotEditableError struct {
+	Status string // e.g. "active" — empty when server omits it
+	Hint   string
+}
+
+func (e *WorkflowNotEditableError) Error() string {
+	if e.Status != "" {
+		return fmt.Sprintf("WORKFLOW_NOT_EDITABLE: status=%s", e.Status)
+	}
+	return "WORKFLOW_NOT_EDITABLE"
+}
+
+func (e *WorkflowNotEditableError) UserMessage() string {
+	var b strings.Builder
+	b.WriteString("workflow is not editable")
+	if e.Status != "" {
+		b.WriteString(" (current status: ")
+		b.WriteString(e.Status)
+		b.WriteString(")")
+	}
+	b.WriteString(". Trigger and step writes require status ∈ {DRAFT, PAUSED}. Run `workflows deactivate <id>` first, or use shell PATCH (name/description/notify_on_fail/max_credits_per_run) which is allowed on ACTIVE.")
+	if e.Hint != "" {
+		b.WriteString("\n  hint: ")
+		b.WriteString(e.Hint)
+	}
+	return b.String()
+}
+
+// -----------------------------------------------------------------------------
+// 9d. WorkflowNotActivatableError — WORKFLOW_NOT_ACTIVATABLE, 422
+//
+// Returned by POST /workflows/{id}/activate when WorkflowActivationValidator
+// finds problems. The validator does NOT short-circuit — it returns ALL
+// failures in one response so the user can fix the workflow in one editing
+// pass. Each entry in Errors carries one validator code (NO_TRIGGER,
+// NO_STEPS, ORPHAN_PARENT_REF, INVALID_STEP_CONFIG, INVALID_STEP_TYPE,
+// CREDIT_LIMIT_EXCEEDED). Step-level failures include StepID.
+// -----------------------------------------------------------------------------
+
+// WorkflowActivationFailure is one entry in WorkflowNotActivatableError.Errors.
+// StepID is non-nil only for step-level failures (INVALID_STEP_CONFIG,
+// INVALID_STEP_TYPE, ORPHAN_PARENT_REF); the workflow-level failures
+// (NO_TRIGGER, NO_STEPS, CREDIT_LIMIT_EXCEEDED) leave it nil.
+type WorkflowActivationFailure struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	StepID  *int64 `json:"step_id,omitempty"`
+}
+
+type WorkflowNotActivatableError struct {
+	Hint   string
+	Errors []WorkflowActivationFailure
+}
+
+func (e *WorkflowNotActivatableError) Error() string {
+	return fmt.Sprintf("WORKFLOW_NOT_ACTIVATABLE (%d failures)", len(e.Errors))
+}
+
+func (e *WorkflowNotActivatableError) UserMessage() string {
+	if len(e.Errors) == 0 {
+		msg := "workflow cannot be activated"
+		if e.Hint != "" {
+			msg += "\n  hint: " + e.Hint
+		}
+		return msg
+	}
+	var b strings.Builder
+	b.WriteString("workflow cannot be activated:")
+	for _, f := range e.Errors {
+		b.WriteString("\n  - ")
+		b.WriteString(f.Code)
+		if f.StepID != nil {
+			b.WriteString(fmt.Sprintf(" (step %d)", *f.StepID))
+		}
+		if f.Message != "" {
+			b.WriteString(": ")
+			b.WriteString(f.Message)
+		}
+	}
+	if e.Hint != "" {
+		b.WriteString("\n  hint: ")
+		b.WriteString(e.Hint)
+	}
+	return b.String()
+}
+
+// -----------------------------------------------------------------------------
 // 10. PayloadTooLargeError — PAYLOAD_TOO_LARGE, 413 (multipart upload)
 //
 // Spec: 10 MiB cap by default; tenant plans may raise. ActualBytes/MaxBytes
@@ -557,6 +653,22 @@ func init() {
 			}
 		},
 
+		"WORKFLOW_NOT_EDITABLE": func(status int, env errorEnvelope) error {
+			// Server sometimes echoes the current workflow status in details
+			// so the user knows whether deactivate is enough or the workflow
+			// is already mid-run; tolerate either key shape.
+			st, _ := decodeStringField(env.Error.Details, "status")
+			if st == "" {
+				st, _ = decodeStringField(env.Error.Details, "workflow_status")
+			}
+			return &WorkflowNotEditableError{Status: st, Hint: env.Error.Hint}
+		},
+
+		"WORKFLOW_NOT_ACTIVATABLE": func(status int, env errorEnvelope) error {
+			failures, _ := decodeActivationFailures(env.Error.Details, "errors")
+			return &WorkflowNotActivatableError{Hint: env.Error.Hint, Errors: failures}
+		},
+
 		"PAYLOAD_TOO_LARGE": func(status int, env errorEnvelope) error {
 			actual, _ := decodeIntField(env.Error.Details, "actual_bytes")
 			maxBytes, _ := decodeIntField(env.Error.Details, "max_bytes")
@@ -610,6 +722,21 @@ func decodeIntField(d map[string]json.RawMessage, key string) (int64, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+// decodeActivationFailures returns []WorkflowActivationFailure at key, or nil
+// if absent / wrong type. Used by the WORKFLOW_NOT_ACTIVATABLE registry
+// constructor to extract `details.errors[]`.
+func decodeActivationFailures(d map[string]json.RawMessage, key string) ([]WorkflowActivationFailure, bool) {
+	raw, ok := d[key]
+	if !ok {
+		return nil, false
+	}
+	var fs []WorkflowActivationFailure
+	if err := json.Unmarshal(raw, &fs); err != nil {
+		return nil, false
+	}
+	return fs, true
 }
 
 // decodeStringSliceField returns []string at key, or nil if absent / wrong type.

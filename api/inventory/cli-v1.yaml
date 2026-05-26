@@ -2845,6 +2845,646 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
 
+  # ──────────────────────────────────────────────────────────────────────
+  # Workflows
+  #
+  # Tenant-level gate: every workflow endpoint is additionally wrapped by
+  # the `WorkflowsIncludedInSubscription` middleware. A tenant whose plan
+  # does not include workflows (`tenant->getPlanLimit('workflows') === 0`)
+  # gets a 404 from EVERY workflow endpoint, matching the UI's upgrade-
+  # gate behavior in `app/Policies/WorkflowPolicy::workflowsIncludedInPlan`.
+  #
+  # Step structure (parent_step_id, branch_type, order, step_type,
+  # action_type) is immutable post-create. PATCH /steps/{id} only accepts
+  # a `config` payload. To move or reshape a step, delete and re-create.
+  # There is no reorder endpoint (the UI doesn't expose reorder either).
+  #
+  # The trigger is a singleton per workflow (one row with step_type=TRIGGER,
+  # order=0) managed via /workflows/{id}/trigger. POST creates or replaces
+  # the trigger atomically. Step CRUD via /steps* does not accept
+  # step_type=TRIGGER.
+  #
+  # Workflow status is one of DRAFT, PAUSED, ACTIVE. Any write to
+  # /trigger or /steps* on an ACTIVE workflow returns 409
+  # WORKFLOW_NOT_EDITABLE — the executor would otherwise see a half-
+  # changed step shape mid-execution. Shell PATCH (name, description,
+  # notify_on_fail, max_credits_per_run) is allowed on ACTIVE.
+  # ──────────────────────────────────────────────────────────────────────
+  /workflows:
+    get:
+      operationId: listWorkflows
+      summary: List workflows
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/IncludeTrashed"
+        - $ref: "#/components/parameters/Since"
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, paused, active] }
+      responses:
+        "200":
+          description: Page of workflows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    post:
+      operationId: createWorkflow
+      summary: Create a workflow (DRAFT)
+      description: |
+        Creates an empty workflow shell with `status=DRAFT`. The workflow is
+        inert until a trigger and at least one step are added and the workflow
+        is activated. `business_unit_id` defaults to the calling user's
+        current business unit when omitted.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              id: { type: string, description: UUID }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /workflows/{id}:
+    get:
+      operationId: showWorkflow
+      summary: Show a workflow with its trigger + step tree
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IncludeTrashed"
+      responses:
+        "200":
+          description: Workflow
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Workflow" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      operationId: updateWorkflow
+      summary: Update workflow shell fields
+      description: |
+        Updates name, description, notify_on_fail, max_credits_per_run.
+        Allowed on ANY status including ACTIVE — these fields have no
+        execution-time impact. For status changes use
+        /activate and /deactivate.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: destroyWorkflow
+      summary: Soft-delete a workflow (cascades to steps)
+      description: |
+        Soft-deletes the workflow and cascade-soft-deletes its steps via the
+        `WorkflowObserver`. Execution rows are retained: the
+        `workflow_executions.workflow_id` FK is SET NULL on hard-delete, but
+        soft-delete leaves the FK pointing at the trashed workflow which can
+        still be restored.
+
+        A waiting execution whose parent workflow is soft-deleted will resolve
+        to FAILED with `fail_reason=workflow_deleted_mid_run` when the queued
+        ProcessWorkflowJob picks it up next.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /workflows/{id}/restore:
+    post:
+      operationId: restoreWorkflow
+      summary: Restore a soft-deleted workflow
+      description: |
+        Clears `deleted_at` and cascade-restores steps that were trashed by
+        this workflow's prior soft-delete (matched via the
+        `workflow_steps.cascade_deleted_by` token). Steps the user trashed
+        individually before the workflow are left alone. Idempotent: restore
+        on a live workflow returns the row unchanged.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /workflows/{id}/activate:
+    post:
+      operationId: activateWorkflow
+      summary: Validate the tree and flip to ACTIVE
+      description: |
+        Runs `WorkflowActivationValidator` over the workflow's full step
+        tree. ALL errors are returned in a single response — the validator
+        does not short-circuit on the first failure. Checks:
+
+        1. Workflow has a TRIGGER step.
+        2. Workflow has at least one non-TRIGGER step.
+        3. Every step's `parent_step_id` (when set) references another step
+           in the same workflow.
+        4. Every step's config validates against the action's `rules()`
+           schema (the contract added in Lane A).
+        5. Sum of step `creditsCost()` ≤ `max_credits_per_run` (when set).
+
+        On failure, returns 422 WORKFLOW_NOT_ACTIVATABLE with
+        `error.details.errors[]` carrying one entry per check. Each entry
+        has `code` (NO_TRIGGER, NO_STEPS, ORPHAN_PARENT_REF,
+        INVALID_STEP_CONFIG, INVALID_STEP_TYPE, CREDIT_LIMIT_EXCEEDED) and
+        a human-readable `message`; step-level errors include `step_id`.
+
+        On success, flips status to ACTIVE. Idempotent: activate on an
+        already-ACTIVE workflow returns the row unchanged.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Activated (or already active)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422":
+          description: Validation gate failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /workflows/{id}/deactivate:
+    post:
+      operationId: deactivateWorkflow
+      summary: Flip to PAUSED (idempotent)
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Paused (or already paused)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+
+  /workflows/{id}/trigger:
+    post:
+      operationId: createWorkflowTrigger
+      summary: Create or replace the trigger (singleton)
+      description: |
+        Atomic create-or-replace. If the workflow already has a trigger, it is
+        force-deleted and the new trigger is written in the same request.
+        Per-trigger `config` is validated against the resolved trigger's
+        `rules()` schema; failures return 422 INVALID_STEP_CONFIG with
+        Laravel-shaped field=>messages in `error.details.errors`.
+
+        Requires workflow.status ∈ {DRAFT, PAUSED}. ACTIVE returns 409
+        WORKFLOW_NOT_EDITABLE.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowTriggerRequest"
+      responses:
+        "200":
+          description: Trigger replaced
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              id: { type: integer }
+        "201":
+          description: Trigger created (no prior trigger)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              id: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workflow not editable (ACTIVE) or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    patch:
+      operationId: updateWorkflowTrigger
+      summary: Update trigger config only
+      description: |
+        Replaces the trigger's `config` payload. The trigger's `action_type`
+        is immutable — to change it, call POST /trigger (which atomically
+        replaces). 404 if no trigger exists yet (use POST first). 409
+        WORKFLOW_NOT_EDITABLE if status=ACTIVE.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowTriggerRequest"
+      responses:
+        "200":
+          description: Trigger updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workflow not editable (ACTIVE) or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /workflows/{id}/steps:
+    post:
+      operationId: createWorkflowStep
+      summary: Create a step (tree-shaped)
+      description: |
+        Creates a non-trigger step (ACTION, CONDITION, DELAY, DELAY_UNTIL,
+        LOOP). Steps form a tree via `parent_step_id` + `branch_type`. The
+        parent must belong to the same workflow — cross-workflow refs are
+        rejected with 422.
+
+        Config is validated against the resolved action's `rules()` schema
+        before persistence; failures return 422 INVALID_STEP_CONFIG.
+
+        step_type=TRIGGER is rejected here — use /workflows/{id}/trigger
+        for the trigger singleton.
+
+        Requires workflow.status ∈ {DRAFT, PAUSED}.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowStepRequest"
+      responses:
+        "201":
+          description: Step created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              id: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workflow not editable (ACTIVE) or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /workflows/{id}/steps/{stepId}:
+    patch:
+      operationId: updateWorkflowStep
+      summary: Update step config only
+      description: |
+        Updates the step's `config` payload. Structure (`parent_step_id`,
+        `branch_type`, `order`, `step_type`, `action_type`,
+        `condition_type`) is immutable post-create — to move or reshape a
+        step, delete and re-create. Requires workflow.status ∈ {DRAFT,
+        PAUSED}.
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: stepId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowStepRequest"
+      responses:
+        "200":
+          description: Step updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workflow not editable (ACTIVE) or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: destroyWorkflowStep
+      summary: Soft-delete a step
+      tags: [Workflows]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: stepId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workflow not editable (ACTIVE) or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Workflow executions — read-only (Eng D3).
+  # No trigger/cancel/retry endpoints in v1. Support uses the Builder UI
+  # for those operations.
+  # ──────────────────────────────────────────────────────────────────────
+  /workflow-executions:
+    get:
+      operationId: listWorkflowExecutions
+      summary: List workflow executions
+      description: |
+        Filterable list of workflow execution rows. Default ordering: latest
+        first (`created_at DESC, id DESC`) — the most common support query
+        is "what failed in the last hour".
+      tags: [WorkflowExecutions]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: workflow_id
+          in: query
+          schema: { type: string, description: UUID }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, waiting, completed, failed]
+        - name: fail_reason
+          in: query
+          schema: { type: string, description: "e.g. workflow_deleted_mid_run" }
+        - name: date_from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: date_to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Page of executions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowExecutionPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /workflow-executions/{id}:
+    get:
+      operationId: showWorkflowExecution
+      summary: Show an execution (with embedded failed log)
+      description: |
+        Returns the execution row plus `failed_log` — the first
+        WorkflowExecutionLog row with status=FAILED, so support can debug
+        a failed run without a second /logs round-trip. For full per-step
+        log history, use /workflow-executions/{id}/logs.
+      tags: [WorkflowExecutions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Execution with embedded failed log
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/WorkflowExecution" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /workflow-executions/{id}/logs:
+    get:
+      operationId: listWorkflowExecutionLogs
+      summary: Paginated per-step logs for an execution
+      tags: [WorkflowExecutions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: step_id
+          in: query
+          schema: { type: integer, description: "Filter to one step's history." }
+      responses:
+        "200":
+          description: Page of execution logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowExecutionLogPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -4545,4 +5185,336 @@ components:
         google_place_id: { type: string, nullable: true }
         timezone: { type: string, maxLength: 64, nullable: true, description: "Accepted but not stored." }
         notes: { type: string, nullable: true, description: "Accepted but not stored." }
+        dry_run: { type: boolean, default: false }
+
+    # ──────────────────────────────────────────────────────────────────
+    # Workflows
+    # ──────────────────────────────────────────────────────────────────
+    Workflow:
+      type: object
+      description: |
+        A workflow definition. Returned shape from /workflows/{id} embeds
+        `trigger` (singleton step with step_type=TRIGGER, may be null) and
+        `steps` (non-trigger steps, sorted by `order`, may be empty). List
+        endpoint returns the same shape; eager-loads steps so the
+        embedded counts are accurate.
+
+        `status` controls editability: DRAFT and PAUSED accept step/trigger
+        writes; ACTIVE rejects them with 409 WORKFLOW_NOT_EDITABLE.
+
+        `deleted_at` is non-null when the workflow has been soft-deleted —
+        use ?include_trashed=true on list/show to see trashed rows.
+      properties:
+        id: { type: string, description: UUID }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [draft, paused, active] }
+        business_unit_id: { type: integer, nullable: true }
+        created_by_user_id: { type: integer, nullable: true }
+        max_credits_per_run:
+          type: integer
+          nullable: true
+          description: |
+            Per-execution credit ceiling. Activation rejects with
+            CREDIT_LIMIT_EXCEEDED when sum(step.creditsCost()) exceeds
+            this. Null means unbounded.
+        notify_on_fail: { type: boolean }
+        last_failed_run: { type: string, format: date-time, nullable: true }
+        deleted_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        trigger:
+          allOf:
+            - $ref: "#/components/schemas/WorkflowStep"
+          nullable: true
+          description: "Singleton TRIGGER step. Null when no trigger has been set."
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowStep" }
+          description: "Non-trigger steps, sorted by `order`."
+        steps_count: { type: integer }
+
+    WorkflowStep:
+      type: object
+      description: |
+        A single step row. `step_type` discriminates the shape: TRIGGER
+        steps live under the workflow's `trigger`; ACTION/CONDITION/
+        DELAY/DELAY_UNTIL/LOOP steps live under `steps[]`. `parent_step_id`
+        and `branch_type` form the tree used by conditions and loops:
+        children of a CONDITION step are marked branch_type=true|false to
+        distinguish the then/else branches; LOOP children use branch_type=true.
+      properties:
+        id: { type: integer }
+        workflow_id: { type: string, description: UUID }
+        step_type:
+          type: string
+          enum: [trigger, action, condition, delay, delay_until, loop]
+        action_type:
+          type: string
+          nullable: true
+          description: |
+            For TRIGGER steps: matches TriggerType (booking_confirmed,
+            scheduled_time, …). For ACTION steps: matches ActionType
+            (send_notification, charge_card_on_file, …). Null for
+            CONDITION steps (use condition_type instead).
+        condition_type:
+          type: string
+          nullable: true
+          enum: [value_check, filter]
+        config:
+          type: object
+          description: |
+            Action-type-specific config. Validated against the resolved
+            action's `rules()` schema at write time and again at
+            execution time. See app/Workflows/Actions/*.php for the
+            per-action shape.
+        order: { type: integer }
+        parent_step_id:
+          type: integer
+          nullable: true
+          description: "Parent step in the tree (CONDITION/LOOP children)."
+        branch_type:
+          type: string
+          nullable: true
+          enum: [true, false]
+          description: "Branch tag for CONDITION children (true/false) or LOOP children (true)."
+        deleted_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    WorkflowExecution:
+      type: object
+      description: |
+        A single run of a workflow. The workflow_id FK is nullable —
+        force-deleting the parent workflow sets it to null, preserving the
+        audit trail via the tenant_id column. The `fail_reason` enum
+        carries structural failure causes (e.g. workflow_deleted_mid_run);
+        per-step exception details live in WorkflowExecutionLog.
+
+        Show endpoint also returns `failed_log`: the first
+        WorkflowExecutionLog row with status=failed, so support can debug
+        without a second /logs round-trip.
+      properties:
+        id: { type: integer }
+        workflow_id:
+          type: string
+          nullable: true
+          description: "Null when the parent workflow has been force-deleted."
+        status:
+          type: string
+          enum: [pending, running, waiting, completed, failed]
+        fail_reason:
+          type: string
+          nullable: true
+          enum: [workflow_deleted_mid_run]
+          description: "Categorized structural fail reason. Per-step exception messages live in WorkflowExecutionLog.error_message."
+        current_step_order: { type: integer, nullable: true }
+        resume_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: "When the execution is in WAITING status, the wall-clock time at which it should resume."
+        credits_cost: { type: integer }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        trigger_data:
+          type: object
+          nullable: true
+          description: "Trigger payload at the moment the execution was created."
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        failed_log:
+          allOf:
+            - $ref: "#/components/schemas/WorkflowExecutionLog"
+          nullable: true
+          description: "Embedded only on /workflow-executions/{id} (single-show)."
+
+    WorkflowExecutionLog:
+      type: object
+      description: |
+        Per-step record of an execution. One row per step attempt — loops
+        produce one row per (step, item) pair. Error context lives here,
+        not on WorkflowExecution.
+      properties:
+        id: { type: integer }
+        execution_id: { type: integer }
+        step_id: { type: integer, nullable: true }
+        status: { type: string, enum: [pending, running, completed, failed] }
+        input_data: { type: object, nullable: true }
+        output_data: { type: object, nullable: true }
+        error_message: { type: string, nullable: true }
+        exception_type: { type: string, nullable: true }
+        credits_cost: { type: integer }
+        executed_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    # Page wrappers
+    WorkflowPage:
+      type: object
+      properties:
+        meta: { $ref: "#/components/schemas/Meta" }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Workflow" }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+
+    WorkflowExecutionPage:
+      type: object
+      properties:
+        meta: { $ref: "#/components/schemas/Meta" }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowExecution" }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+
+    WorkflowExecutionLogPage:
+      type: object
+      properties:
+        meta: { $ref: "#/components/schemas/Meta" }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowExecutionLog" }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+
+    # Request bodies
+    CreateWorkflowRequest:
+      type: object
+      required: [name]
+      description: |
+        Mirrors `CreateWorkflowRequest::rules()`. The workflow is created
+        in DRAFT status — there is no way to skip straight to ACTIVE. Add
+        trigger + steps, then POST /activate.
+      properties:
+        name: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        business_unit_id:
+          type: integer
+          description: "Defaults to the calling user's current_business_unit_id when omitted."
+        max_credits_per_run:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: "Defaults to 50 when omitted."
+        notify_on_fail: { type: boolean, default: false }
+        dry_run: { type: boolean, default: false }
+
+    UpdateWorkflowRequest:
+      type: object
+      description: |
+        Updates the workflow shell. All fields are optional; only
+        passed-in fields are updated. Shell PATCH is allowed on ACTIVE
+        workflows because these fields don't affect the executor.
+      properties:
+        name: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        max_credits_per_run: { type: integer, minimum: 0, nullable: true }
+        notify_on_fail: { type: boolean }
+        dry_run: { type: boolean, default: false }
+
+    CreateWorkflowTriggerRequest:
+      type: object
+      required: [action_type]
+      description: |
+        Mirrors `CreateWorkflowTriggerRequest::rules()`. The `config`
+        shape depends on `action_type` — see
+        app/Workflows/Triggers/*.php and each trigger's `rules()`.
+
+        Example for SCHEDULED_TIME (weekly):
+        ```json
+        {
+          "action_type": "scheduled_time",
+          "config": {
+            "frequency": "weekly",
+            "time": "09:00",
+            "weekly_days": ["monday", "wednesday"]
+          }
+        }
+        ```
+      properties:
+        action_type:
+          type: string
+          enum:
+            - booking_confirmed
+            - booking_cancelled
+            - booking_changed
+            - booking_rescheduled
+            - booking_transaction_processed
+            - documents_signed_complete
+            - customer_created
+            - diary_notes_updated
+            - scheduled_time
+            - webhook
+            - unknown_booking_cancellation
+            - booking_resource_attached
+            - booking_resource_detached
+            - auxiliary_resource_attached_to_booking
+            - auxiliary_resource_detached_from_booking
+            - all_mandatory_questions_answered
+            - abandoned_booking
+            - custom_attribute_updated
+            - waitlist_joined
+        config:
+          type: object
+          description: "Validated against the resolved trigger's rules() schema."
+        dry_run: { type: boolean, default: false }
+
+    UpdateWorkflowTriggerRequest:
+      type: object
+      required: [config]
+      description: |
+        Replaces the trigger's `config`. `action_type` is immutable —
+        to change it, call POST /trigger (which atomically replaces).
+      properties:
+        config: { type: object }
+        dry_run: { type: boolean, default: false }
+
+    CreateWorkflowStepRequest:
+      type: object
+      required: [step_type, order]
+      description: |
+        Mirrors `CreateWorkflowStepRequest::rules()`. step_type=TRIGGER
+        is REJECTED here — use POST /workflows/{id}/trigger for the
+        trigger singleton.
+
+        `action_type` is required for ACTION/DELAY/DELAY_UNTIL/LOOP step
+        types; `condition_type` is required for CONDITION step type. The
+        `config` shape depends on the resolved action — see the relevant
+        class's `rules()`.
+
+        `parent_step_id` (when set) must reference a step in the same
+        workflow; cross-workflow refs return 422. When parent_step_id is
+        set, `branch_type` is required (true/false for condition children;
+        true for loop children).
+      properties:
+        step_type:
+          type: string
+          enum: [action, condition, delay, delay_until, loop]
+        action_type:
+          type: string
+          nullable: true
+          description: "Required for ACTION/DELAY/DELAY_UNTIL/LOOP. See ActionType enum for values."
+        condition_type:
+          type: string
+          nullable: true
+          enum: [value_check, filter]
+          description: "Required for CONDITION step_type."
+        config: { type: object }
+        order: { type: integer, minimum: 0 }
+        parent_step_id: { type: integer, nullable: true }
+        branch_type:
+          type: string
+          nullable: true
+          enum: [true, false]
+          description: "Required when parent_step_id is set."
+        dry_run: { type: boolean, default: false }
+
+    UpdateWorkflowStepRequest:
+      type: object
+      required: [config]
+      description: |
+        Step PATCH only updates the config payload. parent_step_id,
+        branch_type, order, step_type, and action_type are immutable
+        post-create — to move or reshape a step, delete and re-create.
+      properties:
+        config: { type: object }
         dry_run: { type: boolean, default: false }
