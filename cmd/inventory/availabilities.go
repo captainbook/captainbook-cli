@@ -15,6 +15,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Shared date-range flag descriptions. The Availability list / bulk-delete
+// / bulk-update endpoints all use a half-open `[from, to)` window per the
+// CLI v1 spec — `from` inclusive, `to` exclusive. Operators have shipped
+// duplicate boundary-day slots by reading `--to` as inclusive, so every
+// flag that takes one of these dates points at the same string.
+const (
+	availFromDesc = "Date range start, inclusive (YYYY-MM-DD). Range is half-open [from, to)."
+	availToDesc   = "Date range end, exclusive (YYYY-MM-DD). Range is half-open [from, to)."
+)
+
 // availabilitiesCmd builds the `inventory availabilities` subtree. Most
 // resources are bound via bindCommands(); availabilities is special
 // because of D38: bulk-update is split into 5 per-setting subcommands
@@ -52,8 +62,8 @@ func bulkDeleteDef() CommandDef {
 			"--dry-run.",
 		Flags: []FlagDef{
 			{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option ID"},
-			{Name: "from", Type: "string", Required: true, Description: "Date range start (YYYY-MM-DD)"},
-			{Name: "to", Type: "string", Required: true, Description: "Date range end (YYYY-MM-DD)"},
+			{Name: "from", Type: "string", Required: true, Description: availFromDesc},
+			{Name: "to", Type: "string", Required: true, Description: availToDesc},
 		},
 		ForensicFields: []string{"product-option-id", "from", "to"},
 		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -131,8 +141,8 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "limit", Type: "int"},
 				{Name: "cursor", Type: "string"},
 				{Name: "product-option-id", Type: "string"},
-				{Name: "from", Type: "string", Description: "Date from (YYYY-MM-DD)"},
-				{Name: "to", Type: "string", Description: "Date to (YYYY-MM-DD)"},
+				{Name: "from", Type: "string", Description: availFromDesc},
+				{Name: "to", Type: "string", Description: availToDesc},
 				{Name: "has-capacity", Type: "bool", Description: "Only slots with remaining capacity"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
@@ -249,6 +259,17 @@ func availabilitiesDefs() []CommandDef {
 			},
 			ForensicFields: []string{"product-option-id", "start-date", "end-date", "weekdays", "start-time", "end-time"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				// Client-side range gate. The server rejects out-of-range
+				// weekdays with 422, but EU operators (Monday-first muscle
+				// memory) routinely pass `7` for Sunday — fail loudly here
+				// before the request hits the wire.
+				if wd, ok := args.Flags["weekdays"].([]int); ok {
+					for _, d := range wd {
+						if d < 0 || d > 6 {
+							return nil, fmt.Errorf("--weekdays: %d out of range (must be 0..6, where Sunday=0 and Saturday=6)", d)
+						}
+					}
+				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"product-option-id": "product_option_id",
 					"start-date":        "start_date",
@@ -434,8 +455,8 @@ func timeValueNewValue(args RunArgs) (any, error) {
 func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValueFn func(RunArgs) (any, error)) CommandDef {
 	// Common to every bulk-update setting: the temporal/scoping fields.
 	commonFlags := []FlagDef{
-		{Name: "from", Type: "string", Required: true, Description: "Date range start (YYYY-MM-DD)"},
-		{Name: "to", Type: "string", Required: true, Description: "Date range end (YYYY-MM-DD)"},
+		{Name: "from", Type: "string", Required: true, Description: availFromDesc},
+		{Name: "to", Type: "string", Required: true, Description: availToDesc},
 		{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option ID"},
 	}
 	flags := append([]FlagDef{}, commonFlags...)
