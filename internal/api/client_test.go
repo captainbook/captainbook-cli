@@ -39,7 +39,7 @@ func TestBuildURL(t *testing.T) {
 			name:     "basic with from/to",
 			endpoint: &Endpoint{Path: "/revenue"},
 			params:   &QueryParams{From: "2025-01-01", To: "2025-01-31"},
-			wantSub:  "/api/v1/statistics/revenue?",
+			wantSub:  "/statistics/revenue?",
 		},
 		{
 			name:     "with granularity",
@@ -57,7 +57,7 @@ func TestBuildURL(t *testing.T) {
 			name:     "excluded product_id flag is omitted",
 			endpoint: &Endpoint{Path: "/gift-certificates", ExcludeCommonFlags: []string{"product_id"}},
 			params:   &QueryParams{ProductID: 99},
-			wantSub:  "/api/v1/statistics/gift-certificates",
+			wantSub:  "/statistics/gift-certificates",
 		},
 		{
 			name:     "extra params with kebab-to-snake conversion",
@@ -75,7 +75,7 @@ func TestBuildURL(t *testing.T) {
 			name:     "empty extra value is omitted",
 			endpoint: &Endpoint{Path: "/revenue"},
 			params:   &QueryParams{Extra: map[string]string{"payment-method": ""}},
-			wantSub:  "/api/v1/statistics/revenue",
+			wantSub:  "/statistics/revenue",
 		},
 	}
 

@@ -15,7 +15,10 @@ import (
 const (
 	defaultTimeout = 30 * time.Second
 	maxRetries     = 2
-	basePath       = "/api/v1/statistics"
+	// basePath is appended to BaseURL (which must already end in
+	// /api/v1/cli — same convention as the inventory client). The
+	// resulting URL is /api/v1/cli/statistics/<endpoint>.
+	basePath = "/statistics"
 )
 
 // Client is an HTTP client for the CaptainBook Statistics API.
