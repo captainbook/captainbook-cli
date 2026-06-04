@@ -27,13 +27,15 @@ The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` over a Sanc
 
 ```bash
 # Env-var path
-export CEEBEE_API_URL=https://demo.captainbook.io
+export CEEBEE_API_URL=https://demo.captainbook.io/api/v1/cli
 export CEEBEE_API_TOKEN=sk-xxxxxxxxxxxx
 
 # Profile path (persists in ~/.ceebee/config.toml)
-ceebee config add demo --url https://demo.captainbook.io --token sk-xxxxxxxxxxxx
+ceebee config add demo --url https://demo.captainbook.io/api/v1/cli --token sk-xxxxxxxxxxxx
 ceebee --profile demo inventory products list
 ```
+
+The URL must include the `/api/v1/cli` base. Both `stats` and `inventory` commands resolve their endpoint paths against it (e.g. `…/cli/statistics/revenue`, `…/cli/products`).
 
 When both are set, `--profile` wins over env vars.
 
