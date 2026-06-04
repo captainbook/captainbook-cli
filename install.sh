@@ -2,8 +2,29 @@
 set -e
 
 REPO="captainbook/captainbook-cli"
-INSTALL_DIR="/usr/local/bin"
 BINARY="ceebee"
+
+# Install directory resolution.
+#
+# 1. Honour PREFIX if the caller set it explicitly (e.g.
+#    `curl … | PREFIX=$HOME/.local/bin sh`). The leading expansion of
+#    `~` is the shell's job — we don't try to expand it ourselves.
+# 2. Otherwise prefer $HOME/.local/bin when it exists or is creatable
+#    *and* the caller does not need sudo. This is the default that
+#    matches modern Linux/macOS user layouts and lets operators avoid
+#    sudo entirely.
+# 3. Fall back to /usr/local/bin (the historic default) and gate the
+#    move on `sudo` if needed.
+if [ -n "$PREFIX" ]; then
+  INSTALL_DIR="$PREFIX"
+else
+  USER_BIN="${HOME}/.local/bin"
+  if [ -d "$USER_BIN" ] || mkdir -p "$USER_BIN" 2>/dev/null; then
+    INSTALL_DIR="$USER_BIN"
+  else
+    INSTALL_DIR="/usr/local/bin"
+  fi
+fi
 
 # Detect OS
 OS="$(uname -s)"
@@ -24,6 +45,7 @@ esac
 ASSET="${BINARY}-${GOOS}-${GOARCH}"
 
 echo "Detected platform: ${GOOS}/${GOARCH}"
+echo "Install target: ${INSTALL_DIR}"
 
 # Get latest release tag
 TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
@@ -63,6 +85,18 @@ if [ "$ACTUAL" != "$EXPECTED" ]; then
 fi
 echo "Checksum verified."
 
+# Ensure install dir exists. For user-owned paths we create it ourselves;
+# for system paths the caller is expected to have it already (sudo will
+# handle the move).
+if [ ! -d "$INSTALL_DIR" ]; then
+  if mkdir -p "$INSTALL_DIR" 2>/dev/null; then
+    :
+  else
+    echo "Creating ${INSTALL_DIR} (requires sudo)..."
+    sudo mkdir -p "$INSTALL_DIR"
+  fi
+fi
+
 # Install
 chmod 755 "$TMPFILE"
 if [ -w "$INSTALL_DIR" ]; then
@@ -73,3 +107,14 @@ else
 fi
 
 echo "Installed ${BINARY} ${TAG} to ${INSTALL_DIR}/${BINARY}"
+
+# PATH check — warn if the install dir isn't reachable so the operator
+# isn't left wondering why `ceebee` isn't found.
+case ":$PATH:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    echo
+    echo "Note: ${INSTALL_DIR} is not on your PATH."
+    echo "Add it with:  export PATH=\"${INSTALL_DIR}:\$PATH\""
+    ;;
+esac
