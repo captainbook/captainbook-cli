@@ -20,7 +20,13 @@
 curl -fsSL https://captainbook.github.io/captainbook-cli/install.sh | sh
 ```
 
-Auto-detects your OS and architecture, downloads the latest release, verifies the checksum, and installs to `/usr/local/bin`.
+Auto-detects your OS and architecture, downloads the latest release, verifies the checksum, and installs to `$HOME/.local/bin` when available (no sudo) or falls back to `/usr/local/bin` (sudo).
+
+Override the install location with `PREFIX`:
+
+```bash
+curl -fsSL https://captainbook.github.io/captainbook-cli/install.sh | PREFIX="$HOME/.local/bin" sh
+```
 
 ### From source
 
@@ -45,15 +51,17 @@ make build
 ### Environment variables
 
 ```bash
-export CEEBEE_API_URL=https://your-tenant.captainbook.io
+export CEEBEE_API_URL=https://your-tenant.captainbook.io/api/v1/cli
 export CEEBEE_API_TOKEN=your-bearer-token
 ```
+
+The URL must include the `/api/v1/cli` base — the same path stats and inventory both live under. (Earlier releases accepted a bare tenant root for `stats` only; both command groups now share one base.)
 
 ### Config profiles
 
 ```bash
-ceebee config add production --url https://your-tenant.captainbook.io --token your-bearer-token
-ceebee config add staging    --url https://staging.captainbook.io     --token staging-token
+ceebee config add production --url https://your-tenant.captainbook.io/api/v1/cli --token your-bearer-token
+ceebee config add staging    --url https://staging.captainbook.io/api/v1/cli     --token staging-token
 ceebee config use production
 ceebee config list
 ```

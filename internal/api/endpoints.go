@@ -3,7 +3,7 @@ package api
 // Endpoint defines the metadata for a statistics API endpoint.
 type Endpoint struct {
 	Name              string
-	Path              string // URL path suffix under /api/v1/statistics/
+	Path              string // URL path suffix under /api/v1/cli/statistics/
 	Description       string
 	ExtraFlags        []ExtraFlag
 	ExcludeCommonFlags []string // Common flag names to exclude (e.g., "product_id" for gift-certificates)
