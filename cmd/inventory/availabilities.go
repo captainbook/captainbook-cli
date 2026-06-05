@@ -145,6 +145,7 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "to", Type: "string", Description: availToDesc},
 				{Name: "has-capacity", Type: "bool", Description: "Only slots with remaining capacity"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+				{Name: "include-pricing", Type: "bool", Description: "Embed pricing_tiers[] with effective amount overlay (default false)"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListAvailabilitiesParams{}
@@ -182,6 +183,10 @@ func availabilitiesDefs() []CommandDef {
 					}
 					p.Since = &t
 				}
+				if args.FlagSet("include-pricing") {
+					b := args.FlagBool("include-pricing")
+					p.IncludePricing = &b
+				}
 				resp, err := r.Client.ListAvailabilitiesWithResponse(ctx, p)
 				if err != nil {
 					return nil, err
@@ -193,12 +198,20 @@ func availabilitiesDefs() []CommandDef {
 			Use: "get <id>", Short: "Show one availability", Kind: KindRead,
 			Verb: "GET", Path: "/availabilities/{id}", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "include-pricing", Type: "bool", Description: "Embed pricing_tiers[] with effective amount overlay (default false)"},
+			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.ShowAvailabilityWithResponse(ctx, id)
+				p := &gen.ShowAvailabilityParams{}
+				if args.FlagSet("include-pricing") {
+					b := args.FlagBool("include-pricing")
+					p.IncludePricing = &b
+				}
+				resp, err := r.Client.ShowAvailabilityWithResponse(ctx, id, p)
 				if err != nil {
 					return nil, err
 				}

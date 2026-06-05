@@ -464,6 +464,17 @@ paths:
         - name: has_capacity
           in: query
           schema: { type: boolean }
+        - name: include_pricing
+          in: query
+          schema: { type: boolean, default: false }
+          description: |
+            When true, embed `pricing_tiers[]` on each availability with
+            effective `amount` (per-slot override from
+            `availability_pricing_tier.fare` when present, catalogue price
+            otherwise), `default_amount`, and `is_override`. Defaults to
+            false for backward compatibility. Adds 3 batched queries per
+            page (product-option lookup, product tiers, pivot overrides) —
+            no per-row N+1 regardless of page size.
       responses:
         "200":
           description: Page of availabilities
@@ -480,6 +491,12 @@ paths:
       tags: [Availabilities]
       parameters:
         - $ref: "#/components/parameters/IdPath"
+        - name: include_pricing
+          in: query
+          schema: { type: boolean, default: false }
+          description: |
+            When true, embed `pricing_tiers[]` with effective amount
+            overlay. See `GET /availabilities` for the same semantics.
       responses:
         "200":
           description: Availability
@@ -971,16 +988,25 @@ paths:
       operationId: listPricingTiers
       summary: List pricing tiers
       description: |
-        **Filtering:** scope by `product_id` only. `product_option_id` and
-        `availability_id` filters were dropped: pricing_categories.product_option_id
-        was renamed to product_id in 2022 (tiers scope by product, not by
-        product_option), and pricing_tiers ↔ availabilities is M:N via the
-        `availability_pricing_tier` pivot, not a direct FK on the row.
-        Re-introducing per-option or per-availability filters needs a
-        deliberate semantic call (does "tiers for an option" mean tiers
-        of the option's product? always shared across siblings?) and is
-        deferred. Listed here for clients that have a `product_id` and
-        want the full set of tiers under it.
+        **Filtering:** scope by `product_id` (catalogue view) or
+        `availability_id` (per-slot view).
+
+        `product_option_id` is intentionally not supported:
+        `pricing_categories.product_option_id` was renamed to `product_id`
+        in 2022, so tiers scope by product, not by product option.
+
+        Passing `availability_id` auto-scopes the result to the tiers
+        reachable from the availability's product (resolved via
+        `availability.bookable → ProductOption → product`) and overlays
+        the per-slot `availability_pricing_tier.fare` onto each tier's
+        `amount`. The response also carries `default_amount` and
+        `is_override` so callers can detect and diff overrides. If the
+        availability isn't tied to a ProductOption (e.g. a Resource
+        availability) the response is an empty page.
+
+        Combining `product_id` and `availability_id` returns 422 — they
+        describe overlapping scopes and silently picking one would hide
+        the conflict.
       tags: [PricingTiers]
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -991,6 +1017,13 @@ paths:
           in: query
           schema: { type: string }
           description: Returns tiers belonging to this product (via the pricing_category relation).
+        - name: availability_id
+          in: query
+          schema: { type: string }
+          description: |
+            Returns tiers reachable from this availability's product
+            with per-slot overrides overlaid onto `amount`. Mutually
+            exclusive with `product_id`.
       responses:
         "200":
           description: Page of pricing tiers
@@ -1036,9 +1069,23 @@ paths:
     get:
       operationId: showPricingTier
       summary: Show a pricing tier
+      description: |
+        When `availability_id` is supplied the per-slot
+        `availability_pricing_tier.fare` is overlaid onto `amount` and
+        the `default_amount` / `is_override` fields are added. Returns
+        404 if the tier isn't reachable from the availability's product,
+        since surfacing it with overlay fields would imply it applies
+        to that availability when it does not.
       tags: [PricingTiers]
       parameters:
         - $ref: "#/components/parameters/IdPath"
+        - name: availability_id
+          in: query
+          schema: { type: string }
+          description: |
+            Overlay the per-slot override for this availability onto
+            `amount`. Returns 404 if the tier isn't reachable from the
+            availability's product.
       responses:
         "200":
           description: Pricing tier
@@ -3928,21 +3975,59 @@ components:
 
     Availability:
       type: object
+      description: |
+        Mirrors `AvailabilityResource::toArray()`. A single bookable
+        timeslot for one product option. The `bookable` relation on the
+        underlying model is polymorphic; this CLI view exposes only
+        ProductOption-backed rows via `product_option_id` (Resource-backed
+        availabilities are out of scope).
+
+        `starts_at` / `ends_at` carry the full timezoned datetime (mapped
+        from the model's `from` / `to` columns) — the spec previously
+        listed a `start_time` "09:30"-style field that the resource has
+        never emitted.
+
+        `status` is a coarse two-state projection of `is_open_for_booking`
+        — `available` when the operator has the slot open, `blocked` when
+        closed. `sold_out` / `cancelled` are not surfaced here; saturation
+        is observable via `capacity_remaining = 0` and cancellation via
+        `deleted_at`. `is_bookable` separately tracks the slot's
+        bulk-close state so operators can audit closures the
+        `bulk-update booking_status` action makes.
       properties:
         id: { type: string }
-        product_option_id: { type: string }
-        date: { type: string, format: date }
-        start_time: { type: string, nullable: true, example: "09:30" }
-        capacity: { type: integer }
-        capacity_remaining: { type: integer }
+        product_option_id:
+          type: string
+          nullable: true
+          description: "Null when the underlying availability is attached to a non-ProductOption bookable (e.g. a Resource)."
+        date: { type: string, format: date, nullable: true, description: "Local-date portion of `starts_at`." }
+        starts_at: { type: string, format: date-time, nullable: true, description: "ISO 8601 datetime; maps to the model's `from` column." }
+        ends_at: { type: string, format: date-time, nullable: true, description: "ISO 8601 datetime; maps to the model's `to` column." }
+        capacity: { type: integer, nullable: true }
+        capacity_remaining: { type: integer, nullable: true, description: "Maps to the model's `vacancies` column." }
         status:
           type: string
-          enum: [available, sold_out, blocked, cancelled]
-        pricing_tier_ids:
+          nullable: true
+          enum: [available, blocked]
+          description: "`available` when `is_open_for_booking` is true, `blocked` when false."
+        is_bookable:
+          type: boolean
+          nullable: true
+          description: "Independently tracks bulk-close state; `false` after a `bulk-update booking_status` close."
+        pricing_tiers:
           type: array
-          items: { type: string }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
+          nullable: true
+          description: |
+            Embedded pricing tiers for this availability, in compact
+            shape with effective amount overlaid. Only present when
+            the request passes `include_pricing=true`. Empty array when
+            the availability has no product context (e.g. Resource
+            availabilities). Sorted by `pricing_category_id`, then
+            `min` ascending.
+          items: { $ref: "#/components/schemas/EmbeddedPricingTier" }
+        deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise." }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
 
     PricingCategory:
       type: object
@@ -3969,11 +4054,20 @@ components:
       type: object
       description: |
         Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
-        has no `product_option_id`, `availability_id`, or `name` column — those
-        belong to the parent `PricingCategory` (carries `name` + `product_id`)
-        and to the M:N `availability_pricing_tier` pivot. Tiers describe a
-        headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
-        Currency is tenant-level and not stored per row; defaults to `EUR`.
+        has no `product_option_id` or `name` column — those belong to the
+        parent `PricingCategory` (carries `name` + `product_id`). Tiers
+        describe a headcount band (`min`/`max`) and a `fare` (surfaced as
+        `amount`). Currency is tenant-level and not stored per row;
+        defaults to `EUR`.
+
+        **Availability scoping.** When the request supplies
+        `availability_id` (either as a query filter on `/pricing-tiers` or
+        nested under `/availabilities` via `include_pricing=true`), the
+        per-slot pivot fare from `availability_pricing_tier` is overlaid
+        onto `amount`. In that case the response also carries
+        `default_amount` (the catalogue price) and `is_override` (whether
+        a pivot row exists). Without availability scoping those two fields
+        are omitted and `amount` is the catalogue price.
       properties:
         id: { type: string }
         pricing_category_id: { type: string, nullable: true, description: "Parent `PricingCategory` row (carries the named bucket like `Adults`/`Children`)." }
@@ -3982,11 +4076,41 @@ components:
         amount:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
-          description: "Maps to the `fare` column."
+          description: "Effective price. Maps to `pricing_tiers.fare` by default; when availability-scoped, overlays the `availability_pricing_tier.fare` pivot value if a row exists."
+        default_amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+          description: "Catalogue price (`pricing_tiers.fare`). Only present when availability-scoped — compare against `amount` to detect overrides."
+        is_override:
+          type: boolean
+          description: "True iff an `availability_pricing_tier` pivot row exists for the scoping availability. Only present when availability-scoped."
         currency: { type: string, description: "Tenant currency; defaults to `EUR`." }
         deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         created_at: { type: string, format: date-time, nullable: true }
         updated_at: { type: string, format: date-time, nullable: true }
+
+    EmbeddedPricingTier:
+      type: object
+      description: |
+        Compact pricing tier shape embedded inside an availability when
+        `include_pricing=true`. Same overlay semantics as a
+        availability-scoped `PricingTier` — `amount` is effective,
+        `default_amount` and `is_override` are always present — but the
+        `deleted_at` / `created_at` / `updated_at` timestamps are dropped
+        to keep the payload tight. Soft-deleted tiers are excluded.
+      properties:
+        id: { type: string }
+        pricing_category_id: { type: string, nullable: true }
+        min: { type: integer, nullable: true }
+        max: { type: integer, nullable: true }
+        amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+        default_amount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+        is_override: { type: boolean }
+        currency: { type: string }
 
     Discount:
       type: object

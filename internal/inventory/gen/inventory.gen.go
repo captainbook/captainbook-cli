@@ -26,8 +26,6 @@ const (
 const (
 	AvailabilityStatusAvailable AvailabilityStatus = "available"
 	AvailabilityStatusBlocked   AvailabilityStatus = "blocked"
-	AvailabilityStatusCancelled AvailabilityStatus = "cancelled"
-	AvailabilityStatusSoldOut   AvailabilityStatus = "sold_out"
 )
 
 // Valid indicates whether the value is a known member of the AvailabilityStatus enum.
@@ -36,10 +34,6 @@ func (e AvailabilityStatus) Valid() bool {
 	case AvailabilityStatusAvailable:
 		return true
 	case AvailabilityStatusBlocked:
-		return true
-	case AvailabilityStatusCancelled:
-		return true
-	case AvailabilityStatusSoldOut:
 		return true
 	default:
 		return false
@@ -1347,21 +1341,64 @@ type AttachResourceRequest struct {
 	Seniority  *int   `json:"seniority,omitempty"`
 }
 
-// Availability defines model for Availability.
+// Availability Mirrors `AvailabilityResource::toArray()`. A single bookable
+// timeslot for one product option. The `bookable` relation on the
+// underlying model is polymorphic; this CLI view exposes only
+// ProductOption-backed rows via `product_option_id` (Resource-backed
+// availabilities are out of scope).
+//
+// `starts_at` / `ends_at` carry the full timezoned datetime (mapped
+// from the model's `from` / `to` columns) — the spec previously
+// listed a `start_time` "09:30"-style field that the resource has
+// never emitted.
+//
+// `status` is a coarse two-state projection of `is_open_for_booking`
+// — `available` when the operator has the slot open, `blocked` when
+// closed. `sold_out` / `cancelled` are not surfaced here; saturation
+// is observable via `capacity_remaining = 0` and cancellation via
+// `deleted_at`. `is_bookable` separately tracks the slot's
+// bulk-close state so operators can audit closures the
+// `bulk-update booking_status` action makes.
 type Availability struct {
-	Capacity          *int                `json:"capacity,omitempty"`
-	CapacityRemaining *int                `json:"capacity_remaining,omitempty"`
-	CreatedAt         *time.Time          `json:"created_at,omitempty"`
-	Date              *openapi_types.Date `json:"date,omitempty"`
-	Id                *string             `json:"id,omitempty"`
-	PricingTierIds    *[]string           `json:"pricing_tier_ids,omitempty"`
-	ProductOptionId   *string             `json:"product_option_id,omitempty"`
-	StartTime         *string             `json:"start_time,omitempty"`
-	Status            *AvailabilityStatus `json:"status,omitempty"`
-	UpdatedAt         *time.Time          `json:"updated_at,omitempty"`
+	Capacity *int `json:"capacity,omitempty"`
+
+	// CapacityRemaining Maps to the model's `vacancies` column.
+	CapacityRemaining *int       `json:"capacity_remaining,omitempty"`
+	CreatedAt         *time.Time `json:"created_at,omitempty"`
+
+	// Date Local-date portion of `starts_at`.
+	Date *openapi_types.Date `json:"date,omitempty"`
+
+	// DeletedAt Set when soft-deleted; null otherwise.
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+
+	// EndsAt ISO 8601 datetime; maps to the model's `to` column.
+	EndsAt *time.Time `json:"ends_at,omitempty"`
+	Id     *string    `json:"id,omitempty"`
+
+	// IsBookable Independently tracks bulk-close state; `false` after a `bulk-update booking_status` close.
+	IsBookable *bool `json:"is_bookable,omitempty"`
+
+	// PricingTiers Embedded pricing tiers for this availability, in compact
+	// shape with effective amount overlaid. Only present when
+	// the request passes `include_pricing=true`. Empty array when
+	// the availability has no product context (e.g. Resource
+	// availabilities). Sorted by `pricing_category_id`, then
+	// `min` ascending.
+	PricingTiers *[]EmbeddedPricingTier `json:"pricing_tiers,omitempty"`
+
+	// ProductOptionId Null when the underlying availability is attached to a non-ProductOption bookable (e.g. a Resource).
+	ProductOptionId *string `json:"product_option_id,omitempty"`
+
+	// StartsAt ISO 8601 datetime; maps to the model's `from` column.
+	StartsAt *time.Time `json:"starts_at,omitempty"`
+
+	// Status `available` when `is_open_for_booking` is true, `blocked` when false.
+	Status    *AvailabilityStatus `json:"status,omitempty"`
+	UpdatedAt *time.Time          `json:"updated_at,omitempty"`
 }
 
-// AvailabilityStatus defines model for Availability.Status.
+// AvailabilityStatus `available` when `is_open_for_booking` is true, `blocked` when false.
 type AvailabilityStatus string
 
 // AvailabilityPage defines model for AvailabilityPage.
@@ -2151,6 +2188,23 @@ type DiscountPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+// EmbeddedPricingTier Compact pricing tier shape embedded inside an availability when
+// `include_pricing=true`. Same overlay semantics as a
+// availability-scoped `PricingTier` — `amount` is effective,
+// `default_amount` and `is_override` are always present — but the
+// `deleted_at` / `created_at` / `updated_at` timestamps are dropped
+// to keep the payload tight. Soft-deleted tiers are excluded.
+type EmbeddedPricingTier struct {
+	Amount            *Money  `json:"amount,omitempty"`
+	Currency          *string `json:"currency,omitempty"`
+	DefaultAmount     *Money  `json:"default_amount,omitempty"`
+	Id                *string `json:"id,omitempty"`
+	IsOverride        *bool   `json:"is_override,omitempty"`
+	Max               *int    `json:"max,omitempty"`
+	Min               *int    `json:"min,omitempty"`
+	PricingCategoryId *string `json:"pricing_category_id,omitempty"`
+}
+
 // Envelope defines model for Envelope.
 type Envelope struct {
 	// Data Per-endpoint payload (overridden via allOf in concrete responses)
@@ -2461,22 +2515,37 @@ type PricingCategoryPage struct {
 }
 
 // PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
-// has no `product_option_id`, `availability_id`, or `name` column — those
-// belong to the parent `PricingCategory` (carries `name` + `product_id`)
-// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
-// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
-// Currency is tenant-level and not stored per row; defaults to `EUR`.
+// has no `product_option_id` or `name` column — those belong to the
+// parent `PricingCategory` (carries `name` + `product_id`). Tiers
+// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
+// `amount`). Currency is tenant-level and not stored per row;
+// defaults to `EUR`.
+//
+// **Availability scoping.** When the request supplies
+// `availability_id` (either as a query filter on `/pricing-tiers` or
+// nested under `/availabilities` via `include_pricing=true`), the
+// per-slot pivot fare from `availability_pricing_tier` is overlaid
+// onto `amount`. In that case the response also carries
+// `default_amount` (the catalogue price) and `is_override` (whether
+// a pivot row exists). Without availability scoping those two fields
+// are omitted and `amount` is the catalogue price.
 type PricingTier struct {
-	// Amount Maps to the `fare` column.
+	// Amount Effective price. Maps to `pricing_tiers.fare` by default; when availability-scoped, overlays the `availability_pricing_tier.fare` pivot value if a row exists.
 	Amount    *Money     `json:"amount,omitempty"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
 	// Currency Tenant currency; defaults to `EUR`.
 	Currency *string `json:"currency,omitempty"`
 
+	// DefaultAmount Catalogue price (`pricing_tiers.fare`). Only present when availability-scoped — compare against `amount` to detect overrides.
+	DefaultAmount *Money `json:"default_amount,omitempty"`
+
 	// DeletedAt Set when soft-deleted; null otherwise
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	Id        *string    `json:"id,omitempty"`
+
+	// IsOverride True iff an `availability_pricing_tier` pivot row exists for the scoping availability. Only present when availability-scoped.
+	IsOverride *bool `json:"is_override,omitempty"`
 
 	// Max Inclusive upper bound; null = open-ended.
 	Max *int `json:"max,omitempty"`
@@ -3219,6 +3288,15 @@ type ListAvailabilitiesParams struct {
 	From            *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
 	To              *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
 	HasCapacity     *bool               `form:"has_capacity,omitempty" json:"has_capacity,omitempty"`
+
+	// IncludePricing When true, embed `pricing_tiers[]` on each availability with
+	// effective `amount` (per-slot override from
+	// `availability_pricing_tier.fare` when present, catalogue price
+	// otherwise), `default_amount`, and `is_override`. Defaults to
+	// false for backward compatibility. Adds 3 batched queries per
+	// page (product-option lookup, product tiers, pivot overrides) —
+	// no per-row N+1 regardless of page size.
+	IncludePricing *bool `form:"include_pricing,omitempty" json:"include_pricing,omitempty"`
 }
 
 // BulkDeleteAvailabilitiesParams defines parameters for BulkDeleteAvailabilities.
@@ -3267,6 +3345,13 @@ type DeleteAvailabilityParams struct {
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
 	// same key is sent on two real calls, normal idempotency rules apply.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ShowAvailabilityParams defines parameters for ShowAvailability.
+type ShowAvailabilityParams struct {
+	// IncludePricing When true, embed `pricing_tiers[]` with effective amount
+	// overlay. See `GET /availabilities` for the same semantics.
+	IncludePricing *bool `form:"include_pricing,omitempty" json:"include_pricing,omitempty"`
 }
 
 // UpdateAvailabilityParams defines parameters for UpdateAvailability.
@@ -3997,6 +4082,11 @@ type ListPricingTiersParams struct {
 
 	// ProductId Returns tiers belonging to this product (via the pricing_category relation).
 	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+
+	// AvailabilityId Returns tiers reachable from this availability's product
+	// with per-slot overrides overlaid onto `amount`. Mutually
+	// exclusive with `product_id`.
+	AvailabilityId *string `form:"availability_id,omitempty" json:"availability_id,omitempty"`
 }
 
 // CreatePricingTierParams defines parameters for CreatePricingTier.
@@ -4029,6 +4119,14 @@ type DeletePricingTierParams struct {
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
 	// same key is sent on two real calls, normal idempotency rules apply.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ShowPricingTierParams defines parameters for ShowPricingTier.
+type ShowPricingTierParams struct {
+	// AvailabilityId Overlay the per-slot override for this availability onto
+	// `amount`. Returns 404 if the tier isn't reachable from the
+	// availability's product.
+	AvailabilityId *string `form:"availability_id,omitempty" json:"availability_id,omitempty"`
 }
 
 // UpdatePricingTierParams defines parameters for UpdatePricingTier.
@@ -5125,7 +5223,7 @@ type ClientInterface interface {
 	DeleteAvailability(ctx context.Context, id IdPath, params *DeleteAvailabilityParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ShowAvailability request
-	ShowAvailability(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ShowAvailability(ctx context.Context, id IdPath, params *ShowAvailabilityParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateAvailabilityWithBody request with any body
 	UpdateAvailabilityWithBody(ctx context.Context, id IdPath, params *UpdateAvailabilityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5336,7 +5434,7 @@ type ClientInterface interface {
 	DeletePricingTier(ctx context.Context, id IdPath, params *DeletePricingTierParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ShowPricingTier request
-	ShowPricingTier(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ShowPricingTier(ctx context.Context, id IdPath, params *ShowPricingTierParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdatePricingTierWithBody request with any body
 	UpdatePricingTierWithBody(ctx context.Context, id IdPath, params *UpdatePricingTierParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5608,8 +5706,8 @@ func (c *Client) DeleteAvailability(ctx context.Context, id IdPath, params *Dele
 	return c.Client.Do(req)
 }
 
-func (c *Client) ShowAvailability(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewShowAvailabilityRequest(c.Server, id)
+func (c *Client) ShowAvailability(ctx context.Context, id IdPath, params *ShowAvailabilityParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowAvailabilityRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6544,8 +6642,8 @@ func (c *Client) DeletePricingTier(ctx context.Context, id IdPath, params *Delet
 	return c.Client.Do(req)
 }
 
-func (c *Client) ShowPricingTier(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewShowPricingTierRequest(c.Server, id)
+func (c *Client) ShowPricingTier(ctx context.Context, id IdPath, params *ShowPricingTierParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowPricingTierRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -7578,6 +7676,22 @@ func NewListAvailabilitiesRequest(server string, params *ListAvailabilitiesParam
 
 		}
 
+		if params.IncludePricing != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_pricing", *params.IncludePricing, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -7749,7 +7863,7 @@ func NewDeleteAvailabilityRequest(server string, id IdPath, params *DeleteAvaila
 }
 
 // NewShowAvailabilityRequest generates requests for ShowAvailability
-func NewShowAvailabilityRequest(server string, id IdPath) (*http.Request, error) {
+func NewShowAvailabilityRequest(server string, id IdPath, params *ShowAvailabilityParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7772,6 +7886,28 @@ func NewShowAvailabilityRequest(server string, id IdPath) (*http.Request, error)
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludePricing != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_pricing", *params.IncludePricing, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -11188,6 +11324,22 @@ func NewListPricingTiersRequest(server string, params *ListPricingTiersParams) (
 
 		}
 
+		if params.AvailabilityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -11304,7 +11456,7 @@ func NewDeletePricingTierRequest(server string, id IdPath, params *DeletePricing
 }
 
 // NewShowPricingTierRequest generates requests for ShowPricingTier
-func NewShowPricingTierRequest(server string, id IdPath) (*http.Request, error) {
+func NewShowPricingTierRequest(server string, id IdPath, params *ShowPricingTierParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -11327,6 +11479,28 @@ func NewShowPricingTierRequest(server string, id IdPath) (*http.Request, error) 
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.AvailabilityId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -14612,7 +14786,7 @@ type ClientWithResponsesInterface interface {
 	DeleteAvailabilityWithResponse(ctx context.Context, id IdPath, params *DeleteAvailabilityParams, reqEditors ...RequestEditorFn) (*DeleteAvailabilityResponse, error)
 
 	// ShowAvailabilityWithResponse request
-	ShowAvailabilityWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowAvailabilityResponse, error)
+	ShowAvailabilityWithResponse(ctx context.Context, id IdPath, params *ShowAvailabilityParams, reqEditors ...RequestEditorFn) (*ShowAvailabilityResponse, error)
 
 	// UpdateAvailabilityWithBodyWithResponse request with any body
 	UpdateAvailabilityWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateAvailabilityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAvailabilityResponse, error)
@@ -14823,7 +14997,7 @@ type ClientWithResponsesInterface interface {
 	DeletePricingTierWithResponse(ctx context.Context, id IdPath, params *DeletePricingTierParams, reqEditors ...RequestEditorFn) (*DeletePricingTierResponse, error)
 
 	// ShowPricingTierWithResponse request
-	ShowPricingTierWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowPricingTierResponse, error)
+	ShowPricingTierWithResponse(ctx context.Context, id IdPath, params *ShowPricingTierParams, reqEditors ...RequestEditorFn) (*ShowPricingTierResponse, error)
 
 	// UpdatePricingTierWithBodyWithResponse request with any body
 	UpdatePricingTierWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdatePricingTierParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePricingTierResponse, error)
@@ -15215,6 +15389,24 @@ type ShowAvailabilityResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Data Mirrors `AvailabilityResource::toArray()`. A single bookable
+		// timeslot for one product option. The `bookable` relation on the
+		// underlying model is polymorphic; this CLI view exposes only
+		// ProductOption-backed rows via `product_option_id` (Resource-backed
+		// availabilities are out of scope).
+		//
+		// `starts_at` / `ends_at` carry the full timezoned datetime (mapped
+		// from the model's `from` / `to` columns) — the spec previously
+		// listed a `start_time` "09:30"-style field that the resource has
+		// never emitted.
+		//
+		// `status` is a coarse two-state projection of `is_open_for_booking`
+		// — `available` when the operator has the slot open, `blocked` when
+		// closed. `sold_out` / `cancelled` are not surfaced here; saturation
+		// is observable via `capacity_remaining = 0` and cancellation via
+		// `deleted_at`. `is_bookable` separately tracks the slot's
+		// bulk-close state so operators can audit closures the
+		// `bulk-update booking_status` action makes.
 		Data       Availability `json:"data"`
 		Meta       Meta         `json:"meta"`
 		Pagination *Pagination  `json:"pagination,omitempty"`
@@ -16984,11 +17176,20 @@ type CreatePricingTierResponse struct {
 			} `json:"diff,omitempty"`
 
 			// PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
-			// has no `product_option_id`, `availability_id`, or `name` column — those
-			// belong to the parent `PricingCategory` (carries `name` + `product_id`)
-			// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
-			// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
-			// Currency is tenant-level and not stored per row; defaults to `EUR`.
+			// has no `product_option_id` or `name` column — those belong to the
+			// parent `PricingCategory` (carries `name` + `product_id`). Tiers
+			// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
+			// `amount`). Currency is tenant-level and not stored per row;
+			// defaults to `EUR`.
+			//
+			// **Availability scoping.** When the request supplies
+			// `availability_id` (either as a query filter on `/pricing-tiers` or
+			// nested under `/availabilities` via `include_pricing=true`), the
+			// per-slot pivot fare from `availability_pricing_tier` is overlaid
+			// onto `amount`. In that case the response also carries
+			// `default_amount` (the catalogue price) and `is_override` (whether
+			// a pivot row exists). Without availability scoping those two fields
+			// are omitted and `amount` is the catalogue price.
 			PricingTier *PricingTier `json:"pricing_tier,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -17055,11 +17256,20 @@ type ShowPricingTierResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		// Data Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
-		// has no `product_option_id`, `availability_id`, or `name` column — those
-		// belong to the parent `PricingCategory` (carries `name` + `product_id`)
-		// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
-		// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
-		// Currency is tenant-level and not stored per row; defaults to `EUR`.
+		// has no `product_option_id` or `name` column — those belong to the
+		// parent `PricingCategory` (carries `name` + `product_id`). Tiers
+		// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
+		// `amount`). Currency is tenant-level and not stored per row;
+		// defaults to `EUR`.
+		//
+		// **Availability scoping.** When the request supplies
+		// `availability_id` (either as a query filter on `/pricing-tiers` or
+		// nested under `/availabilities` via `include_pricing=true`), the
+		// per-slot pivot fare from `availability_pricing_tier` is overlaid
+		// onto `amount`. In that case the response also carries
+		// `default_amount` (the catalogue price) and `is_override` (whether
+		// a pivot row exists). Without availability scoping those two fields
+		// are omitted and `amount` is the catalogue price.
 		Data       PricingTier `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -18754,8 +18964,8 @@ func (c *ClientWithResponses) DeleteAvailabilityWithResponse(ctx context.Context
 }
 
 // ShowAvailabilityWithResponse request returning *ShowAvailabilityResponse
-func (c *ClientWithResponses) ShowAvailabilityWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowAvailabilityResponse, error) {
-	rsp, err := c.ShowAvailability(ctx, id, reqEditors...)
+func (c *ClientWithResponses) ShowAvailabilityWithResponse(ctx context.Context, id IdPath, params *ShowAvailabilityParams, reqEditors ...RequestEditorFn) (*ShowAvailabilityResponse, error) {
+	rsp, err := c.ShowAvailability(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -19433,8 +19643,8 @@ func (c *ClientWithResponses) DeletePricingTierWithResponse(ctx context.Context,
 }
 
 // ShowPricingTierWithResponse request returning *ShowPricingTierResponse
-func (c *ClientWithResponses) ShowPricingTierWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowPricingTierResponse, error) {
-	rsp, err := c.ShowPricingTier(ctx, id, reqEditors...)
+func (c *ClientWithResponses) ShowPricingTierWithResponse(ctx context.Context, id IdPath, params *ShowPricingTierParams, reqEditors ...RequestEditorFn) (*ShowPricingTierResponse, error) {
+	rsp, err := c.ShowPricingTier(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -20362,6 +20572,24 @@ func ParseShowAvailabilityResponse(rsp *http.Response) (*ShowAvailabilityRespons
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Data Mirrors `AvailabilityResource::toArray()`. A single bookable
+			// timeslot for one product option. The `bookable` relation on the
+			// underlying model is polymorphic; this CLI view exposes only
+			// ProductOption-backed rows via `product_option_id` (Resource-backed
+			// availabilities are out of scope).
+			//
+			// `starts_at` / `ends_at` carry the full timezoned datetime (mapped
+			// from the model's `from` / `to` columns) — the spec previously
+			// listed a `start_time` "09:30"-style field that the resource has
+			// never emitted.
+			//
+			// `status` is a coarse two-state projection of `is_open_for_booking`
+			// — `available` when the operator has the slot open, `blocked` when
+			// closed. `sold_out` / `cancelled` are not surfaced here; saturation
+			// is observable via `capacity_remaining = 0` and cancellation via
+			// `deleted_at`. `is_bookable` separately tracks the slot's
+			// bulk-close state so operators can audit closures the
+			// `bulk-update booking_status` action makes.
 			Data       Availability `json:"data"`
 			Meta       Meta         `json:"meta"`
 			Pagination *Pagination  `json:"pagination,omitempty"`
@@ -23068,11 +23296,20 @@ func ParseCreatePricingTierResponse(rsp *http.Response) (*CreatePricingTierRespo
 				} `json:"diff,omitempty"`
 
 				// PricingTier Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
-				// has no `product_option_id`, `availability_id`, or `name` column — those
-				// belong to the parent `PricingCategory` (carries `name` + `product_id`)
-				// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
-				// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
-				// Currency is tenant-level and not stored per row; defaults to `EUR`.
+				// has no `product_option_id` or `name` column — those belong to the
+				// parent `PricingCategory` (carries `name` + `product_id`). Tiers
+				// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
+				// `amount`). Currency is tenant-level and not stored per row;
+				// defaults to `EUR`.
+				//
+				// **Availability scoping.** When the request supplies
+				// `availability_id` (either as a query filter on `/pricing-tiers` or
+				// nested under `/availabilities` via `include_pricing=true`), the
+				// per-slot pivot fare from `availability_pricing_tier` is overlaid
+				// onto `amount`. In that case the response also carries
+				// `default_amount` (the catalogue price) and `is_override` (whether
+				// a pivot row exists). Without availability scoping those two fields
+				// are omitted and `amount` is the catalogue price.
 				PricingTier *PricingTier `json:"pricing_tier,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -23176,11 +23413,20 @@ func ParseShowPricingTierResponse(rsp *http.Response) (*ShowPricingTierResponse,
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			// Data Mirrors `PricingTierResource::toArray()`. The `pricing_tiers` table
-			// has no `product_option_id`, `availability_id`, or `name` column — those
-			// belong to the parent `PricingCategory` (carries `name` + `product_id`)
-			// and to the M:N `availability_pricing_tier` pivot. Tiers describe a
-			// headcount band (`min`/`max`) and a `fare` (surfaced as `amount`).
-			// Currency is tenant-level and not stored per row; defaults to `EUR`.
+			// has no `product_option_id` or `name` column — those belong to the
+			// parent `PricingCategory` (carries `name` + `product_id`). Tiers
+			// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
+			// `amount`). Currency is tenant-level and not stored per row;
+			// defaults to `EUR`.
+			//
+			// **Availability scoping.** When the request supplies
+			// `availability_id` (either as a query filter on `/pricing-tiers` or
+			// nested under `/availabilities` via `include_pricing=true`), the
+			// per-slot pivot fare from `availability_pricing_tier` is overlaid
+			// onto `amount`. In that case the response also carries
+			// `default_amount` (the catalogue price) and `is_override` (whether
+			// a pivot row exists). Without availability scoping those two fields
+			// are omitted and `amount` is the catalogue price.
 			Data       PricingTier `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`

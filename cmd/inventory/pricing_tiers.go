@@ -25,11 +25,19 @@ func pricingTiersDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int", Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
-				{Name: "product-id", Type: "string", Description: "Filter by parent product (via the pricing_category relation)"},
+				{Name: "product-id", Type: "string", Description: "Filter by parent product (via the pricing_category relation). Mutually exclusive with --availability-id."},
+				{Name: "availability-id", Type: "string", Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto `amount` and adds `default_amount`/`is_override`. Mutually exclusive with --product-id (combining the two returns 422)."},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				// Client-side gate for the documented 422: `product_id` and
+				// `availability_id` describe overlapping scopes and the
+				// server rejects them together. Catching it here saves a
+				// round-trip and surfaces a friendlier message.
+				if args.FlagString("product-id") != "" && args.FlagString("availability-id") != "" {
+					return nil, fmt.Errorf("--product-id and --availability-id are mutually exclusive")
+				}
 				p := &gen.ListPricingTiersParams{}
 				if v := args.FlagInt("limit"); v != 0 {
 					p.Limit = &v
@@ -39,6 +47,9 @@ func pricingTiersDefs() []CommandDef {
 				}
 				if v := args.FlagString("product-id"); v != "" {
 					p.ProductId = &v
+				}
+				if v := args.FlagString("availability-id"); v != "" {
+					p.AvailabilityId = &v
 				}
 				if args.FlagBool("include-trashed") {
 					t := true
@@ -62,12 +73,19 @@ func pricingTiersDefs() []CommandDef {
 			Use: "pricing-tiers get <id>", Short: "Show one pricing tier", Kind: KindRead,
 			Verb: "GET", Path: "/pricing-tiers/{id}", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "availability-id", Type: "string", Description: "Overlay the per-slot override for this availability onto `amount` and surface `default_amount`/`is_override`. Returns 404 if the tier isn't reachable from the availability's product."},
+			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.ShowPricingTierWithResponse(ctx, id)
+				p := &gen.ShowPricingTierParams{}
+				if v := args.FlagString("availability-id"); v != "" {
+					p.AvailabilityId = &v
+				}
+				resp, err := r.Client.ShowPricingTierWithResponse(ctx, id, p)
 				if err != nil {
 					return nil, err
 				}
