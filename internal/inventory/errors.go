@@ -411,6 +411,76 @@ func (e *WorkflowNotActivatableError) UserMessage() string {
 }
 
 // -----------------------------------------------------------------------------
+// 9e. BookingResourceStateStaleError — BOOKING_RESOURCE_STATE_STALE, 409
+//
+// Returned by POST /bookings/{id}/resources when the
+// `expected_resource_state_token` in the request no longer matches the
+// booking's current aggregate resource state — i.e. someone (back office,
+// another agent, a workflow) reassigned resources between the caller's read
+// and its write. This is the optimistic-concurrency guard, not a validation
+// failure: the fix is always "re-read, re-decide, re-send", never "retry the
+// same body".
+//
+// The server may echo the two tokens in details; both are best-effort, so
+// UserMessage degrades gracefully when they're absent.
+// -----------------------------------------------------------------------------
+
+type BookingResourceStateStaleError struct {
+	Expected string // token the caller sent
+	Current  string // token the booking actually has now
+}
+
+func (e *BookingResourceStateStaleError) Error() string {
+	return fmt.Sprintf("BOOKING_RESOURCE_STATE_STALE: expected=%s current=%s", e.Expected, e.Current)
+}
+
+func (e *BookingResourceStateStaleError) UserMessage() string {
+	var b strings.Builder
+	b.WriteString("booking resources changed since you read them; the write was rejected to avoid clobbering the newer state.")
+	if e.Expected != "" && e.Current != "" {
+		b.WriteString(fmt.Sprintf("\n  sent token: %s\n  current token: %s", e.Expected, e.Current))
+	}
+	b.WriteString("\n  Re-read with `bookings get <id>` (or `bookings list --include resources`), confirm the assignment still makes sense, then resend with the fresh --expected-resource-state-token. Do NOT retry the same body.")
+	return b.String()
+}
+
+// -----------------------------------------------------------------------------
+// 9f. BookingResourceConflictError — BOOKING_RESOURCE_CONFLICT, 409
+//
+// Returned by POST /bookings/{id}/resources when the requested selection is
+// invalid for this booking: the resource is double-booked at the slot, isn't
+// attached to the booking's ProductOption, is soft-deleted, or is being used
+// in the wrong slot (an auxiliary passed as `main_resource_id`, say).
+//
+// Distinct from STATE_STALE: the caller's view of the world was current, the
+// selection itself is just not allowed. Re-reading won't help — pick a
+// different resource, which the /resources/available endpoints enumerate.
+// -----------------------------------------------------------------------------
+
+type BookingResourceConflictError struct {
+	ResourceID string
+	Reason     string
+}
+
+func (e *BookingResourceConflictError) Error() string {
+	return fmt.Sprintf("BOOKING_RESOURCE_CONFLICT: resource=%s reason=%s", e.ResourceID, e.Reason)
+}
+
+func (e *BookingResourceConflictError) UserMessage() string {
+	var b strings.Builder
+	b.WriteString("requested resource assignment is not allowed")
+	if e.ResourceID != "" {
+		b.WriteString(fmt.Sprintf(" (resource %s)", e.ResourceID))
+	}
+	if e.Reason != "" {
+		b.WriteString(": ")
+		b.WriteString(e.Reason)
+	}
+	b.WriteString("\n  List valid candidates with `bookings available-resources <id>` (main) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.")
+	return b.String()
+}
+
+// -----------------------------------------------------------------------------
 // 10. PayloadTooLargeError — PAYLOAD_TOO_LARGE, 413 (multipart upload)
 //
 // Spec: 10 MiB cap by default; tenant plans may raise. ActualBytes/MaxBytes
@@ -667,6 +737,36 @@ func init() {
 		"WORKFLOW_NOT_ACTIVATABLE": func(status int, env errorEnvelope) error {
 			failures, _ := decodeActivationFailures(env.Error.Details, "errors")
 			return &WorkflowNotActivatableError{Hint: env.Error.Hint, Errors: failures}
+		},
+
+		"BOOKING_RESOURCE_STATE_STALE": func(status int, env errorEnvelope) error {
+			// Tolerate both the verbose key shape and the short one; the spec
+			// doesn't pin `details` for this code (additionalProperties: true).
+			expected, _ := decodeStringField(env.Error.Details, "expected_resource_state_token")
+			if expected == "" {
+				expected, _ = decodeStringField(env.Error.Details, "expected")
+			}
+			current, _ := decodeStringField(env.Error.Details, "current_resource_state_token")
+			if current == "" {
+				current, _ = decodeStringField(env.Error.Details, "current")
+			}
+			return &BookingResourceStateStaleError{Expected: expected, Current: current}
+		},
+
+		"BOOKING_RESOURCE_CONFLICT": func(status int, env errorEnvelope) error {
+			resourceID, _ := decodeStringField(env.Error.Details, "resource_id")
+			if resourceID == "" {
+				// Resource ids are integers on this surface; accept the numeric
+				// shape too rather than dropping the id from the message.
+				if n, ok := decodeIntField(env.Error.Details, "resource_id"); ok {
+					resourceID = strconv.FormatInt(n, 10)
+				}
+			}
+			reason, _ := decodeStringField(env.Error.Details, "reason")
+			if reason == "" {
+				reason = env.Error.Message
+			}
+			return &BookingResourceConflictError{ResourceID: resourceID, Reason: reason}
 		},
 
 		"PAYLOAD_TOO_LARGE": func(status int, env errorEnvelope) error {

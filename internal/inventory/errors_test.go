@@ -116,6 +116,36 @@ func TestUserMessages(t *testing.T) {
 			wantMessage: "3 availability rows in the matched range have confirmed bookings; entire bulk-delete rejected. Cancel/move the bookings or narrow the range.",
 		},
 		{
+			name:      "BookingResourceStateStaleError_with_tokens",
+			err:       &BookingResourceStateStaleError{Expected: "tok_old", Current: "tok_new"},
+			wantError: "BOOKING_RESOURCE_STATE_STALE: expected=tok_old current=tok_new",
+			wantMessage: "booking resources changed since you read them; the write was rejected to avoid clobbering the newer state.\n" +
+				"  sent token: tok_old\n" +
+				"  current token: tok_new\n" +
+				"  Re-read with `bookings get <id>` (or `bookings list --include resources`), confirm the assignment still makes sense, then resend with the fresh --expected-resource-state-token. Do NOT retry the same body.",
+		},
+		{
+			name:      "BookingResourceStateStaleError_bare",
+			err:       &BookingResourceStateStaleError{},
+			wantError: "BOOKING_RESOURCE_STATE_STALE: expected= current=",
+			wantMessage: "booking resources changed since you read them; the write was rejected to avoid clobbering the newer state.\n" +
+				"  Re-read with `bookings get <id>` (or `bookings list --include resources`), confirm the assignment still makes sense, then resend with the fresh --expected-resource-state-token. Do NOT retry the same body.",
+		},
+		{
+			name:      "BookingResourceConflictError_full",
+			err:       &BookingResourceConflictError{ResourceID: "77", Reason: "double-booked"},
+			wantError: "BOOKING_RESOURCE_CONFLICT: resource=77 reason=double-booked",
+			wantMessage: "requested resource assignment is not allowed (resource 77): double-booked\n" +
+				"  List valid candidates with `bookings available-resources <id>` (main) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
+		},
+		{
+			name:      "BookingResourceConflictError_bare",
+			err:       &BookingResourceConflictError{},
+			wantError: "BOOKING_RESOURCE_CONFLICT: resource= reason=",
+			wantMessage: "requested resource assignment is not allowed\n" +
+				"  List valid candidates with `bookings available-resources <id>` (main) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
+		},
+		{
 			name:        "WorkflowNotEditableError_with_status_and_hint",
 			err:         &WorkflowNotEditableError{Status: "active", Hint: "Deactivate first."},
 			wantError:   "WORKFLOW_NOT_EDITABLE: status=active",
@@ -490,6 +520,100 @@ func TestParseError(t *testing.T) {
 				}
 				if len(e.SampleAvailabilityIDs) != 3 {
 					t.Errorf("wrong sample ids: %v", e.SampleAvailabilityIDs)
+				}
+			},
+		},
+		{
+			name:   "BOOKING_RESOURCE_STATE_STALE carries both tokens",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_STATE_STALE","message":"stale","retriable":false,
+				"details":{"expected_resource_state_token":"tok_old","current_resource_state_token":"tok_new"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceStateStaleError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceStateStaleError, got %T", err)
+				}
+				if e.Expected != "tok_old" || e.Current != "tok_new" {
+					t.Errorf("wrong tokens: %+v", e)
+				}
+			},
+		},
+		{
+			name:   "BOOKING_RESOURCE_STATE_STALE tolerates short detail keys",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_STATE_STALE","message":"stale","retriable":false,
+				"details":{"expected":"tok_old","current":"tok_new"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceStateStaleError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceStateStaleError, got %T", err)
+				}
+				if e.Expected != "tok_old" || e.Current != "tok_new" {
+					t.Errorf("wrong tokens: %+v", e)
+				}
+			},
+		},
+		{
+			name:   "BOOKING_RESOURCE_CONFLICT with numeric resource_id",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"already assigned elsewhere","retriable":false,
+				"details":{"resource_id":77,"reason":"double-booked at 2026-08-04T09:00:00Z"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceConflictError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceConflictError, got %T", err)
+				}
+				if e.ResourceID != "77" {
+					t.Errorf("wrong ResourceID: %q", e.ResourceID)
+				}
+				if e.Reason != "double-booked at 2026-08-04T09:00:00Z" {
+					t.Errorf("wrong Reason: %q", e.Reason)
+				}
+			},
+		},
+		{
+			name:   "BOOKING_RESOURCE_CONFLICT with string resource_id",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"wrong category","retriable":false,
+				"details":{"resource_id":"res_77","reason":"auxiliary resource passed as main"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceConflictError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceConflictError, got %T", err)
+				}
+				if e.ResourceID != "res_77" {
+					t.Errorf("wrong ResourceID: %q", e.ResourceID)
+				}
+				if e.Reason != "auxiliary resource passed as main" {
+					t.Errorf("wrong Reason: %q", e.Reason)
+				}
+			},
+		},
+		{
+			name:   "BOOKING_RESOURCE_CONFLICT falls back to top-level message",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"resource is not attached to this product option","retriable":false,
+				"details":{}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceConflictError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceConflictError, got %T", err)
+				}
+				if e.ResourceID != "" {
+					t.Errorf("ResourceID should be empty: %q", e.ResourceID)
+				}
+				if e.Reason != "resource is not attached to this product option" {
+					t.Errorf("wrong Reason: %q", e.Reason)
 				}
 			},
 		},
