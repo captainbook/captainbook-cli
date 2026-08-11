@@ -520,6 +520,7 @@ func (e MediaType) Valid() bool {
 // Defines values for MutationResultSideEffectsType.
 const (
 	Broadcast MutationResultSideEffectsType = "broadcast"
+	Event     MutationResultSideEffectsType = "event"
 	Job       MutationResultSideEffectsType = "job"
 	Mail      MutationResultSideEffectsType = "mail"
 	Stripe    MutationResultSideEffectsType = "stripe"
@@ -529,6 +530,8 @@ const (
 func (e MutationResultSideEffectsType) Valid() bool {
 	switch e {
 	case Broadcast:
+		return true
+	case Event:
 		return true
 	case Job:
 		return true
@@ -1330,6 +1333,22 @@ func (e ListWorkflowsParamsStatus) Valid() bool {
 	}
 }
 
+// AssignedBookingResource defines model for AssignedBookingResource.
+type AssignedBookingResource struct {
+	Capacity *int    `json:"capacity,omitempty"`
+	Category *string `json:"category,omitempty"`
+	Id       *string `json:"id,omitempty"`
+	Name     *string `json:"name,omitempty"`
+
+	// Source Pivot source on the booking_resource row when assigned.
+	Source *string `json:"source,omitempty"`
+	Type   *string `json:"type,omitempty"`
+	User   *struct {
+		Id   *int    `json:"id,omitempty"`
+		Name *string `json:"name,omitempty"`
+	} `json:"user,omitempty"`
+}
+
 // AttachResourceRequest Attaches a Resource to a ProductOption. `capacity` and `seniority`
 // are optional pivot-level overrides; omit to inherit the
 // Resource-level defaults.
@@ -1514,8 +1533,16 @@ type Booking struct {
 	Reference *string `json:"reference,omitempty"`
 
 	// RefundedAmount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	RefundedAmount *Money     `json:"refunded_amount,omitempty"`
-	StartsAt       *time.Time `json:"starts_at,omitempty"`
+	RefundedAmount *Money `json:"refunded_amount,omitempty"`
+
+	// ResourceStateToken Aggregate booking resource state token used for stale-state guarded
+	// booking resource mutations. Present wherever `resources` are included.
+	ResourceStateToken *string `json:"resource_state_token,omitempty"`
+
+	// Resources Present on booking show and on booking list only when
+	// `include=resources` is requested.
+	Resources *[]AssignedBookingResource `json:"resources,omitempty"`
+	StartsAt  *time.Time                 `json:"starts_at,omitempty"`
 
 	// TotalAmount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
 	TotalAmount  *Money         `json:"total_amount,omitempty"`
@@ -2220,7 +2247,8 @@ type Error struct {
 	// IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_UNKNOWN,
 	// BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
 	// REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
-	// AVAILABILITY_HAS_CONFIRMED_BOOKING, RATE_LIMITED, INTERNAL_ERROR.
+	// AVAILABILITY_HAS_CONFIRMED_BOOKING, BOOKING_RESOURCE_STATE_STALE,
+	// BOOKING_RESOURCE_CONFLICT, RATE_LIMITED, INTERNAL_ERROR.
 	Code string `json:"code"`
 
 	// Details Per-field validation errors or domain-specific context
@@ -2852,6 +2880,18 @@ type UpdateAvailableGiftCertRequest struct {
 	Name                   *string `json:"name,omitempty"`
 }
 
+// UpdateBookingResourcesRequest Normalized desired-state request for booking resource writes.
+// `main_resource_id` switches the primary non-auxiliary resource.
+// `auxiliary_resource_ids` replaces the full auxiliary-resource set.
+type UpdateBookingResourcesRequest struct {
+	AuxiliaryResourceIds *[]int `json:"auxiliary_resource_ids,omitempty"`
+	DryRun               *bool  `json:"dry_run,omitempty"`
+
+	// ExpectedResourceStateToken Aggregate token from the latest booking read with resources included.
+	ExpectedResourceStateToken string `json:"expected_resource_state_token"`
+	MainResourceId             *int   `json:"main_resource_id,omitempty"`
+}
+
 // UpdateExtraRequest Mirrors `UpdateExtraRequest::rules()`. Same field-to-column mappings
 // as `CreateExtraRequest`.
 type UpdateExtraRequest struct {
@@ -3418,6 +3458,20 @@ type ListBookingsParams struct {
 	CustomerEmail   *openapi_types.Email `form:"customer_email,omitempty" json:"customer_email,omitempty"`
 	Reference       *string              `form:"reference,omitempty" json:"reference,omitempty"`
 	ProductOptionId *string              `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+
+	// ResourceId Filter to bookings a specific resource is assigned to (via the
+	// `booking_resource` pivot). Combine with `GET /resources?category=auxiliary`
+	// to answer "which trips has this auxiliary resource been assigned
+	// to?" — resolve the resource id from the resources list, then pass
+	// it here alongside `from`/`to`. Matches active resources only; a
+	// soft-deleted resource returns no rows.
+	ResourceId *int `form:"resource_id,omitempty" json:"resource_id,omitempty"`
+
+	// Include Optional comma-separated expansions. `include=resources` enriches
+	// each booking row with assigned resources plus a
+	// `resource_state_token` suitable for stale-state guarded writes.
+	// Omit it for the lightest list payload.
+	Include *string `form:"include,omitempty" json:"include,omitempty"`
 }
 
 // ListBookingsParamsBookingStatus defines parameters for ListBookings.
@@ -3492,6 +3546,22 @@ type ResendBookingConfirmationJSONBodyChannel string
 
 // RefundBookingParams defines parameters for RefundBooking.
 type RefundBookingParams struct {
+	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
+	// body return the original response. Conflicting body returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateBookingResourcesParams defines parameters for UpdateBookingResources.
+type UpdateBookingResourcesParams struct {
 	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
 	// body return the original response. Conflicting body returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
@@ -4890,6 +4960,9 @@ type ResendBookingConfirmationJSONRequestBody ResendBookingConfirmationJSONBody
 // RefundBookingJSONRequestBody defines body for RefundBooking for application/json ContentType.
 type RefundBookingJSONRequestBody = RefundBookingRequest
 
+// UpdateBookingResourcesJSONRequestBody defines body for UpdateBookingResources for application/json ContentType.
+type UpdateBookingResourcesJSONRequestBody = UpdateBookingResourcesRequest
+
 // CreateDiscountJSONRequestBody defines body for CreateDiscount for application/json ContentType.
 type CreateDiscountJSONRequestBody = CreateDiscountRequest
 
@@ -5260,6 +5333,17 @@ type ClientInterface interface {
 	RefundBookingWithBody(ctx context.Context, id IdPath, params *RefundBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	RefundBooking(ctx context.Context, id IdPath, params *RefundBookingParams, body RefundBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBookingResourcesWithBody request with any body
+	UpdateBookingResourcesWithBody(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateBookingResources(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, body UpdateBookingResourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAvailableBookingAuxiliaryResources request
+	ListAvailableBookingAuxiliaryResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAvailableBookingResources request
+	ListAvailableBookingResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListBookingTransactions request
 	ListBookingTransactions(ctx context.Context, id IdPath, params *ListBookingTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5876,6 +5960,54 @@ func (c *Client) RefundBookingWithBody(ctx context.Context, id IdPath, params *R
 
 func (c *Client) RefundBooking(ctx context.Context, id IdPath, params *RefundBookingParams, body RefundBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRefundBookingRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateBookingResourcesWithBody(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBookingResourcesRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateBookingResources(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, body UpdateBookingResourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBookingResourcesRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAvailableBookingAuxiliaryResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAvailableBookingAuxiliaryResourcesRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAvailableBookingResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAvailableBookingResourcesRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -8217,6 +8349,38 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 
 		}
 
+		if params.ResourceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "resource_id", *params.ResourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Include != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include", *params.Include, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -8505,6 +8669,136 @@ func NewRefundBookingRequestWithBody(server string, id IdPath, params *RefundBoo
 			req.Header.Set("Idempotency-Key", headerParam0)
 		}
 
+	}
+
+	return req, nil
+}
+
+// NewUpdateBookingResourcesRequest calls the generic UpdateBookingResources builder with application/json body
+func NewUpdateBookingResourcesRequest(server string, id IdPath, params *UpdateBookingResourcesParams, body UpdateBookingResourcesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateBookingResourcesRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUpdateBookingResourcesRequestWithBody generates requests for UpdateBookingResources with any type of body
+func NewUpdateBookingResourcesRequestWithBody(server string, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings/%s/resources", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListAvailableBookingAuxiliaryResourcesRequest generates requests for ListAvailableBookingAuxiliaryResources
+func NewListAvailableBookingAuxiliaryResourcesRequest(server string, id IdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings/%s/resources/auxiliary/available", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAvailableBookingResourcesRequest generates requests for ListAvailableBookingResources
+func NewListAvailableBookingResourcesRequest(server string, id IdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings/%s/resources/available", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -14824,6 +15118,17 @@ type ClientWithResponsesInterface interface {
 
 	RefundBookingWithResponse(ctx context.Context, id IdPath, params *RefundBookingParams, body RefundBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*RefundBookingResponse, error)
 
+	// UpdateBookingResourcesWithBodyWithResponse request with any body
+	UpdateBookingResourcesWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBookingResourcesResponse, error)
+
+	UpdateBookingResourcesWithResponse(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, body UpdateBookingResourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBookingResourcesResponse, error)
+
+	// ListAvailableBookingAuxiliaryResourcesWithResponse request
+	ListAvailableBookingAuxiliaryResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingAuxiliaryResourcesResponse, error)
+
+	// ListAvailableBookingResourcesWithResponse request
+	ListAvailableBookingResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingResourcesResponse, error)
+
 	// ListBookingTransactionsWithResponse request
 	ListBookingTransactionsWithResponse(ctx context.Context, id IdPath, params *ListBookingTransactionsParams, reqEditors ...RequestEditorFn) (*ListBookingTransactionsResponse, error)
 
@@ -15769,6 +16074,112 @@ func (r RefundBookingResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r RefundBookingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateBookingResourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// ResourceStateToken Current aggregate booking resource state token after the operation.
+			ResourceStateToken *string `json:"resource_state_token,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                       `json:"identifier,omitempty"`
+				PayloadSummary *string                                       `json:"payload_summary,omitempty"`
+				Type           *UpdateBookingResources200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
+}
+type UpdateBookingResources200DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r UpdateBookingResourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateBookingResourcesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAvailableBookingAuxiliaryResourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data       []AssignedBookingResource `json:"data"`
+		Meta       Meta                      `json:"meta"`
+		Pagination *Pagination               `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAvailableBookingAuxiliaryResourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAvailableBookingAuxiliaryResourcesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAvailableBookingResourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data       []AssignedBookingResource `json:"data"`
+		Meta       Meta                      `json:"meta"`
+		Pagination *Pagination               `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAvailableBookingResourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAvailableBookingResourcesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -19092,6 +19503,41 @@ func (c *ClientWithResponses) RefundBookingWithResponse(ctx context.Context, id 
 	return ParseRefundBookingResponse(rsp)
 }
 
+// UpdateBookingResourcesWithBodyWithResponse request with arbitrary body returning *UpdateBookingResourcesResponse
+func (c *ClientWithResponses) UpdateBookingResourcesWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBookingResourcesResponse, error) {
+	rsp, err := c.UpdateBookingResourcesWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBookingResourcesResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateBookingResourcesWithResponse(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, body UpdateBookingResourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBookingResourcesResponse, error) {
+	rsp, err := c.UpdateBookingResources(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBookingResourcesResponse(rsp)
+}
+
+// ListAvailableBookingAuxiliaryResourcesWithResponse request returning *ListAvailableBookingAuxiliaryResourcesResponse
+func (c *ClientWithResponses) ListAvailableBookingAuxiliaryResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingAuxiliaryResourcesResponse, error) {
+	rsp, err := c.ListAvailableBookingAuxiliaryResources(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAvailableBookingAuxiliaryResourcesResponse(rsp)
+}
+
+// ListAvailableBookingResourcesWithResponse request returning *ListAvailableBookingResourcesResponse
+func (c *ClientWithResponses) ListAvailableBookingResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingResourcesResponse, error) {
+	rsp, err := c.ListAvailableBookingResources(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAvailableBookingResourcesResponse(rsp)
+}
+
 // ListBookingTransactionsWithResponse request returning *ListBookingTransactionsResponse
 func (c *ClientWithResponses) ListBookingTransactionsWithResponse(ctx context.Context, id IdPath, params *ListBookingTransactionsParams, reqEditors ...RequestEditorFn) (*ListBookingTransactionsResponse, error) {
 	rsp, err := c.ListBookingTransactions(ctx, id, params, reqEditors...)
@@ -21137,6 +21583,171 @@ func ParseRefundBookingResponse(rsp *http.Response) (*RefundBookingResponse, err
 			return nil, err
 		}
 		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateBookingResourcesResponse parses an HTTP response from a UpdateBookingResourcesWithResponse call
+func ParseUpdateBookingResourcesResponse(rsp *http.Response) (*UpdateBookingResourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateBookingResourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// ResourceStateToken Current aggregate booking resource state token after the operation.
+				ResourceStateToken *string `json:"resource_state_token,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                       `json:"identifier,omitempty"`
+					PayloadSummary *string                                       `json:"payload_summary,omitempty"`
+					Type           *UpdateBookingResources200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAvailableBookingAuxiliaryResourcesResponse parses an HTTP response from a ListAvailableBookingAuxiliaryResourcesWithResponse call
+func ParseListAvailableBookingAuxiliaryResourcesResponse(rsp *http.Response) (*ListAvailableBookingAuxiliaryResourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAvailableBookingAuxiliaryResourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data       []AssignedBookingResource `json:"data"`
+			Meta       Meta                      `json:"meta"`
+			Pagination *Pagination               `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAvailableBookingResourcesResponse parses an HTTP response from a ListAvailableBookingResourcesWithResponse call
+func ParseListAvailableBookingResourcesResponse(rsp *http.Response) (*ListAvailableBookingResourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAvailableBookingResourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data       []AssignedBookingResource `json:"data"`
+			Meta       Meta                      `json:"meta"`
+			Pagination *Pagination               `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 

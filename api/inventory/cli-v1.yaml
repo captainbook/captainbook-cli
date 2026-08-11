@@ -553,9 +553,21 @@ paths:
         For multi-row deletes spanning a date range, use
         `POST /availabilities/bulk-delete`.
 
+        **Channel retraction.** When the row belongs to a ProductOption mapped
+        to GetYourGuide, the delete also queues a `vacancies: 0` push so GYG
+        stops selling the slot instead of waiting for its next scheduled
+        availability pull. GYG has no delete endpoint, so a zero-vacancy push
+        is the only retraction mechanism. Best-effort and asynchronous: the 204
+        does not mean GYG has been told. The push is skipped when the slot is
+        in the past or beyond the 90-day horizon, when `bookable_type` is not a
+        ProductOption, when another live availability still occupies the same
+        datetime, or when the option's product is already gone. Channels other
+        than GYG are not wired up yet.
+
         Dry-run (`dry_run: true` in the JSON body) returns 200 with
-        `would_apply: true` and the row in `diff.before`; no row is deleted.
-        The 409 confirmed-booking precheck still runs in dry-run.
+        `would_apply: true` and the row in `diff.before`; no row is deleted and
+        no retraction is queued. The 409 confirmed-booking precheck still runs
+        in dry-run.
       tags: [Availabilities]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -774,6 +786,17 @@ paths:
         cascade does NOT run. This is intentional: pricing tiers are M:N
         with availabilities, so cascading from one row would soft-delete
         tier rows still referenced by other availabilities.
+
+        **Channel retraction.** Because the bulk UPDATE fires no model events,
+        the removal is announced explicitly: if the ProductOption is mapped to
+        GetYourGuide, a `vacancies: 0` push is queued for the deleted slots.
+        GYG has no delete endpoint, so a zero-vacancy push is the only
+        retraction mechanism. Best-effort and asynchronous: the 200 does not
+        mean GYG has been told. Only future slots inside the 90-day horizon are
+        sent — a year-long range deletes every matched row but retracts only
+        the near-term ones, leaving the rest to GYG's next scheduled pull. A
+        datetime that still has another live availability behind it is never
+        retracted. Channels other than GYG are not wired up yet.
 
         **No-op:** if the filter matches zero rows, returns 200 with
         `total_deleted: 0` and `status: "no_op"`.
@@ -1664,6 +1687,24 @@ paths:
         - name: product_option_id
           in: query
           schema: { type: string }
+        - name: resource_id
+          in: query
+          description: |
+            Filter to bookings a specific resource is assigned to (via the
+            `booking_resource` pivot). Combine with `GET /resources?category=auxiliary`
+            to answer "which trips has this auxiliary resource been assigned
+            to?" — resolve the resource id from the resources list, then pass
+            it here alongside `from`/`to`. Matches active resources only; a
+            soft-deleted resource returns no rows.
+          schema: { type: integer, minimum: 1 }
+        - name: include
+          in: query
+          description: |
+            Optional comma-separated expansions. `include=resources` enriches
+            each booking row with assigned resources plus a
+            `resource_state_token` suitable for stale-state guarded writes.
+            Omit it for the lightest list payload.
+          schema: { type: string, example: resources }
       responses:
         "200":
           description: Page of bookings
@@ -1694,6 +1735,111 @@ paths:
                       data: { $ref: "#/components/schemas/Booking" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings/{id}/resources/available:
+    get:
+      operationId: listAvailableBookingResources
+      summary: List available main resources for a booking
+      description: |
+        Returns booking-specific candidate main resources using the same
+        availability and concurrency checks as the back-office resource switcher.
+      tags: [Bookings, Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Candidate main resources
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AssignedBookingResource" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings/{id}/resources/auxiliary/available:
+    get:
+      operationId: listAvailableBookingAuxiliaryResources
+      summary: List available auxiliary resources for a booking
+      description: |
+        Returns booking-specific candidate auxiliary resources for desired-set
+        assignment flows.
+      tags: [Bookings, Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Candidate auxiliary resources
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AssignedBookingResource" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings/{id}/resources:
+    post:
+      operationId: updateBookingResources
+      summary: Update booking resources
+      description: |
+        Normalized booking-resource mutation surface for CLI and MCP.
+
+        The caller sends the desired booking resource state plus the last-read
+        `expected_resource_state_token`. The server rejects stale writes with
+        `BOOKING_RESOURCE_STATE_STALE`, rejects invalid resource selections with
+        `BOOKING_RESOURCE_CONFLICT`, and commits booking/resource DB state
+        atomically. Side effects (notifications, workflows, calendar jobs) are
+        emitted after commit.
+      tags: [Bookings, Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingResourcesRequest"
+      responses:
+        "200":
+          description: Updated (or dry-run preview)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              resource_state_token:
+                                type: string
+                                description: Current aggregate booking resource state token after the operation.
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            `BOOKING_RESOURCE_STATE_STALE` or `BOOKING_RESOURCE_CONFLICT`, or a
+            normal CLI idempotency conflict.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /bookings/{id}/transactions:
     get:
@@ -3799,7 +3945,8 @@ components:
             IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_UNKNOWN,
             BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
             REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
-            AVAILABILITY_HAS_CONFIRMED_BOOKING, RATE_LIMITED, INTERNAL_ERROR.
+            AVAILABILITY_HAS_CONFIRMED_BOOKING, BOOKING_RESOURCE_STATE_STALE,
+            BOOKING_RESOURCE_CONFLICT, RATE_LIMITED, INTERNAL_ERROR.
         message:
           type: string
         hint:
@@ -3831,7 +3978,7 @@ components:
           items:
             type: object
             properties:
-              type: { type: string, enum: [job, mail, broadcast, stripe] }
+              type: { type: string, enum: [job, mail, broadcast, stripe, event] }
               identifier: { type: string }
               payload_summary: { type: string }
 
@@ -4343,6 +4490,34 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         deleted_at: { type: string, format: date-time, nullable: true }
+        resources:
+          type: array
+          description: |
+            Present on booking show and on booking list only when
+            `include=resources` is requested.
+          items: { $ref: "#/components/schemas/AssignedBookingResource" }
+        resource_state_token:
+          type: string
+          nullable: true
+          description: |
+            Aggregate booking resource state token used for stale-state guarded
+            booking resource mutations. Present wherever `resources` are included.
+
+    AssignedBookingResource:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, nullable: true }
+        type: { type: string, nullable: true }
+        capacity: { type: integer, nullable: true }
+        category: { type: string, nullable: true }
+        source: { type: string, nullable: true, description: "Pivot source on the booking_resource row when assigned." }
+        user:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string, nullable: true }
 
     Transaction:
       type: object
@@ -5254,6 +5429,23 @@ components:
         seniority: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
+    UpdateBookingResourcesRequest:
+      type: object
+      required: [expected_resource_state_token]
+      description: |
+        Normalized desired-state request for booking resource writes.
+        `main_resource_id` switches the primary non-auxiliary resource.
+        `auxiliary_resource_ids` replaces the full auxiliary-resource set.
+      properties:
+        main_resource_id: { type: integer, minimum: 1, nullable: true }
+        auxiliary_resource_ids:
+          type: array
+          items: { type: integer, minimum: 1 }
+        expected_resource_state_token:
+          type: string
+          description: Aggregate token from the latest booking read with resources included.
+        dry_run: { type: boolean, default: false }
+
     CreateLocationRequest:
       type: object
       required: [type, name, address, attach_to, attach_to_id]
@@ -5348,9 +5540,9 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         trigger:
-          allOf:
+          oneOf:
             - $ref: "#/components/schemas/WorkflowStep"
-          nullable: true
+            - { type: "null" }
           description: "Singleton TRIGGER step. Null when no trigger has been set."
         steps:
           type: array
@@ -5448,9 +5640,9 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         failed_log:
-          allOf:
+          oneOf:
             - $ref: "#/components/schemas/WorkflowExecutionLog"
-          nullable: true
+            - { type: "null" }
           description: "Embedded only on /workflow-executions/{id} (single-show)."
 
     WorkflowExecutionLog:
