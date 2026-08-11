@@ -7,6 +7,28 @@ Test config file path handling on Windows (`%USERPROFILE%\.ceebee\config.yaml`).
 **Why:** Broadens agent compatibility for Windows-based dev environments.
 **Priority:** P3 — no known Windows users yet.
 
+## intSlice flags can't express an empty list
+
+Five flags are declared `Type: "intSlice"`: `availabilities create-rule --weekdays`,
+`gift-certificates {create,update}-available --amounts`, and
+`products {create,update} --category-ids`. pflag's intSlice parser runs
+`strconv.Atoi` on the raw value, so the empty form `--flag=` fails at parse time
+with `invalid syntax` — there is no way to send `[]` through any of them.
+
+`bookings set-resources --auxiliary-resource-ids` hit this and was switched to
+`stringSlice` with manual int parsing (which also enforces the spec's per-item
+`minimum: 1`). The other five are only a latent limitation today because none of
+them documents an empty value as meaningful — but `--category-ids=` (detach all
+categories) and `--amounts=` (clear all denominations) are plausible operations
+a user would expect to work.
+
+Note also that any test constructing `RunArgs{Flags: ...}` by hand cannot catch
+this class of bug: it bypasses cobra entirely. Flag-parsing behaviour needs a
+test that goes through `root.Execute()`.
+
+**Why:** Silent capability gap — the CLI can add to these lists but never clear them.
+**Priority:** P3 — no reported user need yet; convert per-flag when one appears.
+
 ## ~~Spec/code drift tests (inventory CLI)~~ — DONE
 
 Implemented as `cmd/inventory/spec_drift_test.go`. Walks the AST of

@@ -91,8 +91,24 @@ ceebee inventory resources restore 2
 - ⚠️ **`category` is not free-form.** Server validates against the enum (`guide|asset|equipment|auxiliary`). The CLI's enum gate catches bad values before sending. Free-form lives on `--type`.
 - ⚠️ **Attached resources without `Availability` won't constrain anything.** The `resourceables` pivot is only consulted when an Availability is materialized via the recurrence rule (or the dashboard). Bare option-level resource attach is meaningless until at least one Availability exists.
 
+## Two different attachments: option-level vs booking-level
+
+Don't conflate these — they use different endpoints, different id spaces, and different semantics.
+
+| | `resources attach/detach` | `bookings set-resources` |
+|---|---|---|
+| Binds a resource to | a **ProductOption** (`resourceables` pivot) | a single **Booking** (`booking_resource` pivot) |
+| Meaning | "this option can draw on this boat/guide" | "this specific trip is running on that boat, with these kits" |
+| Shape | one resource per call, incremental | full desired state, replaces |
+| Concurrency guard | none (idempotent rewrite) | `expected_resource_state_token`, 409 on stale |
+
+Option-level attachment defines the *pool*; booking-level assignment picks *from* that pool for one trip. `bookings available-resources <id>` is what enumerates the legal picks — a resource that was never attached to the booking's ProductOption won't appear there, and forcing it anyway returns `BOOKING_RESOURCE_CONFLICT`.
+
+To answer "which trips is this auxiliary resource on?", resolve the id from `resources list --category auxiliary`, then pass it to `bookings list --resource-id <id> --from … --to …`.
+
 ## See also
 
+- [bookings.md](bookings.md) — assigning resources to an individual booking (`available-resources`, `set-resources`).
 - [product-options.md](product-options.md) — the parent of resource attachments.
 - [availabilities.md](availabilities.md) — `create-rule` materializes Availability rows that honor attached Resources.
 - [products.md](products.md) — the schedule_type and is_private settings interact with resource constraints during booking.
