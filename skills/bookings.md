@@ -7,9 +7,9 @@ A `Booking` is a customer reservation against a `ProductOption` on a specific da
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory bookings list` | GET /bookings | `cli:read` | n/a |
-| `inventory bookings show <id>` | GET /bookings/{id} | `cli:read` | n/a |
+| `inventory bookings get <id>` | GET /bookings/{id} | `cli:read` | n/a |
 | `inventory bookings transactions <id>` | GET /bookings/{id}/transactions | `cli:read` | n/a |
-| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` (or `cli:write` for `refund_policy=auto`) | body |
+| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:write` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
 
@@ -29,7 +29,7 @@ Status enum: `ON_HOLD`, `CONFIRMED`, `EXPIRED`, `CANCELLED`. Date filters apply 
 ### 2. Show one booking with inlined guests + recent transactions
 
 ```bash
-ceebee inventory bookings show bk_42 --format json
+ceebee inventory bookings get bk_42 --format json
 ```
 
 Response inlines `data.guests[]` and the most-recent `data.transactions[]`. Use `bookings transactions bk_42` for the full ledger.

@@ -7,7 +7,7 @@ A `Guest` is a per-booking traveler — name, passport, DOB, dietary requirement
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory guests list` | GET /guests | `cli:read` | n/a |
-| `inventory guests show <id>` | GET /guests/{id} | `cli:read` | n/a |
+| `inventory guests get <id>` | GET /guests/{id} | `cli:read` | n/a |
 | `inventory guests update <id>` | PATCH /guests/{id} | `cli:write` | body |
 
 ## Worked examples
@@ -23,7 +23,7 @@ Returns table of `{id, booking_id, name, email, dob, passport, updated_at}`.
 ### 2. Show one guest
 
 ```bash
-ceebee inventory guests show g_88 --format json
+ceebee inventory guests get g_88 --format json
 ```
 
 Includes `dietary` and `custom_attributes` (free-form JSON).
@@ -45,10 +45,10 @@ Drop `--dry-run` to commit. The audit log records the field change with `forensi
 ```bash
 ceebee inventory guests update g_88 \
   --dietary "vegetarian, no nuts" \
-  --custom-attributes '{"emergency_contact":"+30 210 1234567","loyalty_tier":"gold"}'
+  --data '{"custom_attributes":{"emergency_contact":"+30 210 1234567","loyalty_tier":"gold"}}'
 ```
 
-`--custom-attributes` takes a JSON object; the server replaces the whole `custom_attributes` blob (no per-key merge).
+There is **no `--custom-attributes` flag** — the map is too nested for a typed flag, so it goes through `--data` as raw JSON. Typed flags are overlaid on top of `--data`, so the two combine as shown. The server replaces the whole `custom_attributes` blob (no per-key merge).
 
 ### 5. List guests updated since last sync
 
@@ -67,5 +67,5 @@ Useful for nightly reconciliation against external CRMs.
 
 ## See also
 
-- [bookings.md](bookings.md) — `bookings show` inlines guests inline.
+- [bookings.md](bookings.md) — `bookings get` inlines the booking's guests.
 - [customers.md](customers.md) — the account record (different concept).

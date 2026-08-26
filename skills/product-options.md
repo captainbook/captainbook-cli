@@ -7,7 +7,7 @@ A `ProductOption` is a variant of a `Product` — "Half-day tour" vs "Full-day t
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory product-options list` | GET /product-options | `cli:read` | n/a |
-| `inventory product-options show <id>` | GET /product-options/{id} | `cli:read` | n/a |
+| `inventory product-options get <id>` | GET /product-options/{id} | `cli:read` | n/a |
 | `inventory product-options create` | POST /product-options | `cli:write` | body |
 | `inventory product-options update <id>` | PATCH /product-options/{id} | `cli:write` | body |
 | `inventory product-options delete <id>` | DELETE /product-options/{id} | `cli:write` | none |
@@ -30,7 +30,7 @@ Returns table of `{id, product_id, title, status, capacity, updated_at}`.
 Intent: confirm capacity + status before bulk-updating availabilities under it.
 
 ```bash
-ceebee inventory product-options show po_88 --format json
+ceebee inventory product-options get po_88 --format json
 ```
 
 ### 3. Create a new variant with a dry-run preview
@@ -67,14 +67,14 @@ ceebee inventory product-options restore 88                      # 200
 ## Pitfalls
 
 - ⚠️ **Cascade on delete:** `ProductOption::$cascadeDeletes` propagates the soft-delete to `virtualProductOption` and `discount`. **`PricingTier`s and `Availability` rows owned by the option are NOT cascaded** — they remain soft-readable but referenced rows may surprise you on restore.
-- ⚠️ **No server-side dry-run on delete.** Same shape as products — the CLI rejects `--dry-run` on `delete` at parse time. Inspect references first via `ceebee inventory pricing-tiers list --product-option-id po_88` and `ceebee inventory availabilities list --product-option-id po_88`.
+- ⚠️ **No server-side dry-run on delete.** Same shape as products — the CLI rejects `--dry-run` on `delete` at parse time. Inspect references first via `ceebee inventory availabilities list --product-option-id po_88`. Tiers are **not** scopable by option — `pricing-tiers list` accepts `--product-id` (or `--availability-id`), because `pricing_categories.product_option_id` was renamed to `product_id` in 2022 and tiers hang off the product, not the option.
 - ⚠️ **Capacity on the option vs. on availabilities:** `ProductOption.capacity` is the default. Per-date `Availability.capacity` overrides it. Don't `update --capacity` and assume it backfills existing availability rows — it doesn't. Use `availabilities bulk-update capacity` instead.
 - ⚠️ **`status: archived` is a soft-archive distinct from soft-delete.** Archived rows still appear in `list` (without `--include-trashed`); soft-deleted rows do not. Two filters, two states, both reachable.
 
 ## See also
 
 - [products.md](products.md) — parent resource.
-- [pricing-tiers.md](pricing-tiers.md) — tiers reference an option.
+- [pricing-tiers.md](pricing-tiers.md) — tiers hang off the *product* (via `PricingCategory`), not off the option.
 - [availabilities.md](availabilities.md) — per-date capacity tied to an option.
 - [extras.md](extras.md) — child catalog filtered by `--product-id` (Product-scoped).
 - [questions.md](questions.md) — child catalog filtered by `--product-option-id`.

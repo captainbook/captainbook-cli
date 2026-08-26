@@ -7,7 +7,7 @@ A `Transaction` is a single money-movement event tied to a booking — a charge,
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory transactions list` | GET /transactions | `cli:read` | n/a |
-| `inventory transactions show <id>` | GET /transactions/{id} | `cli:read` | n/a |
+| `inventory transactions get <id>` | GET /transactions/{id} | `cli:read` | n/a |
 
 (For per-booking transactions, see [bookings.md](bookings.md#endpoints) → `bookings transactions <id>`.)
 
@@ -26,7 +26,7 @@ ceebee inventory transactions list \
 ### 2. Show one transaction (full detail + Stripe IDs)
 
 ```bash
-ceebee inventory transactions show tx_abc123 --format json
+ceebee inventory transactions get tx_abc123 --format json
 ```
 
 Response carries the Stripe charge/refund id, idempotency key used, gross/net amounts, and the linked `booking_id`.
