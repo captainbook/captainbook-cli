@@ -949,6 +949,22 @@ func TestDryRunMode_String(t *testing.T) {
 			t.Errorf("DryRunMode(%d).String() = %q, want %q", int(mode), got, want)
 		}
 	}
+
+	// A mode added without extending the switch must NOT fall through to
+	// "none". "none" means DryRunNotSupported, so a silent default would
+	// make TestSkillsDocEndpointTables assert that every table row for the
+	// new mode reads "none" — enforcing the wrong contract, quietly. The
+	// value here is deliberately out of range: it stands in for whatever
+	// DryRunMode someone adds next.
+	const unhandled = DryRunMode(99)
+	got := unhandled.String()
+	if got == "none" {
+		t.Error(`unhandled DryRunMode returned "none"; an unmapped mode must not ` +
+			`masquerade as DryRunNotSupported — the doc tests consume this string`)
+	}
+	if got != "unknown" {
+		t.Errorf("unhandled DryRunMode(99).String() = %q, want %q", got, "unknown")
+	}
 }
 
 // writeTestImage writes a minimal file that sniffs as image/gif so it clears
