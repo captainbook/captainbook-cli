@@ -7,6 +7,43 @@ Test config file path handling on Windows (`%USERPROFILE%\.ceebee\config.yaml`).
 **Why:** Broadens agent compatibility for Windows-based dev environments.
 **Priority:** P3 — no known Windows users yet.
 
+## ~~Docs/code drift tests (skills + README)~~ — DONE
+
+Implemented as `cmd/inventory/skills_drift_test.go`. Complements
+`spec_drift_test.go`: that one checks code against the spec, this one
+checks the **docs** against the command tree the CLI actually builds
+(walked live from `Cmd()`, so it needs no config or network).
+
+- `TestSkillsDocDrift`: every `ceebee inventory …` invocation in a fenced
+  code block across `skills/*.md` + `README.md` must resolve to a real
+  command, use only declared flags, and not pass `--dry-run` to a
+  `DryRunNotSupported` endpoint. Caught: `bulk-update pricing --fare`
+  (real flag is `--fares`, a JSON array), `pricing-tiers delete --dry-run`,
+  `products list --status` (documented in README, flag did not exist),
+  `guests update --custom-attributes`, `notifications resend-confirmation`,
+  and `<resource> show` in 8 docs (the verb is `get` everywhere).
+- `TestSkillsDocEndpointTables`: every row of the `| command | METHOD /path |
+  ability | dry-run |` grids is checked against the command's bound verb,
+  path, ability, and DryRunMode. Caught: `discounts update` and
+  `categories create/update/delete` (no such spec operations), three wrong
+  gift-cert paths, `gift-certificates available create` (verb is
+  `create-available`), and the `bookings cancel` ability discrepancy now
+  tracked in #19.
+- `TestSpecQueryParamsAreExposedAsFlags`: every GET's spec query params must
+  have a flag or an entry in `intentionallyUnexposedQueryParams` **with a
+  reason**, so a spec re-sync can't quietly add an unreachable filter.
+- `TestFlagDescriptionsHaveNoBackquotes`: cobra's `UnquoteUsage()` turns the
+  first backquoted word of a description into the flag's value placeholder,
+  so ``persisted as `fare` `` rendered as `--amount fare` instead of
+  `--amount int`. Five flags were affected.
+
+Validated by regressing each historical bug in turn and observing precise
+file:line failure output.
+
+Open questions filed: #18 (product `status` filter/response enum mismatch),
+#19 (`bookings cancel` gated `cli:write` while sibling refund ops are
+`cli:cs`).
+
 ## ~~Spec/code drift tests (inventory CLI)~~ — DONE
 
 Implemented as `cmd/inventory/spec_drift_test.go`. Walks the AST of

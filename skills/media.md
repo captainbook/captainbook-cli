@@ -7,7 +7,7 @@
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory media list <product-id>` | GET /products/{id}/media | `cli:read` | n/a |
-| `inventory media show <id>` | GET /media/{id} | `cli:read` | n/a |
+| `inventory media get <id>` | GET /media/{id} | `cli:read` | n/a |
 | `inventory media upload <product-id>` | POST /products/{id}/media | `cli:write` | none (multipart) |
 | `inventory media delete <id>` | DELETE /media/{id} | `cli:write` | none |
 

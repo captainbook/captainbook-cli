@@ -1,6 +1,6 @@
 # Availabilities
 
-An `Availability` is the per-date instance of a `ProductOption`: capacity for a given date, current bookable status, start/end times, and the active pricing tier set. Read endpoints answer "what's bookable on May 5?". The PATCH endpoint edits one row. The **bulk-update** endpoint async-edits every row matching `(product_option_id, from, to)` and is split into five subcommands by setting. The **delete** / **bulk-delete** endpoints soft-delete rows; both reject the request with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` if any matched row carries a confirmed booking. The **create-rule** endpoint generates Availability rows from a recurrence pattern (the same job the dashboard's recurrence picker dispatches).
+An `Availability` is the per-date instance of a `ProductOption`: capacity for a given date, current bookable status, start/end times, and the active pricing tier set. Read endpoints answer "what's bookable on May 5?" — and with `--include-pricing`, "at what price?". The PATCH endpoint edits one row. The **bulk-update** endpoint async-edits every row matching `(product_option_id, from, to)` and is split into five subcommands by setting. The **delete** / **bulk-delete** endpoints soft-delete rows; both reject the request with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` if any matched row carries a confirmed booking. The **create-rule** endpoint generates Availability rows from a recurrence pattern (the same job the dashboard's recurrence picker dispatches).
 
 ## Endpoints
 
@@ -89,11 +89,13 @@ Intent: raise summer prices on the Adult and Child tiers for July.
 ceebee inventory availabilities bulk-update pricing \
   --product-option-id po_88 \
   --from 2026-07-01 --to 2026-08-01 \
-  --fare pricing_tier_id=pt_adult,amount=9500 \
-  --fare pricing_tier_id=pt_child,amount=5500
+  --fares '[{"pricing_tier_id":"pt_adult","amount":9500},
+            {"pricing_tier_id":"pt_child","amount":5500}]'
 ```
 
-`9500` = €95.00, `5500` = €55.00. Tiers omitted from `--fare` are left alone (server uses `replaceAll: false`).
+`--fares` is a **single JSON array**, not a repeatable key=value flag — every tier goes in one string. `9500` = €95.00, `5500` = €55.00. Tiers omitted from `--fares` are left alone (server uses `replaceAll: false`).
+
+This writes the `availability_pricing_tier` pivot: each matched slot gets a per-slot fare that overrides the tier's catalogue `amount`. Verify with `--include-pricing` (example 10) — and note there is no way to delete a pivot row, so an override cannot be reverted to "follows the catalogue".
 
 ### 6. Bulk-update times
 
@@ -162,18 +164,36 @@ ceebee inventory availabilities create-rule \
 
 For `date`-type products, `--start-time`/`--end-time` are ignored (slots span full days). For `datetime` products both are required. `--add-days-count` extends the `to` timestamp for multi-day events.
 
+### 10. Read per-slot pricing (`--include-pricing`)
+
+Intent: check which September slots carry a fare override rather than the catalogue price.
+
+```bash
+ceebee inventory availabilities list \
+  --product-option-id po_88 --from 2026-09-01 --to 2026-10-01 \
+  --include-pricing --format json \
+| jq '.data[] | select(.pricing_tiers[]?.is_override)
+      | {id, date,
+         fares: [.pricing_tiers[] | select(.is_override)
+                 | {id, was: .default_amount, now: .amount}]}'
+```
+
+`--include-pricing` (also available on `get <id>`) embeds `pricing_tiers[]` on each row, where `amount` is the **effective** price — the `availability_pricing_tier` pivot fare when one exists, the catalogue price otherwise — alongside `default_amount` (catalogue) and `is_override` (whether a pivot row exists). It defaults to **false**; without it the rows carry no `pricing_tiers[]` at all, so a jq filter against them silently matches nothing.
+
+Cost is bounded: 3 batched queries per page regardless of page size, no per-row N+1. Soft-deleted tiers are excluded, and slots with no product context (e.g. Resource-backed) get an empty array. For a single slot, `pricing-tiers list --availability-id <id>` returns the same overlay in full tier shape.
+
 ## Pitfalls
 
 - ⚠️ **Bulk-update is async and has no in-band completion signal in V1.** Exit 0 + `BULK_UPDATE_ACCEPTED` on stderr means the audit row was created and jobs queued on `inventory`. Confirm by polling `availabilities list` or by reading the `BulkAvailabilityUpdate` audit row server-side. Phase 2 will add `GET /availabilities/bulk-updates/{id}`.
 - ⚠️ **One setting per bulk call.** `capacity AND booking-status` requires two calls; the underlying job dispatcher can only carry one setting at a time. The CLI enforces this by exposing five separate subcommands.
 - ⚠️ **Date range is half-open `[from, to)`.** `--from 2026-05-01 --to 2026-06-01` matches every May date, NOT June 1.
 - ⚠️ **Timezone:** dates are interpreted in the tenant's `Organisation.timezone`. A rule for "all of August in tenant TZ" is not the same as "all of August UTC" — server uses tenant TZ.
-- ⚠️ **Pricing bulk-update is additive, not replacive.** Tiers omitted from `--fare` keep their existing fares. To zero out a tier across a range, include it explicitly with the new amount.
+- ⚠️ **Pricing bulk-update is additive, not replacive — and irreversible.** Tiers omitted from `--fares` keep their existing fares. To change a tier across a range, include it explicitly with the new amount. There is no operation that removes an `availability_pricing_tier` row, so a slot can never be handed back to the catalogue price; re-setting it to the catalogue number by hand still leaves `is_override: true`.
 - ⚠️ **Delete / bulk-delete are blocked by confirmed bookings.** Both endpoints precheck for `AVAILABILITY_HAS_CONFIRMED_BOOKING` (409) **including in dry-run**. `bulk-delete` is all-or-nothing — one blocker rejects the entire range, and `error.details.sample_availability_ids` returns up to 20 ids to investigate. Cancel/move the bookings or narrow the range, then retry.
-- ⚠️ **Soft-delete is one-way from the CLI.** Availability has no `restore` endpoint and the schema doesn't surface `deleted_at`. A `delete` / `bulk-delete` mistake is recoverable only via DB intervention by ops.
+- ⚠️ **Soft-delete is one-way from the CLI.** The row's `deleted_at` is visible on the Availability schema, but there is no `/availabilities/{id}/restore` operation and `list` has no `--include-trashed`, so a deleted row can be neither listed nor undeleted. A `delete` / `bulk-delete` mistake is recoverable only via DB intervention by ops.
 
 ## See also
 
 - [product-options.md](product-options.md) — `--product-option-id` is required for bulk-update.
-- [pricing-tiers.md](pricing-tiers.md) — fares used by `bulk-update pricing` reference tier IDs.
+- [pricing-tiers.md](pricing-tiers.md) — fares used by `bulk-update pricing` reference tier IDs; also covers reading the `availability_pricing_tier` pivot per slot.
 - [bookings.md](bookings.md) — bookings consume availability capacity.

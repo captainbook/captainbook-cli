@@ -69,7 +69,7 @@ func productOptionsDefs() []CommandDef {
 				"parent Product. --title is mapped onto the underlying `name` column. " +
 				"--option-code is auto-generated from the title slug when omitted.",
 			Flags: []FlagDef{
-				{Name: "title", Type: "string", Required: true, Description: "Option title (persisted as `name`)"},
+				{Name: "title", Type: "string", Required: true, Description: "Option title (persisted as the name column)"},
 				{Name: "product-id", Type: "string", Required: true, Description: "Parent product ID"},
 				{Name: "option-code", Type: "string", Description: "Tenant-supplied SKU (auto-generated from title when omitted)"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
@@ -104,7 +104,7 @@ func productOptionsDefs() []CommandDef {
 			DryRunMode:     DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "title", Type: "string", Description: "Option title (persisted as `name`)"},
+				{Name: "title", Type: "string", Description: "Option title (persisted as the name column)"},
 				{Name: "option-code", Type: "string", Description: "Tenant-supplied SKU"},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "min-age", Type: "int", Description: "Minimum allowed guest age"},

@@ -6,14 +6,16 @@ V1 ships a single notification command: **resend the booking confirmation** (ema
 
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
-| `inventory notifications resend-confirmation <booking-id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
+| `inventory notifications resend <booking-id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
+
+`ceebee inventory bookings resend-confirmation <id>` is an alias for the same endpoint — the spec defines only one operation, and both commands share a flag list and closure. Use whichever reads better in context.
 
 ## Worked examples
 
 ### 1. Resend the confirmation email to the booking's primary contact
 
 ```bash
-ceebee inventory notifications resend-confirmation bk_42
+ceebee inventory notifications resend bk_42
 ```
 
 Default channel is `email`; default recipient is the booking's primary contact. Default `--format json` returns `{notification_id, channel, sent_at}`.
@@ -23,7 +25,7 @@ Default channel is `email`; default recipient is the booking's primary contact. 
 Intent: customer can't access email; send the confirmation as an SMS.
 
 ```bash
-ceebee inventory notifications resend-confirmation bk_42 \
+ceebee inventory notifications resend bk_42 \
   --channel sms
 ```
 
@@ -34,7 +36,7 @@ Server uses the booking's primary phone. SMS provider fires.
 Intent: customer's spouse needs a copy of the confirmation.
 
 ```bash
-ceebee inventory notifications resend-confirmation bk_42 \
+ceebee inventory notifications resend bk_42 \
   --recipient spouse@example.com
 ```
 
@@ -45,7 +47,7 @@ ceebee inventory notifications resend-confirmation bk_42 \
 Intent: confirm what the server WOULD send before clicking the trigger.
 
 ```bash
-ceebee inventory notifications resend-confirmation bk_42 \
+ceebee inventory notifications resend bk_42 \
   --channel email \
   --recipient customer@example.com \
   --dry-run

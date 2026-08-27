@@ -78,6 +78,23 @@ const (
 	DryRunQuery
 )
 
+// String renders the mode for command annotations (see bindCommands).
+func (m DryRunMode) String() string {
+	switch m {
+	case DryRunNotSupported:
+		return "none"
+	case DryRunBody:
+		return "body"
+	case DryRunQuery:
+		return "query"
+	default:
+		// A mode added without updating this switch must NOT masquerade as
+		// "none" (not-supported) — the doc tests consume this string, and a
+		// silent mislabel would make them assert the wrong contract.
+		return "unknown"
+	}
+}
+
 // CommandKind distinguishes read vs mutation commands. It drives the
 // per-command-kind format default (cherry-pick #6: reads default to table,
 // mutations to json) and selects the orchestration helper.
@@ -620,6 +637,29 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 				c.Annotations = map[string]string{}
 			}
 			c.Annotations["ability"] = string(def.Ability)
+		}
+
+		// Annotate dry-run capability. Not surfaced in --help (the flag's
+		// own description already says it may be rejected); this exists so
+		// TestSkillsDocDrift can assert that skills/*.md never documents
+		// --dry-run on an endpoint that rejects it — the exact drift that
+		// shipped in skills/index.md.
+		if def.Kind == KindMutation {
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations["dryRun"] = def.DryRunMode.String()
+		}
+
+		// Annotate the HTTP verb + path so TestSkillsDocEndpointTables can
+		// check the "Method + path" column of every endpoint table in
+		// skills/*.md against what the command actually calls.
+		if def.Verb != "" && def.Path != "" {
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations["verb"] = def.Verb
+			c.Annotations["path"] = def.Path
 		}
 
 		c.RunE = makeRunE(def, runner)

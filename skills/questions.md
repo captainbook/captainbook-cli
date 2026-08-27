@@ -7,7 +7,7 @@ A `Question` is a checkout-time question presented to the customer for a `Produc
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory questions list` | GET /questions | `cli:read` | n/a |
-| `inventory questions show <id>` | GET /questions/{id} | `cli:read` | n/a |
+| `inventory questions get <id>` | GET /questions/{id} | `cli:read` | n/a |
 | `inventory questions create` | POST /questions | `cli:write` | body |
 | `inventory questions update <id>` | PATCH /questions/{id} | `cli:write` | body |
 | `inventory questions delete <id>` | DELETE /questions/{id} | `cli:write` | none |

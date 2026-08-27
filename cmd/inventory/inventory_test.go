@@ -833,3 +833,228 @@ func TestTryParseDataID_PascalCaseFallback(t *testing.T) {
 		})
 	}
 }
+
+// TestMultipartUpload_OptionalFieldsSent verifies that --alt-text and
+// --position reach the multipart body. The position case is the reason this
+// test exists: the fields are gated on Flags().Changed() rather than on
+// emptiness, because position=0 is a legitimate "first in the gallery" and a
+// zero-value check would silently drop it.
+func TestMultipartUpload_OptionalFieldsSent(t *testing.T) {
+	path := writeTestImage(t)
+
+	var gotAlt, gotPos string
+	var haveAlt, havePos bool
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("parse multipart: %v", err)
+		}
+		gotAlt, haveAlt = firstFormValue(r, "alt_text")
+		gotPos, havePos = firstFormValue(r, "position")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"med_1"},"meta":{"request_id":"req_1"}}`))
+	})
+
+	cmd := uploadCmd(runner)
+	cmd.SetArgs([]string{"prod_42", "--file", path, "--alt-text", "Divers at golden hour", "--position", "0"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+
+	if !haveAlt {
+		t.Error("alt_text missing from multipart body")
+	} else if gotAlt != "Divers at golden hour" {
+		t.Errorf("alt_text = %q, want %q", gotAlt, "Divers at golden hour")
+	}
+	// The regression this guards: gating on emptiness instead of Changed()
+	// would drop an explicit --position 0 and silently reorder the gallery.
+	if !havePos {
+		t.Error("position missing from multipart body; explicit --position 0 must still be sent")
+	} else if gotPos != "0" {
+		t.Errorf("position = %q, want %q", gotPos, "0")
+	}
+}
+
+// TestMultipartUpload_OmitsUnsetOptionalFields verifies the other half of the
+// Changed() gate: fields the user never set must not appear on the wire at
+// all, so the server keeps applying its own defaults.
+func TestMultipartUpload_OmitsUnsetOptionalFields(t *testing.T) {
+	path := writeTestImage(t)
+
+	var haveAlt, havePos bool
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("parse multipart: %v", err)
+		}
+		_, haveAlt = firstFormValue(r, "alt_text")
+		_, havePos = firstFormValue(r, "position")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"med_1"},"meta":{"request_id":"req_1"}}`))
+	})
+
+	cmd := uploadCmd(runner)
+	cmd.SetArgs([]string{"prod_42", "--file", path})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+
+	if haveAlt {
+		t.Error("alt_text sent despite --alt-text never being set")
+	}
+	if havePos {
+		t.Error("position sent despite --position never being set; server defaults would be overwritten")
+	}
+}
+
+// TestProductsList_StatusReachesQueryString verifies the --status filter is
+// threaded into the request query. TestSpecQueryParamsAreExposedAsFlags only
+// asserts the flag EXISTS; this asserts its value actually reaches the wire.
+func TestProductsList_StatusReachesQueryString(t *testing.T) {
+	var gotStatus string
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotStatus = r.URL.Query().Get("status")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"request_id":"req_1"}}`))
+	})
+
+	parent := makeResourceParent("products", "Manage products", productsDefs(), runner)
+	parent.SetArgs([]string{"list", "--status", "published"})
+	parent.SetOut(&bytes.Buffer{})
+	parent.SetErr(&bytes.Buffer{})
+	if err := parent.Execute(); err != nil {
+		t.Fatalf("products list: %v", err)
+	}
+
+	if gotStatus != "published" {
+		t.Errorf("status query param = %q, want %q", gotStatus, "published")
+	}
+}
+
+// TestDryRunMode_String pins the annotation values the doc-drift tests match
+// against. A rename here silently turns those assertions into no-ops.
+func TestDryRunMode_String(t *testing.T) {
+	cases := map[DryRunMode]string{
+		DryRunNotSupported: "none",
+		DryRunBody:         "body",
+		DryRunQuery:        "query",
+	}
+	for mode, want := range cases {
+		if got := mode.String(); got != want {
+			t.Errorf("DryRunMode(%d).String() = %q, want %q", int(mode), got, want)
+		}
+	}
+
+	// A mode added without extending the switch must NOT fall through to
+	// "none". "none" means DryRunNotSupported, so a silent default would
+	// make TestSkillsDocEndpointTables assert that every table row for the
+	// new mode reads "none" — enforcing the wrong contract, quietly. The
+	// value here is deliberately out of range: it stands in for whatever
+	// DryRunMode someone adds next.
+	const unhandled = DryRunMode(99)
+	got := unhandled.String()
+	if got == "none" {
+		t.Error(`unhandled DryRunMode returned "none"; an unmapped mode must not ` +
+			`masquerade as DryRunNotSupported — the doc tests consume this string`)
+	}
+	if got != "unknown" {
+		t.Errorf("unhandled DryRunMode(99).String() = %q, want %q", got, "unknown")
+	}
+}
+
+// writeTestImage writes a minimal file that sniffs as image/gif so it clears
+// the upload MIME preflight.
+func writeTestImage(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "pixel.gif")
+	// GIF89a magic — http.DetectContentType keys off the first bytes.
+	if err := os.WriteFile(path, []byte("GIF89a\x01\x00\x01\x00\x00\xff\x00,"), 0o600); err != nil {
+		t.Fatalf("write test image: %v", err)
+	}
+	return path
+}
+
+// firstFormValue reads a multipart form field, reporting whether it was
+// present at all — absence and empty-string are different assertions here.
+func firstFormValue(r *http.Request, key string) (string, bool) {
+	if r.MultipartForm == nil {
+		return "", false
+	}
+	vals, ok := r.MultipartForm.Value[key]
+	if !ok || len(vals) == 0 {
+		return "", false
+	}
+	return vals[0], true
+}
+
+// TestMultipartUpload_ForensicSummaryRecordsOptionalFields verifies the audit
+// entry mirrors the wire request: alt_text/position appear only when they were
+// actually sent, so the D37 forensic record can't claim a default the server
+// never received.
+func TestMultipartUpload_ForensicSummaryRecordsOptionalFields(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		extra    []string
+		wantKeys bool
+	}{
+		{name: "fields set", extra: []string{"--alt-text", "Hero shot", "--position", "0"}, wantKeys: true},
+		{name: "fields unset", extra: nil, wantKeys: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeTestImage(t)
+			_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"data":{"id":"med_1"},"meta":{"request_id":"req_1"}}`))
+			})
+
+			// Own the audit path so the entry can be read back.
+			auditPath := filepath.Join(t.TempDir(), "audit.jsonl")
+			logger, err := invpkg.NewFileLogger(auditPath)
+			if err != nil {
+				t.Fatalf("new audit logger: %v", err)
+			}
+			runner.AuditLogger = logger
+
+			cmd := uploadCmd(runner)
+			cmd.SetArgs(append([]string{"prod_42", "--file", path}, tc.extra...))
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("upload: %v", err)
+			}
+
+			raw, err := os.ReadFile(auditPath)
+			if err != nil {
+				t.Fatalf("read audit log: %v", err)
+			}
+			var entry struct {
+				ForensicSummary map[string]any `json:"forensic_summary"`
+			}
+			line := strings.TrimSpace(string(raw))
+			if line == "" {
+				t.Fatal("audit log is empty")
+			}
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				t.Fatalf("parse audit entry: %v", err)
+			}
+			// File metadata is always recorded, regardless of the optional flags.
+			if entry.ForensicSummary["file_name"] != "pixel.gif" {
+				t.Errorf("file_name = %v, want pixel.gif", entry.ForensicSummary["file_name"])
+			}
+			_, haveAlt := entry.ForensicSummary["alt_text"]
+			_, havePos := entry.ForensicSummary["position"]
+			if haveAlt != tc.wantKeys {
+				t.Errorf("alt_text present = %v, want %v", haveAlt, tc.wantKeys)
+			}
+			if havePos != tc.wantKeys {
+				t.Errorf("position present = %v, want %v", havePos, tc.wantKeys)
+			}
+		})
+	}
+}
