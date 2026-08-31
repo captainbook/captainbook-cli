@@ -41,7 +41,7 @@ func bookingsDefs() []CommandDef {
 				{Name: "reference", Type: "string", Description: "Filter by booking reference"},
 				{Name: "product-option-id", Type: "string", Description: "Filter by product option"},
 				{Name: "resource-id", Type: "int", Description: "Filter to bookings this resource is assigned to (active resources only)"},
-				{Name: "include", Type: "string", Description: "Comma-separated expansions; `resources` adds assigned resources + resource_state_token"},
+				{Name: "include", Type: "string", Description: "Comma-separated expansions; only 'resources' is supported (adds assigned resources + resource_state_token)"},
 				{Name: "include-cancelled", Type: "bool", Description: "Lift the CancellingScope filter so cancelled bookings appear alongside active ones"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {

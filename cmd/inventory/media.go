@@ -12,6 +12,7 @@ import (
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,7 +33,8 @@ import (
 //   - Mint a fresh UUIDv7 idempotency key.
 //   - Build the multipart/form-data body in memory (fits trivially in 10 MiB).
 //   - POST via the gen client's *WithBody method.
-//   - Audit entry with forensic_summary={file_size, mime_type, file_name}.
+//   - Audit entry with forensic_summary={file_size, mime_type, file_name},
+//     plus alt_text / position when those optional fields were sent.
 //
 // No --dry-run support: D32 NotSupported. The CommandDef declares it and
 // runMutation rejects --dry-run before this Run fires.
@@ -127,8 +129,22 @@ func uploadCmd(runner *Runner) *cobra.Command {
 			"  - MIME type MUST be one of: image/jpeg, image/png, image/webp, image/gif, application/pdf\n" +
 			"\nNo --dry-run support (D32 NotSupported).",
 		Args: cobra.ExactArgs(1),
+		// Set by hand: this command is built directly rather than through
+		// bindCommands, so it would otherwise carry none of the metadata
+		// the doc-drift tests check.
+		Annotations: map[string]string{
+			"ability": string(invpkg.Write),
+			"dryRun":  DryRunNotSupported.String(),
+			"verb":    "POST",
+			"path":    "/products/{id}/media",
+		},
 	}
 	c.Flags().StringP("file", "F", "", "Path to the media file (required)")
+	// alt_text / position are optional multipart fields on the spec's
+	// UploadProductMedia operation. Only sent when the user set them, so
+	// the server keeps applying its own defaults otherwise.
+	c.Flags().String("alt-text", "", "Alt text for the media item (accessibility)")
+	c.Flags().Int("position", 0, "Ordering position within the product gallery")
 	c.Flags().StringP("format", "f", "json", "Output format: json, table, csv")
 	c.Flags().String("idempotency-key", "", "Override the auto-minted UUIDv7 idempotency key")
 	// --dry-run is declared so users get the typed "not supported" error
@@ -138,6 +154,8 @@ func uploadCmd(runner *Runner) *cobra.Command {
 	c.RunE = func(cmd *cobra.Command, posArgs []string) error {
 		productID := posArgs[0]
 		path, _ := cmd.Flags().GetString("file")
+		altText, _ := cmd.Flags().GetString("alt-text")
+		position, _ := cmd.Flags().GetInt("position")
 		idemKey, _ := cmd.Flags().GetString("idempotency-key")
 		fmtFlag, _ := cmd.Flags().GetString("format")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -193,6 +211,19 @@ func uploadCmd(runner *Runner) *cobra.Command {
 		}
 		if _, err := io.Copy(part, f); err != nil {
 			return fmt.Errorf("upload: copy: %w", err)
+		}
+		// Gate on Changed rather than emptiness: position=0 is a legitimate
+		// "first in the gallery", so a zero value the user actually typed
+		// must still go on the wire.
+		if cmd.Flags().Changed("alt-text") {
+			if err := mw.WriteField("alt_text", altText); err != nil {
+				return fmt.Errorf("upload: write alt_text: %w", err)
+			}
+		}
+		if cmd.Flags().Changed("position") {
+			if err := mw.WriteField("position", strconv.Itoa(position)); err != nil {
+				return fmt.Errorf("upload: write position: %w", err)
+			}
 		}
 		if err := mw.Close(); err != nil {
 			return fmt.Errorf("upload: close multipart: %w", err)
@@ -252,25 +283,34 @@ func uploadCmd(runner *Runner) *cobra.Command {
 				responseID = runRes.ResponseID
 			}
 		}
+		forensicSummary := map[string]any{
+			"file_size": info.Size(),
+			"mime_type": mime,
+			"file_name": filepath.Base(path),
+		}
+		// Only record the optional fields when they were actually sent, so
+		// the audit log reflects the wire request rather than flag defaults.
+		if cmd.Flags().Changed("alt-text") {
+			forensicSummary["alt_text"] = altText
+		}
+		if cmd.Flags().Changed("position") {
+			forensicSummary["position"] = position
+		}
 		entry := invpkg.AuditEntry{
-			Ts:             time.Now().UTC(),
-			Profile:        runner.ProfileName,
-			Tenant:         runner.Tenant,
-			Command:        "POST /products/{id}/media",
-			Endpoint:       "/products/{id}/media",
-			IdempotencyKey: idemKey,
-			BodySHA256:     hex.EncodeToString(bodyHash[:]),
-			AbilityUsed:    string(invpkg.Write),
-			DryRun:         false,
-			Status:         status,
-			ResponseID:     responseID,
-			DurationMs:     duration.Milliseconds(),
-			Version:        invpkg.AuditSchemaVersion,
-			ForensicSummary: map[string]any{
-				"file_size": info.Size(),
-				"mime_type": mime,
-				"file_name": filepath.Base(path),
-			},
+			Ts:              time.Now().UTC(),
+			Profile:         runner.ProfileName,
+			Tenant:          runner.Tenant,
+			Command:         "POST /products/{id}/media",
+			Endpoint:        "/products/{id}/media",
+			IdempotencyKey:  idemKey,
+			BodySHA256:      hex.EncodeToString(bodyHash[:]),
+			AbilityUsed:     string(invpkg.Write),
+			DryRun:          false,
+			Status:          status,
+			ResponseID:      responseID,
+			DurationMs:      duration.Milliseconds(),
+			Version:         invpkg.AuditSchemaVersion,
+			ForensicSummary: forensicSummary,
 		}
 		if runErr != nil {
 			entry.ErrorCode = errorCode(runErr)

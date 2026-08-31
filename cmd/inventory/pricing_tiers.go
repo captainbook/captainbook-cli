@@ -26,7 +26,7 @@ func pricingTiersDefs() []CommandDef {
 				{Name: "limit", Type: "int", Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "string", Description: "Filter by parent product (via the pricing_category relation). Mutually exclusive with --availability-id."},
-				{Name: "availability-id", Type: "string", Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto `amount` and adds `default_amount`/`is_override`. Mutually exclusive with --product-id (combining the two returns 422)."},
+				{Name: "availability-id", Type: "string", Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto the tier's amount and adds default_amount/is_override. Mutually exclusive with --product-id (combining the two returns 422)."},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
@@ -74,7 +74,7 @@ func pricingTiersDefs() []CommandDef {
 			Verb: "GET", Path: "/pricing-tiers/{id}", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "availability-id", Type: "string", Description: "Overlay the per-slot override for this availability onto `amount` and surface `default_amount`/`is_override`. Returns 404 if the tier isn't reachable from the availability's product."},
+				{Name: "availability-id", Type: "string", Description: "Overlay the per-slot override for this availability onto the tier's amount and surface default_amount/is_override. Returns 404 if the tier isn't reachable from the availability's product."},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
@@ -101,7 +101,7 @@ func pricingTiersDefs() []CommandDef {
 				"describe the inclusive headcount band (--max omitted = open-ended).",
 			Flags: []FlagDef{
 				{Name: "pricing-category-id", Type: "string", Required: true, Description: "Owning PricingCategory row"},
-				{Name: "amount", Type: "int", Required: true, Description: "Price (minor units, persisted as `fare`)"},
+				{Name: "amount", Type: "int", Required: true, Description: "Price (minor units, persisted as the fare column)"},
 				{Name: "min", Type: "int", Description: "Inclusive lower bound of the headcount band"},
 				{Name: "max", Type: "int", Description: "Inclusive upper bound; omit for open-ended"},
 			},
@@ -134,7 +134,7 @@ func pricingTiersDefs() []CommandDef {
 				"different PricingCategory (404 if the target category doesn't exist).",
 			Flags: []FlagDef{
 				{Name: "pricing-category-id", Type: "string", Description: "Reparent under a different PricingCategory"},
-				{Name: "amount", Type: "int", Description: "Price (minor units, persisted as `fare`)"},
+				{Name: "amount", Type: "int", Description: "Price (minor units, persisted as the fare column)"},
 				{Name: "min", Type: "int", Description: "Inclusive lower bound of the headcount band"},
 				{Name: "max", Type: "int", Description: "Inclusive upper bound; omit for open-ended"},
 			},

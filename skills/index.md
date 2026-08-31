@@ -46,8 +46,8 @@ Tokens carry one or more abilities. The server enforces them at the route layer;
 | Ability     | Required for |
 |-------------|--------------|
 | `cli:read`  | All read endpoints. Implicit alongside `cli:write` / `cli:cs`. |
-| `cli:write` | Inventory mutations: products, options, availabilities (incl. bulk), pricing tiers, discounts (incl. apply), gift certs (issue/void/resend), guests, extras, questions, categories, media. |
-| `cli:cs`    | CS-only sensitive operations: `bookings cancel` with `refund_policy=none|full|partial`, `bookings refund`, `bookings comp`, `notifications resend-confirmation`. |
+| `cli:write` | Inventory mutations: products, options, availabilities (incl. bulk), pricing tiers, discounts (incl. apply), gift certs (issue/void/resend), guests, extras, questions, media. NOT categories — those are platform-managed and read-only. |
+| `cli:cs`    | CS-only sensitive operations: `bookings refund`, `bookings comp`, `notifications resend` (aliased as `bookings resend-confirmation`). **`bookings cancel` is NOT in this set** — it binds `cli:write` even when `refund_policy` triggers a Stripe refund; see issue #19. |
 
 Recommended issuance: a `cli:read` token for reporting bots, a `cli:read + cli:write` token for inventory editors, and a `cli:read + cli:write + cli:cs` token for Customer Success engineers.
 
@@ -94,15 +94,17 @@ Dry-runs do NOT consume an idempotency row, so you can preview with the same key
 Most mutations support `--dry-run`. The server runs validation, authorization, and computes the diff, then rolls back the DB transaction and skips Stripe/mailers/jobs. The CLI renders a colored unified diff against the current resource. Reads forbid `--dry-run` (the flag is rejected at parse time). A few delete operations don't accept dry-run server-side — see the capability table below.
 
 ```bash
-ceebee inventory pricing-tiers delete pt_42 --dry-run
-# diff preview, then "would delete; cascade: 124 availabilities will be soft-deleted"
+ceebee inventory availabilities delete av_2026_05_05_po88 --dry-run
+# 200 + would_apply: true + diff.before for the row; nothing deleted
 ```
+
+`pricing-tiers delete` is one of the operations that does **not** accept it — `--dry-run` there fails before any request is sent. Preview its blast radius with `availabilities list --include-pricing` instead (see [pricing-tiers.md](pricing-tiers.md)).
 
 ### Output format defaults
 
 | Command kind | Default `--format` |
 |--------------|--------------------|
-| Reads (`list`, `show`, `whoami`) | `table` (human) |
+| Reads (`list`, `get`, `whoami`) | `table` (human) |
 | Mutations (`create`, `update`, `delete`, `cancel`, `refund`, `comp`, `apply`, `issue`, `void`, `resend`, `restore`, upload) | `json` (machine) |
 
 Override either way with `--format json|table|csv`. JSON is always the full envelope (`meta`, `data`, plus `pagination` on list endpoints).
@@ -122,7 +124,7 @@ Exit code is `0`. The body carries `bulk_update_id`, `total_matched`, and `statu
 bulk_id=$(
   ceebee inventory availabilities bulk-update capacity \
     --product-option-id po_42 --from 2026-05-01 --to 2026-06-01 \
-    --value 12 --operator SET 2>&1 1>/dev/null \
+    --value 12 --operator set_to 2>&1 1>/dev/null \
   | grep '^BULK_UPDATE_ACCEPTED' \
   | sed 's/.*bulk_update_id=//'
 )
@@ -199,17 +201,16 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory pricing-tiers delete <id>` | DELETE /pricing-tiers/{id} | `cli:write` | none |
 | `inventory pricing-tiers restore <id>` | POST /pricing-tiers/{id}/restore | `cli:write` | body |
 | `inventory discounts create` | POST /discounts | `cli:write` | body |
-| `inventory discounts update <id>` | PATCH /discounts/{id} | `cli:write` | body |
 | `inventory discounts delete <id>` | DELETE /discounts/{id} | `cli:write` | query |
 | `inventory discounts restore <id>` | POST /discounts/{id}/restore | `cli:write` | body |
 | `inventory discounts apply <id>` | POST /discounts/{id}/apply | `cli:write` | body |
-| `inventory gift-certificates available create` | POST /gift-certs/available | `cli:write` | body |
-| `inventory gift-certificates available update <id>` | PATCH /gift-certs/available/{id} | `cli:write` | body |
-| `inventory gift-certificates available delete <id>` | DELETE /gift-certs/available/{id} | `cli:write` | none |
-| `inventory gift-certificates issue` | POST /gift-certs/issue | `cli:write` | body |
-| `inventory gift-certificates void <id>` | POST /gift-certs/{id}/void | `cli:write` | body |
-| `inventory gift-certificates resend <id>` | POST /gift-certs/{id}/resend | `cli:write` | body |
-| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` (or `cli:write` for `refund_policy=auto`) | body |
+| `inventory gift-certificates create-available` | POST /gift-certs/available | `cli:write` | body |
+| `inventory gift-certificates update-available <id>` | PATCH /gift-certs/available/{id} | `cli:write` | body |
+| `inventory gift-certificates delete-available <id>` | DELETE /gift-certs/available/{id} | `cli:write` | none |
+| `inventory gift-certificates issue` | POST /gift-certs/issued | `cli:write` | body |
+| `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:write` | body |
+| `inventory gift-certificates resend <id>` | POST /gift-certs/issued/{id}/resend | `cli:write` | body |
+| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:write` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
 | `inventory bookings set-resources <id>` | POST /bookings/{id}/resources | `cli:write` | body |
@@ -222,12 +223,9 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory questions update <id>` | PATCH /questions/{id} | `cli:write` | body |
 | `inventory questions delete <id>` | DELETE /questions/{id} | `cli:write` | none |
 | `inventory questions restore <id>` | POST /questions/{id}/restore | `cli:write` | body |
-| `inventory categories create` | POST /categories | `cli:write` | body |
-| `inventory categories update <id>` | PATCH /categories/{id} | `cli:write` | body |
-| `inventory categories delete <id>` | DELETE /categories/{id} | `cli:write` | none |
 | `inventory media upload <product-id>` | POST /products/{id}/media | `cli:write` | none (multipart) |
 | `inventory media delete <id>` | DELETE /media/{id} | `cli:write` | none |
-| `inventory notifications resend-confirmation <booking-id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
+| `inventory notifications resend <booking-id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
 
 When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally with `"dry-run not supported for this command"` and exit code 1 — no HTTP call is made.
 

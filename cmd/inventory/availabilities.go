@@ -268,7 +268,7 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "weekdays", Type: "intSlice", Required: true, Description: "Days of week (0=Sun .. 6=Sat); comma-separated"},
 				{Name: "start-time", Type: "string", Description: "HH:MM (datetime products only)"},
 				{Name: "end-time", Type: "string", Description: "HH:MM (datetime products only)"},
-				{Name: "add-days-count", Type: "int", Description: "Multi-day events: extra days added to the `to` timestamp"},
+				{Name: "add-days-count", Type: "int", Description: "Multi-day events: extra days added to the end timestamp"},
 			},
 			ForensicFields: []string{"product-option-id", "start-date", "end-date", "weekdays", "start-time", "end-time"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {

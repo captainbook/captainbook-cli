@@ -28,6 +28,10 @@ func productsDefs() []CommandDef {
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "category", Type: "string", Description: "Filter by category slug or ID"},
+				// The list filter accepts `archived` in addition to the two
+				// states create/update can set — archived products are
+				// reachable for reads but not settable as a write target.
+				{Name: "status", Type: "string", Description: "draft|published|archived"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
@@ -44,6 +48,10 @@ func productsDefs() []CommandDef {
 				}
 				if v := args.FlagString("category"); v != "" {
 					params.Category = &v
+				}
+				if v := args.FlagString("status"); v != "" {
+					st := gen.ListProductsParamsStatus(v)
+					params.Status = &st
 				}
 				if args.FlagBool("include-trashed") {
 					t := true

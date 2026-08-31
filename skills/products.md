@@ -21,7 +21,15 @@ Products are the top of the inventory hierarchy: a Product is "a thing the tenan
 ceebee inventory products list --category 18 --include-trashed=false --limit 100
 ```
 
-Returns `{id, title, status, schedule_type, from_price, currency, is_private, ...}`. Cursor-paginate with `--cursor "<pagination.cursor_next>"`. Note: `--status` query filter is no longer in spec — published-vs-draft is exposed via `is_active` on the read response.
+Returns `{id, title, status, schedule_type, from_price, currency, is_private, ...}`. Cursor-paginate with `--cursor "<pagination.cursor_next>"`.
+
+`--status` filters server-side on `draft|published|archived`:
+
+```bash
+ceebee inventory products list --status published
+```
+
+On the response, `status` is *derived* from the canonical `is_active` column (`true` → published, `false` → draft) and `is_active` is surfaced directly for clients that prefer the boolean. Note the asymmetry: the filter accepts `archived`, but the response `status` enum is only `draft|published`, so nothing you list can come back labelled archived.
 
 ### 2. Show one product, machine-readable
 

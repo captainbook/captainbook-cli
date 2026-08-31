@@ -7,7 +7,7 @@ A `Customer` is the bookings-engine first-class customer model — the account r
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory customers list` | GET /customers | `cli:read` | n/a |
-| `inventory customers show <id>` | GET /customers/{id} | `cli:read` | n/a |
+| `inventory customers get <id>` | GET /customers/{id} | `cli:read` | n/a |
 
 ## Worked examples
 
@@ -43,7 +43,7 @@ ceebee inventory customers list \
 ### 4. Show one customer
 
 ```bash
-ceebee inventory customers show cust_42 --format json
+ceebee inventory customers get cust_42 --format json
 ```
 
 Response includes contact info + summary stats (total bookings, total spend in minor units, last-booking date).

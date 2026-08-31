@@ -7,9 +7,8 @@ A `Discount` is a promo code or auto-applied rule that reduces booking total —
 | Command | Method + path | Ability | Dry-run |
 |---------|---------------|---------|---------|
 | `inventory discounts list` | GET /discounts | `cli:read` | n/a |
-| `inventory discounts show <id>` | GET /discounts/{id} | `cli:read` | n/a |
+| `inventory discounts get <id>` | GET /discounts/{id} | `cli:read` | n/a |
 | `inventory discounts create` | POST /discounts | `cli:write` | body |
-| `inventory discounts update <id>` | PATCH /discounts/{id} | `cli:write` | body |
 | `inventory discounts delete <id>` | DELETE /discounts/{id} | `cli:write` | query |
 | `inventory discounts restore <id>` | POST /discounts/{id}/restore | `cli:write` | body |
 | `inventory discounts apply <id>` | POST /discounts/{id}/apply | `cli:write` | body |
@@ -77,6 +76,7 @@ Existing `booking_discount` pivot rows stay valid; the discount no longer applie
 ## Pitfalls
 
 - ⚠️ **`apply` returns 409 `DISCOUNT_NOT_APPLICABLE`** if any of the following: booking is cancelled/expired, the validity window doesn't include the booking date, the discount is scoped to a different `product_option_id`, or `nb_offers` is exhausted. The error envelope's `code` field is stable — branch on `DISCOUNT_NOT_APPLICABLE` rather than the human message.
+- ⚠️ **There is no `discounts update`.** The spec defines no `PATCH /discounts/{id}` — a discount is created, applied, soft-deleted, and restored, never edited in place. To change a discount's terms, delete it and create a replacement.
 - ⚠️ **`apply` does NOT issue refunds.** It updates `booking_discount` and recomputes `discount_total`. If money is now owed back, run `ceebee inventory bookings refund <booking-id> --amount <delta> --reason "discount applied retroactively"` separately.
 - ⚠️ **Soft-delete is the cancellation operation.** There is no `cancel` subcommand for discounts — `delete` is it. The `dry_run` flag for delete is a **query parameter** (`?dry_run=true`), not a body field, because the HTTP method has no body.
 - ⚠️ **Exactly-one-of constraint:** `discounted_price` and `discount_pct` are mutually exclusive — server returns 422 if both or neither are set.
