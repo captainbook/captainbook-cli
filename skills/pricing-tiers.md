@@ -164,4 +164,4 @@ ceebee inventory pricing-tiers restore 22
 
 - [pricing-categories.md](pricing-categories.md) — required parent. Read this first.
 - [product-options.md](product-options.md) — tiers belong to a category which belongs to a product, indirectly to options via product.
-- [availabilities.md](availabilities.md) — the only write path for per-slot pivot fares (`bulk-update pricing`), and the `--include-pricing` overlay for scanning a date range.
+- [availabilities.md](availabilities.md) — both write paths for per-slot pivot fares: `availabilities update <id> --fares` for exactly one slot (synchronous) and `bulk-update pricing` for a date range (async, writes every session on a matched date). Also the `--include-pricing` overlay for scanning a range.

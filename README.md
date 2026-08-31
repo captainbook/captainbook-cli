@@ -123,7 +123,7 @@ ceebee stats summary --business-unit-id 42
 
 ### `ceebee inventory` — read + write
 
-The inventory namespace covers 110+ endpoints across 19 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
+The inventory namespace covers 110+ endpoints across 21 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
 
 ```bash
 # Read
@@ -185,7 +185,7 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `answers` | list, get *(read-only; guest PII — needs `view_answers_of_booking`)* |
 | `discounts` | list, get, create, delete, apply, restore |
 | `gift-certificates` | list-available, get-available, create-available, update-available, delete-available, list-issued, get-issued, issue, void, resend |
-| `media` | list, upload, delete |
+| `media` | list, get, upload, delete |
 | `categories` | list, get *(read-only)* |
 | `notifications` | resend |
 | `workflows` | list, get, create, update, delete, restore, **activate**, **deactivate**, **trigger** (create / update), **steps** (create / update / delete) |
@@ -242,7 +242,7 @@ ceebee completion fish | source
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | CLI usage error (unknown flag, missing subcommand, dry-run not supported) |
+| 1 | CLI usage error (unknown flag, unknown command, missing subcommand, dry-run not supported) |
 | 10 | Authentication failed (401) |
 | 11 | Access denied (403) |
 | 12 | Validation error (422) |
@@ -265,9 +265,13 @@ make build-all       # Cross-compile all platforms
 make clean           # Remove binaries
 ```
 
-The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. Three CI-enforced spec-drift tests catch flag/JSON-key drift, enum-token drift, and idempotency-key threading regressions.
+The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. CI-enforced drift tests keep spec, code, and docs in sync:
 
-**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Two spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`) and nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) and a bare `type: ["null"]` have no 3.0 spelling and are left alone, so they fail codegen loudly rather than being silently mangled. Any other 3.1-only construct upstream adopts does the same.
+- `cmd/inventory/spec_drift_test.go` — three checks against the spec: flag/JSON-key drift, enum-token drift, and idempotency-key threading regressions.
+- `cmd/inventory/since_flag_test.go` — a `--since` flag must exist exactly where the spec declares the `since` query param. Both directions are silent failures: a flag the spec dropped is parsed and thrown away, handing the caller a full unfiltered page they read as an incremental sync.
+- `cmd/inventory/skills_drift_test.go` — every `ceebee inventory …` invocation in `skills/*.md` and this README must resolve against the live cobra tree, and the endpoint tables in the cookbooks must match each command's bound verb, path, ability, and dry-run mode. It also forbids the space form of a bool flag in docs: write `--flag=false`, never `--flag false`.
+
+**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Two spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`) and nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) and a bare `type: ["null"]` have no 3.0 spelling and are left alone, so they fail codegen loudly rather than being silently mangled. Any other 3.1-only construct upstream adopts does the same. The type-array rewrite checks schema *position*, not just the key name: every non-null member must be one of the seven JSON Schema type names, so an `example:` or `default:` block that happens to contain `type: [guest, "null"]` stays data instead of being collapsed and stamped with a fabricated `nullable: true`.
 
 ## AI agents
 

@@ -83,14 +83,16 @@ Every money field — `amount`, `from_price`, `discounted_price`, `refund_amount
 
 ### Dates and times
 
-- **Dates you send** (`--from` / `--to` on list and bulk endpoints) are interpreted in the tenant timezone (`Organisation.timezone`), matching against fields like `Booking.starts_at` and `Availability.date`.
+- **Dates you send** (`--from` / `--to` on list and bulk endpoints) are interpreted in the tenant timezone (`Organisation.timezone`), matching against fields like `Booking.starts_at` and `Availability.date`. One exception: `answers list` reads them in the *product's* timezone once `--product-option-id` narrows the query to a single product, because the departure column it matches stores product-local wall clock. See [answers.md](answers.md).
 - **Date ranges** on list endpoints are half-open `[from, to)`. To match April 2026 in full, pass `?from=2026-04-01&to=2026-05-01`.
 - **Date-times** (`*_at`) are UTC unless the supplied value carries an explicit `±HH:MM` offset.
 - **Trip times come back in the PRODUCT's timezone, not UTC.** `Availability.starts_at` / `ends_at` and `Booking.starts_at` / `ends_at` (read from the linked availability) are emitted with the product's UTC offset: `2026-08-04T10:00:00+01:00` is a 10:00 *local* departure for a product in `Europe/London`. Every other timestamp — `created_at`, `updated_at`, `confirmed_at`, `cancelled_at`, `expires_at`, `deleted_at` — is a genuine UTC instant emitted as `+00:00`. Availabilities with no product option behind them (e.g. resource-backed rows) have no product to attribute and fall back to `+00:00`. Normalising a whole object to UTC with one rule shifts every departure by the product's offset.
 
 ### Incremental sync (`--since`) is not universal
 
-Most list endpoints take `--since`, an ISO 8601 lower bound on `updated_at`. Five do **not**, because their tables carry no timestamp columns at all:
+`--since` is an ISO 8601 lower bound on `updated_at`, and roughly half the list endpoints have it. Never assume it: check `ceebee inventory <resource> list --help` before building a sync loop. `bookings list`, `product-options list`, `gift-certificates list-available` / `list-issued` and `workflow-executions list` have never carried one.
+
+Five endpoints are a sharper case — they **used to** take `--since` and the latest spec sync **removed** it, because their tables carry no timestamp columns at all:
 
 | Resource | Why |
 |----------|-----|
@@ -102,7 +104,7 @@ Most list endpoints take `--since`, an ISO 8601 lower bound on `updated_at`. Fiv
 
 On those five the CLI declares no `--since` flag, and the server answers `422` if you reach the parameter by other means. **That 422 is deliberate and worth understanding:** the alternative — accepting the parameter and returning an unfiltered page — is what a nightly poller would silently misread as "nothing changed since last run". Failing loudly beats a delta that is quietly the whole table.
 
-There is no incremental-sync signal for those resources. List them in full and diff client-side, or drive the sync from a related resource that does carry timestamps (e.g. reconcile guests via `bookings list --since` plus the inline `guests[]` on `bookings get`).
+There is no incremental-sync signal for those resources. List them in full and diff client-side, or narrow the set from a related resource before diffing (e.g. reconcile guests by windowing `bookings list --from` / `--to` on the booking start date and reading the inline `guests[]` off `bookings get` — a smaller diff, still a diff).
 
 One resource takes `--since` with different semantics: `media list --since` bounds `media_updated_at`, the column that endpoint publishes as `created_at`. See [media.md](media.md).
 
@@ -110,7 +112,7 @@ One resource takes `--since` with different semantics: `media list --since` boun
 
 Write `--send-now=false`, never `--send-now false`.
 
-This is not style. Every bool flag is registered with an implicit "true" default, so `--send-now false` sets the flag to **true** and leaves the bare word `false` as a stray argument. Commands that take an id catch the stray and error. Commands that take none used to swallow it silently and do the opposite of what you typed — `issue --send-now false` dispatched the redemption email it was meant to suppress, and `bulk-update booking-status --is-bookable false` re-opened the calendar it was meant to close.
+This is not style. Every bool flag is registered with an implicit "true" default, so `--send-now false` sets the flag to **true** and leaves the bare word `false` as a stray argument. Commands that take an id catch the stray and error — as long as you actually supplied the id. Omit it and the stray fills the slot instead: `bookings cancel --dry-run false` builds a request against booking id `"false"` with `dry_run: true`, which 404s rather than mis-writing, but tells you nothing about the real mistake. Commands that take no positional at all used to swallow the stray silently and do the opposite of what you typed — `issue --send-now false` dispatched the redemption email it was meant to suppress, and `bulk-update booking-status --is-bookable false` re-opened the calendar it was meant to close.
 
 Those commands now reject the stray argument with `unknown command "false"` instead of acting on the inverted value, so the mistake is loud rather than silent. The `=` form has always been correct and still is:
 
@@ -206,6 +208,7 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | Code | Meaning |
 |------|---------|
 | 0    | Success (or async-accepted; see stderr signal) |
+| 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), missing subcommand, or `--dry-run` on an operation the server can't preview |
 | 10   | Authentication failed (401) |
 | 11   | Forbidden / ability missing (403) |
 | 12   | Validation error (422) |

@@ -60,7 +60,7 @@ For nightly reconciliation, page the full set for the bookings you care about an
 ceebee inventory guests list --booking-id bk_42 --limit 200
 ```
 
-If you need "which guests changed", drive it from the booking side instead — `bookings list --since` is a real filter, and a booking's guests come back inlined on `bookings get`.
+If you need "which guests changed", drive it from the booking side instead: window with `bookings list --from` / `--to` (the booking's start date) and read the inline `guests[]` off `bookings get`. Note that `bookings list` carries no `--since` either, so this is a departure-date window, not a change feed — you still diff client-side, you just diff a smaller set.
 
 ## Pitfalls
 

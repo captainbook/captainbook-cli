@@ -61,22 +61,6 @@ in a dedicated test.
 **Why:** the guard's coverage silently ends where the code stops using the helper.
 **Priority:** P2 — same blast radius as any other renamed body key.
 
-## speccompat rewrites `type:` sequences without checking schema position
-
-`rewriteNullableTypeArray` matches any mapping key literally named `type` whose
-value is a sequence, anywhere in the document — including inside an `example:`,
-`default:`, or `x-` extension object where `type` is DATA, not a schema keyword.
-An upstream `example: {type: [image, 'null']}` would be silently rewritten to
-`type: image` plus a spurious `nullable: true` injected into the example. Not
-reachable today (the vendored spec has exactly two `type: [` occurrences, both
-in schema position), but silent mangling is precisely what the tool's
-narrow-scope design promises not to do.
-
-**Fix:** gate the rewrite on the enclosing mapping looking like a schema, or on
-not being nested under `example:` / `default:`; add a passthrough test case.
-**Why:** violates the shim's own "fail loudly rather than mangle" contract.
-**Priority:** P3 — not reachable with the current upstream spec.
-
 ## Upstream: `/answers` types two ids as integer, inconsistent with every other endpoint
 
 `GET /answers` declares `question_id` and `product_option_id` as
@@ -108,6 +92,27 @@ positional on ANY command, replacing the plain `ExactArgs` / `NoArgs` pair.
 **Why:** the space-form bool trap has one corner left.
 **Priority:** P3 — degrades to a 404, not a wrong write.
 
+## ~~speccompat rewrites `type:` sequences without checking schema position~~ — DONE
+
+`rewriteNullableTypeArray` matched any mapping key literally named `type` whose
+value was a sequence, anywhere in the document — including inside an `example:`,
+`default:`, or `x-` extension object where `type` is DATA, not a schema keyword.
+An upstream `example: {type: [guest, 'null']}` would have been collapsed to
+`type: guest` with a fabricated `nullable: true` injected into the operator's
+example. Not contrived for this spec: `granularity` is enum
+`[booking, guest, extra]`.
+
+Fixed by requiring every non-null member of the sequence to be one of the seven
+JSON Schema type names (`isJSONSchemaTypeName` in `tools/speccompat/main.go`)
+before rewriting. It costs nothing on real schemas — a nullable type-array has
+no other legal spelling — and makes the package's "fail loudly rather than
+mangle" promise true for arbitrary upstream input. Covered by the
+`type sequence under example: is data, not a schema keyword` passthrough case in
+`tools/speccompat/main_test.go`.
+
+Generalises: any YAML/JSON transform keyed on a bare key NAME needs a
+position/context check, because spec key names recur as data.
+
 ## ~~Docs/code drift tests (skills + README)~~ — DONE
 
 Implemented as `cmd/inventory/skills_drift_test.go`. Complements
@@ -133,6 +138,12 @@ checks the **docs** against the command tree the CLI actually builds
 - `TestSpecQueryParamsAreExposedAsFlags`: every GET's spec query params must
   have a flag or an entry in `intentionallyUnexposedQueryParams` **with a
   reason**, so a spec re-sync can't quietly add an unreachable filter.
+- `TestDocsNeverUseSpaceFormBoolFlags`: no doc may print the space form of a
+  bool flag (`--flag false`), which pflag parses as `--flag=true` plus a stray
+  positional. Doc-driven rather than grep-driven: it resolves each invocation
+  against the real cobra tree and asks the flag whether it is actually a bool,
+  so a string flag legitimately taking the literal word `true` is not
+  false-positived. 18 doc invocations were rewritten to the `=` form.
 - `TestFlagDescriptionsHaveNoBackquotes`: cobra's `UnquoteUsage()` turns the
   first backquoted word of a description into the flag's value placeholder,
   so ``persisted as `fare` `` rendered as `--amount fare` instead of

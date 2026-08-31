@@ -32,7 +32,7 @@ ceebee inventory answers list \
          | [.answerable_type, .answerable_id, .answer] | @tsv'
 ```
 
-`--from` / `--to` bound the **trip's departure**, not when the answer was written. They are read in the tenant's timezone, or in the product's when `--product-option-id` narrows the query to one — the same rule `bookings list --date-field starts_at` follows, because `availabilities.from` stores product-local wall clock.
+`--from` / `--to` bound the **trip's departure**, not when the answer was written. They are read in the tenant's timezone, or in the product's when `--product-option-id` narrows the query to one — because `availabilities.from` stores product-local wall clock, so once the query is pinned to a single product there is a more specific clock to read them against.
 
 ### 2. One booking's answers
 
@@ -99,6 +99,7 @@ ceebee inventory answers list --booking-id bk_42 --include-trashed
 ## Pitfalls
 
 - ⚠️ **This is PII, and it is gated separately for that reason.** Passport numbers, dates of birth, nationalities, medical notes. `view_answers_of_booking` is not implied by `cli:read`. Don't dump this into a shared channel or a log.
+- ⚠️ **`--question-id` and `--product-option-id` are NUMERIC here, unlike everywhere else.** The spec types them `integer` on `/answers` while `Question.id`, `ProductOption.id` and `GET /questions?product_option_id` are all strings, so the prefixed ids the rest of these cookbooks use do not carry over: `answers list --product-option-id po_88` is a parse error where `availabilities list --product-option-id po_88` works. Pass the bare number. Tracked in TODOS.md as an upstream spec inconsistency.
 - ⚠️ **`--from` / `--to` bound the DEPARTURE; `--since` bounds `updated_at`.** Reaching for `--from` to mean "answered since" silently returns the wrong set — it filters on when the trip leaves, not when the customer typed.
 - ⚠️ **`answerable_id` is not guaranteed to resolve.** `answers` is constrained on `booking_id` only — the polymorphic `answerable` pair has no foreign key — and rescheduling a booking replicates answers **without remapping guest ids**. So a guest-granularity answer on a rescheduled booking can point at the original booking's now-gone guest. The answer text is still correct and still attributable to the booking; only the per-guest attribution is lost. Treat an unresolved `answerable_id` as "unknown guest", not as an error.
 - ⚠️ **A manifest for a past departure can come back short with no warning** if the operator has since retired the question. Pass `--include-trashed` on any historical read.
