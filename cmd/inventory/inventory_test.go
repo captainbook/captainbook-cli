@@ -1429,3 +1429,58 @@ func TestMultipartUpload_ForensicSummaryRecordsOptionalFields(t *testing.T) {
 	}
 }
 
+// TestLeafCommandsRejectStrayPositionals locks the guard that turns a
+// silently-inverted bool flag into a loud error.
+//
+// pflag gives every bool NoOptDefVal="true", so `--send-now false` sets the
+// flag TRUE and leaves "false" as a positional. Under cobra's default
+// (ArbitraryArgs) an argument-less command swallowed that token and did the
+// opposite of what the operator typed — `gift-certificates issue --send-now
+// false` dispatched the redemption email the flag exists to suppress, and it
+// returned 0. bindCommands now binds cobra.NoArgs on every leaf that
+// declares no positionals.
+//
+// This walks the REAL tree from Cmd() rather than a hand-built list, so a
+// resource added later cannot opt out of the guard by being forgotten.
+func TestLeafCommandsRejectStrayPositionals(t *testing.T) {
+	var leaves []*cobra.Command
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		if !c.HasSubCommands() {
+			if c.Runnable() {
+				leaves = append(leaves, c)
+			}
+			return
+		}
+		for _, child := range c.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+	if len(leaves) == 0 {
+		t.Fatal("no runnable leaf commands found — tree walker broken")
+	}
+
+	checked := 0
+	for _, c := range leaves {
+		if c.Args == nil {
+			t.Errorf("%s: Args validator is nil — cobra defaults to ArbitraryArgs, so a "+
+				"stray token from `--boolflag false` would be swallowed silently", c.CommandPath())
+			continue
+		}
+		// Feed the validator one more argument than the command declares.
+		// ExactArgs(n) commands get n+1; NoArgs commands get 1.
+		n := strings.Count(c.Use, "<")
+		args := make([]string, n+1)
+		for i := range args {
+			args[i] = "false" // the exact token a space-form bool leaves behind
+		}
+		if err := c.Args(c, args); err == nil {
+			t.Errorf("%s: accepted %d positional args (declares %d) — a stray `false` from "+
+				"`--boolflag false` would be silently swallowed and the flag would read true",
+				c.CommandPath(), len(args), n)
+		}
+		checked++
+	}
+	t.Logf("verified %d leaf commands reject stray positionals", checked)
+}

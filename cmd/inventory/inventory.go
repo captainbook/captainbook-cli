@@ -629,9 +629,30 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 			declareFlag(c, fd)
 		}
 
-		// Positional args.
+		// Positional args. A command that declares none accepts NONE —
+		// cobra's default is ArbitraryArgs, which silently swallows stray
+		// tokens, and that silence is load-bearing in the worst way here.
+		//
+		// pflag registers every bool with NoOptDefVal="true", so
+		// `--send-now false` parses the FLAG as true and leaves the word
+		// "false" as a positional. Under ArbitraryArgs that token vanishes
+		// and the command does the exact opposite of what the operator
+		// typed: `gift-certificates issue --send-now false` dispatches the
+		// redemption email the flag was meant to suppress, and
+		// `bulk-update booking-status --is-bookable false` re-opens the
+		// calendar it was meant to close. Commands that DO declare
+		// positionals were already safe by accident — ExactArgs caught the
+		// stray token — which is why this only ever bit the argument-less
+		// mutations.
+		//
+		// NoArgs turns that silence into "unknown command \"false\"".
+		// Only leaves come through bindCommands; resource parents are
+		// built separately (makeResourceParent, bulkUpdateCmd, mediaCmd)
+		// and keep their subcommand routing.
 		if n := len(def.PositionalArgs); n > 0 {
 			c.Args = cobra.ExactArgs(n)
+		} else {
+			c.Args = cobra.NoArgs
 		}
 
 		// Annotate ability in --help so users see at a glance what the
