@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -22,13 +21,21 @@ func pricingTiersDefs() []CommandDef {
 		{
 			Use: "pricing-tiers list", Short: "List pricing tiers", Kind: KindRead,
 			Verb: "GET", Path: "/pricing-tiers", Ability: invpkg.Read,
+			// NOTE: no --since. The `pricing_tiers` table carries no
+			// created_at / updated_at columns at all, so there is nothing for
+			// the filter to bound — `/pricing-tiers` REMOVED the parameter and now
+			// answers 422. That 422 is deliberate on the server's part: a
+			// silently-unfiltered page is what a polling client would
+			// misread as "nothing changed since last run". There is no
+			// incremental-sync signal here; list in full and diff
+			// client-side. Re-adding the flag would not compile —
+			// gen.ListPricingTiersParams has no Since field.
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int", Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "string", Description: "Filter by parent product (via the pricing_category relation). Mutually exclusive with --availability-id."},
 				{Name: "availability-id", Type: "string", Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto the tier's amount and adds default_amount/is_override. Mutually exclusive with --product-id (combining the two returns 422)."},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
-				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				// Client-side gate for the documented 422: `product_id` and
@@ -54,13 +61,6 @@ func pricingTiersDefs() []CommandDef {
 				if args.FlagBool("include-trashed") {
 					t := true
 					p.IncludeTrashed = &t
-				}
-				if v := args.FlagString("since"); v != "" {
-					t, err := time.Parse(time.RFC3339, v)
-					if err != nil {
-						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
-					}
-					p.Since = &t
 				}
 				resp, err := r.Client.ListPricingTiersWithResponse(ctx, p)
 				if err != nil {

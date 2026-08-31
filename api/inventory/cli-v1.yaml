@@ -18,6 +18,32 @@ info:
     - **Auth:** Sanctum personal-access-token in `Authorization: Bearer <token>`.
       Per-token `expires_at` is enforced framework-side by Sanctum 4's
       `Guard::isValidAccessToken()`.
+    - **Authorization:** the token's abilities (`cli:read` / `cli:write` /
+      `cli:cs`) decide which endpoints are reachable; the *permissions of the
+      user the token was issued to* decide which data comes back. Every
+      endpoint runs the same policy the web UI runs for that resource — a
+      caller without `view_any_booking` gets `403 FORBIDDEN` on
+      `GET /bookings` even with a valid `cli:read` token. Two consequences
+      worth designing for:
+        - A caller holding `view_own_booking` (declared `exclusive_of`
+          `view_any_booking`) sees only the bookings their linked resource is
+          assigned to. List endpoints return a smaller page rather than a 403.
+        - `Booking.customer.name` / `.email` / `.phone` and the inline
+          `guests` array are withheld from a caller without
+          `view_booker_of_booking` (`customer.id` survives, so the payload
+          stays joinable); `total_amount` / `paid_amount` / `refunded_amount` /
+          `transactions` are null/empty without `see_money_of_booking`; and
+          `answers` is null without `view_answers_of_booking`. The keys are
+          always present; only the values are withheld.
+        - The dedicated child endpoints agree with those field gates rather
+          than letting a caller walk around them: `GET /transactions` also
+          requires `see_money_of_booking`, and `GET /guests` also requires
+          `view_booker_of_booking`. A guest outside the caller's business unit
+          or assigned trips reads as `404 NOT_FOUND`, not `403`, so the id
+          space is not enumerable.
+      `403 FORBIDDEN` is omitted from individual operation definitions to keep
+      the spec terse but applies to every endpoint; consult the `Forbidden`
+      shared response for the body shape.
     - **Money:** integer minor units (`15000` = 150.00 EUR; `15000` = 150 JPY).
       Currency is the tenant's currency, surfaced via `meta.currency`.
     - **Translatable fields:** API responses always return the English
@@ -52,6 +78,15 @@ info:
       the tenant's configured timezone (`Organisation.timezone`). Date-time-typed
       filters (e.g. `Transaction.created_at`) are UTC unless the supplied value
       carries an explicit `±HH:MM` offset.
+    - **Timezones in responses:** trip times (`Availability.starts_at` /
+      `ends_at`, and `Booking.starts_at` / `ends_at`, which are read from the
+      linked availability) are emitted with the **product's** UTC offset —
+      `2026-08-04T10:00:00+01:00` is a 10:00 local departure for a product in
+      `Europe/London`. Every other timestamp (`created_at`, `updated_at`,
+      `confirmed_at`, `cancelled_at`, `expires_at`, `deleted_at`, …) is a
+      genuine UTC instant emitted as `+00:00`. Availabilities not backed by a
+      product option (e.g. resource-backed rows) have no product to attribute,
+      so they fall back to `+00:00`.
 
     ## What this API is NOT
 
@@ -514,8 +549,38 @@ paths:
       operationId: updateAvailability
       summary: Update a single availability row
       description: |
-        Updates capacity and/or status on a single availability. For multi-row
-        updates spanning a date range, use `POST /availabilities/bulk-update`.
+        Updates capacity, status and/or per-slot pricing overrides on a single
+        availability. For multi-row updates spanning a date range, use
+        `POST /availabilities/bulk-update` — but note that endpoint is
+        date-range scoped, so on a date carrying several sessions it writes
+        every one of them. This is the only way to reprice exactly one slot.
+
+        **`fares[]` writes `availability_pricing_tier` for this slot only.**
+        An entry with `amount: null` DELETES the override row so the slot
+        follows the catalogue price again. Writing the catalogue value is not
+        a substitute: the pivot row survives, `is_override` stays true, and
+        the slot silently keeps the old number the next time the tier is
+        repriced. Tiers not listed are left alone.
+
+        Returns 422 when a `pricing_tier_id` belongs to another product's
+        ladder, or when the availability is not attached to a ProductOption
+        (a Resource availability has no pricing tiers).
+
+        When `fares` is present, `diff.before` / `diff.after` carry the
+        availability with its `pricing_tiers[]` overlay so the effective
+        amount and `is_override` can be compared either side of the write.
+
+        **Atomic.** A request carrying `capacity`/`status` AND `fares` commits
+        both halves in one transaction, so a failure cannot leave the field
+        change applied and the pricing write missing.
+
+        A committed fare change then dispatches `PriceScheduleUpdated` so the
+        channel managers pick it up the same way they do for a bulk reprice.
+        That fan-out is **best-effort and runs after the commit** — a failing
+        listener is reported, not surfaced, because turning an applied write
+        into a 500 would invite a retry against state that already moved. A
+        200 therefore means the fare is stored, not that the channels have
+        been told.
       tags: [Availabilities]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -743,6 +808,20 @@ paths:
             queued). The no-op response carries `status: "no_op"` and
             `bulk_update_id: null` — clients should NOT poll for completion
             in that case.
+
+            **`setting=pricing` dry-runs carry a real diff.** `total_matched`
+            on its own is just the date-range row count — identical whether
+            the proposed amount matches the current fare or is wildly
+            different — so it cannot answer "will this change anything?".
+            A pricing preview adds `total_changed` (matched slots whose
+            effective price or pinned/unpinned state would move, counted over
+            the WHOLE range) plus `diff.before` / `diff.after`, which list the
+            first `preview_limit` matched slots with their current and
+            proposed fares. `preview_truncated` is true when the range is
+            longer than that listing; the counts still cover everything.
+
+            A slot that has no override today and is being written to the
+            catalogue value still counts as changed: the write pins it.
           content:
             application/json:
               schema:
@@ -756,9 +835,35 @@ paths:
                           - type: object
                             properties:
                               total_matched: { type: integer }
+                              total_changed:
+                                type: integer
+                                description: "`setting=pricing` dry-run only. Matched slots whose fares would actually move."
+                              preview_limit:
+                                type: integer
+                                description: "`setting=pricing` dry-run only. How many slots `diff` spells out."
+                              preview_truncated:
+                                type: boolean
+                                description: "`setting=pricing` dry-run only. True when more slots matched than `diff` lists."
                               status:
                                 type: string
                                 enum: [preview, no_op]
+                              diff:
+                                type: object
+                                nullable: true
+                                description: "`setting=pricing` dry-run only; null for every other setting."
+                                properties:
+                                  before:
+                                    type: object
+                                    properties:
+                                      availabilities:
+                                        type: array
+                                        items: { $ref: "#/components/schemas/AvailabilityFarePreview" }
+                                  after:
+                                    type: object
+                                    properties:
+                                      availabilities:
+                                        type: array
+                                        items: { $ref: "#/components/schemas/AvailabilityFarePreview" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
@@ -860,12 +965,19 @@ paths:
         Pricing categories are the parent buckets (`Adults`, `Children`, etc.)
         that pricing tiers attach to. Filter by `product_id` to scope to a
         single product.
+
+        **No `since`.** The `pricing_categories` table carries no `created_at` /
+        `updated_at` columns at all, so there is nothing for `since` to bound.
+        Sending it returns 422 — deliberately, rather than a silently
+        unfiltered page that a polling client would read as a delta. The
+        `created_at` / `updated_at` fields on the response are always null for
+        the same reason. There is no incremental-sync signal for this
+        resource: list it in full and diff client-side.
       tags: [PricingCategories]
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/IncludeTrashed"
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Since"
         - name: product_id
           in: query
           schema: { type: string }
@@ -877,6 +989,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PricingCategoryPage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
     post:
       operationId: createPricingCategory
@@ -1030,12 +1143,19 @@ paths:
         Combining `product_id` and `availability_id` returns 422 — they
         describe overlapping scopes and silently picking one would hide
         the conflict.
+
+        **No `since`.** The `pricing_tiers` table carries no `created_at` /
+        `updated_at` columns at all, so there is nothing for `since` to bound.
+        Sending it returns 422 — deliberately, rather than a silently
+        unfiltered page that a polling client would read as a delta. The
+        `created_at` / `updated_at` fields on the response are always null for
+        the same reason. There is no incremental-sync signal for this
+        resource: list it in full and diff client-side.
       tags: [PricingTiers]
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/IncludeTrashed"
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Since"
         - name: product_id
           in: query
           schema: { type: string }
@@ -1055,6 +1175,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PricingTierPage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
     post:
       operationId: createPricingTier
@@ -2071,15 +2192,114 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /answers:
+    get:
+      operationId: listAnswers
+      summary: List answers to custom booking questions
+      description: |
+        Cross-booking read of what customers answered. `GET /bookings/{id}`
+        already returns one booking's answers inline; this exists for the
+        manifest-shaped question — "what are tomorrow's dietary requirements
+        across every booking on the 09:00 departure?" — which would otherwise
+        cost one call per booking.
+
+        Requires `view_answers_of_booking` in addition to `view_any_booking`.
+        This is guest PII (passport numbers, dates of birth, nationalities,
+        dietary and medical notes), not inventory data, and it is gated
+        separately for that reason. A caller restricted to `view_own_booking`
+        sees only answers on the trips they are assigned to, matching
+        `GET /bookings`.
+      tags: [Bookings]
+      parameters:
+        - { in: query, name: booking_id, schema: { type: string }, description: "Answers on one booking." }
+        - { in: query, name: question_id, schema: { type: integer }, description: "Answers to one question, across bookings." }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [booking, guest, extra] }
+          description: "Filter by the linked question's granularity. See `Question.granularity`."
+        - { in: query, name: product_option_id, schema: { type: integer }, description: "Answers on bookings for one product option." }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+          description: |
+            Inclusive lower bound on the trip's DEPARTURE, not on when the
+            answer was written. Interpreted in the tenant's timezone, or in the
+            product's when `product_option_id` narrows the query to one — the
+            same rule `GET /bookings?date_field=starts_at` follows, because
+            `availabilities.from` stores product-local wall clock.
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+          description: "Exclusive upper bound on the trip's departure. See `from`."
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+          description: "Answers updated at or after this instant. Unlike `from`/`to` this is a genuine UTC bound against `updated_at`."
+        - in: query
+          name: include_trashed
+          schema: { type: boolean, default: false }
+          description: |
+            Include answers to retired questions. `Question` soft-deletes and
+            cascade-soft-deletes its answers, so retiring a custom question
+            hides every historical answer to it. Without this flag a manifest
+            query for a past departure comes back short with nothing to say so.
+            Lifts the scope on the linked question too, so restored rows keep
+            a readable `label`.
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Answer" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /answers/{id}:
+    get:
+      operationId: getAnswer
+      summary: Get one answer
+      description: "Same permissions and scoping as `GET /answers`."
+      tags: [Bookings]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Answer" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /guests:
     get:
       operationId: listGuests
       summary: List guests
+      description: |
+        **No `since`.** The `guests` table carries no `created_at` /
+        `updated_at` columns at all, so there is nothing for `since` to bound.
+        Sending it returns 422 — deliberately, rather than a silently
+        unfiltered page that a polling client would read as a delta. The
+        `created_at` / `updated_at` fields on the response are always null for
+        the same reason. There is no incremental-sync signal for this
+        resource: list it in full and diff client-side.
       tags: [Guests]
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Since"
         - name: booking_id
           in: query
           schema: { type: string }
@@ -2091,6 +2311,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/GuestPage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /guests/{id}:
     get:
@@ -2266,12 +2487,19 @@ paths:
     get:
       operationId: listQuestions
       summary: List booking questions
+      description: |
+        **No `since`.** The `questions` table carries no `created_at` /
+        `updated_at` columns at all, so there is nothing for `since` to bound.
+        Sending it returns 422 — deliberately, rather than a silently
+        unfiltered page that a polling client would read as a delta. The
+        `created_at` / `updated_at` fields on the response are always null for
+        the same reason. There is no incremental-sync signal for this
+        resource: list it in full and diff client-side.
       tags: [Questions]
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/IncludeTrashed"
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Since"
         - name: product_option_id
           in: query
           schema: { type: string }
@@ -2286,6 +2514,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuestionPage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
     post:
       operationId: createQuestion
@@ -2386,11 +2615,18 @@ paths:
     get:
       operationId: listCategories
       summary: List categories
+      description: |
+        **No `since`.** The `product_categories` table carries no `created_at` /
+        `updated_at` columns at all, so there is nothing for `since` to bound.
+        Sending it returns 422 — deliberately, rather than a silently
+        unfiltered page that a polling client would read as a delta. The
+        `created_at` field on the response is always null for the same reason
+        (there is no `updated_at` field at all). There is no incremental-sync
+        signal for this resource: list it in full and diff client-side.
       tags: [Categories]
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Since"
       responses:
         "200":
           description: Page of categories
@@ -2399,6 +2635,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CategoryPage"
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /categories/{id}:
     get:
@@ -2746,6 +2983,7 @@ paths:
         - $ref: "#/components/parameters/IdPath"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/SinceMediaUpdatedAt"
       responses:
         "200":
           description: Page of media
@@ -3734,7 +3972,23 @@ components:
     Since:
       name: since
       in: query
-      description: ISO 8601 lower-bound on `updated_at`
+      description: >-
+        ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose
+        table actually carries timestamps — `questions`, `pricing-categories`,
+        `pricing-tiers`, `guests` and `categories` have no `updated_at` column
+        and refuse the parameter with 422 instead of returning an unfiltered
+        page.
+      schema:
+        type: string
+        format: date-time
+    SinceMediaUpdatedAt:
+      name: since
+      in: query
+      description: >-
+        ISO 8601 lower-bound on `media_updated_at` — the column this endpoint
+        publishes as the resource's `created_at`. `product_attachments` carries
+        no Laravel timestamps, so it has no `updated_at` to bound; that is why
+        this endpoint does not use the shared `Since` parameter.
       schema:
         type: string
         format: date-time
@@ -4134,6 +4388,12 @@ components:
         listed a `start_time` "09:30"-style field that the resource has
         never emitted.
 
+        The offset on those two is the **product's**, not UTC: the `from` /
+        `to` columns store product-local wall clock, so a 10:00 departure
+        for a `Europe/London` product is `2026-08-04T10:00:00+01:00`. The
+        remaining timestamps on this object are real UTC instants. Rows
+        with no product option behind them fall back to `+00:00`.
+
         `status` is a coarse two-state projection of `is_open_for_booking`
         — `available` when the operator has the slot open, `blocked` when
         closed. `sold_out` / `cancelled` are not surfaced here; saturation
@@ -4148,8 +4408,8 @@ components:
           nullable: true
           description: "Null when the underlying availability is attached to a non-ProductOption bookable (e.g. a Resource)."
         date: { type: string, format: date, nullable: true, description: "Local-date portion of `starts_at`." }
-        starts_at: { type: string, format: date-time, nullable: true, description: "ISO 8601 datetime; maps to the model's `from` column." }
-        ends_at: { type: string, format: date-time, nullable: true, description: "ISO 8601 datetime; maps to the model's `to` column." }
+        starts_at: { type: string, format: date-time, nullable: true, description: "ISO 8601 datetime in the product's timezone; maps to the model's `from` column." }
+        ends_at: { type: string, format: date-time, nullable: true, description: "ISO 8601 datetime in the product's timezone; maps to the model's `to` column." }
         capacity: { type: integer, nullable: true }
         capacity_remaining: { type: integer, nullable: true, description: "Maps to the model's `vacancies` column." }
         status:
@@ -4182,6 +4442,10 @@ components:
         Parent bucket that one or more `PricingTier` rows live under. Carries
         the named label (`Adults`, `Children`, ...) — translatable, returned
         in English. Soft-deleted rows cascade-delete their pricing tiers.
+
+        The `pricing_categories` table carries no timestamp columns, so
+        `created_at` / `updated_at` are always null and
+        `GET /pricing-categories?since=` is refused with 422.
       properties:
         id: { type: string }
         product_id: { type: string, nullable: true }
@@ -4194,8 +4458,8 @@ components:
         max_age: { type: integer, nullable: true }
         is_internal: { type: boolean, nullable: true, description: "Internal categories are excluded from public-facing checkout flows." }
         deleted_at: { type: string, format: date-time, nullable: true }
-        created_at: { type: string, format: date-time, nullable: true }
-        updated_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `pricing_categories`." }
+        updated_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `pricing_categories`." }
 
     PricingTier:
       type: object
@@ -4205,7 +4469,9 @@ components:
         parent `PricingCategory` (carries `name` + `product_id`). Tiers
         describe a headcount band (`min`/`max`) and a `fare` (surfaced as
         `amount`). Currency is tenant-level and not stored per row;
-        defaults to `EUR`.
+        defaults to `EUR`. The table carries no timestamp columns, so
+        `created_at` / `updated_at` are always null and
+        `GET /pricing-tiers?since=` is refused with 422.
 
         **Availability scoping.** When the request supplies
         `availability_id` (either as a query filter on `/pricing-tiers` or
@@ -4230,11 +4496,20 @@ components:
           description: "Catalogue price (`pricing_tiers.fare`). Only present when availability-scoped — compare against `amount` to detect overrides."
         is_override:
           type: boolean
-          description: "True iff an `availability_pricing_tier` pivot row exists for the scoping availability. Only present when availability-scoped."
+          description: |
+            True iff an `availability_pricing_tier` pivot row exists for the
+            scoping availability. Only present when availability-scoped.
+
+            Writing the catalogue price does NOT clear this — the row survives
+            and the slot stays pinned to a number that will not follow the next
+            catalogue reprice. To clear it, send `amount: null` for that tier
+            via `PATCH /availabilities/{id}` (one slot) or
+            `POST /availabilities/bulk-update` with `setting=pricing` (a date
+            range).
         currency: { type: string, description: "Tenant currency; defaults to `EUR`." }
         deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
-        created_at: { type: string, format: date-time, nullable: true }
-        updated_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `pricing_tiers`." }
+        updated_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `pricing_tiers`." }
 
     EmbeddedPricingTier:
       type: object
@@ -4433,6 +4708,11 @@ components:
         availability_id: { type: string }
         customer:
           type: object
+          nullable: true
+          description: |
+            Null when the booking has no linked Customer, OR when the caller
+            lacks the `view_booker_of_booking` permission. The key is always
+            present; only the value is withheld.
           properties:
             id: { type: string }
             name: { type: string }
@@ -4443,22 +4723,64 @@ components:
           items: { $ref: "#/components/schemas/Guest" }
         transactions:
           type: array
+          description: |
+            Empty for a caller without the `see_money_of_booking` permission —
+            an amount, currency or payment method must not leak through a
+            partially-redacted row.
           items: { $ref: "#/components/schemas/Transaction" }
+        answers:
+          # `type: [array, 'null']`, not `nullable: true`. This document is
+          # OpenAPI 3.1, where `nullable` was removed from the specification
+          # and is silently ignored — a generator would emit a non-nullable
+          # array while this endpoint really can return null, and the client
+          # would break on the first permission-denied read. The rest of the
+          # file still uses the 3.0 `nullable` idiom; that is a pre-existing
+          # inconsistency worth sweeping separately, not a reason to add
+          # another instance of it on a field that genuinely returns null.
+          type: [array, 'null']
+          description: |
+            The customer's answers to the operator's custom booking questions.
+            Present on `GET /bookings/{id}` only — deliberately absent from
+            `GET /bookings`, because answers routinely carry passport numbers,
+            dates of birth and dietary/medical notes and a paginated list
+            carrying them would be a bulk PII export. Ordered by `question_id`,
+            then by `answerable_type` / `answerable_id` / `id` so repeated
+            reads of the same booking are byte-stable.
+
+            Requires the `view_answers_of_booking` permission, which is
+            separate from the rest of the read tier precisely because this is
+            guest PII rather than inventory data. Distinguish the two empty
+            cases:
+
+            - `[]` — you may see answers; this booking has none.
+            - `null` — you may NOT see answers. The server does not even read
+              them from the database in this case.
+          items: { $ref: "#/components/schemas/Answer" }
         total_amount:
-          $ref: "#/components/schemas/Money"
-          description: Sourced from `bookings.gross_price` (booking-level total).
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+          description: |
+            Sourced from `bookings.gross_price` (booking-level total).
+            Null for a caller without the `see_money_of_booking` permission.
         paid_amount:
-          $ref: "#/components/schemas/Money"
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
           description: |
             Sum of charge `BookingTransaction.amount` (rows with
             `refund_for IS NULL`). Computed at serialization time from
             eager-loaded transactions.
+            Null for a caller without the `see_money_of_booking` permission.
         refunded_amount:
-          $ref: "#/components/schemas/Money"
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
           description: |
             Absolute sum of refund `BookingTransaction.amount` (rows with
             `refund_for IS NOT NULL`). Refunds are stored negative; the
             response value is positive.
+            Null for a caller without the `see_money_of_booking` permission.
         discount_total:
           $ref: "#/components/schemas/Money"
           description: |
@@ -4473,8 +4795,20 @@ components:
             pivot rows (with `applied_at` timestamps). Updated by
             `POST /discounts/{id}/apply`.
         currency: { type: string }
-        starts_at: { type: string, format: date-time }
-        ends_at: { type: string, format: date-time, nullable: true }
+        starts_at:
+          type: string
+          format: date-time
+          description: |
+            Trip start, read from the linked availability's `from` column and
+            emitted with the **product's** UTC offset — not UTC. A 10:00
+            departure for a `Europe/London` product is
+            `2026-08-04T10:00:00+01:00`. The booking's own timestamps below
+            (`confirmed_at`, `cancelled_at`, `created_at`, …) are real UTC.
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Trip end, in the product's timezone. See `starts_at`."
         held_until: { type: string, format: date-time, nullable: true }
         confirmed_at:
           type: string
@@ -4563,6 +4897,10 @@ components:
 
     Guest:
       type: object
+      description: |
+        Mirrors `GuestResource::toArray()`. The `guests` table carries no
+        timestamp columns, so `created_at` / `updated_at` are always null and
+        `GET /guests?since=` is refused with 422.
       properties:
         id: { type: string }
         booking_id: { type: string }
@@ -4575,6 +4913,8 @@ components:
         custom_attributes:
           type: object
           additionalProperties: true
+        created_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `guests`." }
+        updated_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `guests`." }
 
     Extra:
       type: object
@@ -4603,6 +4943,96 @@ components:
         created_at: { type: string, format: date-time, nullable: true }
         updated_at: { type: string, format: date-time, nullable: true }
 
+    Answer:
+      type: object
+      description: |
+        Mirrors `AnswerResource::toArray()`. One customer response to one
+        custom booking `Question`. Returned inline on `GET /bookings/{id}`.
+
+        `granularity` and `answerable_type` answer different questions and can
+        legitimately disagree. `granularity` (copied from the Question) says
+        what the operator asked about; `answerable_type` says which row the
+        answer physically hangs off, for joining. Booking-granularity answers
+        are persisted against the *booker* — `granularity: booking` pairs with
+        `answerable_type: customer`, never `booking`.
+      properties:
+        id: { type: string }
+        question_id: { type: string, nullable: true }
+        label: { type: string, nullable: true, description: "The question text, denormalised from the linked Question so the answer is readable without a second call. Null if the question row is unavailable." }
+        type:
+          type: string
+          nullable: true
+          enum: [short_text, long_text, number, decimal_number, boolean, date, datetime, time, list, country, location_list, name, email, phone, birthdate]
+          description: |
+            The linked Question's `answer_type`. Needed to interpret `answer`:
+            `boolean` answers serialize as the string `"1"` / `"0"`, and
+            `country` answers as an ISO-3166 alpha-3 code, not a display name.
+        granularity:
+          type: string
+          nullable: true
+          enum: [booking, guest, extra]
+          description: "Copied from the linked Question. See `Question.granularity`."
+        answerable_type:
+          type: string
+          nullable: true
+          enum: [customer, guest, extra]
+          description: |
+            Snake-cased basename of the `answerable` morph target — the row
+            this answer hangs off. `customer` for booking-granularity answers
+            (the booker), `guest` for per-guest, `extra` for per-extra. An
+            unrecognised morph target degrades to its snake-cased basename
+            rather than null, so the enum is indicative rather than closed.
+        answerable_id:
+          type: string
+          nullable: true
+          description: |
+            Id of the `answerable_type` row. Join against the booking's inline
+            `guests[].id` for guest-granularity answers, or `customer.id` for
+            booking-granularity ones.
+
+            The join is NOT guaranteed to resolve. `answers` is constrained on
+            `booking_id` only — the polymorphic `answerable` pair has no
+            foreign key — and rescheduling a booking replicates answers without
+            remapping guest ids, so a guest-granularity answer on a rescheduled
+            booking can still point at the original booking's (now gone) guest.
+            The answer text is still correct and attributable to the booking;
+            only the per-guest attribution is lost. Treat an unresolved
+            `answerable_id` as "unknown guest", not as an error.
+        answer:
+          type: string
+          description: |
+            The answer flattened to a single display string. Always a string;
+            empty when the stored value is null. Extra-granularity answers
+            store one entry per purchased unit and flatten to a comma-joined
+            list here — use `answer_raw` to recover the per-unit structure.
+
+            Close to, but deliberately NOT identical to, how
+            `GetAnswersAction::normaliseAnswerToString` renders the same answer
+            for workflows and manifests. Two values differ, both in this
+            surface's favour: boolean `false` is `"0"` here and `""` there
+            (that method casts with `(string)`, and `(string)false` is the
+            empty string), and a nested array without an `answer` key is
+            flattened recursively here but stringifies to the literal `"Array"`
+            there. Do not assume the two surfaces agree byte-for-byte.
+        answer_raw:
+          oneOf:
+            - type: string
+            - type: array
+              items: {}
+            - type: boolean
+            - type: number
+            - type: 'null'
+          description: |
+            The stored answer decoded verbatim from its JSON column, with no
+            flattening. Usually a string; an array of `{quantity, answer}`
+            objects for extra-granularity answers. The column accepts any JSON
+            value, hence the open union — spelled out rather than left as a
+            bare `nullable` so generators produce a usable type. (This document
+            is OpenAPI 3.1, where `nullable` is not a keyword at all; null is
+            expressed as a member of the union.)
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+
     Question:
       type: object
       description: |
@@ -4611,9 +5041,11 @@ components:
         `required`. Questions are polymorphic (morphTo `questionable`); the
         wire shape exposes only the `ProductOption` case via
         `product_option_id` (sourced from `questionable_id`).
-        The `questions` table has `public $timestamps = false`, so
-        `created_at` / `updated_at` are always null. `type` returns the raw
-        `answer_type` enum value (broader than the input enum).
+        The `questions` table has no `created_at` / `updated_at` columns at
+        all (the model declares `public $timestamps = false`), so both fields
+        are always null and `GET /questions?since=` is refused with 422.
+        `type` returns the raw `answer_type` enum value (broader than the
+        input enum).
       properties:
         id: { type: string }
         product_option_id: { type: string, nullable: true, description: "Sourced from `questionable_id` when `questionable_type=ProductOption`; null otherwise." }
@@ -4623,6 +5055,24 @@ components:
           nullable: true
           enum: [short_text, long_text, number, decimal_number, boolean, date, datetime, time, list, country, location_list, name, email, phone, birthdate]
           description: "Raw `answer_type` enum value. The write API accepts a narrower input enum (text/textarea/select/date/number/boolean) which the controller maps onto these values."
+        granularity:
+          type: string
+          nullable: true
+          enum: [booking, guest, extra]
+          description: |
+            Whether the question is asked once per booking, once per guest, or
+            once per purchased extra. Determines how many `Answer` rows a
+            booking carries for this question, and which morph target those
+            answers hang off — see `Answer.answerable_type`.
+
+            **Read-only on this API.** Neither `CreateQuestionRequest` nor
+            `UpdateQuestionRequest` accepts a `granularity` field, and
+            `QuestionController::store()` hardcodes `booking` on the row it
+            writes — so every question created here is booking-granularity,
+            and deleting and recreating one does not change that. Guest- and
+            extra-granularity questions exist (they are created in the
+            operator UI and by the importers) and are returned here verbatim;
+            there is simply no API path that produces or edits one.
         required: { type: boolean }
         options:
           type: array
@@ -4638,8 +5088,64 @@ components:
         capacity: { type: integer, minimum: 0 }
         status:
           type: string
-          enum: [available, blocked, cancelled]
+          # `cancelled` is NOT accepted — `UpdateAvailabilityRequest` validates
+          # `in:available,blocked` and the controller maps the value onto the
+          # boolean `is_open_for_booking`. The third member was documented but
+          # never implemented; sending it is a 422.
+          enum: [available, blocked]
+        is_bookable: { type: boolean }
+        fares:
+          type: array
+          minItems: 1
+          description: |
+            Per-slot pricing overrides for THIS availability only. Tiers not
+            listed are left alone. `amount: null` deletes the override row so
+            the slot follows the catalogue price again. An empty array is a
+            422, not a no-op — send no `fares` key at all to leave pricing
+            untouched.
+          items:
+            $ref: "#/components/schemas/AvailabilityFare"
         dry_run: { type: boolean, default: false }
+
+    AvailabilityFare:
+      type: object
+      required: [pricing_tier_id, amount]
+      description: |
+        One fare instruction for an `availability_pricing_tier` row. `amount`
+        is required to be PRESENT but may be null: null means "delete the
+        override", so a client that forgets to serialise an amount gets a 422
+        instead of silently wiping the operator's price. The tier must belong
+        to the product that owns the target availability's ProductOption —
+        a tier from another product's ladder is a 422, not a silent write.
+      properties:
+        pricing_tier_id: { type: string }
+        amount:
+          allOf:
+            - $ref: "#/components/schemas/Money"
+          nullable: true
+          description: "Fare in minor units, or null to remove the override."
+
+    AvailabilityFarePreview:
+      type: object
+      description: |
+        One matched slot inside a `setting=pricing` dry-run diff. `amount` is
+        the EFFECTIVE price — the override when one exists, the catalogue fare
+        otherwise — so the `after` side of a removal shows the catalogue price
+        the slot falls back to rather than null. `changed` appears on the
+        `after` side only.
+      properties:
+        id: { type: string }
+        date: { type: string, format: date }
+        starts_at: { type: string, format: date-time }
+        fares:
+          type: array
+          items:
+            type: object
+            properties:
+              pricing_tier_id: { type: string }
+              amount: { type: integer, nullable: true }
+              is_override: { type: boolean }
+        changed: { type: boolean }
 
     BulkDeleteAvailabilityRequest:
       type: object
@@ -4723,13 +5229,25 @@ components:
               properties:
                 fares:
                   type: array
+                  minItems: 1
                   items:
-                    type: object
-                    required: [pricing_tier_id, amount]
-                    properties:
-                      pricing_tier_id: { type: string }
-                      amount: { $ref: "#/components/schemas/Money" }
-              description: "When `setting=pricing`. Replaces existing fares for the listed tiers; tiers omitted are left alone (the underlying service uses `replaceAll: false`)."
+                    $ref: "#/components/schemas/AvailabilityFare"
+              description: |
+                An empty array is a 422. It used to be accepted, write an audit
+                row, queue a job per chunk of matched ids and fire
+                `PriceScheduleUpdated` at the channel managers, all for zero
+                data change.
+
+                When `setting=pricing`. Replaces existing fares for the listed
+                tiers; tiers omitted are left alone (the underlying service
+                uses `replaceAll: false`). An `amount` of null DELETES the
+                override for that tier across the matched range, so the slots
+                follow the catalogue price again.
+
+                Beware the range scope: every session on a matched DATE is
+                written, including ones that had no override before. Use
+                `PATCH /availabilities/{id}` when a date carries more than one
+                session and you only mean to touch one of them.
             - title: TimeValue
               type: object
               required: [start_time, end_time]
@@ -4980,7 +5498,9 @@ components:
         `product_categories` table only persists `id` + `name`; `slug`,
         `description`, and `position` are surfaced because the
         `ProductCategory` model has accessors for them, but they read as null
-        / 0 against today's schema.
+        / 0 against today's schema. It carries no timestamp columns either, so
+        `created_at` is always null and `GET /categories?since=` is refused
+        with 422.
       properties:
         id: { type: string }
         name: { type: string, nullable: true, description: "English translation of the `name` column." }
@@ -4988,7 +5508,7 @@ components:
         description: { type: string, nullable: true, description: "No underlying column — null today." }
         position: { type: integer, nullable: true, description: "No underlying column — null today." }
         product_count: { type: integer, nullable: true, description: "Set only when the `products` relation is eager-loaded; otherwise null." }
-        created_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `product_categories`." }
 
     Resource:
       type: object
@@ -5326,6 +5846,12 @@ components:
         `text → short_text`, `textarea → long_text`, `select → list`,
         `date → date`, `number → number`, `boolean → boolean`. The polymorphic
         `questionable` morph is set to `(ProductOption::class, product_option_id)`.
+
+        There is no `granularity` field: the controller writes `booking`
+        unconditionally, so this endpoint can only create booking-granularity
+        questions. A `granularity` key in the body is dropped by validation,
+        not honoured and not rejected — the created row comes back
+        `granularity: booking` regardless of what was sent.
       properties:
         product_option_id: { type: string, description: "Persisted as `questionable_id` with `questionable_type=ProductOption`." }
         label: { type: string, maxLength: 200, description: "Persisted as the `question` column." }
@@ -5345,7 +5871,10 @@ components:
       description: |
         Mirrors `UpdateQuestionRequest::rules()`. Same `label`→`question`,
         `required`→`is_required`, `type`→`answer_type` mappings as
-        `CreateQuestionRequest`.
+        `CreateQuestionRequest`. `granularity` is not accepted here either, so
+        an existing question's granularity cannot be changed through the API —
+        and recreating it is no workaround, since create always writes
+        `booking`.
       properties:
         label: { type: string, maxLength: 200 }
         type:
