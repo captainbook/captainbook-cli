@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -372,6 +374,8 @@ func TestErrorCode_Mapping(t *testing.T) {
 		"DISCOUNT_NOT_APPLICABLE":            &invpkg.DiscountNotApplicableError{},
 		"RESOURCE_IN_USE":                    &invpkg.ResourceInUseError{},
 		"AVAILABILITY_HAS_CONFIRMED_BOOKING": &invpkg.AvailabilityHasConfirmedBookingError{},
+		"BOOKING_RESOURCE_STATE_STALE":       &invpkg.BookingResourceStateStaleError{},
+		"BOOKING_RESOURCE_CONFLICT":          &invpkg.BookingResourceConflictError{},
 		"PAYLOAD_TOO_LARGE":                  &invpkg.PayloadTooLargeError{},
 		"UNSUPPORTED_MEDIA_TYPE":             &invpkg.UnsupportedMediaTypeError{},
 		"RATE_LIMITED":                       &invpkg.RateLimitError{},
@@ -651,6 +655,352 @@ func TestGiftCertsIssue_SenderMessageMapping(t *testing.T) {
 	}
 	if got, ok := parsed["sender_message"]; !ok || got != "Happy birthday!" {
 		t.Errorf("wire body must carry sender_message; got %v (full body: %v)", got, parsed)
+	}
+}
+
+// bookingsDefFor returns the single CommandDef with the given Use, failing
+// the test if it isn't there exactly once.
+func bookingsDefFor(t *testing.T, use string) CommandDef {
+	t.Helper()
+	var found []CommandDef
+	for _, d := range bookingsDefs() {
+		if d.Use == use {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("expected exactly one %q CommandDef, got %d", use, len(found))
+	}
+	return found[0]
+}
+
+// TestBookingsSetResources_DesiredStateBody pins the wire shape of the
+// booking-resource write. POST /bookings/{id}/resources is desired-state,
+// not a delta, so three things have to hold and each is a silent-corruption
+// bug if it drifts:
+//
+//   - the concurrency guard rides along as expected_resource_state_token
+//     (drop it and the server 422s, or worse, a future server default lets
+//     an unguarded overwrite through);
+//   - an explicitly-empty --auxiliary-resource-ids serializes as `[]`, which
+//     is the ONLY way to clear every auxiliary. If it were omitted from the
+//     body instead, "clear all" would silently become "leave unchanged";
+//   - flags the user didn't pass are absent entirely rather than sent as
+//     zero values — main_resource_id: 0 would read as a real resource id.
+func TestBookingsSetResources_DesiredStateBody(t *testing.T) {
+	def := bookingsDefFor(t, "bookings set-resources <id>")
+
+	args := RunArgs{
+		PathArgs: []string{"bk_1"},
+		Flags: map[string]any{
+			// No "main-resource-id": leaving the primary resource alone.
+			// []string is what the stringSlice flag actually delivers; the
+			// closure converts it to []int.
+			"auxiliary-resource-ids":        []string{},
+			"expected-resource-state-token": "tok_abc",
+		},
+	}
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{"applied":true,"resource_state_token":"tok_def"},"meta":{"request_id":"r1"}}`))
+	})
+
+	res, err := def.Run(context.Background(), runner, args)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res == nil || res.WireBody == nil {
+		t.Fatal("expected non-nil RunResult with WireBody set")
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(res.WireBody, &parsed); err != nil {
+		t.Fatalf("unmarshal wire body: %v", err)
+	}
+	if got := parsed["expected_resource_state_token"]; got != "tok_abc" {
+		t.Errorf("expected_resource_state_token = %v; want tok_abc (full body: %v)", got, parsed)
+	}
+	aux, ok := parsed["auxiliary_resource_ids"]
+	if !ok {
+		t.Fatalf("auxiliary_resource_ids missing — an explicit empty set must be sent as [] to clear auxiliaries, not omitted (full body: %v)", parsed)
+	}
+	if arr, isArr := aux.([]any); !isArr || len(arr) != 0 {
+		t.Errorf("auxiliary_resource_ids = %v; want [] (full body: %v)", aux, parsed)
+	}
+	if _, present := parsed["main_resource_id"]; present {
+		t.Errorf("main_resource_id must be omitted when the flag isn't passed, else 0 reads as a real resource id (full body: %v)", parsed)
+	}
+}
+
+// TestBookingsSetResources_ClearAllThroughCobra drives the documented clear-all
+// invocation through the REAL cobra flag parser, not a hand-built RunArgs.
+//
+// This exists because a hand-built RunArgs hid a shipped bug: the flag was
+// declared intSlice, and pflag's intSlice parser runs strconv.Atoi on the raw
+// value, so `--auxiliary-resource-ids=` died at parse time with "invalid
+// syntax". Every unit test passed because they injected []int{} directly and
+// never touched pflag. The one documented way to unassign every auxiliary
+// resource was dead on arrival in the real binary.
+//
+// Any test that constructs RunArgs by hand is testing the closure, not the
+// command. For flag-parsing behavior, go through cobra.
+func TestBookingsSetResources_ClearAllThroughCobra(t *testing.T) {
+	var gotBody []byte
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{"applied":true},"meta":{"request_id":"r1"}}`))
+	})
+
+	root := &cobra.Command{Use: "root"}
+	root.PersistentFlags().String("profile", "", "")
+	root.PersistentFlags().Bool("verbose", false, "")
+	root.AddCommand(makeResourceParent("bookings", "", bookingsDefs(), runner))
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{
+		"bookings", "set-resources", "bk_1",
+		"--auxiliary-resource-ids=",
+		"--expected-resource-state-token", "tok_abc",
+	})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("the documented clear-all invocation must parse and run; got: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(gotBody, &parsed); err != nil {
+		t.Fatalf("unmarshal wire body %q: %v", gotBody, err)
+	}
+	aux, ok := parsed["auxiliary_resource_ids"]
+	if !ok {
+		t.Fatalf("auxiliary_resource_ids missing — clear-all must send [] (body: %s)", gotBody)
+	}
+	arr, isArr := aux.([]any)
+	if !isArr || len(arr) != 0 {
+		t.Errorf("auxiliary_resource_ids = %v; want [] (body: %s)", aux, gotBody)
+	}
+}
+
+// TestBookingsSetResources_AuxIDsThroughCobra covers the populated case through
+// cobra too, and pins the JSON type: the flag is stringSlice at the cobra layer,
+// so a missing conversion would silently ship ["1","2"] instead of [1,2].
+func TestBookingsSetResources_AuxIDsThroughCobra(t *testing.T) {
+	cases := []struct {
+		name    string
+		flag    string
+		wantErr string
+		wantIDs []any
+	}{
+		{name: "valid ids convert to JSON integers", flag: "--auxiliary-resource-ids=3,5", wantIDs: []any{float64(3), float64(5)}},
+		{name: "non-integer is rejected", flag: "--auxiliary-resource-ids=abc", wantErr: "not an integer"},
+		{name: "zero is rejected per spec minimum", flag: "--auxiliary-resource-ids=0", wantErr: ">= 1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotBody []byte
+			_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+				gotBody, _ = io.ReadAll(r.Body)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"data":{"applied":true},"meta":{}}`))
+			})
+
+			root := &cobra.Command{Use: "root"}
+			root.PersistentFlags().String("profile", "", "")
+			root.PersistentFlags().Bool("verbose", false, "")
+			root.AddCommand(makeResourceParent("bookings", "", bookingsDefs(), runner))
+			root.SetOut(&bytes.Buffer{})
+			root.SetErr(&bytes.Buffer{})
+			root.SilenceErrors = true
+			root.SetArgs([]string{
+				"bookings", "set-resources", "bk_1", tc.flag,
+				"--expected-resource-state-token", "tok_abc",
+			})
+
+			err := root.Execute()
+
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected an error containing %q, got nil", tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("error = %v; want it to mention %q", err, tc.wantErr)
+				}
+				if gotBody != nil {
+					t.Error("must reject before sending — a bad id should never reach the server")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			var parsed map[string]any
+			if uerr := json.Unmarshal(gotBody, &parsed); uerr != nil {
+				t.Fatalf("unmarshal %q: %v", gotBody, uerr)
+			}
+			got, _ := parsed["auxiliary_resource_ids"].([]any)
+			if !reflect.DeepEqual(got, tc.wantIDs) {
+				t.Errorf("auxiliary_resource_ids = %#v; want %#v (must be JSON ints, not strings)", got, tc.wantIDs)
+			}
+		})
+	}
+}
+
+// TestBookingsAvailableResources_HitsCorrectPaths pins the two candidate-listing
+// reads to their spec paths. These are the endpoints the agent is told to consult
+// after a BOOKING_RESOURCE_CONFLICT, so pointing either at the wrong URL would
+// send it in a loop: retry, conflict, "check availability", retry.
+//
+// The main and auxiliary routes differ by one path segment, which is exactly the
+// kind of thing a copy-paste between two near-identical closures gets wrong.
+func TestBookingsAvailableResources_HitsCorrectPaths(t *testing.T) {
+	cases := []struct {
+		use      string
+		wantPath string
+	}{
+		{"bookings available-resources <id>", "/bookings/bk_1/resources/available"},
+		{"bookings available-auxiliary-resources <id>", "/bookings/bk_1/resources/auxiliary/available"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.use, func(t *testing.T) {
+			def := bookingsDefFor(t, tc.use)
+
+			var gotPath, gotMethod string
+			_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				gotMethod = r.Method
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"data":[{"id":"7","name":"Oceanis 449","category":"asset"}],"meta":{"request_id":"r1"}}`))
+			})
+
+			res, err := def.Run(context.Background(), runner, RunArgs{PathArgs: []string{"bk_1"}})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if gotMethod != http.MethodGet {
+				t.Errorf("method = %s; want GET", gotMethod)
+			}
+			if gotPath != tc.wantPath {
+				t.Errorf("path = %q; want %q", gotPath, tc.wantPath)
+			}
+			if res == nil || len(res.Body) == 0 {
+				t.Fatal("expected the candidate list to be returned to the caller")
+			}
+			if !strings.Contains(string(res.Body), "Oceanis 449") {
+				t.Errorf("response body did not survive to the caller: %s", res.Body)
+			}
+		})
+	}
+}
+
+// TestBookingsAvailableResources_PropagatesNotFound checks that a 404 on a
+// candidate read surfaces as a typed NotFoundError rather than an empty list.
+// Silently rendering "no candidates" for a bad booking id would read as "this
+// booking can't be reassigned" — the opposite of the truth.
+func TestBookingsAvailableResources_PropagatesNotFound(t *testing.T) {
+	def := bookingsDefFor(t, "bookings available-resources <id>")
+
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"meta":{},"error":{"code":"NOT_FOUND","message":"no such booking","details":{"resource_type":"booking","id":"bk_nope"}}}`))
+	})
+
+	_, err := def.Run(context.Background(), runner, RunArgs{PathArgs: []string{"bk_nope"}})
+	var nf *invpkg.NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("want *NotFoundError, got %T (%v)", err, err)
+	}
+}
+
+// TestBookingsSetResources_DryRunInjection verifies --dry-run rides on the
+// body (DryRunBody), so the server previews the reassignment instead of
+// committing it.
+func TestBookingsSetResources_DryRunInjection(t *testing.T) {
+	def := bookingsDefFor(t, "bookings set-resources <id>")
+
+	args := RunArgs{
+		PathArgs: []string{"bk_1"},
+		DryRun:   true,
+		Flags: map[string]any{
+			"main-resource-id":              7,
+			"expected-resource-state-token": "tok_abc",
+		},
+	}
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{"would_apply":true,"diff":{"before":{},"after":{}}},"meta":{"request_id":"r1"}}`))
+	})
+
+	res, err := def.Run(context.Background(), runner, args)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(res.WireBody, &parsed); err != nil {
+		t.Fatalf("unmarshal wire body: %v", err)
+	}
+	if got, ok := parsed["dry_run"]; !ok || got != true {
+		t.Errorf("dry_run must be true on the body; got %v (full body: %v)", got, parsed)
+	}
+	if got := parsed["main_resource_id"]; got != float64(7) {
+		t.Errorf("main_resource_id = %v; want 7 (full body: %v)", got, parsed)
+	}
+}
+
+// TestBookingsList_ResourceFilterParams asserts the two new list filters
+// reach the query string. resource_id answers "which trips is this
+// auxiliary resource on?"; include=resources is what surfaces the
+// resource_state_token that set-resources requires.
+func TestBookingsList_ResourceFilterParams(t *testing.T) {
+	def := bookingsDefFor(t, "bookings list")
+
+	var gotQuery url.Values
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"request_id":"r1"}}`))
+	})
+
+	args := RunArgs{Flags: map[string]any{
+		"resource-id": 42,
+		"include":     "resources",
+	}}
+	if _, err := def.Run(context.Background(), runner, args); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := gotQuery.Get("resource_id"); got != "42" {
+		t.Errorf("resource_id query = %q; want 42 (full query: %v)", got, gotQuery)
+	}
+	if got := gotQuery.Get("include"); got != "resources" {
+		t.Errorf("include query = %q; want resources (full query: %v)", got, gotQuery)
+	}
+}
+
+// TestBookingsList_RejectsZeroResourceID guards the silent-wrong-data path.
+// The spec pins resource_id to minimum 1, and the usual `!= 0` unset-guard
+// would drop a 0 and return EVERY booking unfiltered — which an agent reads as
+// "this resource is assigned to all of them". Fail before the network instead.
+func TestBookingsList_RejectsZeroResourceID(t *testing.T) {
+	def := bookingsDefFor(t, "bookings list")
+
+	var called bool
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[],"meta":{}}`))
+	})
+
+	_, err := def.Run(context.Background(), runner, RunArgs{Flags: map[string]any{"resource-id": 0}})
+	if err == nil {
+		t.Fatal("expected an error for --resource-id 0, got nil")
+	}
+	if !strings.Contains(err.Error(), "resource-id") {
+		t.Errorf("error should name the offending flag; got %v", err)
+	}
+	if called {
+		t.Error("must reject before hitting the network — an unfiltered list is worse than an error")
 	}
 }
 

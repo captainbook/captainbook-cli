@@ -170,6 +170,8 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | `IDEMPOTENCY_UNKNOWN` | Key was swept (server crashed mid-flight); retry with a fresh key. |
 | `DISCOUNT_NOT_APPLICABLE` | Booking state, validity window, scope, or `nb_offers` blocks the apply. |
 | `RESOURCE_IN_USE` | Hard-delete blocked by FK references (categories, gift-cert SKUs). |
+| `BOOKING_RESOURCE_STATE_STALE` | `bookings set-resources`: the booking's resources changed since your read. Re-read, re-decide, re-send with the fresh token — never blind-retry. |
+| `BOOKING_RESOURCE_CONFLICT` | `bookings set-resources`: the selection itself is illegal (double-booked, wrong category, not attached to the option). Re-run `bookings available-resources`. |
 | `RATE_LIMITED` | 429; respect `Retry-After`. |
 
 ## Capability table
@@ -211,6 +213,7 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:write` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
+| `inventory bookings set-resources <id>` | POST /bookings/{id}/resources | `cli:write` | body |
 | `inventory guests update <id>` | PATCH /guests/{id} | `cli:write` | body |
 | `inventory extras create` | POST /extras | `cli:write` | body |
 | `inventory extras update <id>` | PATCH /extras/{id} | `cli:write` | body |
@@ -234,11 +237,11 @@ When the dry-run column says **none**, sending `--dry-run` from the CLI errors l
 - [availabilities.md](availabilities.md) — Per-date capacity + 5 bulk-update subcommands + delete / bulk-delete + recurrence rule generator (`create-rule`).
 - [pricing-categories.md](pricing-categories.md) — Adult/Child/Senior buckets (parent of tiers). REQUIRED before creating tiers.
 - [pricing-tiers.md](pricing-tiers.md) — Pricing tiers under a category (data-loss-adjacent delete).
-- [resources.md](resources.md) — Physical inventory (boats, guides, equipment) bound to a product option via attach/detach.
+- [resources.md](resources.md) — Physical inventory (boats, guides, equipment) bound to a product option via attach/detach. Assigning one to a specific booking lives in [bookings.md](bookings.md).
 - [locations.md](locations.md) — Start / end / primary / secondary points attached to products.
 - [discounts.md](discounts.md) — Discount catalog, apply, soft-delete-as-cancel.
 - [gift-certificates.md](gift-certificates.md) — Sellable SKUs + issued instances.
-- [bookings.md](bookings.md) — Read, cancel, refund, comp, transactions, resend-confirmation.
+- [bookings.md](bookings.md) — Read, cancel, refund, comp, transactions, resend-confirmation, plus per-booking resource assignment (token-guarded).
 - [transactions.md](transactions.md) — Read-only ledger.
 - [customers.md](customers.md) — Customer catalog.
 - [guests.md](guests.md) — Per-booking guest reads + edits (Greek passport workflow).

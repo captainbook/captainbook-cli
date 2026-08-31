@@ -536,6 +536,10 @@ func errorCode(err error) string {
 		return "RESOURCE_IN_USE"
 	case *invpkg.AvailabilityHasConfirmedBookingError:
 		return "AVAILABILITY_HAS_CONFIRMED_BOOKING"
+	case *invpkg.BookingResourceStateStaleError:
+		return "BOOKING_RESOURCE_STATE_STALE"
+	case *invpkg.BookingResourceConflictError:
+		return "BOOKING_RESOURCE_CONFLICT"
 	case *invpkg.WorkflowNotEditableError:
 		return "WORKFLOW_NOT_EDITABLE"
 	case *invpkg.WorkflowNotActivatableError:

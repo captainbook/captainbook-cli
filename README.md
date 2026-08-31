@@ -145,6 +145,13 @@ ceebee inventory availabilities create-rule \
 ceebee inventory resources create --name "Oceanis 449" --type Sailboat --category asset --capacity 8
 ceebee inventory resources attach 47 --resource-id 2
 
+# Write — swap the boat on one booking (guarded against concurrent edits)
+ceebee inventory bookings available-resources <booking-id>
+ceebee inventory bookings set-resources <booking-id> \
+  --main-resource-id 91 \
+  --expected-resource-state-token "$(ceebee inventory bookings get <booking-id> \
+    --format json | jq -r '.data.resource_state_token')"
+
 # Customer-success
 ceebee inventory bookings cancel <booking-id> --reason "weather" --refund-policy full
 ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id> \
@@ -161,7 +168,7 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `pricing-tiers` | list, get, create, update, delete, restore |
 | `resources` | list, get, create, update, delete, restore, **attach**, **detach** |
 | `locations` | list, get, create, update, delete |
-| `bookings` | list, get, transactions, cancel, refund, comp, resend-confirmation |
+| `bookings` | list, get, transactions, **available-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
 | `transactions` | list, get |
 | `customers` | list, get |
 | `guests` | list, get, update |
@@ -250,6 +257,8 @@ make clean           # Remove binaries
 ```
 
 The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. Three CI-enforced spec-drift tests catch flag/JSON-key drift, enum-token drift, and idempotency-key threading regressions.
+
+**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullable-ref unions (`oneOf: [$ref, {type: "null"}]`) into their 3.0 equivalent in a temp copy. The transform is deliberately narrow: any other 3.1-only construct upstream adopts will fail codegen loudly rather than be silently mangled.
 
 ## AI agents
 

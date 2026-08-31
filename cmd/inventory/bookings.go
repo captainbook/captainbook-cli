@@ -3,14 +3,22 @@ package inventory
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// bookingsDefs declares booking commands: list, get, cancel, refund, comp,
-// resend-confirmation.
+// bookingsDefs declares booking commands: list, get, transactions,
+// available-resources, available-auxiliary-resources, set-resources, cancel,
+// refund, comp, resend-confirmation.
+//
+// The three resource verbs are the read → decide → guarded-write loop for
+// booking resource assignment: list candidates, then POST the full desired
+// state along with the resource_state_token you read, so a concurrent
+// back-office edit fails the write instead of being silently overwritten.
 //
 // Refund + comp are CS-only (cli:cs) operations and capture rich
 // forensic_summary fields per D37 (refund: amount, reason, transaction_id;
@@ -32,6 +40,8 @@ func bookingsDefs() []CommandDef {
 				{Name: "customer-email", Type: "string", Description: "Filter by customer email"},
 				{Name: "reference", Type: "string", Description: "Filter by booking reference"},
 				{Name: "product-option-id", Type: "string", Description: "Filter by product option"},
+				{Name: "resource-id", Type: "int", Description: "Filter to bookings this resource is assigned to (active resources only)"},
+				{Name: "include", Type: "string", Description: "Comma-separated expansions; only 'resources' is supported (adds assigned resources + resource_state_token)"},
 				{Name: "include-cancelled", Type: "bool", Description: "Lift the CancellingScope filter so cancelled bookings appear alongside active ones"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -72,6 +82,22 @@ func bookingsDefs() []CommandDef {
 				}
 				if v := args.FlagString("product-option-id"); v != "" {
 					p.ProductOptionId = &v
+				}
+				if args.FlagSet("resource-id") {
+					v := args.FlagInt("resource-id")
+					// Spec pins resource_id to minimum 1. Letting a 0 through
+					// the usual `!= 0` unset-guard would silently drop the
+					// filter and return EVERY booking — the agent would read
+					// that as "this resource is on all of them". Same
+					// wrong-data-with-no-signal failure the enum gate exists
+					// to prevent, so fail loudly here too.
+					if v < 1 {
+						return nil, fmt.Errorf("--resource-id must be >= 1 (got %d)", v)
+					}
+					p.ResourceId = &v
+				}
+				if v := args.FlagString("include"); v != "" {
+					p.Include = &v
 				}
 				if args.FlagBool("include-cancelled") {
 					t := true
@@ -125,6 +151,132 @@ func bookingsDefs() []CommandDef {
 					return nil, err
 				}
 				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Transaction", id)
+			},
+		},
+		{
+			Use: "bookings available-resources <id>", Short: "List main resources assignable to a booking",
+			Kind: KindRead, Verb: "GET", Path: "/bookings/{id}/resources/available",
+			Ability: invpkg.Read, PositionalArgs: []string{"id"},
+			Long: "Candidate MAIN (non-auxiliary) resources for this booking, filtered by the " +
+				"same availability and concurrency checks the back-office resource switcher " +
+				"uses. Feed an id from here to `bookings set-resources --main-resource-id`; " +
+				"anything not in this list is what BOOKING_RESOURCE_CONFLICT rejects.",
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.ListAvailableBookingResourcesWithResponse(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Resource", id)
+			},
+		},
+		{
+			Use: "bookings available-auxiliary-resources <id>", Short: "List auxiliary resources assignable to a booking",
+			Kind: KindRead, Verb: "GET", Path: "/bookings/{id}/resources/auxiliary/available",
+			Ability: invpkg.Read, PositionalArgs: []string{"id"},
+			Long: "Candidate AUXILIARY resources for this booking. Feed ids from here to " +
+				"`bookings set-resources --auxiliary-resource-ids`, which takes the full " +
+				"desired set rather than a delta.",
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.ListAvailableBookingAuxiliaryResourcesWithResponse(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Resource", id)
+			},
+		},
+		{
+			Use: "bookings set-resources <id>", Short: "Set the resources assigned to a booking",
+			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/resources",
+			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			PositionalArgs: []string{"id"},
+			Long: "Desired-state write over a booking's resource assignment. This is NOT a " +
+				"delta: --main-resource-id switches the single primary resource, and " +
+				"--auxiliary-resource-ids REPLACES the whole auxiliary set (pass it empty, " +
+				"`--auxiliary-resource-ids=`, to clear every auxiliary). Omit a flag " +
+				"entirely to leave that half of the assignment untouched.\n\n" +
+				"The write is guarded against concurrent edits: read the booking first " +
+				"(`bookings get <id>`, or `bookings list --include resources`), pass its " +
+				"resource_state_token as --expected-resource-state-token, and the server " +
+				"rejects with BOOKING_RESOURCE_STATE_STALE if anything moved in between. " +
+				"On a stale rejection, re-read and re-decide — never blind-retry the same " +
+				"body. An invalid selection (double-booked, wrong category, not attached to " +
+				"the product option) comes back as BOOKING_RESOURCE_CONFLICT instead; list " +
+				"the legal choices with `bookings available-resources` / " +
+				"`bookings available-auxiliary-resources`.\n\n" +
+				"Booking and resource state commit atomically; notifications, workflows, " +
+				"and calendar jobs fire after commit.",
+			Flags: []FlagDef{
+				{Name: "main-resource-id", Type: "int", Description: "Primary non-auxiliary resource to assign"},
+				// stringSlice, not intSlice, on purpose: pflag's intSlice parser
+				// runs strconv.Atoi on the raw value, so the documented
+				// clear-all form `--auxiliary-resource-ids=` dies at flag-parse
+				// time with "invalid syntax" before the command ever runs.
+				// stringSlice accepts the empty value as [] and we convert
+				// below, which is also where the spec's per-item minimum of 1
+				// gets enforced.
+				{Name: "auxiliary-resource-ids", Type: "stringSlice", Description: "Full desired auxiliary set (replaces, not appends). Pass empty to clear all."},
+				{Name: "expected-resource-state-token", Type: "string", Required: true, Description: "resource_state_token from your last booking read"},
+			},
+			ForensicFields: []string{"main-resource-id", "auxiliary-resource-ids", "expected-resource-state-token"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				// The flag arrives as []string (see the FlagDef comment);
+				// convert to []int so the body carries JSON integers, not
+				// quoted strings the server would reject. An explicitly-empty
+				// slice must survive as [] — that's the clear-all signal — so
+				// this rewrites the value in place rather than skipping when
+				// there's nothing to convert.
+				if args.FlagSet("auxiliary-resource-ids") {
+					raw := args.FlagSlice("auxiliary-resource-ids")
+					ids := make([]int, 0, len(raw))
+					for _, s := range raw {
+						n, convErr := strconv.Atoi(strings.TrimSpace(s))
+						if convErr != nil {
+							return nil, fmt.Errorf("--auxiliary-resource-ids: %q is not an integer", s)
+						}
+						if n < 1 {
+							return nil, fmt.Errorf("--auxiliary-resource-ids: ids must be >= 1 (got %d)", n)
+						}
+						ids = append(ids, n)
+					}
+					// Copy the map so we don't mutate the caller's flags —
+					// forensic_summary reads the same map afterwards and should
+					// record what the user typed.
+					flags := make(map[string]any, len(args.Flags))
+					for k, v := range args.Flags {
+						flags[k] = v
+					}
+					flags["auxiliary-resource-ids"] = ids
+					args.Flags = flags
+				}
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"main-resource-id":              "main_resource_id",
+					"auxiliary-resource-ids":        "auxiliary_resource_ids",
+					"expected-resource-state-token": "expected_resource_state_token",
+				})
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.UpdateBookingResourcesWithBodyWithResponse(ctx, id, &gen.UpdateBookingResourcesParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
+				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, err
 			},
 		},
 		{

@@ -123,6 +123,8 @@ ceebee inventory availabilities delete av_2026_05_05_po88
 
 If the row has a confirmed Booking attached, both calls return 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` (the precheck runs even on `--dry-run`). Cancel or move the booking first, then retry.
 
+**Channel retraction.** If the row's ProductOption is mapped to GetYourGuide, the delete also queues a `vacancies: 0` push so GYG stops selling the slot rather than waiting for its next scheduled pull — GYG has no delete endpoint, so zeroing vacancies is the only retraction there is. It's best-effort and asynchronous: the `204` means the row is gone locally, **not** that GYG has been told. The push is skipped when the slot is in the past or past the 90-day horizon, when `bookable_type` isn't a ProductOption, when another live availability still occupies the same datetime, or when the option's product is already gone. Dry-run queues nothing. Channels other than GYG aren't wired up yet.
+
 ### 8. Bulk soft-delete across a date range (synchronous)
 
 Intent: rip every August slot off `po_88` because the venue closed for the month.
@@ -138,6 +140,8 @@ ceebee inventory availabilities bulk-delete \
 Drop `--dry-run` to commit. The response carries `status: "deleted"` and `total_deleted: <N>` — synchronous, no `BULK_UPDATE_ACCEPTED` signal, no polling. If any matched row has a confirmed booking, the entire request is rejected with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` (no rows touched); `error.details.total_blocked` plus `sample_availability_ids` (up to 20) identify the blockers — narrow the range or cancel/move the bookings before retrying.
 
 The cascade `Availability → pricingTiers` does NOT run on `bulk-delete` (the server uses a single bulk UPDATE that bypasses model events). This is intentional: pricing tiers are M:N with availabilities, so cascading from one row would soft-delete tier rows still referenced by other availabilities.
+
+**Channel retraction is partial on bulk-delete.** Because the bulk UPDATE fires no model events, the server announces the removal explicitly: GYG-mapped options get a `vacancies: 0` push for the deleted slots. But **only future slots inside the 90-day horizon are pushed** — a year-long range deletes every matched row and retracts only the near-term ones, leaving the rest for GYG's next scheduled pull. A datetime that still has another live availability behind it is never retracted. Like the single delete, this is best-effort and asynchronous: `200` + `total_deleted` doesn't mean GYG has been told.
 
 ### 9. Generate Availabilities from a recurrence (NEW)
 
@@ -191,6 +195,7 @@ Cost is bounded: 3 batched queries per page regardless of page size, no per-row 
 - ⚠️ **Pricing bulk-update is additive, not replacive — and irreversible.** Tiers omitted from `--fares` keep their existing fares. To change a tier across a range, include it explicitly with the new amount. There is no operation that removes an `availability_pricing_tier` row, so a slot can never be handed back to the catalogue price; re-setting it to the catalogue number by hand still leaves `is_override: true`.
 - ⚠️ **Delete / bulk-delete are blocked by confirmed bookings.** Both endpoints precheck for `AVAILABILITY_HAS_CONFIRMED_BOOKING` (409) **including in dry-run**. `bulk-delete` is all-or-nothing — one blocker rejects the entire range, and `error.details.sample_availability_ids` returns up to 20 ids to investigate. Cancel/move the bookings or narrow the range, then retry.
 - ⚠️ **Soft-delete is one-way from the CLI.** The row's `deleted_at` is visible on the Availability schema, but there is no `/availabilities/{id}/restore` operation and `list` has no `--include-trashed`, so a deleted row can be neither listed nor undeleted. A `delete` / `bulk-delete` mistake is recoverable only via DB intervention by ops.
+- ⚠️ **A successful delete does not mean the OTA knows.** Channel retraction (GYG `vacancies: 0`) is queued asynchronously and best-effort, and `bulk-delete` only retracts slots inside the next 90 days. If you deleted a far-future range and need GYG to stop selling it *now*, don't assume the 200 handled it — escalate rather than re-running the delete, which is already a no-op.
 
 ## See also
 
