@@ -28,6 +28,86 @@ test that goes through `root.Execute()`.
 
 **Why:** Silent capability gap — the CLI can add to these lists but never clear them.
 **Priority:** P3 — no reported user need yet; convert per-flag when one appears.
+
+## Spec-drift test can't compare a flag's Go TYPE against the spec
+
+`flagLit` in `cmd/inventory/spec_drift_test.go` captures only `Name` and
+`Description`, so no drift test compares a `FlagDef.Type` against the spec
+parameter's schema type. This is not hypothetical: `GET /answers` types
+`question_id` and `product_option_id` as `integer` while every other endpoint
+carrying `product_option_id` types it `string`, and nothing mechanical would
+have caught picking the wrong one. The failure is silent rather than loud —
+`args.FlagInt()` on a value stored as a string falls through its type
+assertion to the zero value instead of failing to compile.
+
+**Fix:** add `Type` to `flagLit`, extract it in `extractCmdLit`, and assert
+integer→int / boolean→bool / string→string for every GET command's flags.
+**Why:** the one drift class the spec-drift suite currently cannot see.
+**Priority:** P2 — a wrong choice ships a silently-empty filter.
+
+## Body keys set outside JSONBodyFromArgs escape the field-map guard
+
+`TestSpecDrift_FieldMapKeysExistInSpec` extracts JSON keys only from the map
+literal passed to `JSONBodyFromArgs`. `availabilities update --fares` does not
+travel that path — it is overlaid separately via `overlayJSONField` — so the
+`fares` key is invisible to the guard that covers `capacity` / `status` /
+`is_bookable`. The key is correct today; if the server renames it, the
+mechanical check stays green while the CLI sends a key the server ignores and
+a PATCH that silently drops the pricing overrides still returns 200.
+
+**Fix:** teach `extractCmdLit` to collect literal key arguments to
+`overlayJSONField` into `FieldMap`, or assert the overlay key against the spec
+in a dedicated test.
+**Why:** the guard's coverage silently ends where the code stops using the helper.
+**Priority:** P2 — same blast radius as any other renamed body key.
+
+## speccompat rewrites `type:` sequences without checking schema position
+
+`rewriteNullableTypeArray` matches any mapping key literally named `type` whose
+value is a sequence, anywhere in the document — including inside an `example:`,
+`default:`, or `x-` extension object where `type` is DATA, not a schema keyword.
+An upstream `example: {type: [image, 'null']}` would be silently rewritten to
+`type: image` plus a spurious `nullable: true` injected into the example. Not
+reachable today (the vendored spec has exactly two `type: [` occurrences, both
+in schema position), but silent mangling is precisely what the tool's
+narrow-scope design promises not to do.
+
+**Fix:** gate the rewrite on the enclosing mapping looking like a schema, or on
+not being nested under `example:` / `default:`; add a passthrough test case.
+**Why:** violates the shim's own "fail loudly rather than mangle" contract.
+**Priority:** P3 — not reachable with the current upstream spec.
+
+## Upstream: `/answers` types two ids as integer, inconsistent with every other endpoint
+
+`GET /answers` declares `question_id` and `product_option_id` as
+`type: integer`, but `Question.id`, `Answer.question_id`, `ProductOption.id`
+and `GET /questions?product_option_id` are all `type: string`, and the docs use
+prefixed ids (`q_42`, `po_88`) throughout. The CLI matches the spec, so
+`answers list --product-option-id po_88` fails to parse while
+`availabilities list --product-option-id po_88` works. Flag descriptions note
+the divergence as a stopgap.
+
+**Fix:** raise with the server repo so `/answers` matches the rest of the
+surface; drop the flag-description caveat and switch to string flags once it does.
+**Why:** an operator copying a working id between commands hits a parse error.
+**Priority:** P3 — cosmetic until someone copies an id between the two.
+
+## Bare true/false can still be swallowed as a MISSING positional
+
+`bindCommands` now binds `cobra.NoArgs` on argument-less leaves, so
+`gift-certificates issue --send-now false` errors instead of silently sending
+the email. But `ExactArgs(N)` only catches the stray token when the user
+supplied all N positionals. Verified residual: `bookings cancel --dry-run false`
+with the id omitted passes arg validation with `PathArgs=["false"]` and builds a
+request against booking id `"false"` carrying `dry_run: true` — the opposite of
+what was typed. It degrades to a 404 rather than a wrong write, so it is not
+dangerous, but it is the same silence and nothing guards it.
+
+**Fix:** a bool-flag-aware Args validator that rejects a bare `true` / `false`
+positional on ANY command, replacing the plain `ExactArgs` / `NoArgs` pair.
+**Why:** the space-form bool trap has one corner left.
+**Priority:** P3 — degrades to a 404, not a wrong write.
+
 ## ~~Docs/code drift tests (skills + README)~~ — DONE
 
 Implemented as `cmd/inventory/skills_drift_test.go`. Complements

@@ -123,7 +123,7 @@ ceebee stats summary --business-unit-id 42
 
 ### `ceebee inventory` — read + write
 
-The inventory namespace covers 90+ endpoints across 18 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
+The inventory namespace covers 110+ endpoints across 19 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
 
 ```bash
 # Read
@@ -152,6 +152,14 @@ ceebee inventory bookings set-resources <booking-id> \
   --expected-resource-state-token "$(ceebee inventory bookings get <booking-id> \
     --format json | jq -r '.data.resource_state_token')"
 
+# Read — tomorrow's dietary manifest across every booking on one departure
+ceebee inventory answers list --product-option-id 47 \
+  --from 2026-09-01T00:00:00Z --to 2026-09-02T00:00:00Z
+
+# Write — reprice exactly one slot (null clears the override)
+ceebee inventory availabilities update <availability-id> \
+  --fares '[{"pricing_tier_id":"22","amount":14500}]'
+
 # Customer-success
 ceebee inventory bookings cancel <booking-id> --reason "weather" --refund-policy full
 ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id> \
@@ -174,6 +182,7 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `guests` | list, get, update |
 | `extras` | list, get, create, update, delete, restore |
 | `questions` | list, get, create, update, delete, restore |
+| `answers` | list, get *(read-only; guest PII — needs `view_answers_of_booking`)* |
 | `discounts` | list, get, create, delete, apply, restore |
 | `gift-certificates` | list-available, get-available, create-available, update-available, delete-available, list-issued, get-issued, issue, void, resend |
 | `media` | list, upload, delete |
@@ -258,7 +267,7 @@ make clean           # Remove binaries
 
 The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. Three CI-enforced spec-drift tests catch flag/JSON-key drift, enum-token drift, and idempotency-key threading regressions.
 
-**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullable-ref unions (`oneOf: [$ref, {type: "null"}]`) into their 3.0 equivalent in a temp copy. The transform is deliberately narrow: any other 3.1-only construct upstream adopts will fail codegen loudly rather than be silently mangled.
+**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Two spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`) and nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) and a bare `type: ["null"]` have no 3.0 spelling and are left alone, so they fail codegen loudly rather than being silently mangled. Any other 3.1-only construct upstream adopts does the same.
 
 ## AI agents
 

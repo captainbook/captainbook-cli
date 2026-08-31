@@ -48,7 +48,7 @@ Availability-scoped responses carry three fields that make an override detectabl
 |-------|---------|
 | `amount` | **Effective** price — the pivot `fare` when a row exists, catalogue price otherwise |
 | `default_amount` | Catalogue price (`pricing_tiers.fare`), for diffing against `amount` |
-| `is_override` | `true` iff an `availability_pricing_tier` row exists for this slot |
+| `is_override` | `true` iff an `availability_pricing_tier` row exists for this slot. Writing the catalogue price does not clear it — only `"amount": null` does |
 
 Without `--availability-id`, `default_amount` and `is_override` are omitted entirely and `amount` is always the catalogue price. `--availability-id` and `--product-id` are mutually exclusive — the CLI rejects the pair before the round-trip, and the server returns 422. An availability with no product context (e.g. a Resource-backed slot) returns an empty page, not an error.
 
@@ -77,9 +77,11 @@ ceebee inventory availabilities bulk-update pricing \
 
 Drop `--dry-run` to commit. Three constraints to plan around:
 
-- **No single-slot write.** `availabilities update <id>` accepts only `--capacity` and `--status`. To override exactly one slot, bracket it with a one-day half-open range as above.
-- **Additive, never subtractive.** Tiers absent from `--fares` keep what they had, and no operation deletes a pivot row — so a slot cannot be reverted to "follows the catalogue". Re-setting it to the catalogue number by hand leaves `is_override: true` forever.
-- **Asynchronous.** Returns 202 plus `BULK_UPDATE_ACCEPTED bulk_update_id=<uuid>` on stderr. Exit 0 means *queued*; confirm by re-reading with `--include-pricing`.
+- **Date-range scoped, so it writes every session on a matched date.** Bracketing with a one-day range still hits all of that day's sessions, including ones that had no override before. To reprice exactly one slot, use `availabilities update <id> --fares '[{"pricing_tier_id":"22","amount":14500}]'` — same JSON array, one row.
+- **Additive, never subtractive by omission.** Tiers absent from `--fares` keep what they had. To *remove* an override, name the tier explicitly with `"amount": null`: that deletes the pivot row so the slot follows the catalogue price again. Re-setting it to the catalogue number by hand does NOT do this — the row survives, `is_override` stays `true`, and the slot silently keeps the old number the next time you reprice the tier.
+- **Asynchronous.** Returns 202 plus `BULK_UPDATE_ACCEPTED bulk_update_id=<uuid>` on stderr. Exit 0 means *queued*; confirm by re-reading with `--include-pricing`. (The single-slot `availabilities update --fares` form is synchronous.)
+
+`--dry-run` on `setting=pricing` is worth using: unlike the other bulk settings it returns `total_changed` plus a `diff` of the first `preview_limit` matched slots, so you can tell whether the write moves anything at all rather than just how many rows matched the dates. See [availabilities.md](availabilities.md) example 5.
 
 ## Worked examples
 
@@ -147,12 +149,13 @@ ceebee inventory pricing-tiers restore 22
 
 ## Pitfalls
 
+- ⚠️ **No `--since`, and sending `since=` is a 422.** The `pricing_tiers` table carries no `created_at` / `updated_at` columns, so there is nothing for the filter to bound and `created_at` / `updated_at` are always null on the response. The 422 is deliberate — a silently-unfiltered page is what a polling client would misread as a delta. No incremental sync here: list in full and diff client-side.
 - ⚠️ **DATA-LOSS-ADJACENT DELETE.** Soft-deleting a tier soft-deletes every `Availability` row rendered against that tier. Calendar data disappears from list endpoints. **Count affected availabilities first** (example 5) — and consider exporting them to JSON before delete.
 - ⚠️ **No server-side dry-run on delete.** The CLI rejects `--dry-run` on `pricing-tiers delete` at parse time. Inspect `availabilities list` before pulling the trigger.
 - ⚠️ **Restoring the tier does not restore cascaded availabilities.** Phase 1 has no "restore cascade" operation. If you delete and then realize the cascade was a mistake, the availabilities are stuck soft-deleted unless an engineer hand-clears `deleted_at` in DB.
 - ⚠️ **Required: `--pricing-category-id` and `--amount`.** All other flags optional.
 - ⚠️ **Legacy aliases ignored on write:** `create` / `update` accept `name`, `product_option_id`, `availability_id`, and `currency` in the request body (reachable via `--data`, since the CLI exposes no such flags) — all four are validated, recorded in the audit log, and then **silently dropped on persist**. The tier's name belongs on the parent `PricingCategory`; currency is tenant-level. Do not confuse the ignored body field `availability_id` with the read-side `--availability-id` filter on `list` / `get`, which is real and does the pivot overlay described above.
-- ⚠️ **Editing a tier's `amount` does not move slots that already have a pivot override.** `pricing-tiers update <id> --amount` changes the catalogue price; any availability with an `availability_pricing_tier` row keeps its own fare and silently diverges. Audit with `availabilities list --include-pricing` before assuming a price change took effect calendar-wide.
+- ⚠️ **Editing a tier's `amount` does not move slots that already have a pivot override.** `pricing-tiers update <id> --amount` changes the catalogue price; any availability with an `availability_pricing_tier` row keeps its own fare and silently diverges. Audit with `availabilities list --include-pricing` before assuming a price change took effect calendar-wide. To make the divergent slots track the catalogue again, clear their overrides with `"amount": null` rather than re-typing the new number into each one.
 - ⚠️ **`amount` is minor units in tenant currency.** `12500` is €125.00 in EUR or ¥12,500 in JPY. The tier's `currency` follows the tenant; not per-row.
 - ⚠️ **`min` / `max` define inclusive headcount bounds.** `min=4 max=null` means "4 or more". Overlapping bands are not validated server-side — the booking flow picks the first match.
 - ⚠️ **Known server bug:** `pricing-tiers restore` may return 404 even after a successful delete (the row IS soft-deleted but the restore handler can't find it). Filed with server team — workaround is delete only what you're prepared to keep deleted.

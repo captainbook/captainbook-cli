@@ -35,7 +35,30 @@ Status enum: `ON_HOLD`, `CONFIRMED`, `EXPIRED`, `CANCELLED`. Date filters apply 
 ceebee inventory bookings get bk_42 --format json
 ```
 
-Response inlines `data.guests[]` and the most-recent `data.transactions[]`. Use `bookings transactions bk_42` for the full ledger. It also carries `data.resources[]` (the assigned boat / guide / kit) and `data.resource_state_token`, which you need for `set-resources`.
+Response inlines `data.guests[]`, the most-recent `data.transactions[]`, and `data.answers[]` (the customer's responses to the operator's custom booking questions). Use `bookings transactions bk_42` for the full ledger, and `answers list` for cross-booking manifest reads. It also carries `data.resources[]` (the assigned boat / guide / kit) and `data.resource_state_token`, which you need for `set-resources`.
+
+`answers` is on `get` only — deliberately **absent** from `bookings list`, because answers routinely carry passport numbers, dates of birth and dietary/medical notes, and a paginated list carrying them would be a bulk PII export. Ordering is stable across repeated reads (`question_id`, then `answerable_type` / `answerable_id` / `id`).
+
+Distinguish the two empty cases, because they mean opposite things:
+
+| `data.answers` | Meaning |
+|----------------|---------|
+| `[]` | You may see answers; this booking has none. |
+| `null` | You may **not** see answers — the token's user lacks `view_answers_of_booking`. The server does not even read them from the database. |
+
+### 2b. What your permissions withhold
+
+Field-level redaction on `Booking` is silent: **the keys are always present, only the values are withheld.** A script that checks for key presence will conclude the data doesn't exist rather than that it can't see it.
+
+| Missing permission | What goes null/empty |
+|--------------------|----------------------|
+| `view_booker_of_booking` | `customer.name` / `.email` / `.phone` and the inline `guests[]`. `customer.id` survives, so the payload stays joinable. |
+| `see_money_of_booking` | `total_amount`, `paid_amount`, `refunded_amount` (null) and `transactions[]` (empty). |
+| `view_answers_of_booking` | `answers` (null — see the table above). |
+
+The dedicated child endpoints agree with those gates rather than letting you walk around them: `transactions list` also requires `see_money_of_booking`, and `guests list` / `answers list` also require `view_booker_of_booking` / `view_answers_of_booking`. A guest or answer outside your business unit or assigned trips reads as **404**, not 403, so the id space is not enumerable.
+
+Ability and permission are two different gates. `cli:read` decides which *endpoints* you can reach; the permissions of the user the token was issued to decide which *data* comes back. A caller holding `view_own_booking` (declared `exclusive_of` `view_any_booking`) sees only the bookings their linked resource is assigned to — list endpoints return a smaller page rather than a 403, so a short page is not evidence of a small calendar.
 
 ### 3. Find every trip a given resource is on
 
@@ -98,7 +121,7 @@ Intent: a customer cancels a booking; apply the product's standard cancellation 
 ceebee inventory bookings cancel bk_42 \
   --reason "customer cancellation request" \
   --refund-policy auto \
-  --notify-customer true \
+  --notify-customer=true \
   --dry-run
 ```
 
@@ -112,7 +135,7 @@ Intent: comp a full refund despite the no-refund policy.
 ceebee inventory bookings cancel bk_42 \
   --reason "weather event — owner approved full refund" \
   --refund-policy full \
-  --notify-customer true
+  --notify-customer=true
 ```
 
 `partial` additionally requires `--refund-amount <minor-units>`.
@@ -127,7 +150,7 @@ Intent: refund €50 of a €150 booking.
 ceebee inventory bookings refund bk_42 \
   --amount 5000 \
   --reason "discount applied retroactively" \
-  --notify-customer false \
+  --notify-customer=false \
   --dry-run
 ```
 
@@ -140,7 +163,7 @@ Intent: write off a booking with no money movement.
 ```bash
 ceebee inventory bookings comp bk_42 \
   --reason "owner-comped tour" \
-  --notify-customer false
+  --notify-customer=false
 ```
 
 A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` defaults `false`.
@@ -155,6 +178,8 @@ A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` 
 - ⚠️ **The state token isn't optional and isn't reusable.** `--expected-resource-state-token` is required, and it's invalidated by any resource change on that booking — including your own successful write. Re-read before each subsequent `set-resources` on the same booking; the response's `data.resource_state_token` is the new one.
 - ⚠️ **Don't retry through a `BOOKING_RESOURCE_STATE_STALE`.** It means the world moved, not that the request was malformed. Retrying the identical body is how you clobber someone else's change the moment the guard happens to line up. Re-read and re-decide.
 - ⚠️ **`--resource-id` on list matches active resources only.** A soft-deleted resource yields an empty page, not a 404 — don't read that as "this resource was never used".
+- ⚠️ **Redaction is silent, and `null` does not mean "empty".** `customer.name`, `total_amount`, `answers` and friends come back as `null` (keys present) when the token's *user* lacks the matching permission — see example 2b. `answers: []` means "none exist"; `answers: null` means "you may not see them". Treating the two the same ships a manifest that is quietly missing every dietary requirement.
+- ⚠️ **`starts_at` / `ends_at` on a booking are in the PRODUCT's timezone, not UTC.** They are read from the linked availability, whose `from` / `to` columns store product-local wall clock: `2026-08-04T10:00:00+01:00` is a 10:00 local departure for a `Europe/London` product. The booking's own timestamps (`confirmed_at`, `cancelled_at`, `created_at`, …) are real UTC. Don't normalise the whole object to UTC with one rule.
 - ⚠️ **`--include resources` is opt-in on list but implicit on get.** `bookings get` always carries `resources[]` + `resource_state_token`; `bookings list` only does with `--include resources`. Scripts that grab the token from a list call will silently read `null` without it.
 
 ## See also
@@ -162,5 +187,6 @@ A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` 
 - [resources.md](resources.md) — creating resources and attaching them to product options (the pool `set-resources` picks from).
 - [transactions.md](transactions.md) — full transaction ledger per booking.
 - [guests.md](guests.md) — per-booking guests, edited separately.
+- [answers.md](answers.md) — cross-booking reads of the same `answers[]` this endpoint inlines (manifests, dietary rollups).
 - [discounts.md](discounts.md) — `discounts apply` attaches to a booking; refund is a separate step here.
 - [notifications.md](notifications.md) — resend the booking confirmation email/SMS.

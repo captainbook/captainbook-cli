@@ -42,11 +42,11 @@ ceebee inventory gift-certificates issue \
   --recipient-email gift-recipient@example.com \
   --recipient-name "Alex Doe" \
   --amount 10000 \
-  --send-now false \
+  --send-now=false \
   --sender-message "Happy birthday!"
 ```
 
-`10000` = €100.00. `--send-now false` (the default) keeps the redemption code from going out. To deliver later, run `gift-certificates resend`.
+`10000` = €100.00. `--send-now=false` (the default) keeps the redemption code from going out. To deliver later, run `gift-certificates resend`.
 
 ### 3. Issue + send in one call (preview first)
 
@@ -56,7 +56,7 @@ ceebee inventory gift-certificates issue \
   --recipient-email recipient@example.com \
   --recipient-name "Alex Doe" \
   --amount 25000 \
-  --send-now true \
+  --send-now=true \
   --dry-run
 ```
 
@@ -69,7 +69,7 @@ Intent: customer disputes the purchase; void the certificate, notify them.
 ```bash
 ceebee inventory gift-certificates void gc_42 \
   --reason "purchase disputed by buyer" \
-  --notify-recipient true
+  --notify-recipient=true
 ```
 
 `--reason` is required (max 500 chars). `--notify-recipient` defaults `false`.
@@ -87,7 +87,7 @@ Without `--recipient-email`, resends to the original recipient. External side ef
 
 - ⚠️ **`delete-available` is HARD delete** (not soft). Returns `409 RESOURCE_IN_USE` if any issued `GiftCertificate` still references the SKU. Either void all issued certs first, or accept the orphaning. There is no `restore-available` — once deleted, the SKU is gone.
 - ⚠️ **No server-side dry-run on `delete-available`.** CLI rejects `--dry-run`. Check references first: `ceebee inventory gift-certificates list-issued --code <SKU-name> --format json | jq '.data | length'`.
-- ⚠️ **`issue --send-now true` is a one-way email trigger.** There is no "unsend"; voiding the cert with `--notify-recipient true` is the closest you get. Default is `false` deliberately so an LLM doesn't accidentally dispatch a redemption email mid-experimentation.
+- ⚠️ **`issue --send-now=true` is a one-way email trigger.** There is no "unsend"; voiding the cert with `--notify-recipient=true` is the closest you get. Default is `false` deliberately so an LLM doesn't accidentally dispatch a redemption email mid-experimentation.
 - ⚠️ **Money is in tenant currency minor units.** `--amount 5000` is €50.00 EUR or ¥5000 JPY — confirm `meta.currency` first via `whoami`.
 
 ## See also

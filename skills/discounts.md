@@ -49,7 +49,7 @@ ceebee inventory discounts create \
   --code WELCOME10 \
   --discounted-price 1000 \
   --validity-start 2026-04-01T00:00:00Z \
-  --auto-apply false
+  --auto-apply=false
 ```
 
 `1000` = €10.00. `--product-option-id` omitted → global discount.
