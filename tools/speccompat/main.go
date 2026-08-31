@@ -23,10 +23,21 @@
 // Both mean "WorkflowStep or null" and both generate `*WorkflowStep`, so the
 // rewrite is semantics-preserving for our purposes.
 //
+// The same idea has a second 3.1 spelling — a type *array* rather than a
+// union of subschemas (Booking.answers uses it):
+//
+//	answers:
+//	  type: [array, 'null']
+//	  items: { $ref: "#/components/schemas/Answer" }
+//
+// which codegen rejects with "unhandled Schema type: &[array null]". The 3.0
+// equivalent is `type: array` + `nullable: true`.
+//
 // Scope is deliberately narrow: only `oneOf`/`anyOf` sequences containing a
-// `type: "null"` member are touched. Everything else passes through untouched,
-// so an unexpected upstream construct fails loudly in codegen rather than
-// being silently mangled here.
+// `type: "null"` member, and `type:` sequences of exactly one real type plus
+// null, are touched. Everything else passes through untouched, so an
+// unexpected upstream construct fails loudly in codegen rather than being
+// silently mangled here.
 //
 // Usage: speccompat <input.yaml> <output.yaml>
 package main
@@ -80,6 +91,7 @@ func normalize(n *yaml.Node) int {
 	count := 0
 	if n.Kind == yaml.MappingNode {
 		count += rewriteNullableUnion(n)
+		count += rewriteNullableTypeArray(n)
 	}
 	for _, c := range n.Content {
 		count += normalize(c)
@@ -149,6 +161,80 @@ func rewriteNullableUnion(m *yaml.Node) int {
 	}
 	setNullable(m)
 	return 1
+}
+
+// rewriteNullableTypeArray converts the 3.1 type-array spelling of a nullable
+// scalar/array/object — `type: [array, "null"]` — into the 3.0 pair
+// `type: array` + `nullable: true`.
+//
+// Returns 1 if it rewrote this mapping, 0 otherwise.
+//
+// Only a sequence of exactly one real type plus null is collapsed. A genuine
+// multi-type union (`type: [string, integer, "null"]`) has no 3.0 spelling, so
+// rewriting it would have to pick a winner and silently generate the wrong Go
+// type for every consumer; it is left alone for codegen to reject. Likewise a
+// lone `type: ["null"]` — nothing survives to name a type with.
+func rewriteNullableTypeArray(m *yaml.Node) int {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		key, val := m.Content[i], m.Content[i+1]
+		if key.Kind != yaml.ScalarNode || key.Value != "type" {
+			continue
+		}
+		if val.Kind != yaml.SequenceNode {
+			continue
+		}
+		var survivors []*yaml.Node
+		sawNull := false
+		wellFormed := true
+		for _, member := range val.Content {
+			if member.Kind != yaml.ScalarNode {
+				wellFormed = false
+				break
+			}
+			if member.Tag == "!!null" || member.Value == "null" {
+				sawNull = true
+				continue
+			}
+			survivors = append(survivors, member)
+		}
+		if !wellFormed || !sawNull || len(survivors) != 1 {
+			continue
+		}
+		// The key is spelled "type", but that alone does not make this a
+		// SCHEMA. `type` is an ordinary word, and a spec is full of places
+		// where it is DATA: an `example:` block describing a payload, a
+		// `default:`, an `x-` extension. This spec's own `granularity` enum
+		// is [booking, guest, extra], so `type: [guest, null]` under an
+		// example is a shape upstream could plausibly write — and rewriting
+		// it would collapse the sequence AND inject a fabricated
+		// `nullable: true` into somebody's example object.
+		//
+		// Requiring the survivor to be a JSON Schema type name is what
+		// separates schema position from data. It costs nothing on real
+		// schemas (a nullable type-array has no other legal spelling) and
+		// makes the package's "fail loudly rather than mangle" promise
+		// actually true for arbitrary upstream input.
+		if !isJSONSchemaTypeName(survivors[0].Value) {
+			continue
+		}
+		// Replace the sequence node in place with the surviving scalar so
+		// anchors/comments attached elsewhere in the mapping are untouched.
+		m.Content[i+1] = survivors[0]
+		setNullable(m)
+		return 1
+	}
+	return 0
+}
+
+// isJSONSchemaTypeName reports whether s is one of the seven type names JSON
+// Schema defines. Anything else in a `type:` sequence means the key is data,
+// not a schema keyword — see rewriteNullableTypeArray.
+func isJSONSchemaTypeName(s string) bool {
+	switch s {
+	case "string", "number", "integer", "boolean", "array", "object", "null":
+		return true
+	}
+	return false
 }
 
 // isNullTypeSchema reports whether node is exactly `{type: "null"}` — the 3.1

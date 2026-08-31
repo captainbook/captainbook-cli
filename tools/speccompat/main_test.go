@@ -224,6 +224,138 @@ mixed:
 			wantCount: 1,
 		},
 		{
+			// The 3.1 type-array spelling, and the exact shape in
+			// cli-v1.yaml today (Booking.answers). `nullable` is not a
+			// keyword in 3.1, so the API team spells nullability this way
+			// on fields that genuinely return null; codegen dies on the
+			// sequence with "unhandled Schema type: &[array null]".
+			name: "type array plus null collapses to the scalar type + nullable",
+			in: `
+answers:
+  type: [array, 'null']
+  items: { $ref: "#/components/schemas/Answer" }
+`,
+			want: `
+answers:
+  type: array
+  items: { $ref: "#/components/schemas/Answer" }
+  nullable: true
+`,
+			wantCount: 1,
+		},
+		{
+			// Same rewrite on a scalar, the likelier shape the next
+			// nullable field will arrive in.
+			name: "type array works for scalars too",
+			in: `
+label:
+  type: [string, 'null']
+`,
+			want: `
+label:
+  type: string
+  nullable: true
+`,
+			wantCount: 1,
+		},
+		{
+			// A genuine multi-type union has no 3.0 spelling. Rewriting it
+			// would have to pick a winner and silently generate the wrong Go
+			// type for every consumer, so it is left for codegen to reject.
+			name: "multi-type union with null is left untouched",
+			in: `
+answer_raw:
+  type: [string, integer, 'null']
+`,
+			want: `
+answer_raw:
+  type: [string, integer, 'null']
+`,
+			wantCount: 0,
+		},
+		{
+			// Degenerate: nothing survives to name a type with.
+			name: "null-only type array is left untouched",
+			in: `
+cleared:
+  type: ['null']
+`,
+			want: `
+cleared:
+  type: ['null']
+`,
+			wantCount: 0,
+		},
+		{
+			// A plain scalar type is the overwhelmingly common case and must
+			// pass through without acquiring a spurious nullable.
+			name: "plain scalar type is left untouched",
+			in: `
+label:
+  type: string
+`,
+			want: `
+label:
+  type: string
+`,
+			wantCount: 0,
+		},
+		{
+			// A `type:` key is only a SCHEMA keyword when its value names a
+			// JSON Schema type. Under an `example:` it is ordinary data, and
+			// rewriting it would both collapse the sequence and inject a
+			// fabricated `nullable: true` into the operator's example — the
+			// exact silent mangling this package promises never to do. Not
+			// contrived for this spec: `granularity` is enum [booking, guest,
+			// extra], so `[guest, null]` is a shape upstream could write.
+			name: "type sequence under example: is data, not a schema keyword",
+			in: `
+example:
+  type: [guest, 'null']
+  name: bob
+`,
+			want: `
+example:
+  type: [guest, 'null']
+  name: bob
+`,
+			wantCount: 0,
+		},
+		{
+			name: "type sequence naming a non-schema value is left alone",
+			in: `
+default:
+  type: [booking, 'null']
+`,
+			want: `
+default:
+  type: [booking, 'null']
+`,
+			wantCount: 0,
+		},
+		{
+			// Every JSON Schema type name must still rewrite — the guard
+			// must not be so tight that it breaks the real case.
+			name: "every JSON Schema type name still rewrites",
+			in: `
+a: {type: [string, 'null']}
+b: {type: [number, 'null']}
+c: {type: [integer, 'null']}
+d: {type: [boolean, 'null']}
+e: {type: [array, 'null']}
+f: {type: [object, 'null']}
+`,
+			want: `
+a: {type: string, nullable: true}
+b: {type: number, nullable: true}
+c: {type: integer, nullable: true}
+d: {type: boolean, nullable: true}
+e: {type: array, nullable: true}
+f: {type: object, nullable: true}
+`,
+			wantCount: 6,
+		},
+		{
 			// The real spec nests these many levels down under
 			// components.schemas.X.properties.y — the walk has to recurse
 			// through mappings AND sequences to reach them.
