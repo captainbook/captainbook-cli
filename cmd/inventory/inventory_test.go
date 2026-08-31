@@ -508,20 +508,28 @@ func newTestParent() *cobra.Command {
 // between the resource files and any future schema additions.
 func TestAllResourceDefs_Buildable(t *testing.T) {
 	groups := map[string][]CommandDef{
-		"auth":              authDefs(),
-		"products":          productsDefs(),
-		"product_options":   productOptionsDefs(),
-		"pricing_tiers":     pricingTiersDefs(),
-		"discounts":         discountsDefs(),
-		"gift_certificates": giftCertificatesDefs(),
-		"bookings":          bookingsDefs(),
-		"transactions":      transactionsDefs(),
-		"customers":         customersDefs(),
-		"guests":            guestsDefs(),
-		"extras":            extrasDefs(),
-		"questions":         questionsDefs(),
-		"categories":        categoriesDefs(),
-		"notifications":     notificationsDefs(),
+		"auth":                authDefs(),
+		"products":            productsDefs(),
+		"product_options":     productOptionsDefs(),
+		"availabilities":      availabilitiesDefs(),
+		"pricing_categories":  pricingCategoriesDefs(),
+		"pricing_tiers":       pricingTiersDefs(),
+		"resources":           resourcesDefs(),
+		"locations":           locationsDefs(),
+		"answers":             answersDefs(),
+		"media":               mediaDefs(),
+		"workflows":           workflowsDefs(),
+		"workflow_executions": workflowExecutionsDefs(),
+		"discounts":           discountsDefs(),
+		"gift_certificates":   giftCertificatesDefs(),
+		"bookings":            bookingsDefs(),
+		"transactions":        transactionsDefs(),
+		"customers":           customersDefs(),
+		"guests":              guestsDefs(),
+		"extras":              extrasDefs(),
+		"questions":           questionsDefs(),
+		"categories":          categoriesDefs(),
+		"notifications":       notificationsDefs(),
 	}
 	for name, defs := range groups {
 		if len(defs) == 0 {
@@ -1010,12 +1018,21 @@ func TestBookingsList_RejectsZeroResourceID(t *testing.T) {
 // bypass on other endpoints — Refuse("") short-circuits as a no-op so
 // any CommandDef that forgets to set Ability would be wide-open.
 func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
+	// EVERY *Defs() in the package must be listed. A resource missing from
+	// this slice silently skips the ability-gate assertion below, which is
+	// the one thing standing between a typo'd Ability and Refuse("") — a
+	// no-op that ships an ungated command. The list had already drifted
+	// past pricing-categories, resources, locations, workflows and
+	// workflow-executions before `answers` was added to it.
 	defGroups := [][]CommandDef{
 		authDefs(),
 		productsDefs(),
 		productOptionsDefs(),
 		availabilitiesDefs(),
+		pricingCategoriesDefs(),
 		pricingTiersDefs(),
+		resourcesDefs(),
+		locationsDefs(),
 		discountsDefs(),
 		giftCertificatesDefs(),
 		bookingsDefs(),
@@ -1024,9 +1041,12 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 		guestsDefs(),
 		extrasDefs(),
 		questionsDefs(),
+		answersDefs(),
 		categoriesDefs(),
 		mediaDefs(),
 		notificationsDefs(),
+		workflowsDefs(),
+		workflowExecutionsDefs(),
 	}
 	for _, defs := range defGroups {
 		for _, d := range defs {
@@ -1040,7 +1060,7 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 	// in any *Defs() table. Cover them directly.
 	bulkSettings := []string{"capacity", "booking-status", "pricing", "start-time", "end-time"}
 	for _, s := range bulkSettings {
-		def := bulkUpdateDef(s, "test-"+s, nil, func(args RunArgs) (any, error) { return map[string]any{}, nil })
+		def := bulkUpdateDef(s, "test-"+s, "", nil, func(args RunArgs) (any, error) { return map[string]any{}, nil })
 		if def.Ability == "" {
 			t.Errorf("bulkUpdateDef(%q) has empty Ability", s)
 		}
@@ -1408,3 +1428,4 @@ func TestMultipartUpload_ForensicSummaryRecordsOptionalFields(t *testing.T) {
 		})
 	}
 }
+

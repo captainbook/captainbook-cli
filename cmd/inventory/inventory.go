@@ -1135,6 +1135,7 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(makeResourceParent("guests", "Manage guests", guestsDefs(), sharedRunner))
 	cmd.AddCommand(makeResourceParent("extras", "Manage extras", extrasDefs(), sharedRunner))
 	cmd.AddCommand(makeResourceParent("questions", "Manage questions", questionsDefs(), sharedRunner))
+	cmd.AddCommand(makeResourceParent("answers", "Read answers to custom booking questions", answersDefs(), sharedRunner))
 	cmd.AddCommand(makeResourceParent("categories", "Read categories", categoriesDefs(), sharedRunner))
 	cmd.AddCommand(makeResourceParent("locations", "Manage locations (start, end, meeting points)", locationsDefs(), sharedRunner))
 	cmd.AddCommand(mediaCmd(sharedRunner))
