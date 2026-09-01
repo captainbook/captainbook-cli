@@ -138,6 +138,30 @@ as `map[string]json.RawMessage` through to the marshal.
 **Why:** one flag preserves the operator's number and the other quietly does not.
 **Priority:** P3 — unreachable at realistic amounts.
 
+## Upstream: `UpdateLocationRequest` description names a property it does not declare
+
+`api/inventory/cli-v1.yaml` `UpdateLocationRequest` says "The controller
+persists only `type`, `name`, `latitude`, `longitude`, `google_place_id`,
+`region`, and (when `address` is provided) `street_address`" — but `region` is
+not among its `properties`, and neither is `street_address`. `CreateLocationRequest`
+declares both.
+
+So one of two things is wrong upstream: either the controller really does
+persist `region` on update and the schema is missing the property (in which
+case no client can send it, including this CLI), or the description is stale
+copy-paste from the create schema. The read response returns no `region`
+either, so the difference is not observable from the outside.
+
+Practical effect today: a location's `region` / `city` / `country_code` /
+`postal_code` can be set at create and never changed, and `skills/locations.md`
+now documents them as create-only for that reason.
+
+**Fix:** ask the server team which it is; add the property or drop it from the
+description. Then re-sync and expose `locations update --region` if it is real.
+**Why:** the spec is the source of truth for the drift tests, and it currently
+disagrees with itself.
+**Priority:** P3 — documented; no operator is blocked, they just cannot edit.
+
 ## ~~Docs/code drift tests (skills + README)~~ — DONE
 
 Implemented as `cmd/inventory/skills_drift_test.go`. Complements
