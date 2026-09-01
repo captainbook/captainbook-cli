@@ -356,6 +356,83 @@ f: {type: object, nullable: true}
 			wantCount: 6,
 		},
 		{
+			// POSITION, not value. `number` is a JSON Schema type name AND a
+			// legal value of this spec's own Answer.type / Question.type
+			// enums, so a value filter cannot see that this is data. Only
+			// the enclosing `example:` key can. This is the case the
+			// value-only guard missed.
+			name: "schema-NAME data value under example: is still left alone",
+			in: `
+Answer:
+  example:
+    id: a_1
+    type: [number, 'null']
+`,
+			want: `
+Answer:
+  example:
+    id: a_1
+    type: [number, 'null']
+`,
+			wantCount: 0,
+		},
+		{
+			// Same for the union form, which previously had no guard at all.
+			name: "oneOf under example: is data too",
+			in: `
+Booking:
+  example:
+    trigger:
+      oneOf:
+        - $ref: "#/components/schemas/WorkflowStep"
+        - { type: "null" }
+`,
+			want: `
+Booking:
+  example:
+    trigger:
+      oneOf:
+        - $ref: "#/components/schemas/WorkflowStep"
+        - { type: "null" }
+`,
+			wantCount: 0,
+		},
+		{
+			name: "default: and x- extensions are data as well",
+			in: `
+a:
+  default: {type: [array, 'null']}
+b:
+  x-vendor: {type: [string, 'null']}
+`,
+			want: `
+a:
+  default: {type: [array, 'null']}
+b:
+  x-vendor: {type: [string, 'null']}
+`,
+			wantCount: 0,
+		},
+		{
+			// Swapping the node out orphans every alias pointing at it, and
+			// the emitted document then fails to re-parse entirely with
+			// "unknown anchor" — worse than not helping.
+			name: "anchored type sequence is left alone rather than orphaning its aliases",
+			in: `
+a:
+  type: &tt [array, 'null']
+b:
+  type: *tt
+`,
+			want: `
+a:
+  type: &tt [array, 'null']
+b:
+  type: *tt
+`,
+			wantCount: 0,
+		},
+		{
 			// The real spec nests these many levels down under
 			// components.schemas.X.properties.y — the walk has to recurse
 			// through mappings AND sequences to reach them.

@@ -113,6 +113,31 @@ mangle" promise true for arbitrary upstream input. Covered by the
 Generalises: any YAML/JSON transform keyed on a bare key NAME needs a
 position/context check, because spec key names recur as data.
 
+## `--data` numbers are rounded through float64 before they reach the wire
+
+`JSONBodyFromArgs` (cmd/inventory/inventory.go) decodes `--data` into
+`map[string]any` and re-marshals it, so every JSON number round-trips through
+`float64`. Anything past 2^53 is silently changed before the request is built:
+
+```
+availabilities update av_1 --data '{"fares":[{"pricing_tier_id":"pt_7","amount":9007199254740993}]}'
+  -> wire: {"fares":[{"amount":9007199254740992,...}]}
+```
+
+The typed `--fares` flag is immune (parseFaresFlag returns `json.RawMessage`,
+which marshals verbatim), so the same field on the same command behaves
+differently depending on which flag carried it. The server cannot reject a
+value that was corrupted before it was sent.
+
+Amounts in minor units past 2^53 are ~90 trillion of any currency, so no
+realistic operator hits this — it is a correctness and honesty problem, not an
+outage. It applies to every `--data`-carrying mutation, not just fares.
+
+**Fix:** decode `--data` with `json.Decoder` + `UseNumber()`, or keep the body
+as `map[string]json.RawMessage` through to the marshal.
+**Why:** one flag preserves the operator's number and the other quietly does not.
+**Priority:** P3 — unreachable at realistic amounts.
+
 ## ~~Docs/code drift tests (skills + README)~~ — DONE
 
 Implemented as `cmd/inventory/skills_drift_test.go`. Complements

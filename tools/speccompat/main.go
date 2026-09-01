@@ -45,6 +45,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -85,18 +86,62 @@ func main() {
 // normalize walks the tree and rewrites every nullable union it finds,
 // returning how many it rewrote.
 func normalize(n *yaml.Node) int {
+	return normalizeAt(n, false)
+}
+
+// normalizeAt is normalize plus the one piece of context the rewrites cannot
+// recover on their own: whether this subtree is SCHEMA or DATA.
+//
+// `type`, `oneOf` and `anyOf` are schema keywords, but they are also ordinary
+// words that appear as payload inside `example:`, `default:` and `x-` blocks.
+// Filtering on the value is not enough to tell them apart: this spec's own
+// `Answer.type` / `Question.type` enums include `number` and `boolean`, which
+// are simultaneously legal data values AND JSON Schema type names. So
+// `example: {type: [number, 'null']}` is indistinguishable from a real schema
+// by value alone — and rewriting it would collapse the sequence and stamp a
+// fabricated `nullable: true` into somebody's example payload.
+//
+// Position is the only thing that separates them, so it is tracked here rather
+// than guessed at in the rewrites.
+func normalizeAt(n *yaml.Node, inData bool) int {
 	if n == nil {
 		return 0
 	}
 	count := 0
 	if n.Kind == yaml.MappingNode {
-		count += rewriteNullableUnion(n)
-		count += rewriteNullableTypeArray(n)
+		if !inData {
+			count += rewriteNullableUnion(n)
+			count += rewriteNullableTypeArray(n)
+		}
+		// Descend key by key so a data block can be recognised by the key
+		// that introduces it. A sequence or scalar just inherits the flag.
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			key, val := n.Content[i], n.Content[i+1]
+			childInData := inData
+			if key.Kind == yaml.ScalarNode && isDataBlockKey(key.Value) {
+				childInData = true
+			}
+			count += normalizeAt(key, inData)
+			count += normalizeAt(val, childInData)
+		}
+		return count
 	}
 	for _, c := range n.Content {
-		count += normalize(c)
+		count += normalizeAt(c, inData)
 	}
 	return count
+}
+
+// isDataBlockKey reports whether a mapping key introduces a subtree of DATA
+// rather than schema. `example` / `examples` / `default` hold payload shaped
+// like the thing being described, and `x-` extensions are vendor-defined and
+// off-limits by definition.
+func isDataBlockKey(k string) bool {
+	switch k {
+	case "example", "examples", "default", "enum":
+		return true
+	}
+	return strings.HasPrefix(k, "x-")
 }
 
 // rewriteNullableUnion converts `oneOf`/`anyOf` sequences that include a
@@ -200,25 +245,30 @@ func rewriteNullableTypeArray(m *yaml.Node) int {
 		if !wellFormed || !sawNull || len(survivors) != 1 {
 			continue
 		}
-		// The key is spelled "type", but that alone does not make this a
-		// SCHEMA. `type` is an ordinary word, and a spec is full of places
-		// where it is DATA: an `example:` block describing a payload, a
-		// `default:`, an `x-` extension. This spec's own `granularity` enum
-		// is [booking, guest, extra], so `type: [guest, null]` under an
-		// example is a shape upstream could plausibly write — and rewriting
-		// it would collapse the sequence AND inject a fabricated
-		// `nullable: true` into somebody's example object.
+		// Second, narrower gate: the survivor must NAME a JSON Schema type.
+		// Position is already handled by normalizeAt, which never calls this
+		// inside a data block; this catches the rest — a `type:` sequence in
+		// schema position holding something that is not a type name is not a
+		// nullable type-array, whatever else it is.
 		//
-		// Requiring the survivor to be a JSON Schema type name is what
-		// separates schema position from data. It costs nothing on real
-		// schemas (a nullable type-array has no other legal spelling) and
-		// makes the package's "fail loudly rather than mangle" promise
-		// actually true for arbitrary upstream input.
+		// This gate alone would NOT be enough, and it is worth being precise
+		// about why: it filters by value, and some values are both. This
+		// spec's `Answer.type` enum contains `number` and `boolean`, which
+		// are legal data AND JSON Schema type names, so `example: {type:
+		// [number, "null"]}` is invisible to a value filter. Position is what
+		// separates those; this is the belt to that pair of braces.
 		if !isJSONSchemaTypeName(survivors[0].Value) {
 			continue
 		}
-		// Replace the sequence node in place with the surviving scalar so
-		// anchors/comments attached elsewhere in the mapping are untouched.
+		// An anchored sequence is left alone. Swapping the node out orphans
+		// every `*alias` pointing at it, and the emitted file then fails to
+		// re-parse at all ("unknown anchor") — the one outcome this package
+		// calls worse than not helping. Fail loudly in codegen instead.
+		if val.Anchor != "" {
+			continue
+		}
+		// Replace the sequence node in place with the surviving scalar. The
+		// mapping's other entries, and their comments, are untouched.
 		m.Content[i+1] = survivors[0]
 		setNullable(m)
 		return 1

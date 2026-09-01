@@ -139,8 +139,12 @@ func bulkDeleteDef() CommandDef {
 // slot follows the catalogue price again" — it is passed straight through.
 //
 // NOTE: this gates the --fares FLAG only. Every mutation also accepts
-// --data, and `--data '{"fares":[]}'` reaches the wire ungated; the server
-// rejects it there.
+// --data, and `--data '{"fares":[...]}'` bypasses every check here. For a
+// malformed shape that is fine — the server rejects it. For a large amount
+// it is NOT: JSONBodyFromArgs decodes --data through map[string]any, so
+// 9007199254740993 is rounded to ...992 before it is sent and the server
+// never sees the value the operator typed. The verbatim guarantee above
+// covers the flag path only. Tracked in TODOS.md.
 func parseFaresFlag(raw string) ([]map[string]json.RawMessage, error) {
 	var fares []map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &fares); err != nil {
@@ -157,8 +161,11 @@ func parseFaresFlag(raw string) ([]map[string]json.RawMessage, error) {
 			`[{"pricing_tier_id":"...","amount":null}] to delete an override`)
 	}
 	for i, entry := range fares {
-		// A null or non-object element decodes to a nil map, which would
-		// otherwise be reported as a missing "amount" key.
+		// Only a JSON `null` element reaches here as a nil map — every other
+		// non-object element (a number, string, array, bool) fails the decode
+		// above and never enters this loop. Without this guard a `null`
+		// element would be reported as a missing "amount" key, which reads
+		// like a field problem rather than a shape problem.
 		if entry == nil {
 			return nil, fmt.Errorf("--fares[%d]: expected an object, got null", i)
 		}
