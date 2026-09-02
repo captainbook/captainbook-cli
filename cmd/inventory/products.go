@@ -28,19 +28,15 @@ func productsDefs() []CommandDef {
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "category", Type: "string", Description: "Filter by category slug or ID"},
-				// `archived` appears here only because the vendored spec's
-				// filter enum still lists it and
-				// TestSpecDrift_FlagDescriptionEnumsMatchSpec locks the
-				// description to that enum. The server does NOT accept it:
-				// ProductController::index validates `status` with
-				// `in:published,draft`, so `--status archived` costs a round
-				// trip to earn a 422 VALIDATION_FAILED. Note this is worse
-				// than a plain typo, not the same: the client-side enum gate
-				// below rejects `--status publshed` locally, but passes
-				// `archived` precisely because it is listed here. Drop it
-				// once the spec fix lands upstream and the spec is re-synced.
-				// See captainbook/captainbook-cli#18.
-				{Name: "status", Type: "string", Description: "draft|published|archived"},
+				// Two-state on purpose: `status` filters the `is_active`
+				// boolean (published → true, draft → false) and the server
+				// validates it with `in:published,draft`. There is no
+				// archived state; the spec used to advertise one, which made
+				// `--status archived` sail past the client-side enum gate to
+				// earn a server 422 a round trip later
+				// (captainbook/captainbook#8111, captainbook-cli#18). Now
+				// that the spec is fixed, the gate rejects it locally.
+				{Name: "status", Type: "string", Description: "draft|published"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
