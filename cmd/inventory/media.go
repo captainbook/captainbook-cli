@@ -182,8 +182,11 @@ func uploadCmd(runner *Runner) *cobra.Command {
 			}
 		}
 
-		// Ability gate first.
-		if err := invpkg.Refuse(invpkg.Write, runner.Abilities); err != nil {
+		// Ability gate first. Same refresh-on-miss retry as every
+		// CommandDef path — uploadCmd is hand-built cobra, so it has to
+		// reach for the helper explicitly rather than getting it from
+		// runMutation.
+		if err := runner.refuseAbility(cmd.Context(), invpkg.Write); err != nil {
 			return err
 		}
 

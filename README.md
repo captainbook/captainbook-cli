@@ -80,7 +80,7 @@ The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` with a Sanc
 
 - `cli:read` — list / show / get
 - `cli:write` — create / update / delete / restore / attach / detach
-- `cli:cs` — customer-success ops (`bookings refund`, `bookings comp`, `bookings resend-confirmation`)
+- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings resend-confirmation`). `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy.
 
 Inspect what your token has:
 

@@ -20,9 +20,12 @@ import (
 // state along with the resource_state_token you read, so a concurrent
 // back-office edit fails the write instead of being silently overwritten.
 //
-// Refund + comp are CS-only (cli:cs) operations and capture rich
-// forensic_summary fields per D37 (refund: amount, reason, transaction_id;
-// comp: reason, notify_customer).
+// Cancel, refund, comp and resend-confirmation are CS-only (cli:cs)
+// operations. Cancel is CS because refund_policy is required and its whole
+// V1 enum (none|full|partial) is policy overrides, which the spec puts behind
+// cli:cs — see the binding for the full reasoning. Refund and comp capture
+// rich forensic_summary fields per D37 (refund: amount, reason,
+// transaction_id; comp: reason, notify_customer).
 //
 // Tuned diff renderer: "Booking".
 func bookingsDefs() []CommandDef {
@@ -280,13 +283,51 @@ func bookingsDefs() []CommandDef {
 			},
 		},
 		{
-			Use: "bookings cancel <id>", Short: "Cancel a booking",
+			Use: "bookings cancel <id>", Short: "Cancel a booking (CS only)",
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/cancel",
-			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Ability: invpkg.CS, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
+			// cli:cs, not cli:write, and NOT conditional on --refund-policy.
+			// The server settles it: POST /bookings/{id}/cancel sits in the
+			// `abilities:cli:cs` route group alongside comp, refund and
+			// resend-confirmation, and Phase1CCancelTest asserts "returns 403
+			// with cli:write only (cancel needs cli:cs)" using a body with
+			// refund_policy=none — the value that moves no money. So cancel
+			// is CS for EVERY refund_policy, and a cli:write gate here would
+			// only let an operator token onto the wire to be refused there.
+			//
+			// The spec agrees where it is specific:
+			// CancelBookingRequest.refund_policy says of `none`, `full`,
+			// `partial` that they "override the product's cancellation policy
+			// (CS only — operator tokens are 403 on overrides)". refund_policy
+			// is required and those three are the whole V1 enum, so no
+			// operator-legal value exists to gate conditionally on. Its
+			// securitySchemes ability table disagrees — it omits cancel from
+			// the cli:cs row, which is what misled this binding in the first
+			// place. Do not trust that table over the routes: it is wrong
+			// upstream, tracked as captainbook/captainbook#8113.
+			//
+			// A static gate is also the only kind this path can enforce:
+			// Refuse() runs in runMutation before the body is built, so it
+			// cannot see refund_policy.
+			//
+			// The relaxed branch the docs used to promise ("cli:write for
+			// refund_policy=auto") was real against an older spec. `auto` is
+			// out of the V1 enum pending the structured policy engine — it
+			// 422s POLICY_AUTO_NOT_READY — and the operator-reachable cancel
+			// went out with it. If `auto` is restored, revisit: that value is
+			// the non-override case, and honouring it needs the ability check
+			// moved after body parsing.
+			Long: "Cancel a booking, applying refund_policy. Requires the cli:cs " +
+				"ability for EVERY --refund-policy value: `none`, `full`, and " +
+				"`partial` all override the product's cancellation policy, and the " +
+				"server 403s operator tokens on overrides. Cancelling with " +
+				"--refund-policy full or partial moves real money through Stripe; " +
+				"--dry-run returns the policy preview and estimated refund without " +
+				"contacting Stripe or the mailer.",
 			Flags: []FlagDef{
 				{Name: "reason", Type: "string", Required: true, Description: "Cancellation reason"},
-				{Name: "refund-policy", Type: "string", Required: true, Description: "none|full|partial (spec: required; CS-only for overrides)"},
+				{Name: "refund-policy", Type: "string", Required: true, Description: "none|full|partial (all three are CS-only policy overrides)"},
 				{Name: "refund-amount", Type: "int", Description: "Refund amount in minor units (only with partial)"},
 				// Server's CancelBookingRequest defaults notify_customer to TRUE.
 				// Mirror that default at the cobra layer so --help reads "(default
@@ -392,7 +433,7 @@ func bookingsDefs() []CommandDef {
 			},
 		},
 		{
-			Use: "bookings resend-confirmation <id>", Short: "Resend booking confirmation",
+			Use: "bookings resend-confirmation <id>", Short: "Resend booking confirmation (CS only)",
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/notifications/resend-confirmation",
 			Ability: invpkg.CS, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},

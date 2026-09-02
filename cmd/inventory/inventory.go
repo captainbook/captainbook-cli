@@ -334,6 +334,15 @@ type Runner struct {
 	// Abilities is the cached token ability set for this invocation.
 	Abilities invpkg.Set
 
+	// RefreshAbilities re-reads the token's abilities from the server,
+	// bypassing (and replacing) the on-disk whoami cache. The ability gate
+	// calls it once when the cached set says no, so a token upgraded in
+	// place — the Provider panel's updateApiToken writes a new abilities
+	// array onto the SAME token string — isn't locked out by a cache entry
+	// that predates the grant. Nil disables the retry; the gate then refuses
+	// on the cached set alone.
+	RefreshAbilities func(context.Context) (invpkg.Set, error)
+
 	// Profile is the resolved config used for audit (Tenant slug + profile
 	// name) and for the multipart upload outlier (which sidesteps the
 	// gen client and posts directly to a constructed URL).
@@ -398,10 +407,95 @@ func (r *Runner) renderResult(_ CommandDef, res *RunResult) error {
 	return nil
 }
 
+// refuseAbility is the ability gate for every command path.
+//
+// It is Refuse plus one retry: a refusal decided purely on a cached ability
+// set is not trustworthy enough to be final. The whoami cache is keyed on
+// (host, token) and an entry with no expiry lives forever, so when an admin
+// grants cli:cs to an EXISTING token — the supported upgrade path; the
+// Provider panel's updateApiToken rewrites the abilities array in place and
+// the token string does not change — the CLI would otherwise refuse locally
+// forever. No request goes out, so nothing can 401, so nothing invalidates
+// the entry, and the error tells the user to ask an admin who already said
+// yes. Re-reading once on a miss costs a whoami round trip only on the
+// refusal path, and the money-moving request still never leaves the machine
+// unless the server confirms the ability.
+//
+// A refresh that fails (offline, 500, expired token) returns the ORIGINAL
+// ability error: the user's problem is the missing ability, not our failure
+// to re-check it.
+func (r *Runner) refuseAbility(ctx context.Context, needed invpkg.Ability) error {
+	err := invpkg.Refuse(needed, r.Abilities)
+	if err == nil || r.RefreshAbilities == nil {
+		return err
+	}
+	fresh, refreshErr := r.RefreshAbilities(ctx)
+	if refreshErr != nil {
+		if r.Verbose && r.Err != nil {
+			fmt.Fprintf(r.Err, "ability re-check failed (%v); refusing on the cached set\n", refreshErr)
+		}
+		return err
+	}
+	r.Abilities = fresh
+	return invpkg.Refuse(needed, fresh)
+}
+
+// newAbilityCache adapts a *DiskCache constructor to the Cache interface
+// without the concrete-nil trap.
+//
+// NewDiskCache returns (nil, err) when the home directory can't be resolved.
+// Assigning that nil *DiskCache straight into a Cache interface produces a
+// NON-nil interface holding a nil pointer, so Preflight's `cache != nil`
+// guard passes and cache.Get dereferences a nil receiver. Returning an
+// untyped nil is what makes the documented "a nil cache disables caching"
+// path actually reachable.
+func newAbilityCache(mk func() (*invpkg.DiskCache, error)) invpkg.Cache {
+	dc, err := mk()
+	if err != nil || dc == nil {
+		return nil
+	}
+	return dc
+}
+
+// abilityRefresher builds the cache-bypassing re-read used by refuseAbility.
+//
+// It calls whoamiFn DIRECTLY rather than going through Preflight with an
+// Invalidate first. Eviction is not a reliable bypass: Invalidate does a
+// read-modify-write of the cache file, so on a read-only filesystem or a full
+// disk it fails while the stale entry stays perfectly readable — and Preflight
+// would then serve the very entry the refresh exists to escape, with no
+// network call and no way for the caller to tell. Fetching unconditionally
+// has no such failure mode.
+//
+// The fresh result is written back so the round trip is paid once rather than
+// on every later command. That write is best-effort on purpose: the abilities
+// are already in hand, and a cache that won't persist should not turn a
+// successful re-read into a refusal.
+func abilityRefresher(
+	host, token string,
+	cache invpkg.Cache,
+	whoamiFn func(context.Context) (invpkg.Set, time.Time, error),
+) func(context.Context) (invpkg.Set, error) {
+	return func(ctx context.Context) (invpkg.Set, error) {
+		fresh, expiresAt, err := whoamiFn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if cache != nil {
+			_ = cache.Set(host, token, invpkg.Entry{
+				Abilities: fresh,
+				ExpiresAt: expiresAt,
+				CachedAt:  time.Now(),
+			})
+		}
+		return fresh, nil
+	}
+}
+
 // runRead orchestrates the read path. No dry-run, no audit — just preflight
 // the ability, invoke Run, render, return.
 func runRead(ctx context.Context, r *Runner, def CommandDef, args RunArgs) error {
-	if err := invpkg.Refuse(def.Ability, r.Abilities); err != nil {
+	if err := r.refuseAbility(ctx, def.Ability); err != nil {
 		return err
 	}
 	res, err := def.Run(ctx, r, args)
@@ -417,7 +511,7 @@ func runRead(ctx context.Context, r *Runner, def CommandDef, args RunArgs) error
 // On a typed inventory error, runMutation appends an audit entry with the
 // error_code and returns the error (cobra renders UserMessage).
 func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) error {
-	if err := invpkg.Refuse(def.Ability, r.Abilities); err != nil {
+	if err := r.refuseAbility(ctx, def.Ability); err != nil {
 		return err
 	}
 
@@ -1229,7 +1323,7 @@ func newRunner(c *cobra.Command) (*Runner, error) {
 		return nil, &api.ExitError{Err: err, Code: api.ExitConfig}
 	}
 
-	cache, _ := invpkg.NewDiskCache()
+	cache := newAbilityCache(invpkg.NewDiskCache)
 	whoamiFn := func(ctx context.Context) (invpkg.Set, time.Time, error) {
 		resp, err := client.WhoamiWithResponse(ctx)
 		if err != nil {
@@ -1256,22 +1350,25 @@ func newRunner(c *cobra.Command) (*Runner, error) {
 		return nil, err
 	}
 
+	refreshAbilities := abilityRefresher(u.Host, resolved.Token, cache, whoamiFn)
+
 	var logger *invpkg.FileLogger
 	if path, perr := invpkg.DefaultAuditPath(); perr == nil {
 		logger, _ = invpkg.NewFileLogger(path)
 	}
 
 	return &Runner{
-		Client:      client,
-		HTTPClient:  httpClient,
-		AuditLogger: logger,
-		Abilities:   abilities,
-		Profile:     resolved,
-		ProfileName: profileName,
-		Tenant:      u.Host,
-		Verbose:     verbose,
-		Out:         os.Stdout,
-		Err:         os.Stderr,
+		Client:           client,
+		HTTPClient:       httpClient,
+		AuditLogger:      logger,
+		Abilities:        abilities,
+		RefreshAbilities: refreshAbilities,
+		Profile:          resolved,
+		ProfileName:      profileName,
+		Tenant:           u.Host,
+		Verbose:          verbose,
+		Out:              os.Stdout,
+		Err:              os.Stderr,
 	}, nil
 }
 

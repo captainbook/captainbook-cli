@@ -15,6 +15,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
@@ -682,6 +685,384 @@ func bookingsDefFor(t *testing.T, use string) CommandDef {
 	return found[0]
 }
 
+// TestBookingsCancel_IsCSGated locks the resolution of issue #19: `bookings
+// cancel` binds cli:cs, statically, for every --refund-policy value.
+//
+// The drift test only proves the docs agree with the binding, so a
+// coordinated edit could flip both back to cli:write and stay green. This
+// asserts against the spec instead, which is what actually decides it:
+// CancelBookingRequest.refund_policy is required, and the spec says of its
+// enum members that they "override the product's cancellation policy (CS
+// only — operator tokens are 403 on overrides)". Every reachable cancel is
+// therefore a CS-attributed override, and an operator token that got past a
+// cli:write gate here would just eat a server 403 after the request left the
+// machine — with a Stripe refund on the line.
+//
+// The second half is the forward guard. `auto` — the one value that would
+// NOT be an override, and the reason the old docs promised "cli:write for
+// refund_policy=auto" — is out of the V1 enum pending the structured policy
+// engine. If a spec re-sync puts it back, this fails, because that is the
+// point at which conditional gating becomes a real question again (and needs
+// the ability check moved after body parsing, since Refuse runs first).
+func TestBookingsCancel_IsCSGated(t *testing.T) {
+	def := bookingsDefFor(t, "bookings cancel <id>")
+	if def.Ability != invpkg.CS {
+		t.Errorf("bookings cancel binds Ability %q, want %q (cli:cs) — see issue #19: "+
+			"refund_policy is required and every V1 enum value is a CS-only policy override",
+			def.Ability, invpkg.CS)
+	}
+
+	spec := loadSpecDoc(t)
+	op := spec.findOp("POST", "/bookings/{id}/cancel")
+	if op == nil {
+		t.Fatal("spec has no POST /bookings/{id}/cancel")
+	}
+	f := spec.bodyField(op, "refund_policy")
+	if f == nil {
+		t.Fatal("spec: CancelBookingRequest has no refund_policy")
+	}
+
+	// Set equality, not a scan for the literal "auto". Scanning only catches
+	// the value by the name it had in V1: a re-sync that adds the
+	// non-override policy back as "standard" or "policy_default", or that
+	// drops a value, would leave a name-scan green while the gate silently
+	// stops matching the spec. The enum IS the argument for a static gate,
+	// so pin the whole set.
+	wantEnum := []string{"none", "full", "partial"}
+	if !sameSet(f.Enum, wantEnum) {
+		t.Errorf("spec refund_policy enum is now %v, was %v. The static cli:cs gate on "+
+			"bookings cancel rests on EVERY member being a CS-only policy override. "+
+			"A member that applies the product's own policy instead is operator-reachable "+
+			"and makes this gate over-strict — re-open the issue #19 decision (conditional "+
+			"gating needs Refuse() moved after body parsing). A member that is merely new "+
+			"and still an override: widen wantEnum here.", f.Enum, wantEnum)
+	}
+
+	// The other half of the argument: refund_policy is REQUIRED, so there is
+	// no omit-the-field path that skips the override. If a re-sync makes it
+	// optional, a defaulted cancel becomes reachable and the gate needs
+	// revisiting — the enum check above would not notice.
+	if !specRequires(t, "CancelBookingRequest", "refund_policy") {
+		t.Error("spec no longer marks CancelBookingRequest.refund_policy as required. " +
+			"An omitted refund_policy would let the server apply its own default, which is " +
+			"the operator-reachable cancel this static cli:cs gate assumes cannot exist. " +
+			"Re-open the issue #19 decision.")
+	}
+}
+
+// specRequires reports whether the named components schema lists field in its
+// `required` array. specDoc flattens properties only and drops `required`, and
+// teaching the shared parser about it would touch every spec-drift test, so
+// this reads the one fact it needs straight from the YAML.
+func specRequires(t *testing.T, schema, field string) bool {
+	t.Helper()
+	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var raw struct {
+		Components struct {
+			Schemas map[string]struct {
+				Required []string `yaml:"required"`
+			} `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("yaml.Unmarshal: %v", err)
+	}
+	sch, ok := raw.Components.Schemas[schema]
+	if !ok {
+		t.Fatalf("spec has no components.schemas.%s", schema)
+	}
+	for _, r := range sch.Required {
+		if r == field {
+			return true
+		}
+	}
+	return false
+}
+
+// TestBookingsCancel_OperatorTokenRefusedBeforeNetwork drives the REAL cancel
+// CommandDef through runMutation on both sides of the gate.
+//
+// TestBookingsCancel_IsCSGated asserts the binding; this asserts the behavior
+// that binding buys, which is not the same claim. The refusal has to happen
+// before the request leaves the machine — a gate that let the call through and
+// relied on the server's 403 would still be "cli:cs" by inspection while
+// putting a Stripe refund one network hop from an operator token. The handler
+// fails the test if it is ever reached.
+//
+// The second half is the guard against over-correcting: a CS token must still
+// get through with refund_policy intact. Tightening a gate is only free if the
+// legitimate caller is unaffected.
+func TestBookingsCancel_OperatorTokenRefusedBeforeNetwork(t *testing.T) {
+	def := bookingsDefFor(t, "bookings cancel <id>")
+	cancelArgs := func() RunArgs {
+		return RunArgs{
+			PathArgs: []string{"bk_1"},
+			Flags: map[string]any{
+				"reason":        "customer cancellation request",
+				"refund-policy": "none",
+			},
+		}
+	}
+
+	t.Run("operator token is refused without sending the cancel", func(t *testing.T) {
+		_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("cancel request sent on %s %s — a refused operator token must never "+
+				"reach the cancel endpoint, however the gate decides", r.Method, r.URL.Path)
+		})
+		// The operator token from the spec's recommended issuance: read +
+		// write, no CS. refund_policy=none is deliberate — it is the value
+		// that moves no money, and it is still refused.
+		runner.Abilities = invpkg.Set{invpkg.Read, invpkg.Write}
+		// Server confirms the token really is operator-grade, so the
+		// re-read changes nothing and the refusal stands.
+		refreshes := 0
+		runner.RefreshAbilities = func(context.Context) (invpkg.Set, error) {
+			refreshes++
+			return invpkg.Set{invpkg.Read, invpkg.Write}, nil
+		}
+
+		err := runMutation(context.Background(), runner, def, cancelArgs())
+		if err == nil {
+			t.Fatal("expected ability refusal for a cli:write token, got nil")
+		}
+		var am *invpkg.AbilityMissingError
+		if !errors.As(err, &am) {
+			t.Fatalf("expected *AbilityMissingError, got %T: %v", err, err)
+		}
+		if am.Needed != invpkg.CS {
+			t.Errorf("refused for ability %q, want %q", am.Needed, invpkg.CS)
+		}
+		if refreshes != 1 {
+			t.Errorf("re-read the ability set %d times, want exactly 1 — a refusal decided "+
+				"on a possibly-stale cache must be confirmed against the server once", refreshes)
+		}
+	})
+
+	t.Run("cs token passes the gate with refund_policy intact", func(t *testing.T) {
+		var gotBody []byte
+		_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotBody, _ = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"applied":true,"refund_amount":0,"policy_applied":"none"},"meta":{"request_id":"r1"}}`))
+		})
+		// fakeServer's default runner already carries CS; state it anyway so
+		// the contrast with the case above is on the page.
+		runner.Abilities = invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS}
+
+		if err := runMutation(context.Background(), runner, def, cancelArgs()); err != nil {
+			t.Fatalf("runMutation with a cli:cs token: %v", err)
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal(gotBody, &parsed); err != nil {
+			t.Fatalf("unmarshal wire body %q: %v", gotBody, err)
+		}
+		if got := parsed["refund_policy"]; got != "none" {
+			t.Errorf("refund_policy = %v; want none (full body: %v)", got, parsed)
+		}
+		if got := parsed["reason"]; got != "customer cancellation request" {
+			t.Errorf("reason = %v; want the passed reason (full body: %v)", got, parsed)
+		}
+	})
+}
+
+// TestRefuseAbility_RefreshRescuesUpgradedToken covers the regression that
+// tightening bookings cancel to cli:cs would otherwise introduce.
+//
+// The whoami cache is keyed on (host, token) and an entry with no expiry is
+// kept forever. Granting cli:cs through the Provider panel rewrites the
+// abilities array on the SAME token string (updateApiToken), so the key does
+// not change and the stale entry survives. With a gate that refuses purely on
+// the cache and never calls out, that token could never run cancel again: no
+// request means no 401, no 401 means no invalidation, and the error tells the
+// user to ask an admin who already granted it. The only escape was deleting
+// the cache file by hand — the CLI advertises a --no-cache in abilities.go
+// but has never had one.
+//
+// Three properties, one per subtest: the retry rescues an upgraded token, a
+// failed re-read still refuses (and surfaces the ability error, not the
+// network error), and a token that passes on the cached set costs no round
+// trip at all.
+func TestRefuseAbility_RefreshRescuesUpgradedToken(t *testing.T) {
+	t.Run("upgraded token passes after the re-read", func(t *testing.T) {
+		r := &Runner{
+			// What the cache recorded before the upgrade.
+			Abilities: invpkg.Set{invpkg.Read, invpkg.Write},
+			RefreshAbilities: func(context.Context) (invpkg.Set, error) {
+				// What the server says now.
+				return invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS}, nil
+			},
+		}
+		if err := r.refuseAbility(context.Background(), invpkg.CS); err != nil {
+			t.Fatalf("upgraded token refused after re-read: %v", err)
+		}
+		// The refreshed set must stick, or every later gate in the same
+		// invocation pays the round trip again.
+		if !r.Abilities.Has(invpkg.CS) {
+			t.Errorf("Abilities = %v; the refreshed set must replace the stale one", r.Abilities)
+		}
+	})
+
+	t.Run("failed re-read refuses with the ability error", func(t *testing.T) {
+		r := &Runner{
+			Abilities: invpkg.Set{invpkg.Read, invpkg.Write},
+			RefreshAbilities: func(context.Context) (invpkg.Set, error) {
+				return nil, errors.New("whoami: connection refused")
+			},
+			Err: &bytes.Buffer{},
+		}
+		err := r.refuseAbility(context.Background(), invpkg.CS)
+		var am *invpkg.AbilityMissingError
+		if !errors.As(err, &am) {
+			t.Fatalf("expected the original *AbilityMissingError when the re-read fails, got %T: %v", err, err)
+		}
+		// Surfacing "connection refused" would send the user debugging
+		// their network when the actual answer is a missing ability.
+		if strings.Contains(err.Error(), "connection refused") {
+			t.Errorf("refusal leaked the refresh failure: %v", err)
+		}
+	})
+
+	t.Run("a token that already has the ability never re-reads", func(t *testing.T) {
+		refreshed := false
+		r := &Runner{
+			Abilities: invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS},
+			RefreshAbilities: func(context.Context) (invpkg.Set, error) {
+				refreshed = true
+				return nil, nil
+			},
+		}
+		if err := r.refuseAbility(context.Background(), invpkg.CS); err != nil {
+			t.Fatalf("granted ability refused: %v", err)
+		}
+		if refreshed {
+			t.Error("re-read the ability set on the happy path — the round trip belongs on the refusal path only")
+		}
+	})
+}
+
+// TestAbilityRefresher_BypassesCacheEvenWhenEvictionFails exercises the
+// PRODUCTION refresh closure, not a stub.
+//
+// The first version of this fix bypassed the cache by calling Invalidate and
+// then Preflight. That is not a bypass: Invalidate rewrites the cache file, so
+// on a read-only filesystem or a full disk it fails while the stale entry
+// stays readable, and Preflight then serves the exact entry the refresh exists
+// to escape — no network call, lockout intact, caller none the wiser. The
+// fake here is that filesystem: eviction always fails and the stale entry
+// never goes away, which is the condition the old code got wrong.
+func TestAbilityRefresher_BypassesCacheEvenWhenEvictionFails(t *testing.T) {
+	stale := invpkg.Entry{Abilities: invpkg.Set{invpkg.Read, invpkg.Write}}
+	c := &stubbornCache{entry: stale}
+
+	whoamiCalls := 0
+	expires := time.Now().Add(time.Hour)
+	whoami := func(context.Context) (invpkg.Set, time.Time, error) {
+		whoamiCalls++
+		// The server's current answer: the token was upgraded in place.
+		return invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS}, expires, nil
+	}
+
+	refresh := abilityRefresher("api.example.com", "tok_1", c, whoami)
+	got, err := refresh(context.Background())
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if whoamiCalls != 1 {
+		t.Errorf("whoami called %d times, want 1 — the refresh must always hit the "+
+			"server, never a cache entry", whoamiCalls)
+	}
+	if !got.Has(invpkg.CS) {
+		t.Errorf("refresh returned %v; want the server's upgraded set including cli:cs "+
+			"(a stale entry was served instead)", got)
+	}
+	if c.setCalls != 1 {
+		t.Errorf("cache written %d times, want 1 — the fresh set must be cached so the "+
+			"round trip is paid once", c.setCalls)
+	}
+	if c.wrote.ExpiresAt != expires {
+		t.Errorf("cached ExpiresAt = %v, want %v — dropping it would re-create the "+
+			"cached-forever entry this whole path exists to escape", c.wrote.ExpiresAt, expires)
+	}
+}
+
+// TestAbilityRefresher_CacheWriteFailureStillReturnsFreshSet: the abilities
+// are already in hand by the time the write happens, so a cache that won't
+// persist must not turn a successful re-read into a refusal.
+func TestAbilityRefresher_CacheWriteFailureStillReturnsFreshSet(t *testing.T) {
+	c := &stubbornCache{entry: invpkg.Entry{Abilities: invpkg.Set{invpkg.Read}}, setErr: errors.New("read-only file system")}
+	whoami := func(context.Context) (invpkg.Set, time.Time, error) {
+		return invpkg.Set{invpkg.Read, invpkg.CS}, time.Time{}, nil
+	}
+	got, err := abilityRefresher("h", "t", c, whoami)(context.Background())
+	if err != nil {
+		t.Fatalf("a failed cache write must not fail the refresh: %v", err)
+	}
+	if !got.Has(invpkg.CS) {
+		t.Errorf("got %v; want the fresh set regardless of the write failure", got)
+	}
+}
+
+// TestAbilityRefresher_NilCacheIsUsable pairs with newAbilityCache returning
+// an untyped nil: the refresher must treat that as "no cache", not panic.
+func TestAbilityRefresher_NilCacheIsUsable(t *testing.T) {
+	whoami := func(context.Context) (invpkg.Set, time.Time, error) {
+		return invpkg.Set{invpkg.Read, invpkg.CS}, time.Time{}, nil
+	}
+	got, err := abilityRefresher("h", "t", nil, whoami)(context.Background())
+	if err != nil {
+		t.Fatalf("refresh with no cache: %v", err)
+	}
+	if !got.Has(invpkg.CS) {
+		t.Errorf("got %v; want the fresh set", got)
+	}
+}
+
+// TestNewAbilityCache_ConstructorFailureYieldsUntypedNil regresses the
+// concrete-nil trap: `cache, _ := invpkg.NewDiskCache()` assigned a nil
+// *DiskCache into a Cache interface, which is NOT nil, so Preflight's
+// `cache != nil` guard passed and cache.Get dereferenced a nil receiver.
+// `c == nil` here is the whole assertion — it is false for a typed nil.
+func TestNewAbilityCache_ConstructorFailureYieldsUntypedNil(t *testing.T) {
+	c := newAbilityCache(func() (*invpkg.DiskCache, error) {
+		return nil, errors.New("resolving home directory: no $HOME")
+	})
+	if c != nil {
+		t.Errorf("newAbilityCache returned a non-nil Cache (%T) for a failed constructor — "+
+			"a typed nil makes Preflight's nil check pass and panic on the nil receiver", c)
+	}
+
+	// A constructor that returns (nil, nil) is the same trap without the error.
+	if c := newAbilityCache(func() (*invpkg.DiskCache, error) { return nil, nil }); c != nil {
+		t.Errorf("newAbilityCache returned a non-nil Cache (%T) for a nil-without-error constructor", c)
+	}
+}
+
+// stubbornCache is a Cache whose entry cannot be evicted — Invalidate reports
+// success but changes nothing, and Get keeps serving the stale entry. That is
+// the read-only-filesystem shape that made Invalidate-then-Preflight unsafe.
+type stubbornCache struct {
+	entry    invpkg.Entry
+	wrote    invpkg.Entry
+	setErr   error
+	setCalls int
+}
+
+func (c *stubbornCache) Get(string, string) (invpkg.Entry, bool) { return c.entry, true }
+
+func (c *stubbornCache) Set(_, _ string, e invpkg.Entry) error {
+	c.setCalls++
+	if c.setErr != nil {
+		return c.setErr
+	}
+	c.wrote = e
+	return nil
+}
+
+func (c *stubbornCache) Invalidate(string, string) error { return nil }
+
 // TestBookingsSetResources_DesiredStateBody pins the wire shape of the
 // booking-resource write. POST /bookings/{id}/resources is desired-state,
 // not a delta, so three things have to hold and each is a silent-corruption
@@ -1068,9 +1449,12 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 	// uploadCmd is hand-written cobra; it doesn't expose a CommandDef, but
 	// the ability gate is hardcoded inline. Static assertion: the source
 	// must mention `invpkg.Refuse(invpkg.Write` so we know the gate fires.
+	// uploadCmd routes through Runner.refuseAbility (Refuse + one
+	// cache-bypassing re-read) like every CommandDef path, so the guard
+	// looks for that call rather than the bare Refuse it used to make.
 	media, _ := os.ReadFile("media.go")
-	if !strings.Contains(string(media), "invpkg.Refuse(invpkg.Write,") {
-		t.Errorf("media.go: uploadCmd must call invpkg.Refuse(invpkg.Write, ...) — ability gate appears missing")
+	if !strings.Contains(string(media), "refuseAbility(cmd.Context(), invpkg.Write)") {
+		t.Errorf("media.go: uploadCmd must call runner.refuseAbility(cmd.Context(), invpkg.Write) — ability gate appears missing")
 	}
 }
 
