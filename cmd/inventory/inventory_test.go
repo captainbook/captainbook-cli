@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/captainbook/captainbook-cli/internal/api"
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -681,6 +683,189 @@ func bookingsDefFor(t *testing.T, use string) CommandDef {
 		t.Fatalf("expected exactly one %q CommandDef, got %d", use, len(found))
 	}
 	return found[0]
+}
+
+// TestBookingsCancel_IsCSGated locks the resolution of issue #19: `bookings
+// cancel` binds cli:cs, statically, for every --refund-policy value.
+//
+// The drift test only proves the docs agree with the binding, so a
+// coordinated edit could flip both back to cli:write and stay green. This
+// asserts against the spec instead, which is what actually decides it:
+// CancelBookingRequest.refund_policy is required, and the spec says of its
+// enum members that they "override the product's cancellation policy (CS
+// only — operator tokens are 403 on overrides)". Every reachable cancel is
+// therefore a CS-attributed override, and an operator token that got past a
+// cli:write gate here would just eat a server 403 after the request left the
+// machine — with a Stripe refund on the line.
+//
+// The second half is the forward guard. `auto` — the one value that would
+// NOT be an override, and the reason the old docs promised "cli:write for
+// refund_policy=auto" — is out of the V1 enum pending the structured policy
+// engine. If a spec re-sync puts it back, this fails, because that is the
+// point at which conditional gating becomes a real question again (and needs
+// the ability check moved after body parsing, since Refuse runs first).
+func TestBookingsCancel_IsCSGated(t *testing.T) {
+	def := bookingsDefFor(t, "bookings cancel <id>")
+	if def.Ability != invpkg.CS {
+		t.Errorf("bookings cancel binds Ability %q, want %q (cli:cs) — see issue #19: "+
+			"refund_policy is required and every V1 enum value is a CS-only policy override",
+			def.Ability, invpkg.CS)
+	}
+
+	spec := loadSpecDoc(t)
+	op := spec.findOp("POST", "/bookings/{id}/cancel")
+	if op == nil {
+		t.Fatal("spec has no POST /bookings/{id}/cancel")
+	}
+	f := spec.bodyField(op, "refund_policy")
+	if f == nil {
+		t.Fatal("spec: CancelBookingRequest has no refund_policy")
+	}
+
+	// Set equality, not a scan for the literal "auto". Scanning only catches
+	// the value by the name it had in V1: a re-sync that adds the
+	// non-override policy back as "standard" or "policy_default", or that
+	// drops a value, would leave a name-scan green while the gate silently
+	// stops matching the spec. The enum IS the argument for a static gate,
+	// so pin the whole set.
+	wantEnum := []string{"none", "full", "partial"}
+	if !sameSet(f.Enum, wantEnum) {
+		t.Errorf("spec refund_policy enum is now %v, was %v. The static cli:cs gate on "+
+			"bookings cancel rests on EVERY member being a CS-only policy override. "+
+			"A member that applies the product's own policy instead is operator-reachable "+
+			"and makes this gate over-strict — re-open the issue #19 decision (conditional "+
+			"gating needs Refuse() moved after body parsing). A member that is merely new "+
+			"and still an override: widen wantEnum here.", f.Enum, wantEnum)
+	}
+
+	// The other half of the argument: refund_policy is REQUIRED, so there is
+	// no omit-the-field path that skips the override. If a re-sync makes it
+	// optional, a defaulted cancel becomes reachable and the gate needs
+	// revisiting — the enum check above would not notice.
+	if !specRequires(t, "CancelBookingRequest", "refund_policy") {
+		t.Error("spec no longer marks CancelBookingRequest.refund_policy as required. " +
+			"An omitted refund_policy would let the server apply its own default, which is " +
+			"the operator-reachable cancel this static cli:cs gate assumes cannot exist. " +
+			"Re-open the issue #19 decision.")
+	}
+}
+
+// specRequires reports whether the named components schema lists field in its
+// `required` array. specDoc flattens properties only and drops `required`, and
+// teaching the shared parser about it would touch every spec-drift test, so
+// this reads the one fact it needs straight from the YAML.
+func specRequires(t *testing.T, schema, field string) bool {
+	t.Helper()
+	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var raw struct {
+		Components struct {
+			Schemas map[string]struct {
+				Required []string `yaml:"required"`
+			} `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("yaml.Unmarshal: %v", err)
+	}
+	sch, ok := raw.Components.Schemas[schema]
+	if !ok {
+		t.Fatalf("spec has no components.schemas.%s", schema)
+	}
+	for _, r := range sch.Required {
+		if r == field {
+			return true
+		}
+	}
+	return false
+}
+
+// TestBookingsCancel_OperatorTokenRefusedBeforeNetwork drives the REAL cancel
+// CommandDef through runMutation on both sides of the gate.
+//
+// TestBookingsCancel_IsCSGated asserts the binding; this asserts the behavior
+// that binding buys, which is not the same claim. The refusal has to happen
+// before the request leaves the machine — a gate that let the call through and
+// relied on the server's 403 would still be "cli:cs" by inspection while
+// putting a Stripe refund one network hop from an operator token. The handler
+// fails the test if it is ever reached.
+//
+// The second half is the guard against over-correcting: a CS token must still
+// get through with refund_policy intact. Tightening a gate is only free if the
+// legitimate caller is unaffected.
+func TestBookingsCancel_OperatorTokenRefusedBeforeNetwork(t *testing.T) {
+	def := bookingsDefFor(t, "bookings cancel <id>")
+	cancelArgs := func() RunArgs {
+		return RunArgs{
+			PathArgs: []string{"bk_1"},
+			Flags: map[string]any{
+				"reason":        "customer cancellation request",
+				"refund-policy": "none",
+			},
+		}
+	}
+
+	t.Run("operator token is refused without sending the cancel", func(t *testing.T) {
+		_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("cancel request sent on %s %s — a refused operator token must never "+
+				"reach the cancel endpoint, however the gate decides", r.Method, r.URL.Path)
+		})
+		// The operator token from the spec's recommended issuance: read +
+		// write, no CS. refund_policy=none is deliberate — it is the value
+		// that moves no money, and it is still refused.
+		runner.Abilities = invpkg.Set{invpkg.Read, invpkg.Write}
+		// Server confirms the token really is operator-grade, so the
+		// re-read changes nothing and the refusal stands.
+		refreshes := 0
+		runner.RefreshAbilities = func(context.Context) (invpkg.Set, error) {
+			refreshes++
+			return invpkg.Set{invpkg.Read, invpkg.Write}, nil
+		}
+
+		err := runMutation(context.Background(), runner, def, cancelArgs())
+		if err == nil {
+			t.Fatal("expected ability refusal for a cli:write token, got nil")
+		}
+		var am *invpkg.AbilityMissingError
+		if !errors.As(err, &am) {
+			t.Fatalf("expected *AbilityMissingError, got %T: %v", err, err)
+		}
+		if am.Needed != invpkg.CS {
+			t.Errorf("refused for ability %q, want %q", am.Needed, invpkg.CS)
+		}
+		if refreshes != 1 {
+			t.Errorf("re-read the ability set %d times, want exactly 1 — a refusal decided "+
+				"on a possibly-stale cache must be confirmed against the server once", refreshes)
+		}
+	})
+
+	t.Run("cs token passes the gate with refund_policy intact", func(t *testing.T) {
+		var gotBody []byte
+		_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotBody, _ = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"applied":true,"refund_amount":0,"policy_applied":"none"},"meta":{"request_id":"r1"}}`))
+		})
+		// fakeServer's default runner already carries CS; state it anyway so
+		// the contrast with the case above is on the page.
+		runner.Abilities = invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS}
+
+		if err := runMutation(context.Background(), runner, def, cancelArgs()); err != nil {
+			t.Fatalf("runMutation with a cli:cs token: %v", err)
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal(gotBody, &parsed); err != nil {
+			t.Fatalf("unmarshal wire body %q: %v", gotBody, err)
+		}
+		if got := parsed["refund_policy"]; got != "none" {
+			t.Errorf("refund_policy = %v; want none (full body: %v)", got, parsed)
+		}
+		if got := parsed["reason"]; got != "customer cancellation request" {
+			t.Errorf("reason = %v; want the passed reason (full body: %v)", got, parsed)
+		}
+	})
 }
 
 // TestRefuseAbility_RefreshRescuesUpgradedToken covers the regression that

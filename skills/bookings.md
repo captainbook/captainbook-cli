@@ -1,6 +1,6 @@
 # Bookings
 
-A `Booking` is a customer reservation against a `ProductOption` on a specific date. The CLI exposes reads, resource assignment (`cli:write`), and the money-moving actions `cancel`, `refund`, and `comp`. `refund` and `comp` require `cli:cs`; `cancel` binds only `cli:write` even when its refund policy triggers a Stripe refund (see issue #19). There is no `create` in V1 — bookings are created via the public booking flow.
+A `Booking` is a customer reservation against a `ProductOption` on a specific date. The CLI exposes reads, resource assignment (`cli:write`), and the money-moving actions `cancel`, `refund`, and `comp`. All three money-moving actions require `cli:cs` — `cancel` included, for every `--refund-policy` value, because the whole V1 enum (`none|full|partial`) is policy overrides and the server 403s operator tokens on overrides. There is no `create` in V1 — bookings are created via the public booking flow.
 
 ## Endpoints
 
@@ -12,7 +12,7 @@ A `Booking` is a customer reservation against a `ProductOption` on a specific da
 | `inventory bookings available-resources <id>` | GET /bookings/{id}/resources/available | `cli:read` | n/a |
 | `inventory bookings available-auxiliary-resources <id>` | GET /bookings/{id}/resources/auxiliary/available | `cli:read` | n/a |
 | `inventory bookings set-resources <id>` | POST /bookings/{id}/resources | `cli:write` | body |
-| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:write` | body |
+| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
 
@@ -113,19 +113,27 @@ Candidates come from `available-resources` (main) and `available-auxiliary-resou
 
 `BOOKING_RESOURCE_CONFLICT` — your view was current, but the selection itself is illegal (resource double-booked at that slot, wrong category for the slot you put it in, not attached to the booking's ProductOption, or soft-deleted). Re-reading won't help. Re-run `available-resources` / `available-auxiliary-resources` and pick from what comes back.
 
-### 6. Cancel with `auto` policy (operator-level)
+### 6. Cancel applying the product's policy (CS only)
 
-Intent: a customer cancels a booking; apply the product's standard cancellation policy.
+Intent: a customer cancels a booking; refund what the product's cancellation policy says they are owed.
+
+There is no `auto` in V1. `Product.cancellation_policy` is free-text human prose and nothing derives a refund amount from it, so `--refund-policy auto` is rejected with `422 POLICY_AUTO_NOT_READY`. Read the policy yourself, decide the amount, and state it explicitly:
 
 ```bash
+# 1. Read the policy text you are applying.
+ceebee inventory products get prd_7 --format json | jq -r '.data.cancellation_policy'
+
+# 2. State the decision the policy implies.
 ceebee inventory bookings cancel bk_42 \
-  --reason "customer cancellation request" \
-  --refund-policy auto \
+  --reason "customer cancellation request; 14 days out, policy allows full refund" \
+  --refund-policy full \
   --notify-customer=true \
   --dry-run
 ```
 
-Dry-run returns `data.refund_amount` (computed from the policy) and `data.policy_applied`. Drop `--dry-run` to commit.
+Dry-run returns `data.refund_amount` and `data.policy_applied` without contacting Stripe or the mailer. Drop `--dry-run` to commit.
+
+Because you are the policy engine here, put the reasoning in `--reason` — that string is what the audit log has to explain the money movement with.
 
 ### 7. Cancel with policy override
 
@@ -138,9 +146,7 @@ ceebee inventory bookings cancel bk_42 \
   --notify-customer=true
 ```
 
-`partial` additionally requires `--refund-amount <minor-units>`.
-
-Note the ability gap: overriding the policy moves real money, but `cancel` binds `cli:write`, not `cli:cs`. An operator token can issue a full refund this way while being 403'd from `bookings refund`. Tracked in issue #19 — until it closes, treat `--refund-policy none|full|partial` as CS-grade by convention, not by enforcement.
+`partial` additionally requires `--refund-amount <minor-units>`. Nothing changes ability-wise between this recipe and recipe 6: `none`, `full` and `partial` are all overrides, so all three need `cli:cs`.
 
 ### 8. Refund a partial amount (CS only)
 
@@ -171,7 +177,7 @@ A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` 
 ## Pitfalls
 
 - ⚠️ **`cancel`, `refund`, and `comp` all touch live external systems** (Stripe, mailer, SMS). Always `--dry-run` first. The `forensic_summary` in `~/.ceebee/audit.jsonl` captures the request + response for these — useful for post-incident review.
-- ⚠️ **`refund` and `comp` require `cli:cs`; `cancel` does not.** Operator tokens (`cli:write` only) get `403 ABILITY_MISSING` on refund and comp, but `cancel` is bound to `cli:write` for every `--refund-policy` value — including the overrides that move money. That asymmetry is a known gap, not a design choice (issue #19). Don't infer from a successful `cancel --refund-policy full` that your token is CS-grade.
+- ⚠️ **`cancel`, `refund` and `comp` all require `cli:cs`.** Operator tokens (`cli:write` only) get `ABILITY_MISSING` on all three, refused locally before any network call. For `cancel` this holds for every `--refund-policy` value including `none`: the spec classes all of `none|full|partial` as CS-attributed overrides of the product's policy, and `refund_policy` is required, so V1 has no operator-reachable cancel. The relaxed path older docs promised (`cli:write` when the policy is applied automatically) belonged to a `refund_policy=auto` that is not in the V1 enum. If you read the spec's ability table and see cancel missing from the `cli:cs` row, that table is wrong — the routes are authoritative (captainbook/captainbook#8113).
 - ⚠️ **`refund` defaults `notify_customer` to `false`**, opposite of `cancel` which defaults to `true`. Different ergonomics for different ops: cancellation customers expect an email; refund-debugging engineers don't want to spam them.
 - ⚠️ **Date-time vs date filters.** `bookings list --from 2026-05-01` matches bookings whose **start date** is May 1 or later (date, tenant TZ). `transactions list --from "2026-05-01T00:00:00Z"` is a UTC date-time on `Transaction.created_at`. Don't mix.
 - ⚠️ **`set-resources` replaces, it doesn't append.** `--auxiliary-resource-ids=7` on a booking that already has kits 3 and 5 leaves it with *only* kit 7. Read the current set first and send the full intended list.

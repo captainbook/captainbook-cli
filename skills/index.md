@@ -47,7 +47,7 @@ Tokens carry one or more abilities. The server enforces them at the route layer;
 |-------------|--------------|
 | `cli:read`  | All read endpoints. Implicit alongside `cli:write` / `cli:cs`. |
 | `cli:write` | Inventory mutations: products, options, availabilities (incl. bulk), pricing tiers, discounts (incl. apply), gift certs (issue/void/resend), guests, extras, questions, media. NOT categories — those are platform-managed and read-only. |
-| `cli:cs`    | CS-only sensitive operations: `bookings refund`, `bookings comp`, `notifications resend` (aliased as `bookings resend-confirmation`). **`bookings cancel` is NOT in this set** — it binds `cli:write` even when `refund_policy` triggers a Stripe refund; see issue #19. |
+| `cli:cs`    | CS-only sensitive operations: `bookings cancel`, `bookings refund`, `bookings comp`, `notifications resend` (aliased as `bookings resend-confirmation`). `bookings cancel` is in this set for **every** `--refund-policy` value — the whole V1 enum (`none|full|partial`) overrides the product's cancellation policy, and the server 403s operator tokens on overrides. |
 
 Recommended issuance: a `cli:read` token for reporting bots, a `cli:read + cli:write` token for inventory editors, and a `cli:read + cli:write + cli:cs` token for Customer Success engineers.
 
@@ -273,7 +273,7 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory gift-certificates issue` | POST /gift-certs/issued | `cli:write` | body |
 | `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:write` | body |
 | `inventory gift-certificates resend <id>` | POST /gift-certs/issued/{id}/resend | `cli:write` | body |
-| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:write` | body |
+| `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
 | `inventory bookings set-resources <id>` | POST /bookings/{id}/resources | `cli:write` | body |
