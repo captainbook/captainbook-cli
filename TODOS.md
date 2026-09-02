@@ -83,10 +83,20 @@ server and succeeded.
 Found by both Codex passes on the #19 branch, independently.
 
 **Fix:** `Runner.refuseAbility` — Refuse plus one cache-bypassing re-read on a
-miss (Invalidate then Preflight, so the fresh set is cached too), then refuse
-on the fresh set. A failed re-read returns the original ability error rather
-than a network error. Every CommandDef path and the hand-built `uploadCmd` go
-through it. The round trip is on the refusal path only.
+miss, then refuse on the fresh set. A failed re-read returns the original
+ability error rather than a network error. Every CommandDef path and the
+hand-built `uploadCmd` go through it. The round trip is on the refusal path
+only.
+
+`abilityRefresher` performs that re-read by calling `whoamiFn` DIRECTLY and
+writing the result back with `cache.Set`. Do not "simplify" it to
+`Invalidate` + `Preflight`: that was the first attempt and it is not a bypass
+at all. `Invalidate` does a read-modify-write of the cache file, so on a
+read-only filesystem or a full disk it fails while the stale entry stays
+perfectly readable — and `Preflight` then serves the exact entry the refresh
+exists to escape, with no network call and no way for the caller to notice.
+`TestAbilityRefresher_BypassesCacheEvenWhenEvictionFails` pins this: its fake
+cache reports successful eviction and keeps serving the stale entry anyway.
 **Fixed in:** the #19 branch, alongside a concrete-nil guard on `NewDiskCache`
 (its `(nil, err)` return was being assigned into a `Cache` interface, making
 Preflight's `cache != nil` true and dereferencing a nil receiver).
