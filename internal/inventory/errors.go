@@ -176,10 +176,17 @@ func (e *IdempotencyConflictError) Error() string {
 	return fmt.Sprintf("IDEMPOTENCY_CONFLICT: key=%s", e.Key)
 }
 
+// UserMessage names both ways a key can conflict. Since spec 1.2.0 a key is
+// bound to the method and path of its first use as well as its body, so the
+// most common cause is no longer a changed body — it's one key reused across
+// two operations (often the same command against two different ids, where
+// the bodies are identical and only the path differs).
 func (e *IdempotencyConflictError) UserMessage() string {
 	return fmt.Sprintf(
-		"idempotency key %s was already used with a different request body. "+
-			"Mint a new key (omit --idempotency-key) or use a fresh UUIDv7.",
+		"idempotency key %s was already used for a different request — either a "+
+			"different body, or a different endpoint/resource (a key is bound to "+
+			"the operation it was first used on). Use one key per operation: mint "+
+			"a new one (omit --idempotency-key) or supply a fresh UUIDv7.",
 		e.Key,
 	)
 }

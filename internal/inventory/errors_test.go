@@ -71,7 +71,7 @@ func TestUserMessages(t *testing.T) {
 			name:        "IdempotencyConflictError",
 			err:         &IdempotencyConflictError{Key: "01HXY"},
 			wantError:   "IDEMPOTENCY_CONFLICT: key=01HXY",
-			wantMessage: "idempotency key 01HXY was already used with a different request body. Mint a new key (omit --idempotency-key) or use a fresh UUIDv7.",
+			wantMessage: "idempotency key 01HXY was already used for a different request — either a different body, or a different endpoint/resource (a key is bound to the operation it was first used on). Use one key per operation: mint a new one (omit --idempotency-key) or supply a fresh UUIDv7.",
 		},
 		{
 			name:        "IdempotencyInProgressError",
