@@ -28,9 +28,18 @@ func productsDefs() []CommandDef {
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "category", Type: "string", Description: "Filter by category slug or ID"},
-				// The list filter accepts `archived` in addition to the two
-				// states create/update can set — archived products are
-				// reachable for reads but not settable as a write target.
+				// `archived` appears here only because the vendored spec's
+				// filter enum still lists it and
+				// TestSpecDrift_FlagDescriptionEnumsMatchSpec locks the
+				// description to that enum. The server does NOT accept it:
+				// ProductController::index validates `status` with
+				// `in:published,draft`, so `--status archived` costs a round
+				// trip to earn a 422 VALIDATION_FAILED. Note this is worse
+				// than a plain typo, not the same: the client-side enum gate
+				// below rejects `--status publshed` locally, but passes
+				// `archived` precisely because it is listed here. Drop it
+				// once the spec fix lands upstream and the spec is re-synced.
+				// See captainbook/captainbook-cli#18.
 				{Name: "status", Type: "string", Description: "draft|published|archived"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},

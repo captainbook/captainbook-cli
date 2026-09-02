@@ -23,7 +23,7 @@ Intent: enumerate the variants of `prod_42` to choose one for an availability bu
 ceebee inventory product-options list --product-id prod_42
 ```
 
-Returns table of `{id, product_id, title, status, capacity, updated_at}`.
+Returns table of `{id, product_id, title, option_code, capacity, updated_at}`. There is no `status` field — see the pitfall below.
 
 ### 2. Show one option
 
@@ -69,7 +69,7 @@ ceebee inventory product-options restore 88                      # 200
 - ⚠️ **Cascade on delete:** `ProductOption::$cascadeDeletes` propagates the soft-delete to `virtualProductOption` and `discount`. **`PricingTier`s and `Availability` rows owned by the option are NOT cascaded** — they remain soft-readable but referenced rows may surprise you on restore.
 - ⚠️ **No server-side dry-run on delete.** Same shape as products — the CLI rejects `--dry-run` on `delete` at parse time. Inspect references first via `ceebee inventory availabilities list --product-option-id po_88`. Tiers are **not** scopable by option — `pricing-tiers list` accepts `--product-id` (or `--availability-id`), because `pricing_categories.product_option_id` was renamed to `product_id` in 2022 and tiers hang off the product, not the option.
 - ⚠️ **Capacity on the option vs. on availabilities:** `ProductOption.capacity` is the default. Per-date `Availability.capacity` overrides it. Don't `update --capacity` and assume it backfills existing availability rows — it doesn't. Use `availabilities bulk-update capacity` instead.
-- ⚠️ **`status: archived` is a soft-archive distinct from soft-delete.** Archived rows still appear in `list` (without `--include-trashed`); soft-deleted rows do not. Two filters, two states, both reachable.
+- ⚠️ **ProductOption has no `status` at all — soft-delete is the only state.** There is no `status` field on the resource, no `--status` flag, and no archived state: the resource returns `{id, product_id, title, option_code, capacity, min_age, max_age, deleted_at, created_at, updated_at}` and `list` filters only on `--product-id` and `--include-trashed`. Status lives on the parent Product (as `ceebee inventory product-options create --help` says). Soft-deleted rows are hidden from `list` unless you pass `--include-trashed`.
 
 ## See also
 
