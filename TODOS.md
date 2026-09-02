@@ -61,6 +61,36 @@ in a dedicated test.
 **Why:** the guard's coverage silently ends where the code stops using the helper.
 **Priority:** P2 — same blast radius as any other renamed body key.
 
+## ~~A stale whoami cache can lock a token out of every ability-gated command~~ — DONE
+
+`abilities.Preflight` returns a warm cache entry without revalidating, and
+`DiskCache.Get` honours `ExpiresAt == zero` as "cached forever" — only
+`Invalidate` evicts it. The gate ran before any network call, so a token whose
+cached set predated an ability grant was refused LOCALLY forever: no request
+went out, so nothing could 401, so nothing invalidated the entry, and
+`AbilityMissingError.UserMessage` told the user to ask an admin who had
+already said yes. The advertised escape hatch (`--no-cache`, named in
+abilities.go's Preflight doc) was never built, so the only remedy was deleting
+`~/.ceebee`'s cache file by hand.
+
+The cache is keyed on `(host, token)`, so issuing a NEW token always sidestepped
+it. The trap was the in-place upgrade, which is the supported path: the Provider
+panel's `updateApiToken` rewrites the abilities array on the same token string.
+Gating `bookings cancel` on `cli:cs` would have regressed exactly that flow —
+under the old `cli:write` gate a stale-but-really-CS token still reached the
+server and succeeded.
+
+Found by both Codex passes on the #19 branch, independently.
+
+**Fix:** `Runner.refuseAbility` — Refuse plus one cache-bypassing re-read on a
+miss (Invalidate then Preflight, so the fresh set is cached too), then refuse
+on the fresh set. A failed re-read returns the original ability error rather
+than a network error. Every CommandDef path and the hand-built `uploadCmd` go
+through it. The round trip is on the refusal path only.
+**Fixed in:** the #19 branch, alongside a concrete-nil guard on `NewDiskCache`
+(its `(nil, err)` return was being assigned into a `Cache` interface, making
+Preflight's `cache != nil` true and dereferencing a nil receiver).
+
 ## Upstream: `/answers` types two ids as integer, inconsistent with every other endpoint
 
 `GET /answers` declares `question_id` and `product_option_id` as
@@ -182,8 +212,8 @@ checks the **docs** against the command tree the CLI actually builds
   path, ability, and DryRunMode. Caught: `discounts update` and
   `categories create/update/delete` (no such spec operations), three wrong
   gift-cert paths, `gift-certificates available create` (verb is
-  `create-available`), and the `bookings cancel` ability discrepancy now
-  tracked in #19.
+  `create-available`), and the `bookings cancel` ability discrepancy that
+  became #19 (resolved: cancel is `cli:cs`).
 - `TestSpecQueryParamsAreExposedAsFlags`: every GET's spec query params must
   have a flag or an entry in `intentionallyUnexposedQueryParams` **with a
   reason**, so a spec re-sync can't quietly add an unreachable filter.
@@ -203,7 +233,11 @@ file:line failure output.
 
 Open questions filed: #18 (product `status` filter/response enum mismatch),
 #19 (`bookings cancel` gated `cli:write` while sibling refund ops are
-`cli:cs`).
+`cli:cs`) — #19 resolved in favour of `cli:cs`, confirmed against the server:
+cancel is in the `abilities:cli:cs` route group and `Phase1CCancelTest` 403s a
+`cli:write` token even with `refund_policy=none`. The spec's ability table
+omits cancel from its `cli:cs` row, which is what misled the binding; filed
+upstream as captainbook/captainbook#8113.
 
 ## ~~Spec/code drift tests (inventory CLI)~~ — DONE
 
