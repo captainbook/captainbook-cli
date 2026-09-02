@@ -1734,9 +1734,9 @@ type AvailableGiftCertPage struct {
 
 // AvailableGiftCertificate Sellable gift-cert SKU (the offering). Mirrors
 // `AvailableGiftCertificateResource::toArray()`. `currency` has no
-// underlying column on `available_gift_certificates` — it always
-// serializes as null today (tenant-level currency is implied) but is
-// kept on the wire for forward compatibility. `expiration_period_months`
+// underlying column on `available_gift_certificates`; it serializes the
+// tenant's currency, which is what the `amounts` are denominated in.
+// `expiration_period_months`
 // sources the `expiration_period` column, which the model accessor
 // `expiryDurationInMonths` treats as MONTHS via
 // `CarbonInterval::make($value, 'months')`. A value of -1 means
@@ -1750,7 +1750,7 @@ type AvailableGiftCertificate struct {
 	CoverImageUrl *string    `json:"cover_image_url,omitempty"`
 	CreatedAt     *time.Time `json:"created_at,omitempty"`
 
-	// Currency Always null today — no column on the table; tenant-level currency is implied.
+	// Currency The tenant's currency — no column on the table; `amounts` are denominated in it. Null only when no tenant is bound; there is no default.
 	Currency *string `json:"currency,omitempty"`
 
 	// ExpirationPeriodMonths Sources the `expiration_period` column (months). -1 means never expires.
@@ -1800,7 +1800,9 @@ type Booking struct {
 	// ConfirmedAt Set when the booking transitions to confirmed; null on held/expired/cancelled rows.
 	ConfirmedAt *time.Time `json:"confirmed_at,omitempty"`
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
-	Currency    *string    `json:"currency,omitempty"`
+
+	// Currency The first transaction's currency (a real column). Falls back to the tenant's currency when the booking has no transaction yet; null only when no tenant is bound.
+	Currency *string `json:"currency,omitempty"`
 
 	// Customer Null when the booking has no linked Customer, OR when the caller
 	// lacks the `view_booker_of_booking` permission. The key is always
@@ -2049,7 +2051,8 @@ type CreateAvailabilityRuleRequest struct {
 }
 
 // CreateAvailableGiftCertRequest Mirrors `CreateAvailableGiftCertRequest::rules()`. `currency` is
-// accepted for symmetry but not stored (no column on the table).
+// accepted for symmetry but not stored (no column on the table); it must
+// still equal the account currency.
 // `expiration_period_months` persists to the `expiration_period`
 // column; the model treats it as MONTHS. `cover_image_url` is
 // read-only and not accepted on writes (cover assets go through the
@@ -2057,7 +2060,7 @@ type CreateAvailabilityRuleRequest struct {
 type CreateAvailableGiftCertRequest struct {
 	Amounts []int `json:"amounts"`
 
-	// Currency Required for symmetry; not stored.
+	// Currency Required for symmetry; not stored — but must equal the account currency (`meta.currency`) or the request is refused with 422.
 	Currency string `json:"currency"`
 	DryRun   *bool  `json:"dry_run,omitempty"`
 
@@ -2092,12 +2095,12 @@ type CreateDiscountRequest struct {
 // `title`, `amount` → `fare`, `max_quantity` → (`maximum`,
 // `maximum_bookable`) on the row. `currency` is required for parity
 // with other create endpoints but has no `extras` column and is
-// dropped (currency is tenant-level).
+// dropped on persist — it must still equal the account currency.
 type CreateExtraRequest struct {
 	// Amount Persisted as `fare`. Minor units.
 	Amount int `json:"amount"`
 
-	// Currency Required for symmetry; not stored.
+	// Currency Required for symmetry; not stored — but must equal the account currency (`meta.currency`) or the request is refused with 422.
 	Currency    string  `json:"currency"`
 	Description *string `json:"description,omitempty"`
 	DryRun      *bool   `json:"dry_run,omitempty"`
@@ -2179,7 +2182,8 @@ type CreatePricingCategoryRequestType string
 // Tiers belong to a `PricingCategory` (the named bucket like
 // `Adults`/`Children`), which in turn belongs to a Product. `amount`
 // is persisted as the `fare` column. `currency` has no per-row column
-// and is dropped on persist.
+// and is dropped on persist, but is validated against the account
+// currency when supplied.
 type CreatePricingTierRequest struct {
 	// Amount Persisted as the `fare` column. Minor units.
 	Amount int `json:"amount"`
@@ -2187,7 +2191,7 @@ type CreatePricingTierRequest struct {
 	// AvailabilityId Legacy alias accepted for compat. Availability scoping is M:N via the `availability_pricing_tier` pivot, not a column. Ignored.
 	AvailabilityId *string `json:"availability_id,omitempty"`
 
-	// Currency Accepted but ignored — no per-row column.
+	// Currency No per-row column, so it is dropped on persist — but it must equal the account currency (`meta.currency`) or the request is refused with 422.
 	Currency *string `json:"currency,omitempty"`
 	DryRun   *bool   `json:"dry_run,omitempty"`
 
@@ -2246,7 +2250,9 @@ type CreateProductRequest struct {
 	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
 	Capacity               *int    `json:"capacity,omitempty"`
 	CategoryIds            *[]int  `json:"category_ids,omitempty"`
-	Currency               string  `json:"currency"`
+
+	// Currency Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose.
+	Currency string `json:"currency"`
 
 	// Description Defaults to empty string server-side when omitted (central_products.description is NOT NULL).
 	Description *string `json:"description,omitempty"`
@@ -2561,7 +2567,9 @@ type DiscountPage struct {
 // `deleted_at` / `created_at` / `updated_at` timestamps are dropped
 // to keep the payload tight. Soft-deleted tiers are excluded.
 type EmbeddedPricingTier struct {
-	Amount            *Money  `json:"amount,omitempty"`
+	Amount *Money `json:"amount,omitempty"`
+
+	// Currency The tenant's currency — same source as PricingTier.currency.
 	Currency          *string `json:"currency,omitempty"`
 	DefaultAmount     *Money  `json:"default_amount,omitempty"`
 	Id                *string `json:"id,omitempty"`
@@ -2603,7 +2611,10 @@ type Error struct {
 type ErrorEnvelope struct {
 	Error Error `json:"error"`
 	Meta  struct {
-		ApiVersion  string    `json:"api_version"`
+		ApiVersion string `json:"api_version"`
+
+		// Currency The tenant's currency, mirroring the success envelope. Null before tenancy is initialized.
+		Currency    *string   `json:"currency,omitempty"`
 		GeneratedAt time.Time `json:"generated_at"`
 		RequestId   string    `json:"request_id"`
 
@@ -2617,7 +2628,8 @@ type ErrorEnvelope struct {
 // Extra Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
 // `title` (translatable) and `fare`; the wire shape exposes them as
 // `name` and `amount`. The `extras` table has no `currency` column —
-// `currency` comes from the tenant default, falling back to `EUR`.
+// `currency` is the tenant's currency (`tenant()->currency`) — there is
+// no per-row column and no default to fall back to.
 // `max_quantity` is derived from the `maximum` discriminator and
 // `maximum_bookable` columns: `maximum=custom` → real cap;
 // `maximum=no_max` / `max_by_participant` → null in the wire response.
@@ -2628,7 +2640,7 @@ type Extra struct {
 	Amount    *Money     `json:"amount,omitempty"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
-	// Currency Tenant currency; defaults to `EUR`.
+	// Currency The tenant's currency. Null only when no tenant is bound; there is no default.
 	Currency *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
@@ -2655,14 +2667,16 @@ type ExtraPage struct {
 // GiftCertificate Issued gift-cert instance (a real cert in a customer's hands). Mirrors
 // `GiftCertificateResource::toArray()`. `recipient_email` is the
 // underlying `recipient` column; `recipient_name` is the `to` column.
-// `currency` is sourced from `tenant()->currency` (no per-row column),
-// falling back to `EUR`. `available_gift_certificate_id` references
+// `currency` is sourced from `tenant()->currency` (no per-row column,
+// and no default to fall back to). `available_gift_certificate_id` references
 // the `available_gift_certificate_uuid` column.
 type GiftCertificate struct {
 	Amount                     *Money  `json:"amount,omitempty"`
 	AvailableGiftCertificateId *string `json:"available_gift_certificate_id,omitempty"`
 	Code                       *string `json:"code,omitempty"`
-	Currency                   *string `json:"currency,omitempty"`
+
+	// Currency The tenant's currency. Null only when no tenant is bound; there is no default.
+	Currency *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when the cert is voided (status maps to `void`).
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
@@ -2725,12 +2739,15 @@ type GuestPage struct {
 // IssueGiftCertRequest defines model for IssueGiftCertRequest.
 type IssueGiftCertRequest struct {
 	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount                     Money               `json:"amount"`
-	AvailableGiftCertificateId string              `json:"available_gift_certificate_id"`
-	DryRun                     *bool               `json:"dry_run,omitempty"`
-	ExpiresAt                  *time.Time          `json:"expires_at,omitempty"`
-	RecipientEmail             openapi_types.Email `json:"recipient_email"`
-	RecipientName              string              `json:"recipient_name"`
+	Amount                     Money  `json:"amount"`
+	AvailableGiftCertificateId string `json:"available_gift_certificate_id"`
+
+	// Currency Optional. Not stored — `gift_certificates` has no currency column — but it must equal the account currency (`meta.currency`) or the request is refused with 422.
+	Currency       *string             `json:"currency,omitempty"`
+	DryRun         *bool               `json:"dry_run,omitempty"`
+	ExpiresAt      *time.Time          `json:"expires_at,omitempty"`
+	RecipientEmail openapi_types.Email `json:"recipient_email"`
+	RecipientName  string              `json:"recipient_name"`
 
 	// SendNow If true, server emails the redemption code to `recipient_email`
 	// immediately. Default false to avoid accidental emails when the
@@ -2900,8 +2917,8 @@ type PricingCategoryPage struct {
 // has no `product_option_id` or `name` column — those belong to the
 // parent `PricingCategory` (carries `name` + `product_id`). Tiers
 // describe a headcount band (`min`/`max`) and a `fare` (surfaced as
-// `amount`). Currency is tenant-level and not stored per row;
-// defaults to `EUR`. The table carries no timestamp columns, so
+// `amount`). Currency is tenant-level and not stored per row; it is
+// the tenant's currency, with no default. The table carries no timestamp columns, so
 // `created_at` / `updated_at` are always null and
 // `GET /pricing-tiers?since=` is refused with 422.
 //
@@ -2920,7 +2937,7 @@ type PricingTier struct {
 	// CreatedAt Always null — no such column on `pricing_tiers`.
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
-	// Currency Tenant currency; defaults to `EUR`.
+	// Currency The tenant's currency. Null only when no tenant is bound; there is no default.
 	Currency *string `json:"currency,omitempty"`
 
 	// DefaultAmount Catalogue price (`pricing_tiers.fare`). Only present when availability-scoped — compare against `amount` to detect overrides.
@@ -2981,7 +2998,9 @@ type Product struct {
 	// CategoryIds IDs of attached `ProductCategory` rows; empty array when the relation isn't eager-loaded.
 	CategoryIds *[]string  `json:"category_ids,omitempty"`
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
-	Currency    *string    `json:"currency,omitempty"`
+
+	// Currency The tenant's currency — no column on `products`; `from_price` and every downstream fare are denominated in it. Null only when no tenant is bound, which no route can reach; there is no default.
+	Currency *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
@@ -3211,12 +3230,14 @@ type ResourcePage struct {
 // Transaction defines model for Transaction.
 type Transaction struct {
 	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount    *Money             `json:"amount,omitempty"`
-	BookingId *string            `json:"booking_id,omitempty"`
-	CreatedAt *time.Time         `json:"created_at,omitempty"`
-	Currency  *string            `json:"currency,omitempty"`
-	Id        *string            `json:"id,omitempty"`
-	Method    *TransactionMethod `json:"method,omitempty"`
+	Amount    *Money     `json:"amount,omitempty"`
+	BookingId *string    `json:"booking_id,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// Currency The row's own currency column. Falls back to the tenant's currency on a legacy row that carries none; null only when no tenant is bound.
+	Currency *string            `json:"currency,omitempty"`
+	Id       *string            `json:"id,omitempty"`
+	Method   *TransactionMethod `json:"method,omitempty"`
 
 	// RefundFor For refund rows, the id of the parent charge transaction this
 	// refund settles. Null on charges.
@@ -3282,7 +3303,10 @@ type UpdateAvailabilityRequestStatus string
 // UpdateAvailableGiftCertRequest Mirrors `UpdateAvailableGiftCertRequest::rules()`. `cover_image_url`
 // is read-only (not accepted on writes).
 type UpdateAvailableGiftCertRequest struct {
-	Amounts                *[]int  `json:"amounts,omitempty"`
+	Amounts *[]int `json:"amounts,omitempty"`
+
+	// Currency Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change.
+	Currency               *string `json:"currency,omitempty"`
 	DryRun                 *bool   `json:"dry_run,omitempty"`
 	ExpirationPeriodMonths *int    `json:"expiration_period_months,omitempty"`
 	Name                   *string `json:"name,omitempty"`
@@ -3303,7 +3327,10 @@ type UpdateBookingResourcesRequest struct {
 // UpdateExtraRequest Mirrors `UpdateExtraRequest::rules()`. Same field-to-column mappings
 // as `CreateExtraRequest`.
 type UpdateExtraRequest struct {
-	Amount      *int    `json:"amount,omitempty"`
+	Amount *int `json:"amount,omitempty"`
+
+	// Currency Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change.
+	Currency    *string `json:"currency,omitempty"`
 	Description *string `json:"description,omitempty"`
 	DryRun      *bool   `json:"dry_run,omitempty"`
 	MaxQuantity *int    `json:"max_quantity,omitempty"`
@@ -3368,10 +3395,13 @@ type UpdatePricingCategoryRequestType string
 // ignored.
 type UpdatePricingTierRequest struct {
 	// Amount Persisted as `fare`. Minor units.
-	Amount *int  `json:"amount,omitempty"`
-	DryRun *bool `json:"dry_run,omitempty"`
-	Max    *int  `json:"max,omitempty"`
-	Min    *int  `json:"min,omitempty"`
+	Amount *int `json:"amount,omitempty"`
+
+	// Currency Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change.
+	Currency *string `json:"currency,omitempty"`
+	DryRun   *bool   `json:"dry_run,omitempty"`
+	Max      *int    `json:"max,omitempty"`
+	Min      *int    `json:"min,omitempty"`
 
 	// Name Legacy alias — ignored.
 	Name *string `json:"name,omitempty"`
@@ -3399,9 +3429,12 @@ type UpdateProductRequest struct {
 	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
 	Capacity               *int    `json:"capacity,omitempty"`
 	CategoryIds            *[]int  `json:"category_ids,omitempty"`
-	Description            *string `json:"description,omitempty"`
-	Displayable            *bool   `json:"displayable,omitempty"`
-	DryRun                 *bool   `json:"dry_run,omitempty"`
+
+	// Currency Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change.
+	Currency    *string `json:"currency,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Displayable *bool   `json:"displayable,omitempty"`
+	DryRun      *bool   `json:"dry_run,omitempty"`
 
 	// Exclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422.
 	Exclusions     *string `json:"exclusions,omitempty"`
@@ -3800,8 +3833,10 @@ type ListAvailabilitiesParams struct {
 
 // BulkDeleteAvailabilitiesParams defines parameters for BulkDeleteAvailabilities.
 type BulkDeleteAvailabilitiesParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3816,8 +3851,10 @@ type BulkDeleteAvailabilitiesParams struct {
 
 // BulkUpdateAvailabilitiesParams defines parameters for BulkUpdateAvailabilities.
 type BulkUpdateAvailabilitiesParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3832,8 +3869,10 @@ type BulkUpdateAvailabilitiesParams struct {
 
 // DeleteAvailabilityParams defines parameters for DeleteAvailability.
 type DeleteAvailabilityParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3855,8 +3894,10 @@ type ShowAvailabilityParams struct {
 
 // UpdateAvailabilityParams defines parameters for UpdateAvailability.
 type UpdateAvailabilityParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3871,8 +3912,10 @@ type UpdateAvailabilityParams struct {
 
 // CreateAvailabilityRuleParams defines parameters for CreateAvailabilityRule.
 type CreateAvailabilityRuleParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3938,8 +3981,10 @@ type ListBookingsParamsBookingStatus string
 
 // CancelBookingParams defines parameters for CancelBooking.
 type CancelBookingParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3961,8 +4006,10 @@ type CompBookingJSONBody struct {
 
 // CompBookingParams defines parameters for CompBooking.
 type CompBookingParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -3986,8 +4033,10 @@ type ResendBookingConfirmationJSONBody struct {
 
 // ResendBookingConfirmationParams defines parameters for ResendBookingConfirmation.
 type ResendBookingConfirmationParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4005,8 +4054,10 @@ type ResendBookingConfirmationJSONBodyChannel string
 
 // RefundBookingParams defines parameters for RefundBooking.
 type RefundBookingParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4021,8 +4072,10 @@ type RefundBookingParams struct {
 
 // UpdateBookingResourcesParams defines parameters for UpdateBookingResources.
 type UpdateBookingResourcesParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4102,8 +4155,10 @@ type ListDiscountsParams struct {
 
 // CreateDiscountParams defines parameters for CreateDiscount.
 type CreateDiscountParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4120,8 +4175,10 @@ type CreateDiscountParams struct {
 type DeleteDiscountParams struct {
 	DryRun *bool `form:"dry_run,omitempty" json:"dry_run,omitempty"`
 
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4142,8 +4199,10 @@ type ApplyDiscountJSONBody struct {
 
 // ApplyDiscountParams defines parameters for ApplyDiscount.
 type ApplyDiscountParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4163,8 +4222,10 @@ type RestoreDiscountJSONBody struct {
 
 // RestoreDiscountParams defines parameters for RestoreDiscount.
 type RestoreDiscountParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4197,8 +4258,10 @@ type ListExtrasParams struct {
 
 // CreateExtraParams defines parameters for CreateExtra.
 type CreateExtraParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4213,8 +4276,10 @@ type CreateExtraParams struct {
 
 // DeleteExtraParams defines parameters for DeleteExtra.
 type DeleteExtraParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4229,8 +4294,10 @@ type DeleteExtraParams struct {
 
 // UpdateExtraParams defines parameters for UpdateExtra.
 type UpdateExtraParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4250,8 +4317,10 @@ type RestoreExtraJSONBody struct {
 
 // RestoreExtraParams defines parameters for RestoreExtra.
 type RestoreExtraParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4275,8 +4344,10 @@ type ListAvailableGiftCertsParams struct {
 
 // CreateAvailableGiftCertParams defines parameters for CreateAvailableGiftCert.
 type CreateAvailableGiftCertParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4291,8 +4362,10 @@ type CreateAvailableGiftCertParams struct {
 
 // DeleteAvailableGiftCertificateParams defines parameters for DeleteAvailableGiftCertificate.
 type DeleteAvailableGiftCertificateParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4307,8 +4380,10 @@ type DeleteAvailableGiftCertificateParams struct {
 
 // UpdateAvailableGiftCertParams defines parameters for UpdateAvailableGiftCert.
 type UpdateAvailableGiftCertParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4338,8 +4413,10 @@ type ListIssuedGiftCertsParamsStatus string
 
 // IssueGiftCertParams defines parameters for IssueGiftCert.
 type IssueGiftCertParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4362,8 +4439,10 @@ type ResendGiftCertJSONBody struct {
 
 // ResendGiftCertParams defines parameters for ResendGiftCert.
 type ResendGiftCertParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4385,8 +4464,10 @@ type VoidGiftCertJSONBody struct {
 
 // VoidGiftCertParams defines parameters for VoidGiftCert.
 type VoidGiftCertParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4411,8 +4492,10 @@ type ListGuestsParams struct {
 
 // UpdateGuestParams defines parameters for UpdateGuest.
 type UpdateGuestParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4443,8 +4526,10 @@ type ListLocationsParamsType string
 
 // CreateLocationParams defines parameters for CreateLocation.
 type CreateLocationParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4459,8 +4544,10 @@ type CreateLocationParams struct {
 
 // DeleteLocationParams defines parameters for DeleteLocation.
 type DeleteLocationParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4475,8 +4562,10 @@ type DeleteLocationParams struct {
 
 // UpdateLocationParams defines parameters for UpdateLocation.
 type UpdateLocationParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4491,8 +4580,10 @@ type UpdateLocationParams struct {
 
 // DeleteMediaParams defines parameters for DeleteMedia.
 type DeleteMediaParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4522,8 +4613,10 @@ type ListPricingCategoriesParams struct {
 
 // CreatePricingCategoryParams defines parameters for CreatePricingCategory.
 type CreatePricingCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4538,8 +4631,10 @@ type CreatePricingCategoryParams struct {
 
 // DeletePricingCategoryParams defines parameters for DeletePricingCategory.
 type DeletePricingCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4554,8 +4649,10 @@ type DeletePricingCategoryParams struct {
 
 // UpdatePricingCategoryParams defines parameters for UpdatePricingCategory.
 type UpdatePricingCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4570,8 +4667,10 @@ type UpdatePricingCategoryParams struct {
 
 // RestorePricingCategoryParams defines parameters for RestorePricingCategory.
 type RestorePricingCategoryParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4608,8 +4707,10 @@ type ListPricingTiersParams struct {
 
 // CreatePricingTierParams defines parameters for CreatePricingTier.
 type CreatePricingTierParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4624,8 +4725,10 @@ type CreatePricingTierParams struct {
 
 // DeletePricingTierParams defines parameters for DeletePricingTier.
 type DeletePricingTierParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4648,8 +4751,10 @@ type ShowPricingTierParams struct {
 
 // UpdatePricingTierParams defines parameters for UpdatePricingTier.
 type UpdatePricingTierParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4669,8 +4774,10 @@ type RestorePricingTierJSONBody struct {
 
 // RestorePricingTierParams defines parameters for RestorePricingTier.
 type RestorePricingTierParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4700,8 +4807,10 @@ type ListProductOptionsParams struct {
 
 // CreateProductOptionParams defines parameters for CreateProductOption.
 type CreateProductOptionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4716,8 +4825,10 @@ type CreateProductOptionParams struct {
 
 // DeleteProductOptionParams defines parameters for DeleteProductOption.
 type DeleteProductOptionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4732,8 +4843,10 @@ type DeleteProductOptionParams struct {
 
 // UpdateProductOptionParams defines parameters for UpdateProductOption.
 type UpdateProductOptionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4748,8 +4861,10 @@ type UpdateProductOptionParams struct {
 
 // AttachResourceToProductOptionParams defines parameters for AttachResourceToProductOption.
 type AttachResourceToProductOptionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4769,8 +4884,10 @@ type RestoreProductOptionJSONBody struct {
 
 // RestoreProductOptionParams defines parameters for RestoreProductOption.
 type RestoreProductOptionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4785,8 +4902,10 @@ type RestoreProductOptionParams struct {
 
 // DetachResourceFromProductOptionParams defines parameters for DetachResourceFromProductOption.
 type DetachResourceFromProductOptionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4830,8 +4949,10 @@ type ListProductsParamsStatus string
 
 // CreateProductParams defines parameters for CreateProduct.
 type CreateProductParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4846,8 +4967,10 @@ type CreateProductParams struct {
 
 // DeleteProductParams defines parameters for DeleteProduct.
 type DeleteProductParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4862,8 +4985,10 @@ type DeleteProductParams struct {
 
 // UpdateProductParams defines parameters for UpdateProduct.
 type UpdateProductParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4903,8 +5028,10 @@ type UploadProductMediaMultipartBody struct {
 
 // UploadProductMediaParams defines parameters for UploadProductMedia.
 type UploadProductMediaParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4924,8 +5051,10 @@ type RestoreProductJSONBody struct {
 
 // RestoreProductParams defines parameters for RestoreProduct.
 type RestoreProductParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4956,8 +5085,10 @@ type ListQuestionsParams struct {
 
 // CreateQuestionParams defines parameters for CreateQuestion.
 type CreateQuestionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4972,8 +5103,10 @@ type CreateQuestionParams struct {
 
 // DeleteQuestionParams defines parameters for DeleteQuestion.
 type DeleteQuestionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4988,8 +5121,10 @@ type DeleteQuestionParams struct {
 
 // UpdateQuestionParams defines parameters for UpdateQuestion.
 type UpdateQuestionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5009,8 +5144,10 @@ type RestoreQuestionJSONBody struct {
 
 // RestoreQuestionParams defines parameters for RestoreQuestion.
 type RestoreQuestionParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5046,8 +5183,10 @@ type ListResourcesParamsCategory string
 
 // CreateResourceParams defines parameters for CreateResource.
 type CreateResourceParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5062,8 +5201,10 @@ type CreateResourceParams struct {
 
 // DeleteResourceParams defines parameters for DeleteResource.
 type DeleteResourceParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5078,8 +5219,10 @@ type DeleteResourceParams struct {
 
 // UpdateResourceParams defines parameters for UpdateResource.
 type UpdateResourceParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5094,8 +5237,10 @@ type UpdateResourceParams struct {
 
 // RestoreResourceParams defines parameters for RestoreResource.
 type RestoreResourceParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5180,8 +5325,10 @@ type ListWorkflowsParamsStatus string
 
 // CreateWorkflowParams defines parameters for CreateWorkflow.
 type CreateWorkflowParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5201,8 +5348,10 @@ type DestroyWorkflowJSONBody struct {
 
 // DestroyWorkflowParams defines parameters for DestroyWorkflow.
 type DestroyWorkflowParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5225,8 +5374,10 @@ type ShowWorkflowParams struct {
 
 // UpdateWorkflowParams defines parameters for UpdateWorkflow.
 type UpdateWorkflowParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5246,8 +5397,10 @@ type ActivateWorkflowJSONBody struct {
 
 // ActivateWorkflowParams defines parameters for ActivateWorkflow.
 type ActivateWorkflowParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5267,8 +5420,10 @@ type DeactivateWorkflowJSONBody struct {
 
 // DeactivateWorkflowParams defines parameters for DeactivateWorkflow.
 type DeactivateWorkflowParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5288,8 +5443,10 @@ type RestoreWorkflowJSONBody struct {
 
 // RestoreWorkflowParams defines parameters for RestoreWorkflow.
 type RestoreWorkflowParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5304,8 +5461,10 @@ type RestoreWorkflowParams struct {
 
 // CreateWorkflowStepParams defines parameters for CreateWorkflowStep.
 type CreateWorkflowStepParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5325,8 +5484,10 @@ type DestroyWorkflowStepJSONBody struct {
 
 // DestroyWorkflowStepParams defines parameters for DestroyWorkflowStep.
 type DestroyWorkflowStepParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5341,8 +5502,10 @@ type DestroyWorkflowStepParams struct {
 
 // UpdateWorkflowStepParams defines parameters for UpdateWorkflowStep.
 type UpdateWorkflowStepParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5357,8 +5520,10 @@ type UpdateWorkflowStepParams struct {
 
 // UpdateWorkflowTriggerParams defines parameters for UpdateWorkflowTrigger.
 type UpdateWorkflowTriggerParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -5373,8 +5538,10 @@ type UpdateWorkflowTriggerParams struct {
 
 // CreateWorkflowTriggerParams defines parameters for CreateWorkflowTrigger.
 type CreateWorkflowTriggerParams struct {
-	// IdempotencyKey UUIDv7 recommended. Replays of completed keys with matching request
-	// body return the original response. Conflicting body returns 409
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
 	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -17406,7 +17573,8 @@ type CreateExtraResponse struct {
 			// Extra Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
 			// `title` (translatable) and `fare`; the wire shape exposes them as
 			// `name` and `amount`. The `extras` table has no `currency` column —
-			// `currency` comes from the tenant default, falling back to `EUR`.
+			// `currency` is the tenant's currency (`tenant()->currency`) — there is
+			// no per-row column and no default to fall back to.
 			// `max_quantity` is derived from the `maximum` discriminator and
 			// `maximum_bookable` columns: `maximum=custom` → real cap;
 			// `maximum=no_max` / `max_by_participant` → null in the wire response.
@@ -17480,7 +17648,8 @@ type ShowExtraResponse struct {
 		// Data Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
 		// `title` (translatable) and `fare`; the wire shape exposes them as
 		// `name` and `amount`. The `extras` table has no `currency` column —
-		// `currency` comes from the tenant default, falling back to `EUR`.
+		// `currency` is the tenant's currency (`tenant()->currency`) — there is
+		// no per-row column and no default to fall back to.
 		// `max_quantity` is derived from the `maximum` discriminator and
 		// `maximum_bookable` columns: `maximum=custom` → real cap;
 		// `maximum=no_max` / `max_by_participant` → null in the wire response.
@@ -17521,6 +17690,7 @@ type UpdateExtraResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
+	JSON422 *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -17599,9 +17769,9 @@ type CreateAvailableGiftCertResponse struct {
 		Data struct {
 			// AvailableGiftCertificate Sellable gift-cert SKU (the offering). Mirrors
 			// `AvailableGiftCertificateResource::toArray()`. `currency` has no
-			// underlying column on `available_gift_certificates` — it always
-			// serializes as null today (tenant-level currency is implied) but is
-			// kept on the wire for forward compatibility. `expiration_period_months`
+			// underlying column on `available_gift_certificates`; it serializes the
+			// tenant's currency, which is what the `amounts` are denominated in.
+			// `expiration_period_months`
 			// sources the `expiration_period` column, which the model accessor
 			// `expiryDurationInMonths` treats as MONTHS via
 			// `CarbonInterval::make($value, 'months')`. A value of -1 means
@@ -17680,9 +17850,9 @@ type ShowAvailableGiftCertResponse struct {
 	JSON200      *struct {
 		// Data Sellable gift-cert SKU (the offering). Mirrors
 		// `AvailableGiftCertificateResource::toArray()`. `currency` has no
-		// underlying column on `available_gift_certificates` — it always
-		// serializes as null today (tenant-level currency is implied) but is
-		// kept on the wire for forward compatibility. `expiration_period_months`
+		// underlying column on `available_gift_certificates`; it serializes the
+		// tenant's currency, which is what the `amounts` are denominated in.
+		// `expiration_period_months`
 		// sources the `expiration_period` column, which the model accessor
 		// `expiryDurationInMonths` treats as MONTHS via
 		// `CarbonInterval::make($value, 'months')`. A value of -1 means
@@ -17723,6 +17893,7 @@ type UpdateAvailableGiftCertResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
+	JSON422 *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -17778,8 +17949,8 @@ type IssueGiftCertResponse struct {
 			// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands). Mirrors
 			// `GiftCertificateResource::toArray()`. `recipient_email` is the
 			// underlying `recipient` column; `recipient_name` is the `to` column.
-			// `currency` is sourced from `tenant()->currency` (no per-row column),
-			// falling back to `EUR`. `available_gift_certificate_id` references
+			// `currency` is sourced from `tenant()->currency` (no per-row column,
+			// and no default to fall back to). `available_gift_certificate_id` references
 			// the `available_gift_certificate_uuid` column.
 			GiftCertificate *GiftCertificate `json:"gift_certificate,omitempty"`
 
@@ -17825,8 +17996,8 @@ type ShowIssuedGiftCertResponse struct {
 		// Data Issued gift-cert instance (a real cert in a customer's hands). Mirrors
 		// `GiftCertificateResource::toArray()`. `recipient_email` is the
 		// underlying `recipient` column; `recipient_name` is the `to` column.
-		// `currency` is sourced from `tenant()->currency` (no per-row column),
-		// falling back to `EUR`. `available_gift_certificate_id` references
+		// `currency` is sourced from `tenant()->currency` (no per-row column,
+		// and no default to fall back to). `available_gift_certificate_id` references
 		// the `available_gift_certificate_uuid` column.
 		Data       GiftCertificate `json:"data"`
 		Meta       Meta            `json:"meta"`
@@ -18454,8 +18625,8 @@ type CreatePricingTierResponse struct {
 			// has no `product_option_id` or `name` column — those belong to the
 			// parent `PricingCategory` (carries `name` + `product_id`). Tiers
 			// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
-			// `amount`). Currency is tenant-level and not stored per row;
-			// defaults to `EUR`. The table carries no timestamp columns, so
+			// `amount`). Currency is tenant-level and not stored per row; it is
+			// the tenant's currency, with no default. The table carries no timestamp columns, so
 			// `created_at` / `updated_at` are always null and
 			// `GET /pricing-tiers?since=` is refused with 422.
 			//
@@ -18536,8 +18707,8 @@ type ShowPricingTierResponse struct {
 		// has no `product_option_id` or `name` column — those belong to the
 		// parent `PricingCategory` (carries `name` + `product_id`). Tiers
 		// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
-		// `amount`). Currency is tenant-level and not stored per row;
-		// defaults to `EUR`. The table carries no timestamp columns, so
+		// `amount`). Currency is tenant-level and not stored per row; it is
+		// the tenant's currency, with no default. The table carries no timestamp columns, so
 		// `created_at` / `updated_at` are always null and
 		// `GET /pricing-tiers?since=` is refused with 422.
 		//
@@ -23336,7 +23507,8 @@ func ParseCreateExtraResponse(rsp *http.Response) (*CreateExtraResponse, error) 
 				// Extra Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
 				// `title` (translatable) and `fare`; the wire shape exposes them as
 				// `name` and `amount`. The `extras` table has no `currency` column —
-				// `currency` comes from the tenant default, falling back to `EUR`.
+				// `currency` is the tenant's currency (`tenant()->currency`) — there is
+				// no per-row column and no default to fall back to.
 				// `max_quantity` is derived from the `maximum` discriminator and
 				// `maximum_bookable` columns: `maximum=custom` → real cap;
 				// `maximum=no_max` / `max_by_participant` → null in the wire response.
@@ -23447,7 +23619,8 @@ func ParseShowExtraResponse(rsp *http.Response) (*ShowExtraResponse, error) {
 			// Data Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
 			// `title` (translatable) and `fare`; the wire shape exposes them as
 			// `name` and `amount`. The `extras` table has no `currency` column —
-			// `currency` comes from the tenant default, falling back to `EUR`.
+			// `currency` is the tenant's currency (`tenant()->currency`) — there is
+			// no per-row column and no default to fall back to.
 			// `max_quantity` is derived from the `maximum` discriminator and
 			// `maximum_bookable` columns: `maximum=custom` → real cap;
 			// `maximum=no_max` / `max_by_participant` → null in the wire response.
@@ -23520,6 +23693,13 @@ func ParseUpdateExtraResponse(rsp *http.Response) (*UpdateExtraResponse, error) 
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -23630,9 +23810,9 @@ func ParseCreateAvailableGiftCertResponse(rsp *http.Response) (*CreateAvailableG
 			Data struct {
 				// AvailableGiftCertificate Sellable gift-cert SKU (the offering). Mirrors
 				// `AvailableGiftCertificateResource::toArray()`. `currency` has no
-				// underlying column on `available_gift_certificates` — it always
-				// serializes as null today (tenant-level currency is implied) but is
-				// kept on the wire for forward compatibility. `expiration_period_months`
+				// underlying column on `available_gift_certificates`; it serializes the
+				// tenant's currency, which is what the `amounts` are denominated in.
+				// `expiration_period_months`
 				// sources the `expiration_period` column, which the model accessor
 				// `expiryDurationInMonths` treats as MONTHS via
 				// `CarbonInterval::make($value, 'months')`. A value of -1 means
@@ -23748,9 +23928,9 @@ func ParseShowAvailableGiftCertResponse(rsp *http.Response) (*ShowAvailableGiftC
 		var dest struct {
 			// Data Sellable gift-cert SKU (the offering). Mirrors
 			// `AvailableGiftCertificateResource::toArray()`. `currency` has no
-			// underlying column on `available_gift_certificates` — it always
-			// serializes as null today (tenant-level currency is implied) but is
-			// kept on the wire for forward compatibility. `expiration_period_months`
+			// underlying column on `available_gift_certificates`; it serializes the
+			// tenant's currency, which is what the `amounts` are denominated in.
+			// `expiration_period_months`
 			// sources the `expiration_period` column, which the model accessor
 			// `expiryDurationInMonths` treats as MONTHS via
 			// `CarbonInterval::make($value, 'months')`. A value of -1 means
@@ -23824,6 +24004,13 @@ func ParseUpdateAvailableGiftCertResponse(rsp *http.Response) (*UpdateAvailableG
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -23888,8 +24075,8 @@ func ParseIssueGiftCertResponse(rsp *http.Response) (*IssueGiftCertResponse, err
 				// GiftCertificate Issued gift-cert instance (a real cert in a customer's hands). Mirrors
 				// `GiftCertificateResource::toArray()`. `recipient_email` is the
 				// underlying `recipient` column; `recipient_name` is the `to` column.
-				// `currency` is sourced from `tenant()->currency` (no per-row column),
-				// falling back to `EUR`. `available_gift_certificate_id` references
+				// `currency` is sourced from `tenant()->currency` (no per-row column,
+				// and no default to fall back to). `available_gift_certificate_id` references
 				// the `available_gift_certificate_uuid` column.
 				GiftCertificate *GiftCertificate `json:"gift_certificate,omitempty"`
 
@@ -23956,8 +24143,8 @@ func ParseShowIssuedGiftCertResponse(rsp *http.Response) (*ShowIssuedGiftCertRes
 			// Data Issued gift-cert instance (a real cert in a customer's hands). Mirrors
 			// `GiftCertificateResource::toArray()`. `recipient_email` is the
 			// underlying `recipient` column; `recipient_name` is the `to` column.
-			// `currency` is sourced from `tenant()->currency` (no per-row column),
-			// falling back to `EUR`. `available_gift_certificate_id` references
+			// `currency` is sourced from `tenant()->currency` (no per-row column,
+			// and no default to fall back to). `available_gift_certificate_id` references
 			// the `available_gift_certificate_uuid` column.
 			Data       GiftCertificate `json:"data"`
 			Meta       Meta            `json:"meta"`
@@ -24951,8 +25138,8 @@ func ParseCreatePricingTierResponse(rsp *http.Response) (*CreatePricingTierRespo
 				// has no `product_option_id` or `name` column — those belong to the
 				// parent `PricingCategory` (carries `name` + `product_id`). Tiers
 				// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
-				// `amount`). Currency is tenant-level and not stored per row;
-				// defaults to `EUR`. The table carries no timestamp columns, so
+				// `amount`). Currency is tenant-level and not stored per row; it is
+				// the tenant's currency, with no default. The table carries no timestamp columns, so
 				// `created_at` / `updated_at` are always null and
 				// `GET /pricing-tiers?since=` is refused with 422.
 				//
@@ -25070,8 +25257,8 @@ func ParseShowPricingTierResponse(rsp *http.Response) (*ShowPricingTierResponse,
 			// has no `product_option_id` or `name` column — those belong to the
 			// parent `PricingCategory` (carries `name` + `product_id`). Tiers
 			// describe a headcount band (`min`/`max`) and a `fare` (surfaced as
-			// `amount`). Currency is tenant-level and not stored per row;
-			// defaults to `EUR`. The table carries no timestamp columns, so
+			// `amount`). Currency is tenant-level and not stored per row; it is
+			// the tenant's currency, with no default. The table carries no timestamp columns, so
 			// `created_at` / `updated_at` are always null and
 			// `GET /pricing-tiers?since=` is refused with 422.
 			//

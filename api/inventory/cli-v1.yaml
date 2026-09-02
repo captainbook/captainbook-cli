@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Inventory CLI API
-  version: 1.0.0
+  version: 1.4.0
   description: |
     Internal HTTP JSON API serving the CaptainBook inventory CLI client
     (which lives in a separate repository). Primary consumer is Claude Code
@@ -45,7 +45,15 @@ info:
       the spec terse but applies to every endpoint; consult the `Forbidden`
       shared response for the body shape.
     - **Money:** integer minor units (`15000` = 150.00 EUR; `15000` = 150 JPY).
-      Currency is the tenant's currency, surfaced via `meta.currency`.
+      Currency is the tenant's currency, surfaced via `meta.currency`. It is an
+      **account-level** setting and there is exactly one of it: `products`,
+      `extras`, `pricing_tiers` and `available_gift_certificates` carry no
+      currency column, so no per-record currency exists to choose. The
+      `currency` field on those create payloads is there for symmetry with the
+      read shape and is dropped on persist — but it must match the account
+      currency, or the request is refused with `422 VALIDATION_FAILED` naming
+      it. Do not convert amounts client-side; a caller quoting prices in
+      another currency has to restate them.
     - **Translatable fields:** API responses always return the English
       translation of Spatie-translatable columns (matches the Statistics API
       contract — see commit `e51d27658`).
@@ -55,6 +63,22 @@ info:
       request body, excluding the `dry_run` field. See
       `app/Support/Cli/Canonicalize.php` (vendored, fuzz-tested against
       `canonicalize` npm reference).
+      A key is **bound to the request it was first used on** — its HTTP method
+      and its path (including query string) as well as its body. Reusing one
+      key across two resources or two endpoints returns `409
+      IDEMPOTENCY_CONFLICT`, not a replay. Generate one key per operation;
+      reuse it only when retrying *that* operation. The resource id lives in
+      the path on nearly every mutating endpoint, so without this binding
+      `POST /gift-certs/issued/A/void` and `POST /gift-certs/issued/B/void`
+      share a body and the second replays the first — a `200` and a success
+      envelope for an operation that never ran.
+      A request refused at the gate (`401` / `403`, and the `404` returned when
+      the tenant's plan does not include workflows) **releases** its key rather
+      than recording it: nothing ran, so there is no outcome to replay. The key
+      is free to reuse — including with a different body, since the release
+      drops its hash binding too. This is what makes "fix the token, retry with
+      the same key" safe. A `404` from a *handler* (the row does not exist) is
+      an outcome and does replay.
     - **Dry-run:** every mutating endpoint accepts `dry_run: true` in the
       body. The handler runs validation, authorization, and computes the
       diff, but suppresses all side effects (DB transaction rolled back,
@@ -93,6 +117,107 @@ info:
     - Not the public reseller API (see `/api/v1/suppliers/...` and Octo).
     - Not the customer-facing widget API.
     - Not for end-traveler self-service.
+
+    ## Changes
+
+    `info.version` moves when the contract does, so a client vendoring this file
+    byte-for-byte can tell which copy it holds by reading it. **It is a serial
+    number, not a semver range** — do NOT treat a minor bump as "compatible" or
+    write a `^1.0`-style constraint against it. This is an internal API with one
+    known consumer; breaking changes ship here without a major bump and are
+    marked **Breaking** below. The URL major (`/api/v1/cli`) is a separate axis
+    and does not move.
+
+    - **1.4.0** — `currency` on a create or update payload is now validated
+      against the account currency instead of being silently discarded.
+      **Breaking** for a caller that sent a currency the account does not trade
+      in: `POST` and `PATCH` on `/products`, `/extras`, `/pricing-tiers` and
+      `/gift-certs/available` now answer `422 VALIDATION_FAILED` where they
+      previously answered `201` (create) or `200` (update). `POST
+      /gift-certs/issued` accepts the same optional field on the same terms.
+      The update verb did not even list the field, so it was dropped by
+      `validated()` before the controller ran — the same silent discard as
+      create, one layer earlier.
+      Those tables have no currency column — the field was dropped on persist
+      and the amounts stored as bare minor units — so the old `200` reported a
+      product priced in GBP that the account would sell in EUR, with nothing
+      downstream to contradict it. An agent driving the MCP tools hit this
+      hardest: it asked the operator which currency to use, was told GBP, and
+      relayed the `200` back as confirmation. Remediation is to send the
+      account currency from `meta.currency`, or omit it where the field is
+      optional. Also in 1.4.0, and the same bug read backwards: the `currency`
+      on the Product, Extra, PricingTier, EmbeddedPricingTier,
+      AvailableGiftCertificate and GiftCertificate read shapes was always
+      `null` or a hardcoded `EUR` (it was read off a column that does not
+      exist). It now carries the tenant's currency, so a non-EUR account no
+      longer reads `EUR` on every priced row. `Booking.currency` and
+      `Transaction.currency` keep their real per-row column and fall back to
+      the tenant's currency only when the row carries none (a booking with no
+      transaction yet), where they previously fell back to `EUR`.
+      **Breaking for a typed client** on the read half too: `Extra.currency`,
+      `PricingTier.currency`, `EmbeddedPricingTier.currency`,
+      `GiftCertificate.currency`, `Booking.currency` and
+      `Transaction.currency` move from non-nullable `string` to
+      `string | null`. The null arm is unreachable through any route (all are
+      tenant-identified) but a generated client must accept it. There is no
+      default behind it: `config('utils.default_currency')` is
+      `env('CURRENCY', 'EUR')`, the same hardcoded EUR one indirection out, so
+      the field is `null` rather than guessed when no tenant is bound — which
+      no route can reach.
+      Also in 1.4.0: a `422` now RELEASES its `Idempotency-Key` instead of
+      recording it, joining `401` / `403` / `429` and the plan-gate `404` from
+      1.2.0. Validation rejects a request before the controller runs, so
+      nothing was applied and there is no outcome to make idempotent.
+      Previously a caller who corrected the body and retried with the same key
+      — which this spec instructs — got `409 IDEMPOTENCY_CONFLICT`
+      (`retriable: false`) for a mutation that never happened, and an
+      uncorrected retry replayed the stale `422` forever.
+    - **1.3.0** — No endpoint, payload or ability requirement changed. What
+      changed is who may MINT a token carrying an ability: `cli:read`,
+      `cli:write` and `cli:cs` are now gated on `issue_cli_read_token`,
+      `issue_cli_write_token` and `issue_cli_cs_token` respectively, and
+      attributing a token to another user needs `issue_api_token_for_other_users`.
+      **Not breaking for an existing token** — the check is at issue time, not at
+      call time, so nothing in flight stops working. It can bite on a rotation:
+      whoever minted a `cli:cs` token may no longer be able to re-issue it, and
+      needs the permission granted in Settings → Roles first. Device-login tokens
+      from the mobile app also stopped carrying Sanctum's `*` wildcard, which had
+      satisfied every `abilities:` gate including `cli:cs`.
+    - **1.2.0** — an `Idempotency-Key` is now scoped to the method and path of
+      its first use, not to the request body alone. **Breaking** for a client
+      that reuses one key across several operations: the second operation now
+      gets `409 IDEMPOTENCY_CONFLICT` (`retriable: false`) where it previously
+      got a `200` replaying the first operation's response — a success envelope
+      for a mutation that never ran, carrying the first resource's data. A
+      client that already generates one key per operation is unaffected.
+      Keys issued before this shipped carry no recorded scope; they keep
+      replaying on the body hash alone for 24 hours (so a retry spanning the
+      deploy still replays rather than re-executing) and are refused with
+      `409 IDEMPOTENCY_CONFLICT` after that.
+      Also in 1.2.0: the `404` from the workflows plan gate releases its key
+      instead of recording it, matching the `401` / `403` rule added in 1.1.0.
+      An operator whose plan did not cover workflows would otherwise upgrade,
+      retry with the same key, and have the stale `404` replayed forever.
+    - **1.1.0** — `POST /gift-certs/issued/{id}/void` moved from `cli:write` to
+      `cli:cs`. **Breaking, no grace period:** a `cli:write`-only token now gets
+      `403 FORBIDDEN` on that route. Remediation is a checkbox — edit the token
+      in Captainbook (Settings → API tokens) to add `cli:cs`, or re-issue it.
+      `GET /whoami` returns `token.abilities`, so a client can self-diagnose
+      before calling. Retrying with the same `Idempotency-Key` after fixing the
+      token is safe: a 403 releases the key rather than recording it.
+      Also in 1.1.0: `void` now runs `GiftCertificatePolicy::delete`
+      (`delete_gift_certificate`, admin-only by default) like the web UI does,
+      so the `cli:cs` ability is no longer the whole gate. A CS token held by a
+      user without that permission gets `403 FORBIDDEN`. Also **breaking**, and
+      the same rule the read endpoints have always followed: the token's
+      abilities decide which endpoints are reachable, the user's permissions
+      decide what they may do.
+      And applying to **every** endpoint: an ability denial's
+      `error.message` now names the missing ability ("This token is not scoped
+      to the `cli:cs` ability.") instead of Sanctum's generic "Invalid ability
+      provided.", and carries a `hint`. Match on `error.code` (`FORBIDDEN`),
+      never on the message text.
+    - **1.0.0** — Phase 1 surface.
 
     ## Status
 
@@ -1528,8 +1653,9 @@ paths:
       description: |
         Hard-deletes the AvailableGiftCertificate (the sellable SKU). Returns 409
         if any issued `GiftCertificate` references this SKU — issued certs hold a
-        FK to the SKU. Caller must void all issued certs first, or accept that
-        deleting the SKU will orphan their lookup.
+        FK to the SKU. Caller must void all issued certs first — which needs a
+        `cli:cs` token, not the `cli:write` this endpoint runs on — or accept
+        that deleting the SKU will orphan their lookup.
       tags: [GiftCertificates]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -1566,6 +1692,7 @@ paths:
                       data: { $ref: "#/components/schemas/MutationResult" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /gift-certs/issued:
     get:
@@ -1654,6 +1781,11 @@ paths:
     post:
       operationId: voidGiftCert
       summary: Void an issued gift certificate
+      description: |
+        Requires the `cli:cs` ability. Voiding kills an instrument the customer
+        paid for, which puts it with the booking mutations rather than with the
+        rest of gift-cert editing. External side effects: mailer (when
+        `notify_recipient: true`).
       tags: [GiftCertificates]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -2486,6 +2618,7 @@ paths:
                       data: { $ref: "#/components/schemas/MutationResult" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /questions:
     get:
@@ -3937,12 +4070,22 @@ components:
         | Ability     | Required for                                                           |
         | ----------- | ---------------------------------------------------------------------- |
         | `cli:read`  | Always granted alongside read endpoints; not enforced explicitly.      |
-        | `cli:write` | Every mutating endpoint **not** listed under `cli:cs`: products, product-options, availabilities (incl. availability-rules, bulk-update, bulk-delete), pricing-categories, pricing-tiers, discounts (incl. apply), gift-certs (available CRUD + issue / void / resend), guests, extras, questions, resources (incl. attach / detach on product-options and `POST /bookings/{id}/resources`), locations, media, workflows (incl. steps + trigger). Stated as the complement of `cli:cs` on purpose: an enumeration drifts every time a resource is added. |
-        | `cli:cs`    | CS-only sensitive ops: booking **cancel**, comp, refund, and confirmation resend — the four routes in the `abilities:cli:cs` group. Cancel is CS for **every** `refund_policy` value, `none` (which moves no money) included. Issued only to CS engineers. |
+        | `cli:write` | Every mutating endpoint **not** listed under `cli:cs`: products, product-options, availabilities (incl. availability-rules, bulk-update, bulk-delete), pricing-categories, pricing-tiers, discounts (incl. apply), gift-certs (available CRUD + issue / resend), guests, extras, questions, resources (incl. attach / detach on product-options and `POST /bookings/{id}/resources`), locations, media, workflows (incl. steps + trigger). Stated as the complement of `cli:cs` on purpose: an enumeration drifts every time a resource is added. |
+        | `cli:cs`    | CS-only sensitive ops: booking **cancel**, comp, refund, and confirmation resend, plus issued gift-cert **void** — the five routes gated on `abilities:cli:cs` (they sit in two groups in `routes/api_cli_v1.php`, not one). Cancel is CS for **every** `refund_policy` value, `none` (which moves no money) included; void is CS because it kills an instrument the customer paid for. Ticking it requires the `issue_cli_cs_token` permission (admin by default), so it is a privilege boundary rather than only a blast-radius control. |
 
         Recommended issuance: a dedicated `cli:read` token for scripted
         reporting, a `cli:read` + `cli:write` token for inventory editors, and
         a `cli:read` + `cli:write` + `cli:cs` token for CS engineers.
+
+        **Who may issue which tier.** Each ability has a matching permission —
+        `issue_cli_read_token` (admin / manager / reservation manager by
+        default), `issue_cli_write_token` and `issue_cli_cs_token` (admin) —
+        checked when the token is created or edited, mirroring
+        `issue_inventory_*_mcp_token` on the MCP side. A user without the
+        permission is not offered the checkbox and is refused if they submit it
+        anyway. Attributing a token to another user is separately gated on
+        `issue_api_token_for_other_users`, and a token issued for a colleague is
+        capped at what the ISSUER may issue, not at what the colleague holds.
 
   parameters:
     IdPath:
@@ -4001,8 +4144,10 @@ components:
       in: header
       required: false
       description: |
-        UUIDv7 recommended. Replays of completed keys with matching request
-        body return the original response. Conflicting body returns 409
+        UUIDv7 recommended. **One key per operation.** A key is bound to the
+        method, path and body of its first use; replays of completed keys
+        matching all three return the original response. A conflicting body,
+        or the same key aimed at a different endpoint or resource, returns 409
         IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
         409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
         IDEMPOTENCY_UNKNOWN. Required for production use; optional for
@@ -4079,7 +4224,7 @@ components:
     IdempotencyConflict:
       description: |
         Idempotency-Key already used. One of:
-        - `IDEMPOTENCY_CONFLICT` — same key, different request body.
+        - `IDEMPOTENCY_CONFLICT` — same key, different request. Either a different body, or a different method/path (the key is bound to the operation it was first used on). Also returned for a key issued before scoping shipped once it is more than 24h old.
         - `IDEMPOTENCY_IN_PROGRESS` — request still executing.
         - `IDEMPOTENCY_UNKNOWN` — server crashed mid-flight, swept by the `cli:prune-stale` artisan command (runs every 5 min against the central `cli_idempotency_keys` table). Caller must check Stripe/mailer logs by `request_id`.
       content:
@@ -4180,6 +4325,7 @@ components:
           properties:
             api_version: { type: string, example: v1 }
             request_id: { type: string, example: req_01HXY12345ABCDEFGHJKMNPQRS }
+            currency: { type: string, nullable: true, description: "The tenant's currency, mirroring the success envelope. Null before tenancy is initialized." }
             tenant_slug:
               type: string
               nullable: true
@@ -4316,7 +4462,7 @@ components:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
         from_price_label: { type: string, nullable: true, description: "Caption shown next to `from_price` (e.g., `From €50/person`)." }
-        currency: { type: string, nullable: true }
+        currency: { type: string, nullable: true, description: "The tenant's currency — no column on `products`; `from_price` and every downstream fare are denominated in it. Null only when no tenant is bound, which no route can reach; there is no default." }
         capacity: { type: integer, nullable: true }
         cancellation_policy: { type: string, nullable: true, description: "Inline policy text. Mutually exclusive with `cancellation_policy_link` in the UI." }
         cancellation_policy_link: { type: string, format: uri, nullable: true, description: "External URL with the policy. Mutually exclusive with `cancellation_policy` in the UI." }
@@ -4472,8 +4618,8 @@ components:
         has no `product_option_id` or `name` column — those belong to the
         parent `PricingCategory` (carries `name` + `product_id`). Tiers
         describe a headcount band (`min`/`max`) and a `fare` (surfaced as
-        `amount`). Currency is tenant-level and not stored per row;
-        defaults to `EUR`. The table carries no timestamp columns, so
+        `amount`). Currency is tenant-level and not stored per row; it is
+        the tenant's currency, with no default. The table carries no timestamp columns, so
         `created_at` / `updated_at` are always null and
         `GET /pricing-tiers?since=` is refused with 422.
 
@@ -4510,7 +4656,7 @@ components:
             via `PATCH /availabilities/{id}` (one slot) or
             `POST /availabilities/bulk-update` with `setting=pricing` (a date
             range).
-        currency: { type: string, description: "Tenant currency; defaults to `EUR`." }
+        currency: { type: string, nullable: true, description: "The tenant's currency. Null only when no tenant is bound; there is no default." }
         deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         created_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `pricing_tiers`." }
         updated_at: { type: string, format: date-time, nullable: true, description: "Always null — no such column on `pricing_tiers`." }
@@ -4536,7 +4682,7 @@ components:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
         is_override: { type: boolean }
-        currency: { type: string }
+        currency: { type: string, nullable: true, description: "The tenant's currency — same source as PricingTier.currency." }
 
     Discount:
       type: object
@@ -4591,9 +4737,9 @@ components:
       description: |
         Sellable gift-cert SKU (the offering). Mirrors
         `AvailableGiftCertificateResource::toArray()`. `currency` has no
-        underlying column on `available_gift_certificates` — it always
-        serializes as null today (tenant-level currency is implied) but is
-        kept on the wire for forward compatibility. `expiration_period_months`
+        underlying column on `available_gift_certificates`; it serializes the
+        tenant's currency, which is what the `amounts` are denominated in.
+        `expiration_period_months`
         sources the `expiration_period` column, which the model accessor
         `expiryDurationInMonths` treats as MONTHS via
         `CarbonInterval::make($value, 'months')`. A value of -1 means
@@ -4606,7 +4752,7 @@ components:
           type: array
           description: Available denominations (minor units)
           items: { $ref: "#/components/schemas/Money" }
-        currency: { type: string, nullable: true, description: "Always null today — no column on the table; tenant-level currency is implied." }
+        currency: { type: string, nullable: true, description: "The tenant's currency — no column on the table; `amounts` are denominated in it. Null only when no tenant is bound; there is no default." }
         expiration_period_months: { type: integer, nullable: true, description: "Sources the `expiration_period` column (months). -1 means never expires." }
         cover_image_url: { type: string, format: uri, nullable: true, description: "URL of the Paperclip `cover` attachment when uploaded; null otherwise. Read-only via the CLI." }
         created_at: { type: string, format: date-time, nullable: true }
@@ -4618,8 +4764,8 @@ components:
         Issued gift-cert instance (a real cert in a customer's hands). Mirrors
         `GiftCertificateResource::toArray()`. `recipient_email` is the
         underlying `recipient` column; `recipient_name` is the `to` column.
-        `currency` is sourced from `tenant()->currency` (no per-row column),
-        falling back to `EUR`. `available_gift_certificate_id` references
+        `currency` is sourced from `tenant()->currency` (no per-row column,
+        and no default to fall back to). `available_gift_certificate_id` references
         the `available_gift_certificate_uuid` column.
       properties:
         id: { type: string }
@@ -4633,7 +4779,7 @@ components:
         remaining_amount:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
-        currency: { type: string }
+        currency: { type: string, nullable: true, description: "The tenant's currency. Null only when no tenant is bound; there is no default." }
         valid_from: { type: string, format: date-time, nullable: true }
         expires_at: { type: string, format: date-time, nullable: true }
         status:
@@ -4798,7 +4944,7 @@ components:
             IDs of discounts attached to this booking via `BookingDiscount`
             pivot rows (with `applied_at` timestamps). Updated by
             `POST /discounts/{id}/apply`.
-        currency: { type: string }
+        currency: { type: string, nullable: true, description: "The first transaction's currency (a real column). Falls back to the tenant's currency when the booking has no transaction yet; null only when no tenant is bound." }
         starts_at:
           type: string
           format: date-time
@@ -4878,7 +5024,7 @@ components:
             status column, so a row's existence implies the payment / refund
             landed. Failed payments don't produce a row at all.
         amount: { $ref: "#/components/schemas/Money" }
-        currency: { type: string }
+        currency: { type: string, nullable: true, description: "The row's own currency column. Falls back to the tenant's currency on a legacy row that carries none; null only when no tenant is bound." }
         stripe_charge_id:
           type: string
           nullable: true
@@ -4926,7 +5072,8 @@ components:
         Mirrors `ExtraResource::toArray()`. The underlying `extras` table uses
         `title` (translatable) and `fare`; the wire shape exposes them as
         `name` and `amount`. The `extras` table has no `currency` column —
-        `currency` comes from the tenant default, falling back to `EUR`.
+        `currency` is the tenant's currency (`tenant()->currency`) — there is
+        no per-row column and no default to fall back to.
         `max_quantity` is derived from the `maximum` discriminator and
         `maximum_bookable` columns: `maximum=custom` → real cap;
         `maximum=no_max` / `max_by_participant` → null in the wire response.
@@ -4941,7 +5088,7 @@ components:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
           description: "Maps to the `fare` column."
-        currency: { type: string, description: "Tenant currency; defaults to `EUR`." }
+        currency: { type: string, nullable: true, description: "The tenant's currency. Null only when no tenant is bound; there is no default." }
         max_quantity: { type: integer, nullable: true }
         deleted_at: { type: string, format: date-time, nullable: true, description: "Set when soft-deleted; null otherwise" }
         created_at: { type: string, format: date-time, nullable: true }
@@ -5309,6 +5456,7 @@ components:
             CLI / LLM intends to issue + manually verify before sending. To
             send a previously-issued cert, use `POST /gift-certs/issued/{id}/resend`.
         sender_message: { type: string, maxLength: 1000, nullable: true }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Optional. Not stored — `gift_certificates` has no currency column — but it must equal the account currency (`meta.currency`) or the request is refused with 422." }
         dry_run: { type: boolean, default: false }
 
     CancelBookingRequest:
@@ -5656,7 +5804,7 @@ components:
         must_validate_cancellation_policy: { type: boolean, default: false, description: "Customer must explicitly accept the cancellation policy at checkout. When `false`, both `cancellation_policy` and `cancellation_policy_link` are nulled regardless of what the caller supplied — set `true` to retain a policy." }
         from_price: { type: integer, minimum: 0, nullable: true, description: "Minor units." }
         from_price_label: { type: string, maxLength: 255, nullable: true, description: "Caption shown next to `from_price` (e.g., `From €50/person`)." }
-        currency: { type: string, minLength: 3, maxLength: 3 }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose." }
         capacity: { type: integer, minimum: 0, nullable: true }
         cancellation_policy: { type: string, nullable: true, description: "Inline policy text. Mutually exclusive with `cancellation_policy_link`." }
         cancellation_policy_link: { type: string, format: uri, maxLength: 500, nullable: true, description: "External URL with the policy. Mutually exclusive with `cancellation_policy`." }
@@ -5697,6 +5845,7 @@ components:
         must_validate_cancellation_policy: { type: boolean }
         from_price: { type: integer, minimum: 0, nullable: true }
         from_price_label: { type: string, maxLength: 255, nullable: true }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change." }
         capacity: { type: integer, minimum: 0, nullable: true }
         cancellation_policy: { type: string, nullable: true }
         cancellation_policy_link: { type: string, format: uri, maxLength: 500, nullable: true }
@@ -5782,13 +5931,14 @@ components:
         Tiers belong to a `PricingCategory` (the named bucket like
         `Adults`/`Children`), which in turn belongs to a Product. `amount`
         is persisted as the `fare` column. `currency` has no per-row column
-        and is dropped on persist.
+        and is dropped on persist, but is validated against the account
+        currency when supplied.
       properties:
         pricing_category_id: { type: string, description: "Required parent `PricingCategory` row." }
         min: { type: integer, minimum: 0, description: "Inclusive lower bound of the headcount band." }
         max: { type: integer, minimum: 0, nullable: true, description: "Inclusive upper bound; null = open-ended." }
         amount: { type: integer, minimum: 0, description: "Persisted as the `fare` column. Minor units." }
-        currency: { type: string, minLength: 3, maxLength: 3, description: "Accepted but ignored — no per-row column." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "No per-row column, so it is dropped on persist — but it must equal the account currency (`meta.currency`) or the request is refused with 422." }
         name: { type: string, maxLength: 100, description: "Legacy alias accepted for compat — belongs on the parent `PricingCategory`, not the tier. Ignored." }
         product_option_id: { type: string, nullable: true, description: "Legacy alias accepted for compat. Ignored — tiers don't link to ProductOption directly." }
         availability_id: { type: string, nullable: true, description: "Legacy alias accepted for compat. Availability scoping is M:N via the `availability_pricing_tier` pivot, not a column. Ignored." }
@@ -5808,6 +5958,7 @@ components:
         max: { type: integer, minimum: 0, nullable: true }
         amount: { type: integer, minimum: 0, description: "Persisted as `fare`. Minor units." }
         name: { type: string, maxLength: 100, description: "Legacy alias — ignored." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change." }
         dry_run: { type: boolean, default: false }
 
     CreateExtraRequest:
@@ -5818,13 +5969,13 @@ components:
         `title`, `amount` → `fare`, `max_quantity` → (`maximum`,
         `maximum_bookable`) on the row. `currency` is required for parity
         with other create endpoints but has no `extras` column and is
-        dropped (currency is tenant-level).
+        dropped on persist — it must still equal the account currency.
       properties:
         product_id: { type: string, description: "Persisted as the morph (`product_id`, `product_type=Product`)." }
         name: { type: string, maxLength: 200, description: "Persisted as the translatable `title` column." }
         description: { type: string, nullable: true }
         amount: { type: integer, minimum: 0, description: "Persisted as `fare`. Minor units." }
-        currency: { type: string, minLength: 3, maxLength: 3, description: "Required for symmetry; not stored." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Required for symmetry; not stored — but must equal the account currency (`meta.currency`) or the request is refused with 422." }
         max_quantity: { type: integer, minimum: 0, nullable: true, description: "When set, `maximum` becomes `custom` and the value lands in `maximum_bookable`." }
         dry_run: { type: boolean, default: false }
 
@@ -5837,6 +5988,7 @@ components:
         name: { type: string, maxLength: 200 }
         description: { type: string, nullable: true }
         amount: { type: integer, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change." }
         max_quantity: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
@@ -5895,7 +6047,8 @@ components:
       required: [name, amounts, currency]
       description: |
         Mirrors `CreateAvailableGiftCertRequest::rules()`. `currency` is
-        accepted for symmetry but not stored (no column on the table).
+        accepted for symmetry but not stored (no column on the table); it must
+        still equal the account currency.
         `expiration_period_months` persists to the `expiration_period`
         column; the model treats it as MONTHS. `cover_image_url` is
         read-only and not accepted on writes (cover assets go through the
@@ -5906,7 +6059,7 @@ components:
           type: array
           minItems: 1
           items: { type: integer, minimum: 0, description: "Minor units." }
-        currency: { type: string, minLength: 3, maxLength: 3, description: "Required for symmetry; not stored." }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Required for symmetry; not stored — but must equal the account currency (`meta.currency`) or the request is refused with 422." }
         expiration_period_months: { type: integer, nullable: true, description: "Months. -1 means never expires." }
         dry_run: { type: boolean, default: false }
 
@@ -5921,6 +6074,7 @@ components:
           type: array
           minItems: 1
           items: { type: integer, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3, description: "Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change." }
         expiration_period_months: { type: integer, nullable: true }
         dry_run: { type: boolean, default: false }
 
