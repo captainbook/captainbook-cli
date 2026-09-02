@@ -23,13 +23,15 @@ ceebee inventory products list --category 18 --include-trashed=false --limit 100
 
 Returns `{id, title, status, schedule_type, from_price, currency, is_private, ...}`. Cursor-paginate with `--cursor "<pagination.cursor_next>"`.
 
-`--status` filters server-side on `draft|published|archived`:
+`--status` filters server-side on `draft|published` only:
 
 ```bash
 ceebee inventory products list --status published
 ```
 
-On the response, `status` is *derived* from the canonical `is_active` column (`true` → published, `false` → draft) and `is_active` is surfaced directly for clients that prefer the boolean. Note the asymmetry: the filter accepts `archived`, but the response `status` enum is only `draft|published`, so nothing you list can come back labelled archived.
+On the response, `status` is *derived* from the canonical `is_active` column (`true` → published, `false` → draft) and `is_active` is surfaced directly for clients that prefer the boolean.
+
+⚠️ **`--status archived` returns a server 422, not results.** There is no archived state — the server validates `status` with `in:published,draft` and rejects anything else with `VALIDATION_FAILED`. The flag's help text still advertises `draft|published|archived` because the spec's filter enum lists it, and that makes `archived` worse than a typo rather than equivalent to one: the CLI's client-side enum gate rejects `--status publshed` instantly and locally (`invalid value for --status: "publshed" (allowed: draft, published, archived)`), but waves `archived` through because it is on the allow-list, so you spend a round trip to learn it is invalid. Use `--status draft` / `--status published`, or omit the flag. Tracked in [captainbook-cli#18](https://github.com/captainbook/captainbook-cli/issues/18); the spec fix is [captainbook#8111](https://github.com/captainbook/captainbook/issues/8111). Once that lands and the spec is re-synced here, `TestSpecDrift_FlagDescriptionEnumsMatchSpec` starts failing — the help text is a hard-coded flag description, so someone has to drop `archived` from it by hand; the test only makes ignoring it impossible.
 
 ### 2. Show one product, machine-readable
 

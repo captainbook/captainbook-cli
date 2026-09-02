@@ -76,6 +76,33 @@ surface; drop the flag-description caveat and switch to string flags once it doe
 **Why:** an operator copying a working id between commands hits a parse error.
 **Priority:** P3 — cosmetic until someone copies an id between the two.
 
+## Upstream: `GET /products` advertises `status=archived`, server rejects it
+
+The spec's filter enum for `GET /products` is `[draft, published, archived]`
+(`api/inventory/cli-v1.yaml:191`), but the server validates the parameter with
+`in:published,draft` and 422s on anything else — verified in
+`app/Http/Controllers/Api/Cli/ProductController.php` and its regression test
+`tests/Feature/Controllers/Api/Cli/ProductReadTest.php` ("rejects unknown
+status filter values with 422"). There is no archived state: `Product.status`
+is derived from the two-state `is_active` boolean and no archived column,
+scope, or migration exists.
+
+The asymmetry is worse than a plain typo. The client-side enum gate in
+`cmd/inventory/inventory.go` validates string flags against the leading
+pipe-token run in their description, so `--status publshed` fails locally with
+a clear allowed-values message, while `--status archived` is on the allow-list
+and is waved through to earn a server 422 a round trip later.
+
+**Fix:** raised upstream as captainbook/captainbook#8111 (drop `archived` from
+the parameter enum). Once it lands and the spec is re-synced,
+`TestSpecDrift_FlagDescriptionEnumsMatchSpec` fails until someone drops
+`archived` from the `--status` description in `cmd/inventory/products.go` and
+removes the explanatory comment and the `skills/products.md` warning.
+**Why:** the CLI's own help text currently advertises a value the server
+refuses.
+**Priority:** P3 — blocked on the upstream spec decision; `draft` and
+`published` are unaffected.
+
 ## Bare true/false can still be swallowed as a MISSING positional
 
 `bindCommands` now binds `cobra.NoArgs` on argument-less leaves, so
