@@ -73,7 +73,7 @@ func extrasDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "name", Type: "string", Required: true, Description: "Extra name"},
 				{Name: "amount", Type: "int", Required: true, Description: "Price in minor units"},
-				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code — must equal the account currency from whoami; not stored, but a mismatch is refused with 422"},
 				{Name: "product-id", Type: "string", Required: true, Description: "Owning product"},
 				{Name: "description", Type: "string", Description: "Extra description"},
 				{Name: "max-quantity", Type: "int", Description: "Maximum purchasable per booking"},
