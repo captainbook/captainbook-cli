@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
@@ -682,6 +683,201 @@ func bookingsDefFor(t *testing.T, use string) CommandDef {
 	return found[0]
 }
 
+// TestRefuseAbility_RefreshRescuesUpgradedToken covers the regression that
+// tightening bookings cancel to cli:cs would otherwise introduce.
+//
+// The whoami cache is keyed on (host, token) and an entry with no expiry is
+// kept forever. Granting cli:cs through the Provider panel rewrites the
+// abilities array on the SAME token string (updateApiToken), so the key does
+// not change and the stale entry survives. With a gate that refuses purely on
+// the cache and never calls out, that token could never run cancel again: no
+// request means no 401, no 401 means no invalidation, and the error tells the
+// user to ask an admin who already granted it. The only escape was deleting
+// the cache file by hand — the CLI advertises a --no-cache in abilities.go
+// but has never had one.
+//
+// Three properties, one per subtest: the retry rescues an upgraded token, a
+// failed re-read still refuses (and surfaces the ability error, not the
+// network error), and a token that passes on the cached set costs no round
+// trip at all.
+func TestRefuseAbility_RefreshRescuesUpgradedToken(t *testing.T) {
+	t.Run("upgraded token passes after the re-read", func(t *testing.T) {
+		r := &Runner{
+			// What the cache recorded before the upgrade.
+			Abilities: invpkg.Set{invpkg.Read, invpkg.Write},
+			RefreshAbilities: func(context.Context) (invpkg.Set, error) {
+				// What the server says now.
+				return invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS}, nil
+			},
+		}
+		if err := r.refuseAbility(context.Background(), invpkg.CS); err != nil {
+			t.Fatalf("upgraded token refused after re-read: %v", err)
+		}
+		// The refreshed set must stick, or every later gate in the same
+		// invocation pays the round trip again.
+		if !r.Abilities.Has(invpkg.CS) {
+			t.Errorf("Abilities = %v; the refreshed set must replace the stale one", r.Abilities)
+		}
+	})
+
+	t.Run("failed re-read refuses with the ability error", func(t *testing.T) {
+		r := &Runner{
+			Abilities: invpkg.Set{invpkg.Read, invpkg.Write},
+			RefreshAbilities: func(context.Context) (invpkg.Set, error) {
+				return nil, errors.New("whoami: connection refused")
+			},
+			Err: &bytes.Buffer{},
+		}
+		err := r.refuseAbility(context.Background(), invpkg.CS)
+		var am *invpkg.AbilityMissingError
+		if !errors.As(err, &am) {
+			t.Fatalf("expected the original *AbilityMissingError when the re-read fails, got %T: %v", err, err)
+		}
+		// Surfacing "connection refused" would send the user debugging
+		// their network when the actual answer is a missing ability.
+		if strings.Contains(err.Error(), "connection refused") {
+			t.Errorf("refusal leaked the refresh failure: %v", err)
+		}
+	})
+
+	t.Run("a token that already has the ability never re-reads", func(t *testing.T) {
+		refreshed := false
+		r := &Runner{
+			Abilities: invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS},
+			RefreshAbilities: func(context.Context) (invpkg.Set, error) {
+				refreshed = true
+				return nil, nil
+			},
+		}
+		if err := r.refuseAbility(context.Background(), invpkg.CS); err != nil {
+			t.Fatalf("granted ability refused: %v", err)
+		}
+		if refreshed {
+			t.Error("re-read the ability set on the happy path — the round trip belongs on the refusal path only")
+		}
+	})
+}
+
+// TestAbilityRefresher_BypassesCacheEvenWhenEvictionFails exercises the
+// PRODUCTION refresh closure, not a stub.
+//
+// The first version of this fix bypassed the cache by calling Invalidate and
+// then Preflight. That is not a bypass: Invalidate rewrites the cache file, so
+// on a read-only filesystem or a full disk it fails while the stale entry
+// stays readable, and Preflight then serves the exact entry the refresh exists
+// to escape — no network call, lockout intact, caller none the wiser. The
+// fake here is that filesystem: eviction always fails and the stale entry
+// never goes away, which is the condition the old code got wrong.
+func TestAbilityRefresher_BypassesCacheEvenWhenEvictionFails(t *testing.T) {
+	stale := invpkg.Entry{Abilities: invpkg.Set{invpkg.Read, invpkg.Write}}
+	c := &stubbornCache{entry: stale}
+
+	whoamiCalls := 0
+	expires := time.Now().Add(time.Hour)
+	whoami := func(context.Context) (invpkg.Set, time.Time, error) {
+		whoamiCalls++
+		// The server's current answer: the token was upgraded in place.
+		return invpkg.Set{invpkg.Read, invpkg.Write, invpkg.CS}, expires, nil
+	}
+
+	refresh := abilityRefresher("api.example.com", "tok_1", c, whoami)
+	got, err := refresh(context.Background())
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if whoamiCalls != 1 {
+		t.Errorf("whoami called %d times, want 1 — the refresh must always hit the "+
+			"server, never a cache entry", whoamiCalls)
+	}
+	if !got.Has(invpkg.CS) {
+		t.Errorf("refresh returned %v; want the server's upgraded set including cli:cs "+
+			"(a stale entry was served instead)", got)
+	}
+	if c.setCalls != 1 {
+		t.Errorf("cache written %d times, want 1 — the fresh set must be cached so the "+
+			"round trip is paid once", c.setCalls)
+	}
+	if c.wrote.ExpiresAt != expires {
+		t.Errorf("cached ExpiresAt = %v, want %v — dropping it would re-create the "+
+			"cached-forever entry this whole path exists to escape", c.wrote.ExpiresAt, expires)
+	}
+}
+
+// TestAbilityRefresher_CacheWriteFailureStillReturnsFreshSet: the abilities
+// are already in hand by the time the write happens, so a cache that won't
+// persist must not turn a successful re-read into a refusal.
+func TestAbilityRefresher_CacheWriteFailureStillReturnsFreshSet(t *testing.T) {
+	c := &stubbornCache{entry: invpkg.Entry{Abilities: invpkg.Set{invpkg.Read}}, setErr: errors.New("read-only file system")}
+	whoami := func(context.Context) (invpkg.Set, time.Time, error) {
+		return invpkg.Set{invpkg.Read, invpkg.CS}, time.Time{}, nil
+	}
+	got, err := abilityRefresher("h", "t", c, whoami)(context.Background())
+	if err != nil {
+		t.Fatalf("a failed cache write must not fail the refresh: %v", err)
+	}
+	if !got.Has(invpkg.CS) {
+		t.Errorf("got %v; want the fresh set regardless of the write failure", got)
+	}
+}
+
+// TestAbilityRefresher_NilCacheIsUsable pairs with newAbilityCache returning
+// an untyped nil: the refresher must treat that as "no cache", not panic.
+func TestAbilityRefresher_NilCacheIsUsable(t *testing.T) {
+	whoami := func(context.Context) (invpkg.Set, time.Time, error) {
+		return invpkg.Set{invpkg.Read, invpkg.CS}, time.Time{}, nil
+	}
+	got, err := abilityRefresher("h", "t", nil, whoami)(context.Background())
+	if err != nil {
+		t.Fatalf("refresh with no cache: %v", err)
+	}
+	if !got.Has(invpkg.CS) {
+		t.Errorf("got %v; want the fresh set", got)
+	}
+}
+
+// TestNewAbilityCache_ConstructorFailureYieldsUntypedNil regresses the
+// concrete-nil trap: `cache, _ := invpkg.NewDiskCache()` assigned a nil
+// *DiskCache into a Cache interface, which is NOT nil, so Preflight's
+// `cache != nil` guard passed and cache.Get dereferenced a nil receiver.
+// `c == nil` here is the whole assertion — it is false for a typed nil.
+func TestNewAbilityCache_ConstructorFailureYieldsUntypedNil(t *testing.T) {
+	c := newAbilityCache(func() (*invpkg.DiskCache, error) {
+		return nil, errors.New("resolving home directory: no $HOME")
+	})
+	if c != nil {
+		t.Errorf("newAbilityCache returned a non-nil Cache (%T) for a failed constructor — "+
+			"a typed nil makes Preflight's nil check pass and panic on the nil receiver", c)
+	}
+
+	// A constructor that returns (nil, nil) is the same trap without the error.
+	if c := newAbilityCache(func() (*invpkg.DiskCache, error) { return nil, nil }); c != nil {
+		t.Errorf("newAbilityCache returned a non-nil Cache (%T) for a nil-without-error constructor", c)
+	}
+}
+
+// stubbornCache is a Cache whose entry cannot be evicted — Invalidate reports
+// success but changes nothing, and Get keeps serving the stale entry. That is
+// the read-only-filesystem shape that made Invalidate-then-Preflight unsafe.
+type stubbornCache struct {
+	entry    invpkg.Entry
+	wrote    invpkg.Entry
+	setErr   error
+	setCalls int
+}
+
+func (c *stubbornCache) Get(string, string) (invpkg.Entry, bool) { return c.entry, true }
+
+func (c *stubbornCache) Set(_, _ string, e invpkg.Entry) error {
+	c.setCalls++
+	if c.setErr != nil {
+		return c.setErr
+	}
+	c.wrote = e
+	return nil
+}
+
+func (c *stubbornCache) Invalidate(string, string) error { return nil }
+
 // TestBookingsSetResources_DesiredStateBody pins the wire shape of the
 // booking-resource write. POST /bookings/{id}/resources is desired-state,
 // not a delta, so three things have to hold and each is a silent-corruption
@@ -1068,9 +1264,12 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 	// uploadCmd is hand-written cobra; it doesn't expose a CommandDef, but
 	// the ability gate is hardcoded inline. Static assertion: the source
 	// must mention `invpkg.Refuse(invpkg.Write` so we know the gate fires.
+	// uploadCmd routes through Runner.refuseAbility (Refuse + one
+	// cache-bypassing re-read) like every CommandDef path, so the guard
+	// looks for that call rather than the bare Refuse it used to make.
 	media, _ := os.ReadFile("media.go")
-	if !strings.Contains(string(media), "invpkg.Refuse(invpkg.Write,") {
-		t.Errorf("media.go: uploadCmd must call invpkg.Refuse(invpkg.Write, ...) — ability gate appears missing")
+	if !strings.Contains(string(media), "refuseAbility(cmd.Context(), invpkg.Write)") {
+		t.Errorf("media.go: uploadCmd must call runner.refuseAbility(cmd.Context(), invpkg.Write) — ability gate appears missing")
 	}
 }
 
