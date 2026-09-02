@@ -1335,7 +1335,6 @@ func (e ListLocationsParamsType) Valid() bool {
 
 // Defines values for ListProductsParamsStatus.
 const (
-	Archived  ListProductsParamsStatus = "archived"
 	Draft     ListProductsParamsStatus = "draft"
 	Published ListProductsParamsStatus = "published"
 )
@@ -1343,8 +1342,6 @@ const (
 // Valid indicates whether the value is a known member of the ListProductsParamsStatus enum.
 func (e ListProductsParamsStatus) Valid() bool {
 	switch e {
-	case Archived:
-		return true
 	case Draft:
 		return true
 	case Published:
@@ -4819,7 +4816,11 @@ type ListProductsParams struct {
 	Q *Q `form:"q,omitempty" json:"q,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
-	Since    *Since                    `form:"since,omitempty" json:"since,omitempty"`
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
+
+	// Status Filters on the `is_active` column (`published` → true, `draft` →
+	// false). `is_active` is a two-state boolean, so there is no archived
+	// state; any other value returns 422 `VALIDATION_FAILED`.
 	Status   *ListProductsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 	Category *string                   `form:"category,omitempty" json:"category,omitempty"`
 }

@@ -188,7 +188,11 @@ paths:
         - $ref: "#/components/parameters/Since"
         - name: status
           in: query
-          schema: { type: string, enum: [draft, published, archived] }
+          schema: { type: string, enum: [draft, published] }
+          description: |
+            Filters on the `is_active` column (`published` → true, `draft` →
+            false). `is_active` is a two-state boolean, so there is no archived
+            state; any other value returns 422 `VALIDATION_FAILED`.
         - name: category
           in: query
           schema: { type: string }
@@ -3933,8 +3937,8 @@ components:
         | Ability     | Required for                                                           |
         | ----------- | ---------------------------------------------------------------------- |
         | `cli:read`  | Always granted alongside read endpoints; not enforced explicitly.      |
-        | `cli:write` | Mutating endpoints: availabilities update / delete / bulk-update / bulk-delete, discounts CRUD + apply, gift-certs issue / void / resend, guest update. |
-        | `cli:cs`    | CS-only sensitive ops: booking comp, booking refund, confirmation resend. Issued only to CS engineers. |
+        | `cli:write` | Every mutating endpoint **not** listed under `cli:cs`: products, product-options, availabilities (incl. availability-rules, bulk-update, bulk-delete), pricing-categories, pricing-tiers, discounts (incl. apply), gift-certs (available CRUD + issue / void / resend), guests, extras, questions, resources (incl. attach / detach on product-options and `POST /bookings/{id}/resources`), locations, media, workflows (incl. steps + trigger). Stated as the complement of `cli:cs` on purpose: an enumeration drifts every time a resource is added. |
+        | `cli:cs`    | CS-only sensitive ops: booking **cancel**, comp, refund, and confirmation resend — the four routes in the `abilities:cli:cs` group. Cancel is CS for **every** `refund_policy` value, `none` (which moves no money) included. Issued only to CS engineers. |
 
         Recommended issuance: a dedicated `cli:read` token for scripted
         reporting, a `cli:read` + `cli:write` token for inventory editors, and

@@ -1868,3 +1868,70 @@ func TestLeafCommandsRejectStrayPositionals(t *testing.T) {
 	}
 	t.Logf("verified %d leaf commands reject stray positionals", checked)
 }
+
+// productsDefFor mirrors bookingsDefFor for the products resource.
+func productsDefFor(t *testing.T, use string) CommandDef {
+	t.Helper()
+	var found []CommandDef
+	for _, d := range productsDefs() {
+		if d.Use == use {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("expected exactly one %q CommandDef, got %d", use, len(found))
+	}
+	return found[0]
+}
+
+// TestProductsList_StatusGateRejectsArchived covers the runtime half of the
+// captainbook#8111 fix. TestSpecDrift_FlagDescriptionEnumsMatchSpec proves
+// the --status description matches the spec enum, but nothing exercised the
+// gate that description drives: makeRunE feeds it through extractEnumTokens
+// and inSlice before any request leaves the machine, and that path had no
+// test at all.
+//
+// The distinction is the whole point of the fix. While the spec still listed
+// `archived`, the token was on the allow-list, so it sailed past this gate to
+// earn a server 422 a round trip later — strictly worse than a typo like
+// `publshed`, which failed instantly and locally. Asserting the token set
+// alone would not catch a regression in extractEnumTokens (a parser change
+// that returns nil disables the gate entirely and stays green against the
+// spec), so drive the real allow-list and assert both directions.
+func TestProductsList_StatusGateRejectsArchived(t *testing.T) {
+	def := productsDefFor(t, "products list")
+	var desc string
+	for _, f := range def.Flags {
+		if f.Name == "status" {
+			desc = f.Description
+		}
+	}
+	if desc == "" {
+		t.Fatal("products list has no --status flag")
+	}
+
+	tokens := extractEnumTokens(desc)
+	if tokens == nil {
+		t.Fatalf("extractEnumTokens(%q) returned nil — the client-side enum gate "+
+			"in makeRunE is disabled for --status, so any value reaches the server", desc)
+	}
+	if !sameSet(tokens, []string{"draft", "published"}) {
+		t.Errorf("--status allow-list is %v, want [draft published]. status filters the "+
+			"two-state is_active column and the server validates it with in:published,draft",
+			tokens)
+	}
+
+	for _, v := range []string{"draft", "published"} {
+		if !inSlice(v, tokens) {
+			t.Errorf("--status %q rejected locally but the server accepts it", v)
+		}
+	}
+	// `archived` specifically: it was the spec's phantom third state, and a
+	// re-sync that reinstates it must fail here as well as in the drift test.
+	for _, v := range []string{"archived", "publshed", ""} {
+		if v != "" && inSlice(v, tokens) {
+			t.Errorf("--status %q passes the client-side gate; the server 422s on it, "+
+				"so the operator pays a round trip to learn it is invalid", v)
+		}
+	}
+}
