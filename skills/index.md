@@ -51,6 +51,26 @@ Tokens carry one or more abilities. The server enforces them at the route layer;
 
 Recommended issuance: a `cli:read` token for reporting bots, a `cli:read + cli:write` token for inventory editors, and a `cli:read + cli:write + cli:cs` token for Customer Success engineers.
 
+### Abilities are not permissions
+
+Two gates run on every call, and they answer different questions:
+
+- **The token's abilities** (`cli:read` / `cli:write` / `cli:cs`) decide which *endpoints* you can reach.
+- **The permissions of the user the token was issued to** decide which *data* comes back. Every endpoint runs the same policy the web UI runs for that resource — a caller without `view_any_booking` gets `403 FORBIDDEN` on `bookings list` even with a valid `cli:read` token.
+
+Two consequences worth designing around:
+
+- **A restricted caller gets a smaller page, not a 403.** `view_own_booking` (declared `exclusive_of` `view_any_booking`) scopes list endpoints to the bookings the caller's linked resource is assigned to. A short result is not evidence of a small calendar.
+- **Field-level redaction is silent — keys stay present, values go null.** A script testing for key presence concludes the data doesn't exist rather than that it can't see it.
+
+| Missing permission | What goes null/empty on `Booking` |
+|--------------------|-----------------------------------|
+| `view_booker_of_booking` | `customer.name` / `.email` / `.phone`, and inline `guests[]`. `customer.id` survives so the payload stays joinable. |
+| `see_money_of_booking` | `total_amount`, `paid_amount`, `refunded_amount` (null); `transactions[]` (empty). |
+| `view_answers_of_booking` | `answers` (null — distinct from `[]`, which means "none exist"). |
+
+The dedicated child endpoints agree with those gates rather than letting a caller walk around them: `transactions list` also requires `see_money_of_booking`, `guests list` also requires `view_booker_of_booking`, and `answers list` requires `view_answers_of_booking`. A guest or answer outside the caller's business unit or assigned trips reads as **404**, not 403, so the id space is not enumerable.
+
 ### TLS
 
 `ceebee` uses the operating-system trust store and Sanctum bearer-token auth. **There is no certificate pinning** — this is a deliberate choice, not an oversight. Pinning would make tenant onboarding painful (subdomains rotate; corporate proxies inject MITM certs). The bearer token is the credential of record.
@@ -63,9 +83,51 @@ Every money field — `amount`, `from_price`, `discounted_price`, `refund_amount
 
 ### Dates and times
 
-- **Dates** are interpreted in the tenant timezone (`Organisation.timezone`) — applies to fields like `Booking.starts_at`, `Availability.date`.
+- **Dates you send** (`--from` / `--to` on list and bulk endpoints) are interpreted in the tenant timezone (`Organisation.timezone`), matching against fields like `Booking.starts_at` and `Availability.date`. One exception: `answers list` reads them in the *product's* timezone once `--product-option-id` narrows the query to a single product, because the departure column it matches stores product-local wall clock. See [answers.md](answers.md).
 - **Date ranges** on list endpoints are half-open `[from, to)`. To match April 2026 in full, pass `?from=2026-04-01&to=2026-05-01`.
 - **Date-times** (`*_at`) are UTC unless the supplied value carries an explicit `±HH:MM` offset.
+- **Trip times come back in the PRODUCT's timezone, not UTC.** `Availability.starts_at` / `ends_at` and `Booking.starts_at` / `ends_at` (read from the linked availability) are emitted with the product's UTC offset: `2026-08-04T10:00:00+01:00` is a 10:00 *local* departure for a product in `Europe/London`. Every other timestamp — `created_at`, `updated_at`, `confirmed_at`, `cancelled_at`, `expires_at`, `deleted_at` — is a genuine UTC instant emitted as `+00:00`. Availabilities with no product option behind them (e.g. resource-backed rows) have no product to attribute and fall back to `+00:00`. Normalising a whole object to UTC with one rule shifts every departure by the product's offset.
+
+### Incremental sync (`--since`) is not universal
+
+`--since` is an ISO 8601 lower bound on `updated_at`, and roughly half the list endpoints have it. Never assume it: check `ceebee inventory <resource> list --help` before building a sync loop. `bookings list`, `product-options list`, `gift-certificates list-available` / `list-issued` and `workflow-executions list` have never carried one.
+
+Five endpoints are a sharper case — they **used to** take `--since` and the latest spec sync **removed** it, because their tables carry no timestamp columns at all:
+
+| Resource | Why |
+|----------|-----|
+| `questions` | `questions` has no `created_at` / `updated_at` (`$timestamps = false`) |
+| `guests` | no timestamp columns |
+| `pricing-categories` | no timestamp columns |
+| `pricing-tiers` | no timestamp columns |
+| `categories` | no timestamp columns (and no `updated_at` field at all) |
+
+On those five the CLI declares no `--since` flag, and the server answers `422` if you reach the parameter by other means. **That 422 is deliberate and worth understanding:** the alternative — accepting the parameter and returning an unfiltered page — is what a nightly poller would silently misread as "nothing changed since last run". Failing loudly beats a delta that is quietly the whole table.
+
+There is no incremental-sync signal for those resources. List them in full and diff client-side, or narrow the set from a related resource before diffing (e.g. reconcile guests by windowing `bookings list --from` / `--to` on the booking start date and reading the inline `guests[]` off `bookings get` — a smaller diff, still a diff).
+
+One resource takes `--since` with different semantics: `media list --since` bounds `media_updated_at`, the column that endpoint publishes as `created_at`. See [media.md](media.md).
+
+### Boolean flags need `=`, not a space
+
+Write `--send-now=false`, never `--send-now false`.
+
+This is not style. Every bool flag is registered with an implicit "true" default, so `--send-now false` sets the flag to **true** and leaves the bare word `false` as a stray argument. Commands that take an id catch the stray and error — as long as you actually supplied the id. Omit it and the stray fills the slot instead: `bookings cancel --dry-run false` builds a request against booking id `"false"` with `dry_run: true`, which 404s rather than mis-writing, but tells you nothing about the real mistake. Commands that take no positional at all used to swallow the stray silently and do the opposite of what you typed — `issue --send-now false` dispatched the redemption email it was meant to suppress, and `bulk-update booking-status --is-bookable false` re-opened the calendar it was meant to close.
+
+Those commands now reject the stray argument with `unknown command "false"` instead of acting on the inverted value, so the mistake is loud rather than silent. The `=` form has always been correct and still is:
+
+```bash
+ceebee inventory gift-certificates issue --send-now=false
+```
+
+The space form now errors instead of silently inverting:
+
+```text
+$ ceebee inventory gift-certificates issue --send-now false
+unknown command "false" for "ceebee inventory gift-certificates issue"
+```
+
+Passing a bool bare still means true (`--dry-run`, `--include-trashed`), which is the common case and unaffected.
 
 ### Idempotency keys
 
@@ -146,6 +208,7 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | Code | Meaning |
 |------|---------|
 | 0    | Success (or async-accepted; see stderr signal) |
+| 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), missing subcommand, or `--dry-run` on an operation the server can't preview |
 | 10   | Authentication failed (401) |
 | 11   | Forbidden / ability missing (403) |
 | 12   | Validation error (422) |
@@ -229,6 +292,8 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 
 When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally with `"dry-run not supported for this command"` and exit code 1 — no HTTP call is made.
 
+**Not every dry-run tells you the same amount.** Most return `total_matched` — the number of rows the filter hit — which cannot answer *"will this change anything?"*, because it is identical whether your proposed value matches the current one or not. `availabilities bulk-update pricing` is the exception: its dry-run also returns `total_changed` plus a `diff` of the first `preview_limit` matched slots. See [availabilities.md](availabilities.md) example 5.
+
 ## Resource directory
 
 - [auth.md](auth.md) — `whoami`, token / ability probing.
@@ -247,6 +312,7 @@ When the dry-run column says **none**, sending `--dry-run` from the CLI errors l
 - [guests.md](guests.md) — Per-booking guest reads + edits (Greek passport workflow).
 - [extras.md](extras.md) — Add-ons CRUD + restore.
 - [questions.md](questions.md) — Booking questions CRUD + restore.
+- [answers.md](answers.md) — Read-only cross-booking reads of what customers answered (manifests, dietary rollups). Guest PII; needs `view_answers_of_booking`.
 - [categories.md](categories.md) — Read-only product category catalog (platform-managed).
 - [media.md](media.md) — Product images + documents.
 - [notifications.md](notifications.md) — Booking confirmation resend.

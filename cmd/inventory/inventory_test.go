@@ -508,20 +508,28 @@ func newTestParent() *cobra.Command {
 // between the resource files and any future schema additions.
 func TestAllResourceDefs_Buildable(t *testing.T) {
 	groups := map[string][]CommandDef{
-		"auth":              authDefs(),
-		"products":          productsDefs(),
-		"product_options":   productOptionsDefs(),
-		"pricing_tiers":     pricingTiersDefs(),
-		"discounts":         discountsDefs(),
-		"gift_certificates": giftCertificatesDefs(),
-		"bookings":          bookingsDefs(),
-		"transactions":      transactionsDefs(),
-		"customers":         customersDefs(),
-		"guests":            guestsDefs(),
-		"extras":            extrasDefs(),
-		"questions":         questionsDefs(),
-		"categories":        categoriesDefs(),
-		"notifications":     notificationsDefs(),
+		"auth":                authDefs(),
+		"products":            productsDefs(),
+		"product_options":     productOptionsDefs(),
+		"availabilities":      availabilitiesDefs(),
+		"pricing_categories":  pricingCategoriesDefs(),
+		"pricing_tiers":       pricingTiersDefs(),
+		"resources":           resourcesDefs(),
+		"locations":           locationsDefs(),
+		"answers":             answersDefs(),
+		"media":               mediaDefs(),
+		"workflows":           workflowsDefs(),
+		"workflow_executions": workflowExecutionsDefs(),
+		"discounts":           discountsDefs(),
+		"gift_certificates":   giftCertificatesDefs(),
+		"bookings":            bookingsDefs(),
+		"transactions":        transactionsDefs(),
+		"customers":           customersDefs(),
+		"guests":              guestsDefs(),
+		"extras":              extrasDefs(),
+		"questions":           questionsDefs(),
+		"categories":          categoriesDefs(),
+		"notifications":       notificationsDefs(),
 	}
 	for name, defs := range groups {
 		if len(defs) == 0 {
@@ -1010,12 +1018,21 @@ func TestBookingsList_RejectsZeroResourceID(t *testing.T) {
 // bypass on other endpoints — Refuse("") short-circuits as a no-op so
 // any CommandDef that forgets to set Ability would be wide-open.
 func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
+	// EVERY *Defs() in the package must be listed. A resource missing from
+	// this slice silently skips the ability-gate assertion below, which is
+	// the one thing standing between a typo'd Ability and Refuse("") — a
+	// no-op that ships an ungated command. The list had already drifted
+	// past pricing-categories, resources, locations, workflows and
+	// workflow-executions before `answers` was added to it.
 	defGroups := [][]CommandDef{
 		authDefs(),
 		productsDefs(),
 		productOptionsDefs(),
 		availabilitiesDefs(),
+		pricingCategoriesDefs(),
 		pricingTiersDefs(),
+		resourcesDefs(),
+		locationsDefs(),
 		discountsDefs(),
 		giftCertificatesDefs(),
 		bookingsDefs(),
@@ -1024,9 +1041,12 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 		guestsDefs(),
 		extrasDefs(),
 		questionsDefs(),
+		answersDefs(),
 		categoriesDefs(),
 		mediaDefs(),
 		notificationsDefs(),
+		workflowsDefs(),
+		workflowExecutionsDefs(),
 	}
 	for _, defs := range defGroups {
 		for _, d := range defs {
@@ -1040,7 +1060,7 @@ func TestCommandDef_NoStrayEmptyAbility(t *testing.T) {
 	// in any *Defs() table. Cover them directly.
 	bulkSettings := []string{"capacity", "booking-status", "pricing", "start-time", "end-time"}
 	for _, s := range bulkSettings {
-		def := bulkUpdateDef(s, "test-"+s, nil, func(args RunArgs) (any, error) { return map[string]any{}, nil })
+		def := bulkUpdateDef(s, "test-"+s, "", nil, func(args RunArgs) (any, error) { return map[string]any{}, nil })
 		if def.Ability == "" {
 			t.Errorf("bulkUpdateDef(%q) has empty Ability", s)
 		}
@@ -1407,4 +1427,60 @@ func TestMultipartUpload_ForensicSummaryRecordsOptionalFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLeafCommandsRejectStrayPositionals locks the guard that turns a
+// silently-inverted bool flag into a loud error.
+//
+// pflag gives every bool NoOptDefVal="true", so `--send-now false` sets the
+// flag TRUE and leaves "false" as a positional. Under cobra's default
+// (ArbitraryArgs) an argument-less command swallowed that token and did the
+// opposite of what the operator typed — `gift-certificates issue --send-now
+// false` dispatched the redemption email the flag exists to suppress, and it
+// returned 0. bindCommands now binds cobra.NoArgs on every leaf that
+// declares no positionals.
+//
+// This walks the REAL tree from Cmd() rather than a hand-built list, so a
+// resource added later cannot opt out of the guard by being forgotten.
+func TestLeafCommandsRejectStrayPositionals(t *testing.T) {
+	var leaves []*cobra.Command
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		if !c.HasSubCommands() {
+			if c.Runnable() {
+				leaves = append(leaves, c)
+			}
+			return
+		}
+		for _, child := range c.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+	if len(leaves) == 0 {
+		t.Fatal("no runnable leaf commands found — tree walker broken")
+	}
+
+	checked := 0
+	for _, c := range leaves {
+		if c.Args == nil {
+			t.Errorf("%s: Args validator is nil — cobra defaults to ArbitraryArgs, so a "+
+				"stray token from `--boolflag false` would be swallowed silently", c.CommandPath())
+			continue
+		}
+		// Feed the validator one more argument than the command declares.
+		// ExactArgs(n) commands get n+1; NoArgs commands get 1.
+		n := strings.Count(c.Use, "<")
+		args := make([]string, n+1)
+		for i := range args {
+			args[i] = "false" // the exact token a space-form bool leaves behind
+		}
+		if err := c.Args(c, args); err == nil {
+			t.Errorf("%s: accepted %d positional args (declares %d) — a stray `false` from "+
+				"`--boolflag false` would be silently swallowed and the flag would read true",
+				c.CommandPath(), len(args), n)
+		}
+		checked++
+	}
+	t.Logf("verified %d leaf commands reject stray positionals", checked)
 }

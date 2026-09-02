@@ -19,7 +19,15 @@
 ceebee inventory media list prod_42
 ```
 
-Returns `{id, product_id, filename, mime_type, size, position, alt_text, url, updated_at}`.
+Returns `{id, product_id, filename, mime_type, size, position, alt_text, url, created_at}`.
+
+### 1b. List media added since a sync point
+
+```bash
+ceebee inventory media list prod_42 --since "2026-08-01T00:00:00Z"
+```
+
+`--since` here does NOT mean what it means on every other resource. `product_attachments` carries no Laravel timestamps, so there is no `updated_at` to bound. The filter runs against `media_updated_at` — the column this endpoint publishes as the item's `created_at`. Read it as **"added since"**, not "edited since": since V1 has no `update` endpoint (you delete and re-upload), those happen to be the same thing in practice, but a re-upload arrives as a new row with a new id.
 
 ### 2. Upload an image with alt text + position
 
@@ -57,6 +65,7 @@ Hard delete; no restore. The remote storage object is reaped async.
 ## Pitfalls
 
 - ⚠️ **No `update` endpoint in V1.** Want to change `alt_text` or `position`? Delete and re-upload. Phase 2 will add PATCH.
+- ⚠️ **`--since` bounds `media_updated_at`, not `updated_at`.** This resource has no Laravel timestamps at all; `media_updated_at` is what the endpoint surfaces as `created_at`. Scripts that reuse a generic "sync since last run" helper across resources are reading a different column here — see example 1b.
 - ⚠️ **Size limits return 413, MIME mismatches return 415.** Both have stable `code` fields in the error envelope. The CLI surfaces these as exit code 12 (validation). Re-encode large JPEGs before upload, or check tenant plan limits via the admin UI.
 - ⚠️ **Variants are async.** A successful 201 does NOT mean thumbnails are ready. Customer-facing widgets may show the original until Paperclip finishes — typically seconds, but no in-band signal.
 - ⚠️ **No dry-run.** Upload is multipart; the server has no preview path. To check size + MIME locally before upload, use `file ./hero.jpg` and `du -h ./hero.jpg`.

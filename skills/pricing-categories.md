@@ -71,6 +71,7 @@ ceebee inventory pricing-categories restore 22
 
 ## Pitfalls
 
+- ⚠️ **No `--since`, and sending `since=` is a 422.** The `pricing_categories` table carries no `created_at` / `updated_at` columns, so there is nothing for the filter to bound and `created_at` / `updated_at` are always null on the response. The 422 is deliberate — a silently-unfiltered page is what a polling client would misread as a delta. No incremental sync here: list in full and diff client-side.
 - ⚠️ **Reparenting is forbidden via PATCH.** Updating `product_id` is rejected by `UpdatePricingCategoryRequest::rules()` per spec. Create a new category if you need to move tiers across products.
 - ⚠️ **Delete cascades to PricingTiers.** Deleting a category soft-deletes every tier underneath it. Restore restores the category only — tiers stay soft-deleted and need explicit `pricing-tiers restore <id>` calls.
 - ⚠️ **`--min-age` / `--max-age` are advisory.** They're passed through to the booking widget for age-gating UX but don't enforce anything server-side. If a customer lies about age, you find out at the door.

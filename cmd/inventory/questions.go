@@ -2,8 +2,6 @@ package inventory
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -16,12 +14,20 @@ func questionsDefs() []CommandDef {
 		{
 			Use: "questions list", Short: "List questions", Kind: KindRead,
 			Verb: "GET", Path: "/questions", Ability: invpkg.Read,
+			// NOTE: no --since. The `questions` table carries no
+			// created_at / updated_at columns at all, so there is nothing for
+			// the filter to bound — `/questions` REMOVED the parameter and now
+			// answers 422. That 422 is deliberate on the server's part: a
+			// silently-unfiltered page is what a polling client would
+			// misread as "nothing changed since last run". There is no
+			// incremental-sync signal here; list in full and diff
+			// client-side. Re-adding the flag would not compile —
+			// gen.ListQuestionsParams has no Since field.
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
 				{Name: "product-option-id", Type: "string", Description: "Filter by option"},
 				{Name: "required", Type: "bool", Description: "Filter required-only"},
 				{Name: "include-trashed", Type: "bool"},
-				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListQuestionsParams{}
@@ -41,13 +47,6 @@ func questionsDefs() []CommandDef {
 				if args.FlagBool("include-trashed") {
 					t := true
 					p.IncludeTrashed = &t
-				}
-				if v := args.FlagString("since"); v != "" {
-					t, err := time.Parse(time.RFC3339, v)
-					if err != nil {
-						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
-					}
-					p.Since = &t
 				}
 				resp, err := r.Client.ListQuestionsWithResponse(ctx, p)
 				if err != nil {

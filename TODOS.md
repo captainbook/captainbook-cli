@@ -28,6 +28,140 @@ test that goes through `root.Execute()`.
 
 **Why:** Silent capability gap — the CLI can add to these lists but never clear them.
 **Priority:** P3 — no reported user need yet; convert per-flag when one appears.
+
+## Spec-drift test can't compare a flag's Go TYPE against the spec
+
+`flagLit` in `cmd/inventory/spec_drift_test.go` captures only `Name` and
+`Description`, so no drift test compares a `FlagDef.Type` against the spec
+parameter's schema type. This is not hypothetical: `GET /answers` types
+`question_id` and `product_option_id` as `integer` while every other endpoint
+carrying `product_option_id` types it `string`, and nothing mechanical would
+have caught picking the wrong one. The failure is silent rather than loud —
+`args.FlagInt()` on a value stored as a string falls through its type
+assertion to the zero value instead of failing to compile.
+
+**Fix:** add `Type` to `flagLit`, extract it in `extractCmdLit`, and assert
+integer→int / boolean→bool / string→string for every GET command's flags.
+**Why:** the one drift class the spec-drift suite currently cannot see.
+**Priority:** P2 — a wrong choice ships a silently-empty filter.
+
+## Body keys set outside JSONBodyFromArgs escape the field-map guard
+
+`TestSpecDrift_FieldMapKeysExistInSpec` extracts JSON keys only from the map
+literal passed to `JSONBodyFromArgs`. `availabilities update --fares` does not
+travel that path — it is overlaid separately via `overlayJSONField` — so the
+`fares` key is invisible to the guard that covers `capacity` / `status` /
+`is_bookable`. The key is correct today; if the server renames it, the
+mechanical check stays green while the CLI sends a key the server ignores and
+a PATCH that silently drops the pricing overrides still returns 200.
+
+**Fix:** teach `extractCmdLit` to collect literal key arguments to
+`overlayJSONField` into `FieldMap`, or assert the overlay key against the spec
+in a dedicated test.
+**Why:** the guard's coverage silently ends where the code stops using the helper.
+**Priority:** P2 — same blast radius as any other renamed body key.
+
+## Upstream: `/answers` types two ids as integer, inconsistent with every other endpoint
+
+`GET /answers` declares `question_id` and `product_option_id` as
+`type: integer`, but `Question.id`, `Answer.question_id`, `ProductOption.id`
+and `GET /questions?product_option_id` are all `type: string`, and the docs use
+prefixed ids (`q_42`, `po_88`) throughout. The CLI matches the spec, so
+`answers list --product-option-id po_88` fails to parse while
+`availabilities list --product-option-id po_88` works. Flag descriptions note
+the divergence as a stopgap.
+
+**Fix:** raise with the server repo so `/answers` matches the rest of the
+surface; drop the flag-description caveat and switch to string flags once it does.
+**Why:** an operator copying a working id between commands hits a parse error.
+**Priority:** P3 — cosmetic until someone copies an id between the two.
+
+## Bare true/false can still be swallowed as a MISSING positional
+
+`bindCommands` now binds `cobra.NoArgs` on argument-less leaves, so
+`gift-certificates issue --send-now false` errors instead of silently sending
+the email. But `ExactArgs(N)` only catches the stray token when the user
+supplied all N positionals. Verified residual: `bookings cancel --dry-run false`
+with the id omitted passes arg validation with `PathArgs=["false"]` and builds a
+request against booking id `"false"` carrying `dry_run: true` — the opposite of
+what was typed. It degrades to a 404 rather than a wrong write, so it is not
+dangerous, but it is the same silence and nothing guards it.
+
+**Fix:** a bool-flag-aware Args validator that rejects a bare `true` / `false`
+positional on ANY command, replacing the plain `ExactArgs` / `NoArgs` pair.
+**Why:** the space-form bool trap has one corner left.
+**Priority:** P3 — degrades to a 404, not a wrong write.
+
+## ~~speccompat rewrites `type:` sequences without checking schema position~~ — DONE
+
+`rewriteNullableTypeArray` matched any mapping key literally named `type` whose
+value was a sequence, anywhere in the document — including inside an `example:`,
+`default:`, or `x-` extension object where `type` is DATA, not a schema keyword.
+An upstream `example: {type: [guest, 'null']}` would have been collapsed to
+`type: guest` with a fabricated `nullable: true` injected into the operator's
+example. Not contrived for this spec: `granularity` is enum
+`[booking, guest, extra]`.
+
+Fixed by requiring every non-null member of the sequence to be one of the seven
+JSON Schema type names (`isJSONSchemaTypeName` in `tools/speccompat/main.go`)
+before rewriting. It costs nothing on real schemas — a nullable type-array has
+no other legal spelling — and makes the package's "fail loudly rather than
+mangle" promise true for arbitrary upstream input. Covered by the
+`type sequence under example: is data, not a schema keyword` passthrough case in
+`tools/speccompat/main_test.go`.
+
+Generalises: any YAML/JSON transform keyed on a bare key NAME needs a
+position/context check, because spec key names recur as data.
+
+## `--data` numbers are rounded through float64 before they reach the wire
+
+`JSONBodyFromArgs` (cmd/inventory/inventory.go) decodes `--data` into
+`map[string]any` and re-marshals it, so every JSON number round-trips through
+`float64`. Anything past 2^53 is silently changed before the request is built:
+
+```
+availabilities update av_1 --data '{"fares":[{"pricing_tier_id":"pt_7","amount":9007199254740993}]}'
+  -> wire: {"fares":[{"amount":9007199254740992,...}]}
+```
+
+The typed `--fares` flag is immune (parseFaresFlag returns `json.RawMessage`,
+which marshals verbatim), so the same field on the same command behaves
+differently depending on which flag carried it. The server cannot reject a
+value that was corrupted before it was sent.
+
+Amounts in minor units past 2^53 are ~90 trillion of any currency, so no
+realistic operator hits this — it is a correctness and honesty problem, not an
+outage. It applies to every `--data`-carrying mutation, not just fares.
+
+**Fix:** decode `--data` with `json.Decoder` + `UseNumber()`, or keep the body
+as `map[string]json.RawMessage` through to the marshal.
+**Why:** one flag preserves the operator's number and the other quietly does not.
+**Priority:** P3 — unreachable at realistic amounts.
+
+## Upstream: `UpdateLocationRequest` description names a property it does not declare
+
+`api/inventory/cli-v1.yaml` `UpdateLocationRequest` says "The controller
+persists only `type`, `name`, `latitude`, `longitude`, `google_place_id`,
+`region`, and (when `address` is provided) `street_address`" — but `region` is
+not among its `properties`, and neither is `street_address`. `CreateLocationRequest`
+declares both.
+
+So one of two things is wrong upstream: either the controller really does
+persist `region` on update and the schema is missing the property (in which
+case no client can send it, including this CLI), or the description is stale
+copy-paste from the create schema. The read response returns no `region`
+either, so the difference is not observable from the outside.
+
+Practical effect today: a location's `region` / `city` / `country_code` /
+`postal_code` can be set at create and never changed, and `skills/locations.md`
+now documents them as create-only for that reason.
+
+**Fix:** ask the server team which it is; add the property or drop it from the
+description. Then re-sync and expose `locations update --region` if it is real.
+**Why:** the spec is the source of truth for the drift tests, and it currently
+disagrees with itself.
+**Priority:** P3 — documented; no operator is blocked, they just cannot edit.
+
 ## ~~Docs/code drift tests (skills + README)~~ — DONE
 
 Implemented as `cmd/inventory/skills_drift_test.go`. Complements
@@ -53,6 +187,12 @@ checks the **docs** against the command tree the CLI actually builds
 - `TestSpecQueryParamsAreExposedAsFlags`: every GET's spec query params must
   have a flag or an entry in `intentionallyUnexposedQueryParams` **with a
   reason**, so a spec re-sync can't quietly add an unreachable filter.
+- `TestDocsNeverUseSpaceFormBoolFlags`: no doc may print the space form of a
+  bool flag (`--flag false`), which pflag parses as `--flag=true` plus a stray
+  positional. Doc-driven rather than grep-driven: it resolves each invocation
+  against the real cobra tree and asks the flag whether it is actually a bool,
+  so a string flag legitimately taking the literal word `true` is not
+  false-positived. 18 doc invocations were rewritten to the `=` form.
 - `TestFlagDescriptionsHaveNoBackquotes`: cobra's `UnquoteUsage()` turns the
   first backquoted word of a description into the flag's value placeholder,
   so ``persisted as `fare` `` rendered as `--amount fare` instead of

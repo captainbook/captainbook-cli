@@ -170,17 +170,19 @@ func scanDoc(t *testing.T, path string) []invocation {
 // first shell operator. Cutting at `|` matters: several examples pipe into
 // jq, and jq programs contain their own text that must not be mistaken for
 // CLI flags.
+//
+// The cut is QUOTE-AWARE, and that is not a nicety. An unquoted scan cuts at
+// the first `)` in `--label "Shoe size (EU)"` and silently drops the rest of
+// the invocation — which is how `questions create --position 2` sat in the
+// docs, validated, for as long as it did: the test was checking a prefix and
+// reporting success. A truncated invocation is worse than an unparsed one,
+// because it passes.
 func parseInvocation(text string) (invocation, bool) {
 	loc := ceebeeRe.FindStringIndex(text)
 	if loc == nil {
 		return invocation{}, false
 	}
-	seg := text[loc[1]:]
-	for _, cut := range []string{"|", "&&", "||", ";", "#", ">", ")"} {
-		if idx := strings.Index(seg, cut); idx >= 0 {
-			seg = seg[:idx]
-		}
-	}
+	seg := cutAtShellOperator(text[loc[1]:])
 	seg = strings.TrimSpace(seg)
 	if seg == "" {
 		return invocation{}, false
@@ -191,6 +193,50 @@ func parseInvocation(text string) (invocation, bool) {
 		Args:  strings.Fields(seg),
 		Flags: dedupe(flagRe.FindAllString(seg, -1)),
 	}, true
+}
+
+// shellOperators end an invocation when they appear outside quotes. `)` is
+// here for the `$(ceebee …)` capture idiom; the others end or redirect the
+// command.
+var shellOperators = []string{"&&", "||", "|", ";", "#", ">", ")"}
+
+// cutAtShellOperator truncates s at the first shell operator that is not
+// inside single or double quotes. Backslash escapes the next character
+// inside double quotes only, matching POSIX sh: inside single quotes a
+// backslash is literal, so `'\'` does not escape the closing quote.
+func cutAtShellOperator(s string) string {
+	var inSingle, inDouble bool
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case inSingle:
+			if c == '\'' {
+				inSingle = false
+			}
+			continue
+		case inDouble:
+			if c == '\\' {
+				i++ // skip the escaped character
+				continue
+			}
+			if c == '"' {
+				inDouble = false
+			}
+			continue
+		case c == '\'':
+			inSingle = true
+			continue
+		case c == '"':
+			inDouble = true
+			continue
+		}
+		for _, op := range shellOperators {
+			if strings.HasPrefix(s[i:], op) {
+				return s[:i]
+			}
+		}
+	}
+	return s
 }
 
 func dedupe(in []string) []string {
@@ -454,4 +500,164 @@ func TestSkillsDocEndpointTables(t *testing.T) {
 		t.Fatal("matched no endpoint-table rows — the row parser is broken, not the docs")
 	}
 	t.Logf("validated %d endpoint-table rows across %d docs", rows, len(docs))
+}
+
+// TestCutAtShellOperator guards the truncation bug that made TestSkillsDocDrift
+// report success on an invocation it had only half-read. A `)` inside
+// `--label "Shoe size (EU)"` cut the invocation there, so every flag after it
+// went unvalidated — which is how `questions create --position 2` stayed in
+// the docs despite no such flag existing. A silently-truncated invocation is
+// worse than an unparsed one, because it passes.
+func TestCutAtShellOperator(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			// The regression. Everything after the quoted `)` must survive.
+			name: "paren inside double quotes does not truncate",
+			in:   ` inventory questions create --label "Shoe size (EU)" --required true`,
+			want: ` inventory questions create --label "Shoe size (EU)" --required true`,
+		},
+		{
+			// The reason `)` is a cut token at all: the $(ceebee …) capture
+			// idiom. An unquoted `)` still ends the invocation.
+			name: "unquoted paren still ends the invocation",
+			in:   ` inventory whoami --format json)`,
+			want: ` inventory whoami --format json`,
+		},
+		{
+			// jq programs are single-quoted and contain `|` constantly. The
+			// pipe that matters is the one before jq, not the ones inside it.
+			name: "pipe outside quotes cuts, pipe inside single quotes does not",
+			in:   ` inventory bookings list | jq '.data[] | .id'`,
+			want: ` inventory bookings list `,
+		},
+		{
+			name: "hash inside quotes is not a comment",
+			in:   ` inventory discounts create --code "SUMMER#1"`,
+			want: ` inventory discounts create --code "SUMMER#1"`,
+		},
+		{
+			name: "trailing comment is cut",
+			in:   ` inventory whoami   # validates auth`,
+			want: ` inventory whoami   `,
+		},
+		{
+			name: "redirect outside quotes cuts",
+			in:   ` inventory whoami > out.json`,
+			want: ` inventory whoami `,
+		},
+		{
+			// JSON payloads are single-quoted and carry `>` and `|` freely
+			// inside string values.
+			name: "json payload in single quotes survives intact",
+			in:   ` inventory availabilities update av_1 --fares '[{"pricing_tier_id":"pt_7","amount":null}]'`,
+			want: ` inventory availabilities update av_1 --fares '[{"pricing_tier_id":"pt_7","amount":null}]'`,
+		},
+		{
+			// Inside double quotes a backslash escapes the next character, so
+			// the escaped quote must not be read as closing the string.
+			name: "escaped quote inside double quotes does not end the string",
+			in:   ` inventory products create --name "The \"Big\" One" --slug x`,
+			want: ` inventory products create --name "The \"Big\" One" --slug x`,
+		},
+		{
+			name: "two-char operator wins over its one-char prefix",
+			in:   ` inventory whoami && echo ok`,
+			want: ` inventory whoami `,
+		},
+		{
+			name: "no operator returns the whole segment",
+			in:   ` inventory products list --limit 5`,
+			want: ` inventory products list --limit 5`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := cutAtShellOperator(tc.in); got != tc.want {
+				t.Errorf("cutAtShellOperator(%q)\n = %q\nwant %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestParseInvocation_SeesFlagsAfterAQuotedParen is the end-to-end form of
+// the same guard: the flags list parseInvocation hands the drift test must
+// include the ones that follow a quoted `)`, or the test validates a prefix
+// and calls it a pass.
+func TestParseInvocation_SeesFlagsAfterAQuotedParen(t *testing.T) {
+	inv, ok := parseInvocation(`ceebee inventory questions create --label "Shoe size (EU)" --position 2 --dry-run`)
+	if !ok {
+		t.Fatal("parseInvocation returned !ok")
+	}
+	if !contains(inv.Flags, "--position") {
+		t.Errorf("flags = %v; want them to include --position (the flag that slipped through)", inv.Flags)
+	}
+	if !contains(inv.Flags, "--dry-run") {
+		t.Errorf("flags = %v; want them to include --dry-run", inv.Flags)
+	}
+}
+
+// TestDocsNeverUseSpaceFormBoolFlags guards the bug class that made
+// `--send-now false` dispatch the email it was meant to suppress.
+//
+// pflag registers every bool with NoOptDefVal="true", so the space form
+// `--flag false` sets the flag to TRUE and leaves the bare word "false" as
+// a positional argument. Only the `--flag=false` form carries the value.
+// Commands declaring positionals caught the stray token via ExactArgs;
+// argument-less ones swallowed it under cobra's default ArbitraryArgs and
+// silently did the opposite of what the doc said. bindCommands now binds
+// cobra.NoArgs there (see inventory.go), which makes the mistake loud —
+// but a doc that still prints the space form is teaching an invocation
+// that now hard-errors, so the docs have to stay in the equals form.
+//
+// The check is doc-driven rather than grep-driven: it resolves each
+// invocation against the real cobra tree and asks the flag whether it is
+// actually a bool, so a string flag that legitimately takes the literal
+// word "true" is never flagged.
+func TestDocsNeverUseSpaceFormBoolFlags(t *testing.T) {
+	docs, err := filepath.Glob(filepath.Join("..", "..", "skills", "*.md"))
+	if err != nil || len(docs) == 0 {
+		t.Fatalf("no skills/*.md found (err=%v)", err)
+	}
+	docs = append(docs, filepath.Join("..", "..", "README.md"))
+	root := Cmd()
+
+	checked := 0
+	for _, doc := range docs {
+		for _, inv := range scanDoc(t, doc) {
+			if len(inv.Args) == 0 || inv.Args[0] != root.Name() {
+				continue
+			}
+			cmd, _ := resolveCommand(root, inv.Args[1:])
+			// Walk the token stream: a bool flag followed by a bare
+			// true/false is the bug. `--flag=false` never reaches here
+			// because the value is part of the same token.
+			for i := 0; i < len(inv.Args)-1; i++ {
+				tok, next := inv.Args[i], inv.Args[i+1]
+				if !strings.HasPrefix(tok, "--") || strings.Contains(tok, "=") {
+					continue
+				}
+				if next != "true" && next != "false" {
+					continue
+				}
+				f := cmd.Flags().Lookup(strings.TrimPrefix(tok, "--"))
+				if f == nil {
+					f = cmd.InheritedFlags().Lookup(strings.TrimPrefix(tok, "--"))
+				}
+				if f == nil || f.Value.Type() != "bool" {
+					continue
+				}
+				checked++
+				t.Errorf("%s:%d: `%s` — %s is a bool flag, so `%s %s` sets it to TRUE "+
+					"and leaves %q as a stray argument (pflag NoOptDefVal). Write `%s=%s`.",
+					inv.File, inv.Line, inv.Text, tok, tok, next, next, tok, next)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Logf("no space-form bool invocations in the docs")
+	}
 }

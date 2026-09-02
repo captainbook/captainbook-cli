@@ -49,6 +49,7 @@ Useful for "what does this category currently hold?" reviews.
 
 ## Pitfalls
 
+- ⚠️ **No `--since`, and sending `since=` is a 422.** The `product_categories` table carries no `created_at` / `updated_at` columns, so there is nothing for the filter to bound and `created_at` is always null on the response. The 422 is deliberate — a silently-unfiltered page is what a polling client would misread as a delta. No incremental sync here: list in full and diff client-side.
 - ⚠️ **No write operations.** `categories create / update / delete` do not exist. The gen client carries the methods (the spec previously had them) but they're intentionally not bound at the CLI layer. Looking for a way to "add a category" is a wrong-tool sign — escalate to platform.
 - ⚠️ **`category_ids[]` is integer, not string.** When passing to `products create` / `update`, use `--category-ids "18,87,7"` (kebab-case flag, intSlice). The spec previously typed these as strings; the new contract is integers.
 - ⚠️ **`slug` / `description` / `position` may be null.** Their underlying columns don't exist on `product_categories` today — model accessors return null. Don't rely on these fields for filtering or display.

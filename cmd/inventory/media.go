@@ -58,8 +58,15 @@ func mediaDefs() []CommandDef {
 			Use: "list <product-id>", Short: "List media for a product",
 			Kind: KindRead, Verb: "GET", Path: "/products/{id}/media",
 			Ability: invpkg.Read, PositionalArgs: []string{"product-id"},
+			// --since here bounds media_updated_at, NOT updated_at like
+			// every other resource's --since. product_attachments carries
+			// no Laravel timestamps, so media_updated_at is the only clock
+			// available — and it is the column this endpoint publishes as
+			// the item's created_at. Reading it as "created since" is the
+			// correct mental model; reading it as "edited since" is not.
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on media_updated_at (surfaced as the item's created_at)"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
@@ -72,6 +79,13 @@ func mediaDefs() []CommandDef {
 				}
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListProductMediaWithResponse(ctx, id, p)
 				if err != nil {

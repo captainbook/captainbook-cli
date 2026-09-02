@@ -108,6 +108,135 @@ func bulkDeleteDef() CommandDef {
 	}
 }
 
+// parseFaresFlag decodes and validates the `--fares` JSON array shared by
+// `availabilities update` and `availabilities bulk-update pricing`. Both
+// write `availability_pricing_tier` rows through the spec's
+// AvailabilityFare shape, so they share one parser: a fix to the amount
+// rules can't drift between the single-slot and date-range write paths.
+//
+// It returns the entries as RawMessage so the operator's bytes reach the
+// wire VERBATIM. Decoding into `any` would route every amount through
+// float64 and silently round anything past 2^53 — 9007199254740993 ships as
+// ...992. Out of range for minor units, but the exact bytes are already in
+// hand, so there is no reason to lose them.
+//
+// The client-side gates all mirror a server 422 that is expensive to
+// discover the hard way:
+//
+//   - Empty array. The server used to accept it and would write an audit
+//     row, queue a job per chunk of matched ids and fire PriceScheduleUpdated
+//     at the channel managers, all for zero data change.
+//   - Missing `amount` key. The spec requires `amount` to be PRESENT but
+//     allows it to be null, precisely so a client that forgets to serialise
+//     an amount gets an error instead of silently wiping the operator's
+//     price. A Go marshaller that omitempty's a zero amount is exactly that
+//     bug, so we check for the KEY, not for a non-null value.
+//   - Wrong `amount` type. `Money` is an integer or null; a quoted "4500"
+//     or a nested object would 422 server-side.
+//   - Missing, non-string, or blank `pricing_tier_id`.
+//
+// `amount: null` is explicitly legal and means "delete the override so the
+// slot follows the catalogue price again" — it is passed straight through.
+//
+// NOTE: this gates the --fares FLAG only. Every mutation also accepts
+// --data, and `--data '{"fares":[...]}'` bypasses every check here. For a
+// malformed shape that is fine — the server rejects it. For a large amount
+// it is NOT: JSONBodyFromArgs decodes --data through map[string]any, so
+// 9007199254740993 is rounded to ...992 before it is sent and the server
+// never sees the value the operator typed. The verbatim guarantee above
+// covers the flag path only. Tracked in TODOS.md.
+func parseFaresFlag(raw string) ([]map[string]json.RawMessage, error) {
+	var fares []map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &fares); err != nil {
+		return nil, fmt.Errorf("--fares: invalid JSON: %w", err)
+	}
+	// `--fares null` decodes into a nil slice without error, which is not
+	// the same input as `--fares '[]'` and deserves its own message.
+	if fares == nil {
+		return nil, fmt.Errorf("--fares: expected a JSON array, got null")
+	}
+	if len(fares) == 0 {
+		return nil, fmt.Errorf("--fares: empty array is rejected by the server (422). " +
+			"Omit --fares entirely to leave pricing untouched, or send " +
+			`[{"pricing_tier_id":"...","amount":null}] to delete an override`)
+	}
+	for i, entry := range fares {
+		// Only a JSON `null` element reaches here as a nil map — every other
+		// non-object element (a number, string, array, bool) fails the decode
+		// above and never enters this loop. Without this guard a `null`
+		// element would be reported as a missing "amount" key, which reads
+		// like a field problem rather than a shape problem.
+		if entry == nil {
+			return nil, fmt.Errorf("--fares[%d]: expected an object, got null", i)
+		}
+		amount, ok := entry["amount"]
+		if !ok {
+			return nil, fmt.Errorf(`--fares[%d]: missing "amount" key. `+
+				`It is required to be present but may be null; null DELETES the `+
+				`override so the slot follows the catalogue price again`, i)
+		}
+		if err := validateFareAmount(amount); err != nil {
+			return nil, fmt.Errorf("--fares[%d]: %w", i, err)
+		}
+		// Distinguish absent from present-but-wrong-type. The spec types
+		// pricing_tier_id as a string, but ids appear unquoted in enough
+		// examples that an operator hand-writing the JSON will reach for
+		// {"pricing_tier_id": 7}. Reporting that as "missing" sends them
+		// hunting for a key that is right there in front of them.
+		rawTier, present := entry["pricing_tier_id"]
+		if !present {
+			return nil, fmt.Errorf(`--fares[%d]: missing "pricing_tier_id"`, i)
+		}
+		var tier string
+		if err := json.Unmarshal(rawTier, &tier); err != nil {
+			return nil, fmt.Errorf(`--fares[%d]: "pricing_tier_id" must be a JSON string, got %s`, i, rawTier)
+		}
+		if strings.TrimSpace(tier) == "" {
+			return nil, fmt.Errorf(`--fares[%d]: "pricing_tier_id" is empty`, i)
+		}
+	}
+	return fares, nil
+}
+
+// validateFareAmount enforces the spec's AvailabilityFare.amount shape: an
+// integer in minor units, or null to delete the override. A quoted "4500"
+// or a nested object 422s server-side; catching it here names the field.
+func validateFareAmount(raw json.RawMessage) error {
+	if string(raw) == "null" {
+		return nil // the documented "delete this override" spelling
+	}
+	// Decode through UseNumber and type-assert rather than unmarshalling
+	// straight into json.Number: json.Number is a string type, so a QUOTED
+	// "4500" unmarshals into it without error and would sail through.
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		return fmt.Errorf(`"amount" must be an integer in minor units, or null, got %s`, raw)
+	}
+	n, ok := v.(json.Number)
+	if !ok {
+		return fmt.Errorf(`"amount" must be an integer in minor units, or null, got %s`, raw)
+	}
+	if _, err := n.Int64(); err != nil {
+		return fmt.Errorf(`"amount" must be a whole number of minor units, got %s`, raw)
+	}
+	return nil
+}
+
+// overlayJSONField sets one key on an already-marshalled JSON object body.
+// Used for fields whose value is structured (an array, an object) and so
+// cannot travel through JSONBodyFromArgs's flag→key map, which copies the
+// flag's Go value verbatim and would put a quoted string on the wire.
+func overlayJSONField(body []byte, key string, value any) ([]byte, error) {
+	m := map[string]any{}
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, err
+	}
+	m[key] = value
+	return json.Marshal(m)
+}
+
 // dryRunBodyEditor returns a RequestEditorFn that attaches a JSON body to
 // a request the gen client built without one. Used by `availabilities
 // delete <id>` to send `{"dry_run": true}` on the DELETE — the spec
@@ -222,22 +351,66 @@ func availabilitiesDefs() []CommandDef {
 			Use: "update <id>", Short: "Update one availability", Kind: KindMutation,
 			Verb: "PATCH", Path: "/availabilities/{id}", Ability: invpkg.Write,
 			DryRunMode: DryRunBody, PositionalArgs: []string{"id"},
+			Long: "Updates capacity, status and/or per-slot pricing overrides on ONE " +
+				"availability.\n\n" +
+				"--fares is the only way to reprice exactly one slot. `bulk-update pricing` " +
+				"is date-range scoped, so on a date carrying several sessions it writes " +
+				"every one of them.\n\n" +
+				"Each --fares entry writes an availability_pricing_tier row for this slot " +
+				"only; tiers not listed are left alone. An entry with \"amount\": null " +
+				"DELETES the override so the slot follows the catalogue price again. " +
+				"Writing the catalogue value is NOT a substitute — the pivot row survives, " +
+				"is_override stays true, and the slot silently keeps the old number the " +
+				"next time the tier is repriced.\n\n" +
+				"422 when a pricing_tier_id belongs to another product's ladder, when the " +
+				"availability is not attached to a ProductOption (Resource availabilities " +
+				"have no pricing tiers), or when --fares is an empty array. The CLI catches " +
+				"the empty-array case before the request goes out; --data '{\"fares\":[]}' " +
+				"bypasses that gate and is rejected server-side instead.\n\n" +
+				"Field and fare changes commit in ONE transaction, so a failure cannot " +
+				"leave the capacity change applied and the pricing write missing. A " +
+				"committed fare change then dispatches PriceScheduleUpdated to the channel " +
+				"managers best-effort AFTER the commit: a 200 means the fare is stored, " +
+				"not that the channels have been told.",
+			Example: "  # Close one slot\n" +
+				"  ceebee inventory availabilities update av_42 --status blocked\n\n" +
+				"  # Reprice one slot's adult tier to 4500 minor units\n" +
+				"  ceebee inventory availabilities update av_42 --fares '[{\"pricing_tier_id\":\"pt_7\",\"amount\":4500}]'\n\n" +
+				"  # Drop the override so the slot follows the catalogue price again\n" +
+				"  ceebee inventory availabilities update av_42 --fares '[{\"pricing_tier_id\":\"pt_7\",\"amount\":null}]'",
 			Flags: []FlagDef{
 				{Name: "capacity", Type: "int", Description: "Slot capacity"},
-				{Name: "status", Type: "string", Description: "available|blocked|cancelled"},
+				{Name: "status", Type: "string", Description: "available|blocked"},
+				{Name: "is-bookable", Type: "bool", Description: "Bulk-close state, tracked independently of --status. Reads false after a bulk-update booking-status close"},
+				{Name: "fares", Type: "string", Description: "JSON array of per-slot pricing overrides: [{pricing_tier_id, amount}, ...]. amount null deletes the override"},
 			},
-			ForensicFields: []string{"capacity", "status"},
+			ForensicFields: []string{"capacity", "status", "is-bookable", "fares"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"capacity": "capacity",
-					"status":   "status",
+					"capacity":    "capacity",
+					"status":      "status",
+					"is-bookable": "is_bookable",
 				})
 				if err != nil {
 					return nil, err
+				}
+				// --fares is a JSON array, so it can't go through the
+				// flag→key map (which copies the flag's Go value verbatim
+				// and would send the array as a quoted string). Parse and
+				// overlay it onto the body the helper built.
+				if args.FlagSet("fares") {
+					fares, ferr := parseFaresFlag(args.FlagString("fares"))
+					if ferr != nil {
+						return nil, ferr
+					}
+					body, err = overlayJSONField(body, "fares", fares)
+					if err != nil {
+						return nil, err
+					}
 				}
 				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil { return &RunResult{WireBody: body}, err }
@@ -385,7 +558,7 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 
 	bindCommands(parent, []CommandDef{
 		bulkUpdateDef("capacity",
-			"Bulk update slot capacity",
+			"Bulk update slot capacity", "",
 			[]FlagDef{
 				{Name: "operator", Type: "string", Required: true, Description: "set_to|increase_by|decrease_by"},
 				{Name: "value", Type: "int", Required: true, Description: "Capacity value (or delta)"},
@@ -398,7 +571,7 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 			},
 		),
 		bulkUpdateDef("booking-status",
-			"Bulk update bookable flag (open / close slots)",
+			"Bulk update bookable flag (open / close slots)", "",
 			[]FlagDef{
 				{Name: "is-bookable", Type: "bool", Required: true, Description: "true to open, false to close"},
 			},
@@ -418,13 +591,32 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 		),
 		bulkUpdateDef("pricing",
 			"Bulk update pricing fares (replace specified tiers)",
+			"Replaces the fares for the listed tiers across [from, to). Tiers omitted "+
+				"are left alone. An amount of null DELETES the override for that tier "+
+				"across the matched range, so those slots follow the catalogue price "+
+				"again. An empty --fares array is a 422.\n\n"+
+				"Beware the range scope: every session on a matched DATE is written, "+
+				"including ones that had no override before. Use `availabilities update "+
+				"<id> --fares` when a date carries more than one session and you only "+
+				"mean to touch one of them.\n\n"+
+				"--dry-run on this setting alone carries a real diff. total_matched is "+
+				"just the date-range row count — identical whether the proposed amount "+
+				"matches the current fare or is wildly different — so it cannot answer "+
+				"\"will this change anything?\". The preview adds total_changed (matched "+
+				"slots whose effective price or pinned/unpinned state would move, counted "+
+				"over the WHOLE range) plus diff.before / diff.after listing the first "+
+				"preview_limit matched slots with their current and proposed fares. "+
+				"preview_truncated is true when the range is longer than that listing; "+
+				"the counts still cover everything. A slot with no override today that is "+
+				"being written to the catalogue value still counts as changed — the write "+
+				"pins it.",
 			[]FlagDef{
-				{Name: "fares", Type: "string", Required: true, Description: "JSON array: [{pricing_tier_id, amount}, ...]"},
+				{Name: "fares", Type: "string", Required: true, Description: "JSON array: [{pricing_tier_id, amount}, ...]. amount null deletes the override"},
 			},
 			func(args RunArgs) (any, error) {
-				var fares []any
-				if err := json.Unmarshal([]byte(args.FlagString("fares")), &fares); err != nil {
-					return nil, fmt.Errorf("--fares: invalid JSON: %w", err)
+				fares, err := parseFaresFlag(args.FlagString("fares"))
+				if err != nil {
+					return nil, err
 				}
 				return map[string]any{"fares": fares}, nil
 			},
@@ -433,8 +625,8 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 		// end_time + optional day_count) — only the `setting` discriminator
 		// differs. Build both from the same flag list and closure so a fix
 		// to one path can't drift from the other.
-		bulkUpdateDef("start-time", "Bulk update slot start time (and optional day-count for multi-day)", timeValueFlags, timeValueNewValue),
-		bulkUpdateDef("end-time", "Bulk update slot end time", timeValueFlags, timeValueNewValue),
+		bulkUpdateDef("start-time", "Bulk update slot start time (and optional day-count for multi-day)", "", timeValueFlags, timeValueNewValue),
+		bulkUpdateDef("end-time", "Bulk update slot end time", "", timeValueFlags, timeValueNewValue),
 	}, runner)
 
 	return parent
@@ -465,7 +657,7 @@ func timeValueNewValue(args RunArgs) (any, error) {
 // bulkUpdateDef returns one CommandDef for an `availabilities bulk-update
 // <setting>` subcommand. settingName is the kebab-case CLI form; the
 // underlying spec setting is the same with `-` → `_`.
-func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValueFn func(RunArgs) (any, error)) CommandDef {
+func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, newValueFn func(RunArgs) (any, error)) CommandDef {
 	// Common to every bulk-update setting: the temporal/scoping fields.
 	commonFlags := []FlagDef{
 		{Name: "from", Type: "string", Required: true, Description: availFromDesc},
@@ -486,7 +678,7 @@ func bulkUpdateDef(settingName, short string, perSettingFlags []FlagDef, newValu
 	specSetting := strings.ReplaceAll(settingName, "-", "_")
 
 	return CommandDef{
-		Use: settingName, Short: short,
+		Use: settingName, Short: short, Long: long,
 		Kind: KindMutation, Verb: "POST", Path: "/availabilities/bulk-update",
 		Ability: invpkg.Write, DryRunMode: DryRunBody,
 		Flags:          flags,
