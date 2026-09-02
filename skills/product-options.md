@@ -27,7 +27,7 @@ Returns table of `{id, product_id, title, option_code, capacity, updated_at}`. T
 
 ### 2. Show one option
 
-Intent: confirm capacity + status before bulk-updating availabilities under it.
+Intent: confirm capacity before bulk-updating availabilities under it.
 
 ```bash
 ceebee inventory product-options get po_88 --format json
