@@ -17,7 +17,7 @@ Two distinct resources live under `gift-certificates`:
 | `inventory gift-certificates list-issued` | GET /gift-certs/issued | `cli:read` | n/a |
 | `inventory gift-certificates get-issued <id>` | GET /gift-certs/issued/{id} | `cli:read` | n/a |
 | `inventory gift-certificates issue` | POST /gift-certs/issued | `cli:write` | body |
-| `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:write` | body |
+| `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:cs` | body |
 | `inventory gift-certificates resend <id>` | POST /gift-certs/issued/{id}/resend | `cli:write` | body |
 
 ## Worked examples
@@ -74,6 +74,8 @@ ceebee inventory gift-certificates void gc_42 \
 
 `--reason` is required (max 500 chars). `--notify-recipient` defaults `false`.
 
+`void` needs a `cli:cs` token — it is the one gift-cert operation that isn't `cli:write`.
+
 ### 5. Resend the redemption email to a new address
 
 ```bash
@@ -85,10 +87,12 @@ Without `--recipient-email`, resends to the original recipient. External side ef
 
 ## Pitfalls
 
-- ⚠️ **`delete-available` is HARD delete** (not soft). Returns `409 RESOURCE_IN_USE` if any issued `GiftCertificate` still references the SKU. Either void all issued certs first, or accept the orphaning. There is no `restore-available` — once deleted, the SKU is gone.
+- ⚠️ **`void` requires `cli:cs`, the rest of this resource requires `cli:write`.** A `cli:write`-only token gets `403 FORBIDDEN` on void alone. Check with `ceebee inventory whoami --format json | jq '.data.abilities'` before planning a void; remediation is a checkbox on the token in Settings → API tokens (which an admin has to tick, since `issue_cli_cs_token` is admin-only by default).
+- ⚠️ **`delete-available` is HARD delete** (not soft). Returns `409 RESOURCE_IN_USE` if any issued `GiftCertificate` still references the SKU. Either void all issued certs first — which needs that `cli:cs` token, not the `cli:write` `delete-available` itself runs on — or accept the orphaning. There is no `restore-available` — once deleted, the SKU is gone.
 - ⚠️ **No server-side dry-run on `delete-available`.** CLI rejects `--dry-run`. Check references first: `ceebee inventory gift-certificates list-issued --code <SKU-name> --format json | jq '.data | length'`.
 - ⚠️ **`issue --send-now=true` is a one-way email trigger.** There is no "unsend"; voiding the cert with `--notify-recipient=true` is the closest you get. Default is `false` deliberately so an LLM doesn't accidentally dispatch a redemption email mid-experimentation.
 - ⚠️ **Money is in tenant currency minor units.** `--amount 5000` is €50.00 EUR or ¥5000 JPY — confirm `meta.currency` first via `whoami`.
+- ⚠️ **`--currency` on `create-available` must equal the account currency.** `available_gift_certificates` has no currency column, so the value is dropped on persist — but since spec 1.4.0 a mismatch is refused with `422 VALIDATION_FAILED` rather than silently accepted. There is no such thing as a gift cert denominated in another currency.
 
 ## See also
 
