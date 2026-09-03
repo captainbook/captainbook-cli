@@ -19,9 +19,9 @@ import (
 //   - list-issued / get-issued work on /gift-certs/issued.
 //   - issue posts to /gift-certs/issue.
 //   - void / resend operate on /gift-certs/{id}/...
-// Spec abilities: gift-certs issue / void / resend require cli:write
-// (per spec line 2312). cli:cs is for booking comp/refund/confirmation
-// resend only.
+// Spec abilities: gift-certs available CRUD, issue and resend require
+// cli:write. void is the exception — spec 1.1.0 moved it to cli:cs,
+// alongside booking cancel/comp/refund/confirmation-resend.
 func giftCertificatesDefs() []CommandDef {
 	return []CommandDef{
 		{
@@ -55,7 +55,7 @@ func giftCertificatesDefs() []CommandDef {
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			Flags: []FlagDef{
 				{Name: "name", Type: "string", Required: true, Description: "Template name"},
-				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code — must equal the account currency from whoami; not stored, but a mismatch is refused with 422"},
 				{Name: "amounts", Type: "intSlice", Required: true, Description: "Allowed denominations (minor units, comma-separated)"},
 				{Name: "expiration-period-months", Type: "int", Description: "Months until expiry; -1 = never expires"},
 			},
@@ -242,9 +242,14 @@ func giftCertificatesDefs() []CommandDef {
 			},
 		},
 		{
-			Use: "gift-certificates void <id>", Short: "Void an issued gift cert",
+			Use: "gift-certificates void <id>", Short: "Void an issued gift cert (CS only)",
 			Kind: KindMutation, Verb: "POST", Path: "/gift-certs/issued/{id}/void",
-			Ability:    invpkg.Write, // Spec line 2312: gift-certs void is cli:write.
+			// Spec 1.1.0 moved void from cli:write to cli:cs — voiding kills an
+			// instrument the customer paid for, which puts it with the booking
+			// mutations rather than with the rest of gift-cert editing. The
+			// server also runs GiftCertificatePolicy::delete on top, so a CS
+			// token whose user lacks delete_gift_certificate still gets a 403.
+			Ability:    invpkg.CS,
 			DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{

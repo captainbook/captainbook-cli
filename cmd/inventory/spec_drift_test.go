@@ -25,11 +25,14 @@ package inventory
 // CommandDef literal.
 
 import (
+	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -46,6 +49,7 @@ type cmdLit struct {
 	Use      string
 	Verb     string
 	Path     string
+	Ability  string // "cli:read" / "cli:write" / "cli:cs"; "" when ungated (whoami)
 	Flags    []flagLit
 	FieldMap map[string]string // flag name → JSON key, from JSONBodyFromArgs map literal
 }
@@ -119,6 +123,8 @@ func extractCmdLit(file string, cl *ast.CompositeLit) cmdLit {
 			lit.Verb = stringLit(kv.Value)
 		case "Path":
 			lit.Path = stringLit(kv.Value)
+		case "Ability":
+			lit.Ability = abilityConstValue(kv.Value)
 		case "Flags":
 			lit.Flags = parseFlagsLit(kv.Value)
 		case "Run":
@@ -740,5 +746,475 @@ func TestSpecDrift_FlagDescriptionEnumsMatchSpec(t *testing.T) {
 					c.File, c.Use, c.Verb, c.Path, f.Name, tokens, specEnum)
 			}
 		}
+	}
+}
+
+// abilityConstValue maps the `Ability:` field's AST expression to the
+// wire string the constant carries. The field is written as a qualified
+// constant (`invpkg.CS`) in every production CommandDef; anything else
+// returns "" and is reported as unrecognized by the caller rather than
+// silently passing.
+func abilityConstValue(e ast.Expr) string {
+	se, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	if x, ok := se.X.(*ast.Ident); !ok || x.Name != "invpkg" {
+		return ""
+	}
+	switch se.Sel.Name {
+	case "Read":
+		return "cli:read"
+	case "Write":
+		return "cli:write"
+	case "CS":
+		return "cli:cs"
+	}
+	return ""
+}
+
+// TestSpecDrift_AbilitiesMatchSpec locks each CommandDef's Ability to the
+// spec. Abilities are hand-mirrored (D34) because the spec states them in
+// prose rather than as an enum, and that hand-mirroring has now drifted
+// twice: bookings cancel (issue #19) and gift-certs void (spec 1.1.0 moved
+// it to cli:cs while the CommandDef kept cli:write and a comment citing a
+// spec line number that had since moved).
+//
+// A wrong Ability breaks in both directions. Too permissive and preflight
+// waves a token through into a server 403, wasting the local gate that
+// exists precisely to avoid that round trip. Too restrictive and we refuse
+// a call the server would have allowed.
+//
+// Two checks, because the spec exposes the cli:cs set two different ways
+// and neither alone is sufficient:
+//
+//  1. Per-operation: an operation whose `description` says "Requires the
+//     `cli:X` ability" pins every CommandDef bound to that (verb, path).
+//     Exact, but the spec only annotates a couple of operations.
+//  2. Cardinality: the securitySchemes prose commits to a specific number
+//     of cli:cs routes ("the five routes gated on `abilities:cli:cs`").
+//     Coarse, but it covers the routes check 1 says nothing about — a
+//     route silently entering or leaving the CS set moves the count.
+//
+// Check 2 counts distinct (verb, path) pairs, not CommandDefs: resend
+// confirmation is deliberately exposed as two commands (`bookings
+// resend-confirmation` and `notifications resend`) over one route.
+func TestSpecDrift_AbilitiesMatchSpec(t *testing.T) {
+	cmds := walkInventoryCmdLits(t)
+	if len(cmds) == 0 {
+		t.Fatal("no CommandDef literals found — AST walker broken")
+	}
+
+	// --- Check 1: operations that name their required ability in prose. ---
+	for opKey, ability := range specDeclaredAbilities(t) {
+		matched := 0
+		for _, c := range cmds {
+			if c.Verb+" "+c.Path != opKey {
+				continue
+			}
+			matched++
+			if c.Ability != ability {
+				got := c.Ability
+				if got == "" {
+					got = "(unset or unrecognized)"
+				}
+				t.Errorf("[%s] %q (%s): binds Ability %s, but the spec's operation description requires %s",
+					c.File, c.Use, opKey, got, ability)
+			}
+		}
+		if matched == 0 {
+			t.Errorf("spec declares %s on %s but no CommandDef binds that route", ability, opKey)
+		}
+	}
+
+	// --- Check 2: the cli:cs route count the spec commits to. ---
+	want := specCSRouteCount(t)
+	routes := map[string]bool{}
+	for _, c := range cmds {
+		if c.Ability == "cli:cs" {
+			routes[c.Verb+" "+c.Path] = true
+		}
+	}
+	if len(routes) != want {
+		var got []string
+		for r := range routes {
+			got = append(got, r)
+		}
+		sort.Strings(got)
+		t.Errorf("CLI binds %d distinct cli:cs routes, spec says %d.\nBound: %v\n"+
+			"Either a route moved between cli:write and cli:cs, or the spec's count changed — reconcile against the securitySchemes ability table.",
+			len(routes), want, got)
+	}
+}
+
+// specDeclaredAbilities returns "VERB /path" → "cli:x" for every operation
+// whose description states its required ability outright.
+func specDeclaredAbilities(t *testing.T) map[string]string {
+	t.Helper()
+	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	out, err := parseSpecDeclaredAbilities(data)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	return out
+}
+
+// declaredAbilityRe matches the phrasing the spec uses when it pins an
+// operation's ability inline: "Requires the `cli:cs` ability".
+var declaredAbilityRe = regexp.MustCompile("Requires the `(cli:[a-z]+)` ability")
+
+// parseSpecDeclaredAbilities is the pure half of specDeclaredAbilities: spec
+// bytes in, "VERB /path" → "cli:x" out. Split from the testing.T wrapper so
+// the regexp and the empty-result guard are directly unit-testable — the
+// guard exists to catch a spec rewording, and a guard that has never been
+// exercised is a guard nobody has checked.
+func parseSpecDeclaredAbilities(data []byte) (map[string]string, error) {
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("yaml.Unmarshal: %w", err)
+	}
+	out := map[string]string{}
+	paths, _ := raw["paths"].(map[string]any)
+	for path, pv := range paths {
+		verbs, ok := pv.(map[string]any)
+		if !ok {
+			continue
+		}
+		for verb, op := range verbs {
+			if !isHTTPVerb(verb) {
+				continue
+			}
+			opMap, ok := op.(map[string]any)
+			if !ok {
+				continue
+			}
+			desc, _ := opMap["description"].(string)
+			if m := declaredAbilityRe.FindStringSubmatch(desc); m != nil {
+				out[strings.ToUpper(verb)+" "+path] = m[1]
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no operation description declares a required ability — the spec's phrasing changed; re-anchor declaredAbilityRe")
+	}
+	return out, nil
+}
+
+// specCSRouteCount reads the number of cli:cs routes out of the ability
+// table in the securitySchemes description ("the five routes gated on
+// `abilities:cli:cs`"). Written as an English numeral in prose, so it is
+// matched against a small word list.
+//
+// A miss is a hard failure, not a skip: the whole point of this test is
+// that an unnoticed change in the CS set ships. If the spec rewords the
+// sentence, that is exactly when a human should re-read the table.
+func specCSRouteCount(t *testing.T) int {
+	t.Helper()
+	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	n, err := parseCSRouteCount(data)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	return n
+}
+
+// csRouteCountRe matches the sentence in the securitySchemes ability table
+// that commits to a specific number of cli:cs routes.
+var csRouteCountRe = regexp.MustCompile("the ([a-z]+) routes gated on `abilities:cli:cs`")
+
+// numeralWords maps the English numerals the spec plausibly uses. Both this
+// map and csRouteCountRe are the failure-prone parts of the cardinality
+// check, so parseCSRouteCount is split out and unit-tested directly.
+var numeralWords = map[string]int{
+	"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+	"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+}
+
+func parseCSRouteCount(data []byte) (int, error) {
+	m := csRouteCountRe.FindSubmatch(data)
+	if m == nil {
+		return 0, errors.New("could not find the cli:cs route count in the spec's ability table — the wording changed; re-read the securitySchemes table and re-anchor csRouteCountRe")
+	}
+	n, ok := numeralWords[string(m[1])]
+	if !ok {
+		return 0, fmt.Errorf("cli:cs route count %q is not a numeral this test knows — extend numeralWords", m[1])
+	}
+	return n, nil
+}
+
+// TestSpecDriftHelpers_ParseAbilityAnnotations covers the parsing that
+// TestSpecDrift_AbilitiesMatchSpec depends on, including the guards that
+// only fire when the spec's prose changes. Those guards are the reason the
+// drift check can't silently pass on a reworded spec, so they get fixtures
+// rather than waiting for a real rewording to exercise them.
+func TestSpecDriftHelpers_ParseAbilityAnnotations(t *testing.T) {
+	t.Run("declared abilities: happy path", func(t *testing.T) {
+		got, err := parseSpecDeclaredAbilities([]byte(`
+paths:
+  /gift-certs/issued/{id}/void:
+    post:
+      description: |
+        Requires the ` + "`cli:cs`" + ` ability. Voiding kills an instrument.
+    get:
+      description: No ability stated here.
+  /products:
+    post:
+      description: |
+        Requires the ` + "`cli:write`" + ` ability.
+`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := map[string]string{
+			"POST /gift-certs/issued/{id}/void": "cli:cs",
+			"POST /products":                    "cli:write",
+		}
+		if len(got) != len(want) {
+			t.Fatalf("got %d entries %v, want %d %v", len(got), got, len(want), want)
+		}
+		for k, v := range want {
+			if got[k] != v {
+				t.Errorf("got[%q] = %q, want %q", k, got[k], v)
+			}
+		}
+	})
+
+	t.Run("declared abilities: rewording is an error, not an empty pass", func(t *testing.T) {
+		// The exact failure mode the guard exists for: a spec that still
+		// describes the ability, in words the regexp no longer matches.
+		_, err := parseSpecDeclaredAbilities([]byte(`
+paths:
+  /gift-certs/issued/{id}/void:
+    post:
+      description: This endpoint needs the cli:cs scope.
+`))
+		if err == nil {
+			t.Fatal("expected an error when no description matches the phrasing, got nil — a reworded spec would silently pass the drift check")
+		}
+		if !strings.Contains(err.Error(), "re-anchor") {
+			t.Errorf("error %q should tell the maintainer to re-anchor the regexp", err)
+		}
+	})
+
+	t.Run("declared abilities: malformed yaml", func(t *testing.T) {
+		if _, err := parseSpecDeclaredAbilities([]byte("paths: [unclosed")); err == nil {
+			t.Fatal("expected a yaml error, got nil")
+		}
+	})
+
+	t.Run("cs route count: happy path", func(t *testing.T) {
+		n, err := parseCSRouteCount([]byte("plus issued gift-cert **void** — the five routes gated on `abilities:cli:cs` (they sit in two groups)."))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if n != 5 {
+			t.Errorf("got %d, want 5", n)
+		}
+	})
+
+	t.Run("cs route count: rewording is an error", func(t *testing.T) {
+		_, err := parseCSRouteCount([]byte("the 5 routes gated on `abilities:cli:cs`"))
+		if err == nil {
+			t.Fatal("expected an error when the numeral is a digit, got nil")
+		}
+		if !strings.Contains(err.Error(), "re-anchor") {
+			t.Errorf("error %q should tell the maintainer to re-anchor the regexp", err)
+		}
+	})
+
+	t.Run("cs route count: unknown numeral", func(t *testing.T) {
+		_, err := parseCSRouteCount([]byte("the eleven routes gated on `abilities:cli:cs`"))
+		if err == nil {
+			t.Fatal("expected an error for a numeral outside the word list, got nil")
+		}
+		if !strings.Contains(err.Error(), "numeralWords") {
+			t.Errorf("error %q should name the map to extend", err)
+		}
+	})
+}
+
+// TestSpecDriftHelpers_AbilityConstValue covers the AST→wire-string mapping,
+// including the unrecognized-expression fallback that no production
+// CommandDef reaches today (all of them write invpkg.Read/Write/CS). A
+// CommandDef that stopped using the qualified constant would otherwise read
+// as ability "" and slip past the mismatch check as a false pass.
+func TestSpecDriftHelpers_AbilityConstValue(t *testing.T) {
+	cases := []struct {
+		expr string
+		want string
+	}{
+		{"invpkg.Read", "cli:read"},
+		{"invpkg.Write", "cli:write"},
+		{"invpkg.CS", "cli:cs"},
+		{"invpkg.Unknown", ""}, // new constant the mapper doesn't know
+		{"inventory.CS", ""},   // different package qualifier
+		{"CS", ""},             // dot-imported / unqualified
+		{`"cli:cs"`, ""},       // raw string instead of the constant
+	}
+	for _, tc := range cases {
+		e, err := parser.ParseExpr(tc.expr)
+		if err != nil {
+			t.Fatalf("ParseExpr(%q): %v", tc.expr, err)
+		}
+		if got := abilityConstValue(e); got != tc.want {
+			t.Errorf("abilityConstValue(%s) = %q, want %q", tc.expr, got, tc.want)
+		}
+	}
+}
+
+// currencyReq records how a request schema treats its `currency` property.
+type currencyReq struct {
+	Declared bool // the schema has a `currency` property at all
+	Required bool // ...and lists it in `required:`
+}
+
+// parseCurrencyRequirements maps "#/components/schemas/X" → how schema X
+// treats `currency`. Split from the testing.T wrapper so the required-list
+// handling is unit-testable.
+func parseCurrencyRequirements(data []byte) (map[string]currencyReq, error) {
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("yaml.Unmarshal: %w", err)
+	}
+	comps, _ := raw["components"].(map[string]any)
+	schemas, _ := comps["schemas"].(map[string]any)
+	out := map[string]currencyReq{}
+	for name, s := range schemas {
+		m, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		props, _ := m["properties"].(map[string]any)
+		if _, has := props["currency"]; !has {
+			continue
+		}
+		req := currencyReq{Declared: true}
+		if reqList, ok := m["required"].([]any); ok {
+			for _, r := range reqList {
+				if s, _ := r.(string); s == "currency" {
+					req.Required = true
+					break
+				}
+			}
+		}
+		out["#/components/schemas/"+name] = req
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no request schema declares a `currency` property — the spec's money shape changed; re-check parseCurrencyRequirements")
+	}
+	return out, nil
+}
+
+// TestSpecDrift_CurrencyFlagTracksSpecRequirement locks a deliberate
+// asymmetry that reads like an oversight and has already been reported as
+// one: the CLI exposes --currency on the three CREATE commands whose spec
+// schema lists currency in `required:`, and on NOTHING else — not on any
+// update, not on `gift-certificates issue`, not on `pricing-tiers create`.
+//
+// The omission is the point. None of these tables has a currency column, so
+// the field is dropped on persist ("There is no per-record currency to
+// change", cli-v1.yaml). Since spec 1.4.0 it is also validated against the
+// account currency. Where the spec makes it optional, sending it therefore
+// has exactly two outcomes: it matches and changes nothing, or it mismatches
+// and takes the whole write down with a 422. A flag whose best case is a
+// no-op and whose worst case is a failed update is a footgun, and an agent
+// driving the CLI is exactly who trips it — spec 1.4.0's own changelog
+// describes an agent relaying a bogus currency back to an operator as
+// confirmation. Where the spec makes it required we have no choice, so it
+// gets a flag.
+//
+// Callers who genuinely need to send it on an optional endpoint still can,
+// via --data '{"currency":"EUR"}'.
+//
+// If a future spec gives one of these tables a real currency column, this
+// test fails and the flag should be added deliberately rather than by
+// pattern-matching against create.
+func TestSpecDrift_CurrencyFlagTracksSpecRequirement(t *testing.T) {
+	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	reqs, err := parseCurrencyRequirements(data)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	spec := loadSpecDoc(t)
+
+	checked := 0
+	for _, c := range walkInventoryCmdLits(t) {
+		op := spec.findOp(c.Verb, c.Path)
+		if op == nil || op.BodyRef == "" {
+			continue
+		}
+		cr, ok := reqs[op.BodyRef]
+		if !ok || !cr.Declared {
+			continue // this operation's body has no currency property
+		}
+		checked++
+
+		hasFlag := false
+		for _, f := range c.Flags {
+			if f.Name == "currency" {
+				hasFlag = true
+				break
+			}
+		}
+		switch {
+		case cr.Required && !hasFlag:
+			t.Errorf("[%s] %q (%s %s): spec lists currency in `required:` on %s, but the command declares no --currency flag — the request cannot be built",
+				c.File, c.Use, c.Verb, c.Path, op.BodyRef)
+		case !cr.Required && hasFlag:
+			t.Errorf("[%s] %q (%s %s): spec makes currency OPTIONAL on %s, but the command declares a --currency flag. "+
+				"Optional currency is dropped on persist and validated against the account currency, so the flag can only no-op or 422 the write. "+
+				"Remove it, or update this test if the field became storable.",
+				c.File, c.Use, c.Verb, c.Path, op.BodyRef)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no command was matched to a currency-bearing request schema — the walker or the spec's schema names changed")
+	}
+}
+
+// TestSpecDriftHelpers_ParseCurrencyRequirements covers the required-list
+// handling, including the guard that fires if the spec's money shape changes
+// out from under the rule above.
+func TestSpecDriftHelpers_ParseCurrencyRequirements(t *testing.T) {
+	got, err := parseCurrencyRequirements([]byte(`
+components:
+  schemas:
+    CreateThingRequest:
+      required: [name, currency]
+      properties:
+        name: { type: string }
+        currency: { type: string }
+    UpdateThingRequest:
+      properties:
+        currency: { type: string }
+    NoCurrencyRequest:
+      required: [name]
+      properties:
+        name: { type: string }
+`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c := got["#/components/schemas/CreateThingRequest"]; !c.Declared || !c.Required {
+		t.Errorf("CreateThingRequest: got %+v, want declared+required", c)
+	}
+	if c := got["#/components/schemas/UpdateThingRequest"]; !c.Declared || c.Required {
+		t.Errorf("UpdateThingRequest: got %+v, want declared, not required", c)
+	}
+	if _, ok := got["#/components/schemas/NoCurrencyRequest"]; ok {
+		t.Error("NoCurrencyRequest has no currency property and must not appear in the map")
+	}
+
+	if _, err := parseCurrencyRequirements([]byte("components: {schemas: {Foo: {properties: {name: {type: string}}}}}")); err == nil {
+		t.Fatal("expected an error when no schema declares currency, got nil — a spec reshape would silently disable the flag rule")
 	}
 }

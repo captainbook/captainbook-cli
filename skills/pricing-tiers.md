@@ -91,7 +91,7 @@ Drop `--dry-run` to commit. Three constraints to plan around:
 ceebee inventory pricing-tiers list --product-id 44
 ```
 
-Returns `{id, pricing_category_id, min, max, amount, currency, deleted_at, ...}` — `amount` in minor units of tenant currency. `currency` defaults to `EUR` (no per-row column; tenant-level).
+Returns `{id, pricing_category_id, min, max, amount, currency, deleted_at, ...}` — `amount` in minor units of tenant currency. `currency` has no per-row column; it reports the account currency (it used to report a hardcoded `EUR` regardless, which spec 1.4.0 fixed).
 
 ### 2. Single flat fare (one tier, all headcounts)
 
@@ -154,9 +154,10 @@ ceebee inventory pricing-tiers restore 22
 - ⚠️ **No server-side dry-run on delete.** The CLI rejects `--dry-run` on `pricing-tiers delete` at parse time. Inspect `availabilities list` before pulling the trigger.
 - ⚠️ **Restoring the tier does not restore cascaded availabilities.** Phase 1 has no "restore cascade" operation. If you delete and then realize the cascade was a mistake, the availabilities are stuck soft-deleted unless an engineer hand-clears `deleted_at` in DB.
 - ⚠️ **Required: `--pricing-category-id` and `--amount`.** All other flags optional.
-- ⚠️ **Legacy aliases ignored on write:** `create` / `update` accept `name`, `product_option_id`, `availability_id`, and `currency` in the request body (reachable via `--data`, since the CLI exposes no such flags) — all four are validated, recorded in the audit log, and then **silently dropped on persist**. The tier's name belongs on the parent `PricingCategory`; currency is tenant-level. Do not confuse the ignored body field `availability_id` with the read-side `--availability-id` filter on `list` / `get`, which is real and does the pivot overlay described above.
+- ⚠️ **Legacy aliases ignored on write:** `create` / `update` accept `name`, `product_option_id` and `availability_id` in the request body (reachable via `--data`, since the CLI exposes no such flags) — all three are validated, recorded in the audit log, and then **silently dropped on persist**. The tier's name belongs on the parent `PricingCategory`. Do not confuse the ignored body field `availability_id` with the read-side `--availability-id` filter on `list` / `get`, which is real and does the pivot overlay described above.
+- ⚠️ **`currency` in the body is dropped on persist but no longer ignored.** It has no per-row column, so it changes nothing — but since spec 1.4.0 it must equal the account currency or the whole request is refused with `422 VALIDATION_FAILED`. Sending a currency to *express intent* does not work and now costs you the write. Omit it.
 - ⚠️ **Editing a tier's `amount` does not move slots that already have a pivot override.** `pricing-tiers update <id> --amount` changes the catalogue price; any availability with an `availability_pricing_tier` row keeps its own fare and silently diverges. Audit with `availabilities list --include-pricing` before assuming a price change took effect calendar-wide. To make the divergent slots track the catalogue again, clear their overrides with `"amount": null` rather than re-typing the new number into each one.
-- ⚠️ **`amount` is minor units in tenant currency.** `12500` is €125.00 in EUR or ¥12,500 in JPY. The tier's `currency` follows the tenant; not per-row.
+- ⚠️ **`amount` is minor units in tenant currency.** `12500` is €125.00 in EUR or ¥12,500 in JPY. The tier's `currency` follows the account; not per-row. There is exactly one account currency and no way to price a tier in another one.
 - ⚠️ **`min` / `max` define inclusive headcount bounds.** `min=4 max=null` means "4 or more". Overlapping bands are not validated server-side — the booking flow picks the first match.
 - ⚠️ **Known server bug:** `pricing-tiers restore` may return 404 even after a successful delete (the row IS soft-deleted but the restore handler can't find it). Filed with server team — workaround is delete only what you're prepared to keep deleted.
 

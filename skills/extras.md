@@ -67,7 +67,7 @@ ceebee inventory extras list --since "2026-04-20T00:00:00Z"
 
 - ⚠️ **No cascade on delete.** Soft-deleting an Extra does NOT touch related rows — children are not affected. Safer than `pricing-tiers delete`, but historical bookings still reference the (now soft-deleted) extra; their booking lines stay intact.
 - ⚠️ **No server-side dry-run on delete.** CLI rejects `--dry-run` at parse time. To gauge impact, search bookings server-side via the admin UI; the CLI does not expose "find bookings using extra X".
-- ⚠️ **Amount is minor units in tenant currency.** `--amount 500` is €5.00 in EUR, ¥500 in JPY. `--currency` is required on create.
+- ⚠️ **Amount is minor units in tenant currency.** `--amount 500` is €5.00 in EUR, ¥500 in JPY. `--currency` is required on create, but it is not a choice: `extras` has no currency column, so the value is dropped on persist and must equal the account currency or the create is refused with `422 VALIDATION_FAILED`. Read it off `meta.currency` (or `whoami`) and echo it back.
 - ⚠️ **`--max-quantity` is per-booking, not per-availability.** If you sell 20 wetsuits per booking and an availability has 30 seats, each booking still caps at 20 wetsuits.
 
 ## See also

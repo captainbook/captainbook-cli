@@ -80,7 +80,7 @@ The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` with a Sanc
 
 - `cli:read` — list / show / get
 - `cli:write` — create / update / delete / restore / attach / detach
-- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings resend-confirmation`). `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy.
+- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings resend-confirmation`, `gift-certificates void`). `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy. `gift-certificates void` needs it because voiding kills an instrument the customer paid for — every other gift-cert command is `cli:write`.
 
 Inspect what your token has:
 
@@ -223,6 +223,8 @@ ceebee inventory products update 42 --title "New title" --dry-run
 ## Idempotency
 
 UUIDv7 is auto-minted per call and sent as the `Idempotency-Key` header. Override with `--idempotency-key <uuid>` to replay a specific call (server returns the cached original response). Retries within an invocation reuse the same key automatically.
+
+A key is bound to the operation it was first used on — method, path (including query string) and body — so it is one key per operation, not per script. Aiming a used key at a different endpoint or a different resource id returns `409 IDEMPOTENCY_CONFLICT` rather than replaying. Requests refused before the handler runs (`401`, `403`, `422`, `429`, and the workflows plan-gate `404`) release their key, so fixing the token or the body and retrying with the same key is safe.
 
 ## Shell completions
 

@@ -269,8 +269,10 @@ Open questions filed: #18 (product `status` filter/response enum mismatch),
 `cli:cs`) — #19 resolved in favour of `cli:cs`, confirmed against the server:
 cancel is in the `abilities:cli:cs` route group and `Phase1CCancelTest` 403s a
 `cli:write` token even with `refund_policy=none`. The spec's ability table
-omits cancel from its `cli:cs` row, which is what misled the binding; filed
-upstream as captainbook/captainbook#8113.
+omitted cancel from its `cli:cs` row, which is what misled the binding; filed
+upstream as captainbook/captainbook#8113 and **resolved** — the table now names
+cancel explicitly and restates `cli:write` as the complement of `cli:cs`, so it
+no longer drifts each time a resource is added. Vendored in the 1.4.0 sync.
 
 ## ~~Spec/code drift tests (inventory CLI)~~ — DONE
 
@@ -293,6 +295,19 @@ Implemented as `cmd/inventory/spec_drift_test.go`. Walks the AST of
   derived statically from `internal/inventory/gen` so the test stays
   accurate as the spec evolves). Caught: 33 mutation closures that were
   passing empty Params, causing audit/wire key divergence.
+- `TestSpecDrift_AbilitiesMatchSpec`: every `CommandDef.Ability` is checked
+  against the spec two ways, because the spec states abilities in prose and
+  neither reading covers the set alone. (1) Per-operation: an operation whose
+  description says "Requires the `cli:X` ability" pins every CommandDef on
+  that verb+path. (2) Cardinality: the securitySchemes table commits to a
+  route count ("the five routes gated on `abilities:cli:cs`") and the CLI must
+  bind exactly that many distinct cli:cs routes. Caught: `gift-certificates
+  void` still bound `cli:write` after spec 1.1.0 moved it to `cli:cs` — the
+  second time a hand-mirrored ability drifted, after `bookings cancel` (#19).
+  The parsing helpers are unit-tested directly
+  (`TestSpecDriftHelpers_ParseAbilityAnnotations`,
+  `TestSpecDriftHelpers_AbilityConstValue`) so the guards that fire on a spec
+  rewording are themselves exercised rather than trusted.
 
 Validated by reverting each historical drift bug in turn and observing
 precise file:line failure output.

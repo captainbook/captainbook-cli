@@ -46,10 +46,12 @@ Tokens carry one or more abilities. The server enforces them at the route layer;
 | Ability     | Required for |
 |-------------|--------------|
 | `cli:read`  | All read endpoints. Implicit alongside `cli:write` / `cli:cs`. |
-| `cli:write` | Inventory mutations: products, options, availabilities (incl. bulk), pricing tiers, discounts (incl. apply), gift certs (issue/void/resend), guests, extras, questions, media. NOT categories — those are platform-managed and read-only. |
-| `cli:cs`    | CS-only sensitive operations: `bookings cancel`, `bookings refund`, `bookings comp`, `notifications resend` (aliased as `bookings resend-confirmation`). `bookings cancel` is in this set for **every** `--refund-policy` value — the whole V1 enum (`none|full|partial`) overrides the product's cancellation policy, and the server 403s operator tokens on overrides. |
+| `cli:write` | Inventory mutations: products, options, availabilities (incl. bulk), pricing tiers, discounts (incl. apply), gift certs (issue/resend), guests, extras, questions, media. NOT categories — those are platform-managed and read-only. |
+| `cli:cs`    | CS-only sensitive operations: `bookings cancel`, `bookings refund`, `bookings comp`, `notifications resend` (aliased as `bookings resend-confirmation`), and `gift-certificates void`. `bookings cancel` is in this set for **every** `--refund-policy` value — the whole V1 enum (`none|full|partial`) overrides the product's cancellation policy, and the server 403s operator tokens on overrides. `gift-certificates void` is in it because voiding kills an instrument the customer paid for. |
 
 Recommended issuance: a `cli:read` token for reporting bots, a `cli:read + cli:write` token for inventory editors, and a `cli:read + cli:write + cli:cs` token for Customer Success engineers.
+
+Who may *issue* each tier is itself gated. `cli:read`, `cli:write` and `cli:cs` need the `issue_cli_read_token`, `issue_cli_write_token` and `issue_cli_cs_token` permissions respectively (the latter two admin-only by default), checked when the token is created or edited in Settings → API tokens. Issuing a token attributed to another user additionally needs `issue_api_token_for_other_users`, and such a token is capped at what the *issuer* may issue, not at what the colleague holds. This bites on rotation rather than on use: an existing token keeps working, but whoever minted it may no longer be able to re-issue it. Device-login tokens from the mobile app no longer carry Sanctum's `*` wildcard, which used to satisfy every ability gate including `cli:cs`.
 
 ### Abilities are not permissions
 
@@ -147,7 +149,11 @@ ceebee inventory bookings refund bk_88 \
   --idempotency-key 018f5e2c-6c4a-7c5a-9d2c-83a1b1f6e4cd
 ```
 
-The server matches on (`Idempotency-Key`, canonical-JSON SHA-256 of the body excluding `dry_run`). On replay with the same body, you get the original response. On replay with a different body, you get `409 IDEMPOTENCY_CONFLICT`. On a key currently in flight, `409 IDEMPOTENCY_IN_PROGRESS`. On a swept key (server crashed), `409 IDEMPOTENCY_UNKNOWN` — retry with a fresh key.
+**One key per operation.** Since spec 1.2.0 the server matches on (`Idempotency-Key`, HTTP method, path including query string, canonical-JSON SHA-256 of the body excluding `dry_run`) — not on the body alone. Reuse a key across two different operations and you get `409 IDEMPOTENCY_CONFLICT`, not a replay. This matters most where the resource id lives in the path and the bodies are identical: without the binding, `gift-certificates void gc_A` and `gift-certificates void gc_B` share a body, and the second would replay the first — a `200` and a success envelope for a void that never happened. The CLI's auto-minting already gives you one key per invocation; the rule only binds you when you pass `--idempotency-key` by hand.
+
+On replay of the same operation with the same body, you get the original response. On a different body, or the same key aimed at a different endpoint or resource, `409 IDEMPOTENCY_CONFLICT`. On a key currently in flight, `409 IDEMPOTENCY_IN_PROGRESS`. On a swept key (server crashed), `409 IDEMPOTENCY_UNKNOWN` — retry with a fresh key.
+
+**Refusals release the key.** A request rejected at the gate — `401`, `403`, `422 VALIDATION_FAILED`, `429`, and the `404` from the workflows plan gate — records no outcome, because nothing ran. The key is free to reuse, including with a different body. So "fix the token and retry with the same key" and "fix the invalid field and retry with the same key" are both safe. A `404` from a handler (the row genuinely does not exist) is a real outcome and does replay.
 
 Dry-runs do NOT consume an idempotency row, so you can preview with the same key you intend to use for the real call.
 
@@ -271,7 +277,7 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory gift-certificates update-available <id>` | PATCH /gift-certs/available/{id} | `cli:write` | body |
 | `inventory gift-certificates delete-available <id>` | DELETE /gift-certs/available/{id} | `cli:write` | none |
 | `inventory gift-certificates issue` | POST /gift-certs/issued | `cli:write` | body |
-| `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:write` | body |
+| `inventory gift-certificates void <id>` | POST /gift-certs/issued/{id}/void | `cli:cs` | body |
 | `inventory gift-certificates resend <id>` | POST /gift-certs/issued/{id}/resend | `cli:write` | body |
 | `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |

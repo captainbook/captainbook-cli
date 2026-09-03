@@ -105,7 +105,7 @@ func productsDefs() []CommandDef {
 				"--product-code is auto-generated from the title slug when omitted.",
 			Flags: []FlagDef{
 				{Name: "title", Type: "string", Required: true, Description: "Product title"},
-				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code (e.g. EUR, USD)"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code — must equal the account currency from whoami; not stored, but a mismatch is refused with 422"},
 				{Name: "description", Type: "string", Description: "Product description (translatable rich text)"},
 				{Name: "instructions", Type: "string", Description: "Rich text shown to confirmed customers"},
 				{Name: "requirements", Type: "string", Description: "Rich text — what the customer needs to bring/know"},
