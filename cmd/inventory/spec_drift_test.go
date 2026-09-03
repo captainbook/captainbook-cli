@@ -1067,3 +1067,154 @@ func TestSpecDriftHelpers_AbilityConstValue(t *testing.T) {
 		}
 	}
 }
+
+// currencyReq records how a request schema treats its `currency` property.
+type currencyReq struct {
+	Declared bool // the schema has a `currency` property at all
+	Required bool // ...and lists it in `required:`
+}
+
+// parseCurrencyRequirements maps "#/components/schemas/X" → how schema X
+// treats `currency`. Split from the testing.T wrapper so the required-list
+// handling is unit-testable.
+func parseCurrencyRequirements(data []byte) (map[string]currencyReq, error) {
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("yaml.Unmarshal: %w", err)
+	}
+	comps, _ := raw["components"].(map[string]any)
+	schemas, _ := comps["schemas"].(map[string]any)
+	out := map[string]currencyReq{}
+	for name, s := range schemas {
+		m, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		props, _ := m["properties"].(map[string]any)
+		if _, has := props["currency"]; !has {
+			continue
+		}
+		req := currencyReq{Declared: true}
+		if reqList, ok := m["required"].([]any); ok {
+			for _, r := range reqList {
+				if s, _ := r.(string); s == "currency" {
+					req.Required = true
+					break
+				}
+			}
+		}
+		out["#/components/schemas/"+name] = req
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no request schema declares a `currency` property — the spec's money shape changed; re-check parseCurrencyRequirements")
+	}
+	return out, nil
+}
+
+// TestSpecDrift_CurrencyFlagTracksSpecRequirement locks a deliberate
+// asymmetry that reads like an oversight and has already been reported as
+// one: the CLI exposes --currency on the three CREATE commands whose spec
+// schema lists currency in `required:`, and on NOTHING else — not on any
+// update, not on `gift-certificates issue`, not on `pricing-tiers create`.
+//
+// The omission is the point. None of these tables has a currency column, so
+// the field is dropped on persist ("There is no per-record currency to
+// change", cli-v1.yaml). Since spec 1.4.0 it is also validated against the
+// account currency. Where the spec makes it optional, sending it therefore
+// has exactly two outcomes: it matches and changes nothing, or it mismatches
+// and takes the whole write down with a 422. A flag whose best case is a
+// no-op and whose worst case is a failed update is a footgun, and an agent
+// driving the CLI is exactly who trips it — spec 1.4.0's own changelog
+// describes an agent relaying a bogus currency back to an operator as
+// confirmation. Where the spec makes it required we have no choice, so it
+// gets a flag.
+//
+// Callers who genuinely need to send it on an optional endpoint still can,
+// via --data '{"currency":"EUR"}'.
+//
+// If a future spec gives one of these tables a real currency column, this
+// test fails and the flag should be added deliberately rather than by
+// pattern-matching against create.
+func TestSpecDrift_CurrencyFlagTracksSpecRequirement(t *testing.T) {
+	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	reqs, err := parseCurrencyRequirements(data)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	spec := loadSpecDoc(t)
+
+	checked := 0
+	for _, c := range walkInventoryCmdLits(t) {
+		op := spec.findOp(c.Verb, c.Path)
+		if op == nil || op.BodyRef == "" {
+			continue
+		}
+		cr, ok := reqs[op.BodyRef]
+		if !ok || !cr.Declared {
+			continue // this operation's body has no currency property
+		}
+		checked++
+
+		hasFlag := false
+		for _, f := range c.Flags {
+			if f.Name == "currency" {
+				hasFlag = true
+				break
+			}
+		}
+		switch {
+		case cr.Required && !hasFlag:
+			t.Errorf("[%s] %q (%s %s): spec lists currency in `required:` on %s, but the command declares no --currency flag — the request cannot be built",
+				c.File, c.Use, c.Verb, c.Path, op.BodyRef)
+		case !cr.Required && hasFlag:
+			t.Errorf("[%s] %q (%s %s): spec makes currency OPTIONAL on %s, but the command declares a --currency flag. "+
+				"Optional currency is dropped on persist and validated against the account currency, so the flag can only no-op or 422 the write. "+
+				"Remove it, or update this test if the field became storable.",
+				c.File, c.Use, c.Verb, c.Path, op.BodyRef)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no command was matched to a currency-bearing request schema — the walker or the spec's schema names changed")
+	}
+}
+
+// TestSpecDriftHelpers_ParseCurrencyRequirements covers the required-list
+// handling, including the guard that fires if the spec's money shape changes
+// out from under the rule above.
+func TestSpecDriftHelpers_ParseCurrencyRequirements(t *testing.T) {
+	got, err := parseCurrencyRequirements([]byte(`
+components:
+  schemas:
+    CreateThingRequest:
+      required: [name, currency]
+      properties:
+        name: { type: string }
+        currency: { type: string }
+    UpdateThingRequest:
+      properties:
+        currency: { type: string }
+    NoCurrencyRequest:
+      required: [name]
+      properties:
+        name: { type: string }
+`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c := got["#/components/schemas/CreateThingRequest"]; !c.Declared || !c.Required {
+		t.Errorf("CreateThingRequest: got %+v, want declared+required", c)
+	}
+	if c := got["#/components/schemas/UpdateThingRequest"]; !c.Declared || c.Required {
+		t.Errorf("UpdateThingRequest: got %+v, want declared, not required", c)
+	}
+	if _, ok := got["#/components/schemas/NoCurrencyRequest"]; ok {
+		t.Error("NoCurrencyRequest has no currency property and must not appear in the map")
+	}
+
+	if _, err := parseCurrencyRequirements([]byte("components: {schemas: {Foo: {properties: {name: {type: string}}}}}")); err == nil {
+		t.Fatal("expected an error when no schema declares currency, got nil — a spec reshape would silently disable the flag rule")
+	}
+}
