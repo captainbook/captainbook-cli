@@ -240,7 +240,8 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | `DISCOUNT_NOT_APPLICABLE` | Booking state, validity window, scope, or `nb_offers` blocks the apply. |
 | `RESOURCE_IN_USE` | Hard-delete blocked by FK references (categories, gift-cert SKUs). |
 | `BOOKING_RESOURCE_STATE_STALE` | `bookings set-resources`: the booking's resources changed since your read. Re-read, re-decide, re-send with the fresh token — never blind-retry. |
-| `BOOKING_RESOURCE_CONFLICT` | `bookings set-resources`: the selection itself is illegal (double-booked, wrong category, not attached to the option). Re-run `bookings available-resources`. |
+| `BOOKING_RESOURCE_CONFLICT` | `bookings set-resources`: the selection itself is illegal. `details.rejections[]` names every refused id with a `<FIELD>_RESOURCE_<PROBLEM>` code. Re-run the `bookings available-*` lists. |
+| `TICKET_REISSUE_NOT_CONFIRMED` | `products update`: changing `--delivery-method` would reissue existing bookings' tickets, invalidating the QR codes customers already hold (un-notified). Preview with `--dry-run`, then resend with `--confirm-ticket-reissue`. |
 | `RATE_LIMITED` | 429; respect `Retry-After`. |
 
 ## Capability table

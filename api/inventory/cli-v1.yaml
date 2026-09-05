@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Inventory CLI API
-  version: 1.4.0
+  version: 1.6.0
   description: |
     Internal HTTP JSON API serving the CaptainBook inventory CLI client
     (which lives in a separate repository). Primary consumer is Claude Code
@@ -128,6 +128,113 @@ info:
     marked **Breaking** below. The URL major (`/api/v1/cli`) is a separate axis
     and does not move.
 
+    - **1.6.0** — a booking's resources are addressed in THREE parts instead of
+      two. A booking holds exactly one **main** resource (the guide or the
+      asset), many **equipment** resources, and many **auxiliary** ones. The
+      split is `resourceables.capacity` — the product option's pivot — not
+      `Resource.category`: a capacity-bearing non-auxiliary resource competes
+      for the single main slot, a null-capacity one is equipment.
+      `Booking::attachResources()` has always worked that way, and the two
+      agree in practice because an `equipment` resource is forced to a null
+      capacity.
+      New: `equipment_resource_ids` on `UpdateBookingResourcesRequest` (full
+      desired set, omit to leave equipment untouched) and
+      `GET /bookings/{id}/resources/equipment/available` for the candidates,
+      also reachable over MCP as
+      `inventory_browse` → `booking-equipment-resources-available`. Asking for a
+      capacity-bearing resource in that list is refused with
+      `EQUIPMENT_RESOURCE_IS_MAIN` rather than quietly putting a second main on
+      the booking.
+      Also new: `main_resource_id` now makes the FIRST assignment on a booking
+      that has none, instead of refusing with
+      `MAIN_RESOURCE_NOT_ASSIGNABLE_NO_CURRENT` ("no current main resource to
+      switch from"). That code is gone. Switching was previously the only
+      assignment path and it needs something to switch away from, so a booking
+      that never got a guide — `Booking::attachResources()` throws rather than
+      assign when nothing fits at creation — or that had one detached by hand
+      could not be given one through the API at all. The request is unchanged:
+      `main_resource_id` replaces the current main if there is one and assigns
+      if there is not.
+      Asking for a SECOND guide or asset is still refused, since the only way to
+      express it is to name a capacity-bearing resource under one of the plural
+      fields: `EQUIPMENT_RESOURCE_IS_MAIN` / `AUXILIARY_RESOURCE_IS_MAIN`.
+      The rejection codes are reorganised around which FIELD the id was put in
+      and which kind it turned out to be — `<FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION`
+      and `<FIELD>_RESOURCE_IS_<KIND>`, plus `MAIN_RESOURCE_NOT_AVAILABLE` and
+      `AUXILIARY_RESOURCE_NOT_AVAILABLE` for a right-kind resource that is busy.
+      `EQUIPMENT_RESOURCE_NOT_AVAILABLE` is gone with them: equipment is never
+      rationed per booking, so it is either on the option or it is not.
+      **Breaking**: `POST /bookings/{id}/resources` now answers
+      `422 VALIDATION_FAILED` for an unrecognised field instead of dropping it.
+      Every field on this request is optional, so a body carrying only a
+      misspelt or invented instruction validated, planned no change and returned
+      `200` with `before` equal to `after` — a caller reading that as "assigned"
+      was believing what the API told them. Reported by a CLI user who sent
+      `auto_assign: true`, a field this endpoint has never had, and got success
+      with nothing assigned.
+      **Breaking for a caller writing resources on a booking that carries
+      equipment.** `main_resource_id` was previously diffed against
+      `resources.first(not auxiliary)`, and equipment is not auxiliary — on an
+      unordered relation that could be any row, so the same request could
+      no-op, switch, or come back `MAIN_RESOURCE_NOT_AVAILABLE` on identical
+      data. It is now diffed against the capacity-bearing assignment, so a
+      request that happened to work against the arbitrary row may now resolve
+      differently. Bookings with no equipment are unaffected.
+      **Breaking for a typed client reading a dry run.** `diff.after.resources`
+      rows now carry the same shape as `diff.before.resources` and as the
+      committed `diff.after` — `id`, `name`, `type`, `capacity`, `category`,
+      `source`, `user`. A preview used to build changed rows from a wider
+      serializer and ship `seniority`, `pivot_capacity` and
+      `custom_attributes` alongside them, so a preview and the commit that
+      followed it described the same assignment with different keys. Two
+      related preview bugs go with it: a main switch no longer drops the
+      booking's equipment from `after` (the commit re-attaches it, so the
+      preview was simply wrong), and a row this mutation attaches now reads
+      `source: manual` rather than `auto`.
+      **Breaking** for `POST /resources`, `PATCH /resources/{id}` and
+      `POST /product-options/{id}/resources`: a `capacity` sent for a resource
+      whose category is `equipment` now answers `422 VALIDATION_FAILED` where
+      it previously answered `201` / `200` / `201`. Both web write paths null
+      that field on save; the CLI wrote it through, so an agent could create
+      `category: equipment, capacity: 12`, attach it to an option, and have it
+      compete for the main slot by seniority — while `ComputeIsOpenForBooking`
+      and `UpdateIsFullyBookedJob`, which exclude EQUIPMENT by category, sized
+      the availability as though it did not exist. Refused rather than nulled
+      because the alternative is the silent discard 1.4.0 removed from the
+      `currency` fields: the caller is told the resource holds twelve seats and
+      nothing downstream ever contradicts it. Remediation is to omit
+      `capacity`, or to send `guide` / `asset` if the resource really does
+      carry seats.
+    - **1.5.0** — `delivery_method` and `redemption_method` (the product's
+      "Ticket type" and "Redemption method") are now readable on `Product` and
+      writable on `POST /products` and `PATCH /products/{id}`. Additive: a
+      caller that never sends them keeps the previous behaviour, and the
+      columns keep their DB defaults (`VOUCHER` / `MANIFEST`). Two conditions
+      attach to the write, both mirroring the Ticketing form rather than being
+      invented here:
+        - CHANGING either field requires the `update_delivery_method`
+          permission, which is what the form's Update button carries. A caller
+          without it gets `403 FORBIDDEN`. The gate is on the change, not on
+          the key: since both fields are now on the read shape, the ordinary
+          read-modify-write client PATCHes them straight back, and refusing
+          that echo would `403` a caller over a value they never moved. On
+          `POST /products` there is no stored row, so the comparison is
+          against the column default — sending a field at its default, or
+          omitting it, needs no permission, which keeps "GET a product, POST
+          it back to clone it" working for a caller who never touches
+          ticketing.
+        - Changing `delivery_method` on a product that has bookings is refused
+          with `422 TICKET_REISSUE_NOT_CONFIRMED` unless the payload carries
+          `confirm_ticket_reissue: true`. The change deletes every ticket on
+          those bookings and issues new ones, so the QR codes customers are
+          already holding stop scanning, and nothing notifies them. `dry_run:
+          true` is never refused — it is how you read
+          `ticket_reissue.affected_bookings` before deciding. The refusal is
+          raised before the write, so like every other `422` here it releases
+          its `Idempotency-Key`: the retry carrying the confirmation may reuse
+          the same key.
+      **Breaking for a typed client** on the read half only: `Product` gains
+      two properties.
     - **1.4.0** — `currency` on a create or update payload is now validated
       against the account currency instead of being silently discarded.
       **Breaking** for a caller that sent a currency the account does not trade
@@ -353,6 +460,17 @@ paths:
         which re-derives the `can_be_sold` column. New products have no
         Availabilities yet, so the inventory cascade jobs that fire on
         update do not run on create.
+
+        **Ticketing.** `delivery_method` and `redemption_method` are accepted
+        here. Asking for a value other than the column default requires the
+        `update_delivery_method` permission — the same single permission the
+        Ticketing form's Update button carries for both fields. Sending a
+        field AT its default (`VOUCHER` / `MANIFEST`) does not, because that
+        asks for exactly what omitting it produces: a caller cloning a product
+        by posting its read shape back is not choosing a ticketing setup.
+        Omitting both is likewise unrestricted. A brand new product has no
+        bookings, so nothing is reissued and `confirm_ticket_reissue` has no
+        meaning on create.
       tags: [Products]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -379,6 +497,7 @@ paths:
                             properties:
                               product: { $ref: "#/components/schemas/Product" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
@@ -461,6 +580,34 @@ paths:
           Deferred via `defer()` so the response returns before the heavy
           fan-out runs.
 
+        **Ticket reissue.** Changing `delivery_method` dispatches
+        `DeliverTicketOrVoucher`, which deletes every ticket on every booking
+        departing in the next 10 years and issues replacements in the new
+        shape. The QR codes those customers are already holding stop
+        scanning, and **nothing notifies them** — the operator has to resend.
+        So the change is refused with `422 TICKET_REISSUE_NOT_CONFIRMED`
+        unless the payload carries `confirm_ticket_reissue: true`, mirroring
+        the confirmation modal the Ticketing form shows. The refusal's
+        `error.details` is the same `TicketReissue` block the 200 returns —
+        `delivery_method_from`, `delivery_method_to`, `affected_bookings`,
+        `customers_notified` — so one renderer covers the preview and the
+        refusal.
+
+        Not refused when: the product has no bookings in that window
+        (`affected_bookings` is 0 — nothing to invalidate), the submitted
+        `delivery_method` equals the stored one (not a change), or `dry_run:
+        true`. The dry run is the intended way to find out: it answers 200
+        with `data.ticket_reissue` — `{delivery_method_from,
+        delivery_method_to, affected_bookings, customers_notified: false}` —
+        and the suppressed job in `data.side_effects`. The committed response
+        carries the same `ticket_reissue` block.
+
+        CHANGING `delivery_method` or `redemption_method` also requires the
+        `update_delivery_method` permission — echoing back the value already
+        stored does not, so a read-modify-write round trip is safe without it.
+        See `POST /products`, where presence is the trigger because there is no
+        stored value to compare against.
+
         Finally, `Product::updateCanBeSold()` re-derives the canonical
         `can_be_sold` column, matching the UI flow.
       tags: [Products]
@@ -483,11 +630,50 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - type: object
                     properties:
-                      data: { $ref: "#/components/schemas/MutationResult" }
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              ticket_reissue: { $ref: "#/components/schemas/TicketReissue" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
-        "422": { $ref: "#/components/responses/ValidationError" }
+        "422":
+          description: |
+            Either an ordinary validation failure (`VALIDATION_FAILED`) or the
+            ticket-reissue confirmation refusal (`TICKET_REISSUE_NOT_CONFIRMED`).
+            Both release the `Idempotency-Key`, so the corrected retry may reuse
+            it — that is what makes "add the confirmation and resend" safe.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      error: { $ref: "#/components/schemas/Error" }
+              examples:
+                ticketReissueNotConfirmed:
+                  summary: delivery_method would reissue existing tickets
+                  value:
+                    error:
+                      code: TICKET_REISSUE_NOT_CONFIRMED
+                      message: >-
+                        Changing the ticket type reissues tickets for 12 existing booking(s)
+                        and invalidates the tickets or vouchers customers already received.
+                        Customers will NOT be notified automatically — you will need to
+                        resend their tickets.
+                      hint: >-
+                        Preview it with dry_run: true, then resend with
+                        confirm_ticket_reissue: true to go ahead.
+                      retriable: false
+                      details:
+                        delivery_method_from: VOUCHER
+                        delivery_method_to: TICKET
+                        affected_bookings: 12
+                        customers_notified: false
 
   /product-options:
     get:
@@ -2032,6 +2218,39 @@ paths:
       responses:
         "200":
           description: Candidate auxiliary resources
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AssignedBookingResource" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /bookings/{id}/resources/equipment/available:
+    get:
+      operationId: listAvailableBookingEquipmentResources
+      summary: List available equipment resources for a booking
+      description: |
+        Returns the booking's product option's EQUIPMENT resources — every
+        non-auxiliary resource attached to the option with no pivot capacity.
+        These are the ids `equipment_resource_ids` accepts.
+
+        Unlike the main list this runs no availability or concurrency filter,
+        and that is deliberate: a null pivot capacity is the statement that the
+        resource is not rationed per booking, which is why
+        `Booking::attachResources()` attaches all of them to every booking
+        unconditionally. Every candidate is therefore always assignable.
+      tags: [Bookings, Resources]
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Candidate equipment resources
           content:
             application/json:
               schema:
@@ -4350,7 +4569,8 @@ components:
             BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
             REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
             AVAILABILITY_HAS_CONFIRMED_BOOKING, BOOKING_RESOURCE_STATE_STALE,
-            BOOKING_RESOURCE_CONFLICT, RATE_LIMITED, INTERNAL_ERROR.
+            BOOKING_RESOURCE_CONFLICT, TICKET_REISSUE_NOT_CONFIRMED,
+            RATE_LIMITED, INTERNAL_ERROR.
         message:
           type: string
         hint:
@@ -4362,6 +4582,46 @@ components:
           type: object
           description: Per-field validation errors or domain-specific context
           additionalProperties: true
+
+    TicketReissue:
+      type: object
+      description: |
+        Present on `PATCH /products/{id}` — both the dry-run preview and the
+        committed response — ONLY when the request moves `delivery_method`.
+        Absent when the field is omitted, or carries the value the product
+        already has (that is not a change and reissues nothing).
+
+        `affected_bookings` is the number of bookings whose tickets the change
+        deletes and reissues, counted over the same 10-year departure window
+        `DeliverTicketOrVoucher` then walks. It is NOT scoped to the caller's
+        business unit, because the job is not either — a scoped number would
+        promise a smaller blast radius than the one that actually lands.
+
+        The same four keys are returned as `error.details` on the `422
+        TICKET_REISSUE_NOT_CONFIRMED` refusal, so a client can render one shape
+        for both the preview and the refusal.
+      required: [delivery_method_from, delivery_method_to, affected_bookings, customers_notified]
+      properties:
+        delivery_method_from:
+          type: string
+          enum: [TICKET, VOUCHER]
+          description: The stored value the change moves away from.
+        delivery_method_to:
+          type: string
+          enum: [TICKET, VOUCHER]
+          description: The submitted value.
+        affected_bookings:
+          type: integer
+          minimum: 0
+          description: >-
+            Bookings whose tickets the change would reissue, counted just before
+            the write. It is an ESTIMATE, not an outcome: the job runs
+            afterwards and re-reads its own window, so a booking taken in
+            between is reissued without being counted here. `0` means nothing is
+            currently invalidated, and the confirmation is not required.
+        customers_notified:
+          type: boolean
+          description: Always `false` — reissuing sends nothing. The operator has to resend the tickets themselves.
 
     MutationResult:
       type: object
@@ -4458,6 +4718,16 @@ components:
           nullable: true
           enum: [date, datetime]
           description: "`date` = customer picks a date only; `datetime` = customer picks a date and a starting time."
+        delivery_method:
+          type: string
+          nullable: true
+          enum: [TICKET, VOUCHER]
+          description: "\"Ticket type\" in the dashboard. `VOUCHER` = one ticket for the whole booking; `TICKET` = one per guest. Decides the shape of the QR tokens a booking carries, and therefore how attendance is counted. Null only on the unsaved preview a `dry_run` create returns — the column has a `VOUCHER` default, so a persisted row always has one."
+        redemption_method:
+          type: string
+          nullable: true
+          enum: [MANIFEST, DIGITAL, PRINT]
+          description: "How the customer proves they are booked: `MANIFEST` = no identification needed, `DIGITAL` = digital or printed tickets accepted, `PRINT` = printed only. Null only on a `dry_run` create preview; the column defaults to `MANIFEST`."
         from_price:
           allOf: [{ $ref: "#/components/schemas/Money" }]
           nullable: true
@@ -5795,6 +6065,16 @@ components:
           type: string
           enum: [date, datetime]
           description: "`date` for date-only products; `datetime` for products with a starting time."
+        delivery_method:
+          type: string
+          enum: [TICKET, VOUCHER]
+          default: VOUCHER
+          description: "\"Ticket type\". `VOUCHER` = one ticket per booking; `TICKET` = one per guest. Asking for `TICKET` requires the `update_delivery_method` permission; sending `VOUCHER`, or omitting the field, does not — both take the column default."
+        redemption_method:
+          type: string
+          enum: [MANIFEST, DIGITAL, PRINT]
+          default: MANIFEST
+          description: "How the customer is admitted. Asking for `DIGITAL` or `PRINT` requires the `update_delivery_method` permission — the same one gates both ticketing fields, matching the form they live on. Sending `MANIFEST`, or omitting the field, does not."
         is_private: { type: boolean, default: false, description: "`true` = a single party books the whole experience (private); `false` = multiple parties share the slot (shared). When `false`, `is_priced_per_person` is forced to `true` and `use_alternate_tier_pricing` to `false` regardless of what the caller supplied." }
         is_priced_per_person: { type: boolean, default: true, description: "`true` = price applies per traveler; `false` = price applies per group/booking. Implicitly forced to `true` when `is_private=false`." }
         is_tier_priced: { type: boolean, default: false, description: "Whether quantity-based pricing tiers apply." }
@@ -5836,6 +6116,18 @@ components:
           type: string
           enum: [date, datetime]
           description: "`date` for date-only products; `datetime` for products with a starting time."
+        delivery_method:
+          type: string
+          enum: [TICKET, VOUCHER]
+          description: "\"Ticket type\". CHANGING it requires the `update_delivery_method` permission and reissues the tickets of every existing booking in the next 10 years, invalidating the QR codes customers already hold without notifying them — so it is refused with `422 TICKET_REISSUE_NOT_CONFIRMED` unless `confirm_ticket_reissue: true` is sent alongside. Sending the value the product already has is not a change: no permission needed, nothing reissued, no `ticket_reissue` block."
+        redemption_method:
+          type: string
+          enum: [MANIFEST, DIGITAL, PRINT]
+          description: "How the customer is admitted. CHANGING it requires the `update_delivery_method` permission; echoing back the stored value does not. Changing it alone reissues nothing — it does not affect the tickets already issued."
+        confirm_ticket_reissue:
+          type: boolean
+          default: false
+          description: "Acknowledgement, not a field — nothing is stored. Required to commit a `delivery_method` change on a product that has bookings. Ignored when `delivery_method` is absent or unchanged, and never required under `dry_run`."
         is_private: { type: boolean, description: "Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and seven inventory recompute jobs are dispatched. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description." }
         is_priced_per_person: { type: boolean }
         is_tier_priced: { type: boolean }
@@ -6087,7 +6379,7 @@ components:
         category:
           type: string
           enum: [guide, asset, equipment, auxiliary]
-        capacity: { type: integer, minimum: 0, nullable: true }
+        capacity: { type: integer, minimum: 0, nullable: true, description: "Seats the resource can host. Refused (422) when `category` is `equipment`: capacity is what makes a resource the booking's single main resource, and equipment is never that." }
         rating: { type: number, format: float, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
@@ -6099,7 +6391,7 @@ components:
         category:
           type: string
           enum: [guide, asset, equipment, auxiliary]
-        capacity: { type: integer, minimum: 0, nullable: true }
+        capacity: { type: integer, minimum: 0, nullable: true, description: "Seats the resource can host. Refused (422) when the resource's category is (or becomes) `equipment`: capacity is what makes a resource the booking's single main resource, and equipment is never that." }
         rating: { type: number, format: float, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
@@ -6112,7 +6404,7 @@ components:
         Resource-level defaults.
       properties:
         resource_id: { type: string }
-        capacity: { type: integer, minimum: 0, nullable: true, description: "Overrides the Resource's capacity for this specific ProductOption attachment." }
+        capacity: { type: integer, minimum: 0, nullable: true, description: "Overrides the Resource's capacity for this specific ProductOption attachment. This is the capacity `Booking::attachResources()` reads, so setting it makes the resource a candidate for the booking's single main slot — refused (422) for an `equipment` resource." }
         seniority: { type: integer, minimum: 0, nullable: true }
         dry_run: { type: boolean, default: false }
 
@@ -6120,13 +6412,89 @@ components:
       type: object
       required: [expected_resource_state_token]
       description: |
-        Normalized desired-state request for booking resource writes.
-        `main_resource_id` switches the primary non-auxiliary resource.
-        `auxiliary_resource_ids` replaces the full auxiliary-resource set.
+        Normalized desired-state request for booking resource writes. Every
+        field is optional and an OMITTED field means "leave this kind alone" —
+        only what you send is reconciled.
+
+        An UNRECOGNISED field is a `422`, not a silent drop. Because every field
+        is optional, a body whose only instruction was a misspelt or invented
+        one would otherwise validate, plan nothing, and answer `200` with
+        `before` equal to `after` — indistinguishable from a mutation that
+        worked.
+
+        A booking's resources come in three kinds, split by the product
+        option's pivot capacity rather than by `Resource.category`:
+
+        | kind | on the product option | per booking | field |
+        | --- | --- | --- | --- |
+        | main | non-auxiliary, pivot capacity SET | exactly one | `main_resource_id` |
+        | equipment | non-auxiliary, pivot capacity NULL | many | `equipment_resource_ids` |
+        | auxiliary | `category = auxiliary` | many | `auxiliary_resource_ids` |
+
+        In practice the main resource is the trip's guide or its asset (boat,
+        vehicle, room) and equipment is the kit that goes out with every
+        departure — an `equipment` resource is forced to a null capacity on
+        every write path, so the capacity split and the category agree.
+
+        `main_resource_id` is singular because the booking holds one, and it
+        ASSIGNS: it replaces the current main resource if there is one and makes
+        the first assignment if there is not. There is no separate attach verb —
+        the request is the same sentence either way ("the main resource is now
+        X") and you should not have to read the booking's state to know which
+        one you are doing. It is not nullable: there is no way to leave a
+        booking with no main resource through this endpoint.
+
+        Naming a resource the booking already holds elsewhere is how you would
+        ask for a SECOND guide or asset, and both of the plural fields refuse
+        it: `EQUIPMENT_RESOURCE_IS_MAIN` and `AUXILIARY_RESOURCE_IS_MAIN`. Only
+        `main_resource_id` may point at a capacity-bearing resource, and it
+        holds one.
+
+        `equipment_resource_ids` and `auxiliary_resource_ids` each replace their
+        whole set: send the full desired list, not a delta. Equipment attached
+        to the booking but no longer carried by the product option is left
+        alone — it cannot be offered back once removed, so it is out of scope
+        for this field rather than silently detached.
+
+        One thing to know about omitting `equipment_resource_ids` while moving
+        the main resource: switching the main detaches and re-attaches the
+        option's WHOLE equipment set, so a booking previously narrowed to a
+        subset comes back with all of it. That is what `attachResources()` does
+        and the dry run reports it faithfully. Send the set you want alongside
+        `main_resource_id` if you need to keep a narrowed one.
+
+        On a `409 BOOKING_RESOURCE_CONFLICT`, `error.details.rejections[]`
+        carries one entry per refused id with a `code`:
+
+        | code | meaning |
+        | --- | --- |
+        | `<FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION` | the booking's product option does not carry that resource at all — attach it to the option first |
+        | `<FIELD>_RESOURCE_IS_MAIN` | it is a main resource (capacity-bearing). A booking holds one; use `main_resource_id` |
+        | `<FIELD>_RESOURCE_IS_EQUIPMENT` | it is equipment (no pivot capacity). Use `equipment_resource_ids` |
+        | `<FIELD>_RESOURCE_IS_AUXILIARY` | it is auxiliary. Use `auxiliary_resource_ids` |
+        | `MAIN_RESOURCE_NOT_AVAILABLE` | it IS a main resource on the option, but cannot take this booking — already on an overlapping departure, cannot host this party size, or inside a cool-off window |
+        | `AUXILIARY_RESOURCE_NOT_AVAILABLE` | it IS auxiliary on the option, but is on an overlapping departure or cannot host this party size |
+
+        `<FIELD>` is `MAIN`, `EQUIPMENT` or `AUXILIARY` — the field you put the
+        id in, not what the resource turned out to be. The `_IS_` codes are the
+        wrong-field case and name the field you wanted. There is no
+        `EQUIPMENT_RESOURCE_NOT_AVAILABLE`: equipment is never rationed per
+        booking, so it is either on the option or it is not.
+
+        `MAIN_RESOURCE_NOT_AVAILABLE` can also arrive on a request whose dry run
+        was clean — a concurrent booking can take the resource in between, and
+        `expected_resource_state_token` cannot see that (it covers this
+        booking's own assignments, and none of them moved). Re-read the
+        candidates and retry.
       properties:
-        main_resource_id: { type: integer, minimum: 1, nullable: true }
+        main_resource_id: { type: integer, minimum: 1 }
+        equipment_resource_ids:
+          type: array
+          description: Full desired equipment set. Omit to leave equipment untouched.
+          items: { type: integer, minimum: 1 }
         auxiliary_resource_ids:
           type: array
+          description: Full desired auxiliary set. Omit to leave auxiliary resources untouched.
           items: { type: integer, minimum: 1 }
         expected_resource_state_token:
           type: string

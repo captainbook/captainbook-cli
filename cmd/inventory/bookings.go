@@ -196,28 +196,63 @@ func bookingsDefs() []CommandDef {
 			},
 		},
 		{
+			Use: "bookings available-equipment-resources <id>", Short: "List equipment resources assignable to a booking",
+			Kind: KindRead, Verb: "GET", Path: "/bookings/{id}/resources/equipment/available",
+			Ability: invpkg.Read, PositionalArgs: []string{"id"},
+			Long: "Candidate EQUIPMENT resources for this booking: every non-auxiliary " +
+				"resource on its product option that carries no pivot capacity. Feed ids " +
+				"from here to `bookings set-resources --equipment-resource-ids`.\n\n" +
+				"Unlike the main list this runs no availability or concurrency filter, and " +
+				"that is deliberate — a null pivot capacity means the resource is not " +
+				"rationed per booking, so every candidate here is always assignable.",
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.ListAvailableBookingEquipmentResourcesWithResponse(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				return ParseGenResponse(resp.Body, resp.HTTPResponse, "Resource", id)
+			},
+		},
+		{
 			Use: "bookings set-resources <id>", Short: "Set the resources assigned to a booking",
 			Kind: KindMutation, Verb: "POST", Path: "/bookings/{id}/resources",
 			Ability: invpkg.Write, DryRunMode: DryRunBody,
 			PositionalArgs: []string{"id"},
-			Long: "Desired-state write over a booking's resource assignment. This is NOT a " +
-				"delta: --main-resource-id switches the single primary resource, and " +
-				"--auxiliary-resource-ids REPLACES the whole auxiliary set (pass it empty, " +
-				"`--auxiliary-resource-ids=`, to clear every auxiliary). Omit a flag " +
-				"entirely to leave that half of the assignment untouched.\n\n" +
+			Long: "Desired-state write over a booking's resource assignment. A booking's " +
+				"resources come in THREE kinds, split by the product option's pivot " +
+				"capacity rather than by the resource's category: exactly one MAIN " +
+				"resource (the guide or the asset — the capacity-bearing one), many " +
+				"EQUIPMENT resources (non-auxiliary, no pivot capacity), and many " +
+				"AUXILIARY ones.\n\n" +
+				"This is NOT a delta. --main-resource-id ASSIGNS the single main " +
+				"resource: it replaces the current one if there is one and makes the " +
+				"first assignment if there is not. --equipment-resource-ids and " +
+				"--auxiliary-resource-ids each REPLACE their whole set (pass one empty, " +
+				"`--auxiliary-resource-ids=`, to clear it). Omit a flag entirely to " +
+				"leave that kind untouched.\n\n" +
+				"One trap worth knowing when you omit --equipment-resource-ids: moving " +
+				"the main resource detaches and re-attaches the option's WHOLE equipment " +
+				"set, so a booking previously narrowed to a subset comes back with all of " +
+				"it. Pass the set you want alongside --main-resource-id to keep a narrowed " +
+				"one. The dry run reports this faithfully — read it.\n\n" +
 				"The write is guarded against concurrent edits: read the booking first " +
 				"(`bookings get <id>`, or `bookings list --include resources`), pass its " +
 				"resource_state_token as --expected-resource-state-token, and the server " +
 				"rejects with BOOKING_RESOURCE_STATE_STALE if anything moved in between. " +
 				"On a stale rejection, re-read and re-decide — never blind-retry the same " +
-				"body. An invalid selection (double-booked, wrong category, not attached to " +
-				"the product option) comes back as BOOKING_RESOURCE_CONFLICT instead; list " +
-				"the legal choices with `bookings available-resources` / " +
-				"`bookings available-auxiliary-resources`.\n\n" +
+				"body. An invalid selection comes back as BOOKING_RESOURCE_CONFLICT " +
+				"instead, listing every refused id with a code naming the flag you put it " +
+				"in and what it turned out to be; list the legal choices with " +
+				"`bookings available-resources` / `bookings available-equipment-resources` " +
+				"/ `bookings available-auxiliary-resources`.\n\n" +
 				"Booking and resource state commit atomically; notifications, workflows, " +
 				"and calendar jobs fire after commit.",
 			Flags: []FlagDef{
-				{Name: "main-resource-id", Type: "int", Description: "Primary non-auxiliary resource to assign"},
+				{Name: "main-resource-id", Type: "int", Description: "The booking's single main resource. Replaces the current one, or makes the first assignment if it has none."},
 				// stringSlice, not intSlice, on purpose: pflag's intSlice parser
 				// runs strconv.Atoi on the raw value, so the documented
 				// clear-all form `--auxiliary-resource-ids=` dies at flag-parse
@@ -225,46 +260,67 @@ func bookingsDefs() []CommandDef {
 				// stringSlice accepts the empty value as [] and we convert
 				// below, which is also where the spec's per-item minimum of 1
 				// gets enforced.
+				{Name: "equipment-resource-ids", Type: "stringSlice", Description: "Full desired equipment set (replaces, not appends). Pass empty to clear all."},
 				{Name: "auxiliary-resource-ids", Type: "stringSlice", Description: "Full desired auxiliary set (replaces, not appends). Pass empty to clear all."},
 				{Name: "expected-resource-state-token", Type: "string", Required: true, Description: "resource_state_token from your last booking read"},
 			},
-			ForensicFields: []string{"main-resource-id", "auxiliary-resource-ids", "expected-resource-state-token"},
+			ForensicFields: []string{"main-resource-id", "equipment-resource-ids", "auxiliary-resource-ids", "expected-resource-state-token"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				// The flag arrives as []string (see the FlagDef comment);
+				// Spec pins main_resource_id to minimum 1, and 1.6.0 dropped
+				// its `nullable: true` — there is no longer any way to leave a
+				// booking with no main resource through this endpoint. The old
+				// spec allowed null, so a caller reaching for "unassign" will
+				// try 0; without this guard that becomes an opaque server 422
+				// instead of a local message naming the real constraint.
+				if args.FlagSet("main-resource-id") {
+					if v := args.FlagInt("main-resource-id"); v < 1 {
+						return nil, fmt.Errorf(
+							"--main-resource-id must be >= 1 (got %d); a booking's main resource cannot be cleared, only replaced", v)
+					}
+				}
+				// Both set flags arrive as []string (see the FlagDef comment);
 				// convert to []int so the body carries JSON integers, not
 				// quoted strings the server would reject. An explicitly-empty
 				// slice must survive as [] — that's the clear-all signal — so
 				// this rewrites the value in place rather than skipping when
 				// there's nothing to convert.
-				if args.FlagSet("auxiliary-resource-ids") {
-					raw := args.FlagSlice("auxiliary-resource-ids")
+				//
+				// The copy is made once and only when a set flag was given, so
+				// we don't mutate the caller's flags — forensic_summary reads
+				// the same map afterwards and should record what the user typed.
+				var flags map[string]any
+				for _, name := range []string{"equipment-resource-ids", "auxiliary-resource-ids"} {
+					if !args.FlagSet(name) {
+						continue
+					}
+					raw := args.FlagSlice(name)
 					ids := make([]int, 0, len(raw))
 					for _, s := range raw {
 						n, convErr := strconv.Atoi(strings.TrimSpace(s))
 						if convErr != nil {
-							return nil, fmt.Errorf("--auxiliary-resource-ids: %q is not an integer", s)
+							return nil, fmt.Errorf("--%s: %q is not an integer", name, s)
 						}
 						if n < 1 {
-							return nil, fmt.Errorf("--auxiliary-resource-ids: ids must be >= 1 (got %d)", n)
+							return nil, fmt.Errorf("--%s: ids must be >= 1 (got %d)", name, n)
 						}
 						ids = append(ids, n)
 					}
-					// Copy the map so we don't mutate the caller's flags —
-					// forensic_summary reads the same map afterwards and should
-					// record what the user typed.
-					flags := make(map[string]any, len(args.Flags))
-					for k, v := range args.Flags {
-						flags[k] = v
+					if flags == nil {
+						flags = make(map[string]any, len(args.Flags))
+						for k, v := range args.Flags {
+							flags[k] = v
+						}
+						args.Flags = flags
 					}
-					flags["auxiliary-resource-ids"] = ids
-					args.Flags = flags
+					flags[name] = ids
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"main-resource-id":              "main_resource_id",
+					"equipment-resource-ids":        "equipment_resource_ids",
 					"auxiliary-resource-ids":        "auxiliary_resource_ids",
 					"expected-resource-state-token": "expected_resource_state_token",
 				})

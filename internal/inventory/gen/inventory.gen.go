@@ -322,6 +322,45 @@ func (e CreatePricingCategoryRequestType) Valid() bool {
 	}
 }
 
+// Defines values for CreateProductRequestDeliveryMethod.
+const (
+	CreateProductRequestDeliveryMethodTICKET  CreateProductRequestDeliveryMethod = "TICKET"
+	CreateProductRequestDeliveryMethodVOUCHER CreateProductRequestDeliveryMethod = "VOUCHER"
+)
+
+// Valid indicates whether the value is a known member of the CreateProductRequestDeliveryMethod enum.
+func (e CreateProductRequestDeliveryMethod) Valid() bool {
+	switch e {
+	case CreateProductRequestDeliveryMethodTICKET:
+		return true
+	case CreateProductRequestDeliveryMethodVOUCHER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateProductRequestRedemptionMethod.
+const (
+	CreateProductRequestRedemptionMethodDIGITAL  CreateProductRequestRedemptionMethod = "DIGITAL"
+	CreateProductRequestRedemptionMethodMANIFEST CreateProductRequestRedemptionMethod = "MANIFEST"
+	CreateProductRequestRedemptionMethodPRINT    CreateProductRequestRedemptionMethod = "PRINT"
+)
+
+// Valid indicates whether the value is a known member of the CreateProductRequestRedemptionMethod enum.
+func (e CreateProductRequestRedemptionMethod) Valid() bool {
+	switch e {
+	case CreateProductRequestRedemptionMethodDIGITAL:
+		return true
+	case CreateProductRequestRedemptionMethodMANIFEST:
+		return true
+	case CreateProductRequestRedemptionMethodPRINT:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateProductRequestScheduleType.
 const (
 	CreateProductRequestScheduleTypeDate     CreateProductRequestScheduleType = "date"
@@ -685,6 +724,45 @@ func (e PricingCategoryType) Valid() bool {
 	}
 }
 
+// Defines values for ProductDeliveryMethod.
+const (
+	ProductDeliveryMethodTICKET  ProductDeliveryMethod = "TICKET"
+	ProductDeliveryMethodVOUCHER ProductDeliveryMethod = "VOUCHER"
+)
+
+// Valid indicates whether the value is a known member of the ProductDeliveryMethod enum.
+func (e ProductDeliveryMethod) Valid() bool {
+	switch e {
+	case ProductDeliveryMethodTICKET:
+		return true
+	case ProductDeliveryMethodVOUCHER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProductRedemptionMethod.
+const (
+	ProductRedemptionMethodDIGITAL  ProductRedemptionMethod = "DIGITAL"
+	ProductRedemptionMethodMANIFEST ProductRedemptionMethod = "MANIFEST"
+	ProductRedemptionMethodPRINT    ProductRedemptionMethod = "PRINT"
+)
+
+// Valid indicates whether the value is a known member of the ProductRedemptionMethod enum.
+func (e ProductRedemptionMethod) Valid() bool {
+	switch e {
+	case ProductRedemptionMethodDIGITAL:
+		return true
+	case ProductRedemptionMethodMANIFEST:
+		return true
+	case ProductRedemptionMethodPRINT:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProductScheduleType.
 const (
 	ProductScheduleTypeDate     ProductScheduleType = "date"
@@ -817,6 +895,42 @@ func (e ResourceCategory) Valid() bool {
 	case ResourceCategoryEquipment:
 		return true
 	case ResourceCategoryGuide:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TicketReissueDeliveryMethodFrom.
+const (
+	TicketReissueDeliveryMethodFromTICKET  TicketReissueDeliveryMethodFrom = "TICKET"
+	TicketReissueDeliveryMethodFromVOUCHER TicketReissueDeliveryMethodFrom = "VOUCHER"
+)
+
+// Valid indicates whether the value is a known member of the TicketReissueDeliveryMethodFrom enum.
+func (e TicketReissueDeliveryMethodFrom) Valid() bool {
+	switch e {
+	case TicketReissueDeliveryMethodFromTICKET:
+		return true
+	case TicketReissueDeliveryMethodFromVOUCHER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TicketReissueDeliveryMethodTo.
+const (
+	TicketReissueDeliveryMethodToTICKET  TicketReissueDeliveryMethodTo = "TICKET"
+	TicketReissueDeliveryMethodToVOUCHER TicketReissueDeliveryMethodTo = "VOUCHER"
+)
+
+// Valid indicates whether the value is a known member of the TicketReissueDeliveryMethodTo enum.
+func (e TicketReissueDeliveryMethodTo) Valid() bool {
+	switch e {
+	case TicketReissueDeliveryMethodToTICKET:
+		return true
+	case TicketReissueDeliveryMethodToVOUCHER:
 		return true
 	default:
 		return false
@@ -967,6 +1081,45 @@ func (e UpdatePricingCategoryRequestType) Valid() bool {
 	case TRAVELLER:
 		return true
 	case YOUTH:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProductRequestDeliveryMethod.
+const (
+	TICKET  UpdateProductRequestDeliveryMethod = "TICKET"
+	VOUCHER UpdateProductRequestDeliveryMethod = "VOUCHER"
+)
+
+// Valid indicates whether the value is a known member of the UpdateProductRequestDeliveryMethod enum.
+func (e UpdateProductRequestDeliveryMethod) Valid() bool {
+	switch e {
+	case TICKET:
+		return true
+	case VOUCHER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProductRequestRedemptionMethod.
+const (
+	DIGITAL  UpdateProductRequestRedemptionMethod = "DIGITAL"
+	MANIFEST UpdateProductRequestRedemptionMethod = "MANIFEST"
+	PRINT    UpdateProductRequestRedemptionMethod = "PRINT"
+)
+
+// Valid indicates whether the value is a known member of the UpdateProductRequestRedemptionMethod enum.
+func (e UpdateProductRequestRedemptionMethod) Valid() bool {
+	switch e {
+	case DIGITAL:
+		return true
+	case MANIFEST:
+		return true
+	case PRINT:
 		return true
 	default:
 		return false
@@ -1597,7 +1750,7 @@ type AssignedBookingResource struct {
 // are optional pivot-level overrides; omit to inherit the
 // Resource-level defaults.
 type AttachResourceRequest struct {
-	// Capacity Overrides the Resource's capacity for this specific ProductOption attachment.
+	// Capacity Overrides the Resource's capacity for this specific ProductOption attachment. This is the capacity `Booking::attachResources()` reads, so setting it makes the resource a candidate for the booking's single main slot — refused (422) for an `equipment` resource.
 	Capacity   *int   `json:"capacity,omitempty"`
 	DryRun     *bool  `json:"dry_run,omitempty"`
 	ResourceId string `json:"resource_id"`
@@ -2254,6 +2407,9 @@ type CreateProductRequest struct {
 	// Currency Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose.
 	Currency string `json:"currency"`
 
+	// DeliveryMethod "Ticket type". `VOUCHER` = one ticket per booking; `TICKET` = one per guest. Asking for `TICKET` requires the `update_delivery_method` permission; sending `VOUCHER`, or omitting the field, does not — both take the column default.
+	DeliveryMethod *CreateProductRequestDeliveryMethod `json:"delivery_method,omitempty"`
+
 	// Description Defaults to empty string server-side when omitted (central_products.description is NOT NULL).
 	Description *string `json:"description,omitempty"`
 
@@ -2294,6 +2450,9 @@ type CreateProductRequest struct {
 	// ProductCode Tenant-supplied SKU. Auto-generated from title when omitted.
 	ProductCode *string `json:"product_code,omitempty"`
 
+	// RedemptionMethod How the customer is admitted. Asking for `DIGITAL` or `PRINT` requires the `update_delivery_method` permission — the same one gates both ticketing fields, matching the form they live on. Sending `MANIFEST`, or omitting the field, does not.
+	RedemptionMethod *CreateProductRequestRedemptionMethod `json:"redemption_method,omitempty"`
+
 	// Requirements Rich text — what the customer needs. Translatable.
 	Requirements *string `json:"requirements,omitempty"`
 
@@ -2311,6 +2470,12 @@ type CreateProductRequest struct {
 	// UseAlternateTierPricing Alternate tier-pricing rendering / calculation. Implicitly forced to `false` when `is_private=false`.
 	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
+
+// CreateProductRequestDeliveryMethod "Ticket type". `VOUCHER` = one ticket per booking; `TICKET` = one per guest. Asking for `TICKET` requires the `update_delivery_method` permission; sending `VOUCHER`, or omitting the field, does not — both take the column default.
+type CreateProductRequestDeliveryMethod string
+
+// CreateProductRequestRedemptionMethod How the customer is admitted. Asking for `DIGITAL` or `PRINT` requires the `update_delivery_method` permission — the same one gates both ticketing fields, matching the form they live on. Sending `MANIFEST`, or omitting the field, does not.
+type CreateProductRequestRedemptionMethod string
 
 // CreateProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
 type CreateProductRequestScheduleType string
@@ -2354,6 +2519,7 @@ type CreateQuestionRequestType string
 
 // CreateResourceRequest defines model for CreateResourceRequest.
 type CreateResourceRequest struct {
+	// Capacity Seats the resource can host. Refused (422) when `category` is `equipment`: capacity is what makes a resource the booking's single main resource, and equipment is never that.
 	Capacity *int                          `json:"capacity,omitempty"`
 	Category CreateResourceRequestCategory `json:"category"`
 	DryRun   *bool                         `json:"dry_run,omitempty"`
@@ -2595,7 +2761,8 @@ type Error struct {
 	// BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
 	// REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
 	// AVAILABILITY_HAS_CONFIRMED_BOOKING, BOOKING_RESOURCE_STATE_STALE,
-	// BOOKING_RESOURCE_CONFLICT, RATE_LIMITED, INTERNAL_ERROR.
+	// BOOKING_RESOURCE_CONFLICT, TICKET_REISSUE_NOT_CONFIRMED,
+	// RATE_LIMITED, INTERNAL_ERROR.
 	Code string `json:"code"`
 
 	// Details Per-field validation errors or domain-specific context
@@ -3003,8 +3170,11 @@ type Product struct {
 	Currency *string `json:"currency,omitempty"`
 
 	// DeletedAt Set when soft-deleted; null otherwise
-	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
-	Description *string    `json:"description,omitempty"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+
+	// DeliveryMethod "Ticket type" in the dashboard. `VOUCHER` = one ticket for the whole booking; `TICKET` = one per guest. Decides the shape of the QR tokens a booking carries, and therefore how attendance is counted. Null only on the unsaved preview a `dry_run` create returns — the column has a `VOUCHER` default, so a persisted row always has one.
+	DeliveryMethod *ProductDeliveryMethod `json:"delivery_method,omitempty"`
+	Description    *string                `json:"description,omitempty"`
 
 	// Displayable Whether the product is shown in widgets / catalog.
 	Displayable *bool `json:"displayable,omitempty"`
@@ -3044,6 +3214,9 @@ type Product struct {
 	// ProductCode Tenant-supplied SKU. Auto-generated when `CreateProductRequest` omits it.
 	ProductCode *string `json:"product_code,omitempty"`
 
+	// RedemptionMethod How the customer proves they are booked: `MANIFEST` = no identification needed, `DIGITAL` = digital or printed tickets accepted, `PRINT` = printed only. Null only on a `dry_run` create preview; the column defaults to `MANIFEST`.
+	RedemptionMethod *ProductRedemptionMethod `json:"redemption_method,omitempty"`
+
 	// Requirements Translatable rich-text — what the customer needs to bring / know.
 	Requirements *string `json:"requirements,omitempty"`
 
@@ -3062,6 +3235,12 @@ type Product struct {
 	// UseAlternateTierPricing Alternate tier-pricing rendering / calculation.
 	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
+
+// ProductDeliveryMethod "Ticket type" in the dashboard. `VOUCHER` = one ticket for the whole booking; `TICKET` = one per guest. Decides the shape of the QR tokens a booking carries, and therefore how attendance is counted. Null only on the unsaved preview a `dry_run` create returns — the column has a `VOUCHER` default, so a persisted row always has one.
+type ProductDeliveryMethod string
+
+// ProductRedemptionMethod How the customer proves they are booked: `MANIFEST` = no identification needed, `DIGITAL` = digital or printed tickets accepted, `PRINT` = printed only. Null only on a `dry_run` create preview; the column defaults to `MANIFEST`.
+type ProductRedemptionMethod string
 
 // ProductScheduleType `date` = customer picks a date only; `datetime` = customer picks a date and a starting time.
 type ProductScheduleType string
@@ -3227,6 +3406,40 @@ type ResourcePage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+// TicketReissue Present on `PATCH /products/{id}` — both the dry-run preview and the
+// committed response — ONLY when the request moves `delivery_method`.
+// Absent when the field is omitted, or carries the value the product
+// already has (that is not a change and reissues nothing).
+//
+// `affected_bookings` is the number of bookings whose tickets the change
+// deletes and reissues, counted over the same 10-year departure window
+// `DeliverTicketOrVoucher` then walks. It is NOT scoped to the caller's
+// business unit, because the job is not either — a scoped number would
+// promise a smaller blast radius than the one that actually lands.
+//
+// The same four keys are returned as `error.details` on the `422
+// TICKET_REISSUE_NOT_CONFIRMED` refusal, so a client can render one shape
+// for both the preview and the refusal.
+type TicketReissue struct {
+	// AffectedBookings Bookings whose tickets the change would reissue, counted just before the write. It is an ESTIMATE, not an outcome: the job runs afterwards and re-reads its own window, so a booking taken in between is reissued without being counted here. `0` means nothing is currently invalidated, and the confirmation is not required.
+	AffectedBookings int `json:"affected_bookings"`
+
+	// CustomersNotified Always `false` — reissuing sends nothing. The operator has to resend the tickets themselves.
+	CustomersNotified bool `json:"customers_notified"`
+
+	// DeliveryMethodFrom The stored value the change moves away from.
+	DeliveryMethodFrom TicketReissueDeliveryMethodFrom `json:"delivery_method_from"`
+
+	// DeliveryMethodTo The submitted value.
+	DeliveryMethodTo TicketReissueDeliveryMethodTo `json:"delivery_method_to"`
+}
+
+// TicketReissueDeliveryMethodFrom The stored value the change moves away from.
+type TicketReissueDeliveryMethodFrom string
+
+// TicketReissueDeliveryMethodTo The submitted value.
+type TicketReissueDeliveryMethodTo string
+
 // Transaction defines model for Transaction.
 type Transaction struct {
 	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
@@ -3312,12 +3525,87 @@ type UpdateAvailableGiftCertRequest struct {
 	Name                   *string `json:"name,omitempty"`
 }
 
-// UpdateBookingResourcesRequest Normalized desired-state request for booking resource writes.
-// `main_resource_id` switches the primary non-auxiliary resource.
-// `auxiliary_resource_ids` replaces the full auxiliary-resource set.
+// UpdateBookingResourcesRequest Normalized desired-state request for booking resource writes. Every
+// field is optional and an OMITTED field means "leave this kind alone" —
+// only what you send is reconciled.
+//
+// An UNRECOGNISED field is a `422`, not a silent drop. Because every field
+// is optional, a body whose only instruction was a misspelt or invented
+// one would otherwise validate, plan nothing, and answer `200` with
+// `before` equal to `after` — indistinguishable from a mutation that
+// worked.
+//
+// A booking's resources come in three kinds, split by the product
+// option's pivot capacity rather than by `Resource.category`:
+//
+// | kind | on the product option | per booking | field |
+// | --- | --- | --- | --- |
+// | main | non-auxiliary, pivot capacity SET | exactly one | `main_resource_id` |
+// | equipment | non-auxiliary, pivot capacity NULL | many | `equipment_resource_ids` |
+// | auxiliary | `category = auxiliary` | many | `auxiliary_resource_ids` |
+//
+// In practice the main resource is the trip's guide or its asset (boat,
+// vehicle, room) and equipment is the kit that goes out with every
+// departure — an `equipment` resource is forced to a null capacity on
+// every write path, so the capacity split and the category agree.
+//
+// `main_resource_id` is singular because the booking holds one, and it
+// ASSIGNS: it replaces the current main resource if there is one and makes
+// the first assignment if there is not. There is no separate attach verb —
+// the request is the same sentence either way ("the main resource is now
+// X") and you should not have to read the booking's state to know which
+// one you are doing. It is not nullable: there is no way to leave a
+// booking with no main resource through this endpoint.
+//
+// Naming a resource the booking already holds elsewhere is how you would
+// ask for a SECOND guide or asset, and both of the plural fields refuse
+// it: `EQUIPMENT_RESOURCE_IS_MAIN` and `AUXILIARY_RESOURCE_IS_MAIN`. Only
+// `main_resource_id` may point at a capacity-bearing resource, and it
+// holds one.
+//
+// `equipment_resource_ids` and `auxiliary_resource_ids` each replace their
+// whole set: send the full desired list, not a delta. Equipment attached
+// to the booking but no longer carried by the product option is left
+// alone — it cannot be offered back once removed, so it is out of scope
+// for this field rather than silently detached.
+//
+// One thing to know about omitting `equipment_resource_ids` while moving
+// the main resource: switching the main detaches and re-attaches the
+// option's WHOLE equipment set, so a booking previously narrowed to a
+// subset comes back with all of it. That is what `attachResources()` does
+// and the dry run reports it faithfully. Send the set you want alongside
+// `main_resource_id` if you need to keep a narrowed one.
+//
+// On a `409 BOOKING_RESOURCE_CONFLICT`, `error.details.rejections[]`
+// carries one entry per refused id with a `code`:
+//
+// | code | meaning |
+// | --- | --- |
+// | `<FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION` | the booking's product option does not carry that resource at all — attach it to the option first |
+// | `<FIELD>_RESOURCE_IS_MAIN` | it is a main resource (capacity-bearing). A booking holds one; use `main_resource_id` |
+// | `<FIELD>_RESOURCE_IS_EQUIPMENT` | it is equipment (no pivot capacity). Use `equipment_resource_ids` |
+// | `<FIELD>_RESOURCE_IS_AUXILIARY` | it is auxiliary. Use `auxiliary_resource_ids` |
+// | `MAIN_RESOURCE_NOT_AVAILABLE` | it IS a main resource on the option, but cannot take this booking — already on an overlapping departure, cannot host this party size, or inside a cool-off window |
+// | `AUXILIARY_RESOURCE_NOT_AVAILABLE` | it IS auxiliary on the option, but is on an overlapping departure or cannot host this party size |
+//
+// `<FIELD>` is `MAIN`, `EQUIPMENT` or `AUXILIARY` — the field you put the
+// id in, not what the resource turned out to be. The `_IS_` codes are the
+// wrong-field case and name the field you wanted. There is no
+// `EQUIPMENT_RESOURCE_NOT_AVAILABLE`: equipment is never rationed per
+// booking, so it is either on the option or it is not.
+//
+// `MAIN_RESOURCE_NOT_AVAILABLE` can also arrive on a request whose dry run
+// was clean — a concurrent booking can take the resource in between, and
+// `expected_resource_state_token` cannot see that (it covers this
+// booking's own assignments, and none of them moved). Re-read the
+// candidates and retry.
 type UpdateBookingResourcesRequest struct {
+	// AuxiliaryResourceIds Full desired auxiliary set. Omit to leave auxiliary resources untouched.
 	AuxiliaryResourceIds *[]int `json:"auxiliary_resource_ids,omitempty"`
 	DryRun               *bool  `json:"dry_run,omitempty"`
+
+	// EquipmentResourceIds Full desired equipment set. Omit to leave equipment untouched.
+	EquipmentResourceIds *[]int `json:"equipment_resource_ids,omitempty"`
 
 	// ExpectedResourceStateToken Aggregate token from the latest booking read with resources included.
 	ExpectedResourceStateToken string `json:"expected_resource_state_token"`
@@ -3430,11 +3718,17 @@ type UpdateProductRequest struct {
 	Capacity               *int    `json:"capacity,omitempty"`
 	CategoryIds            *[]int  `json:"category_ids,omitempty"`
 
+	// ConfirmTicketReissue Acknowledgement, not a field — nothing is stored. Required to commit a `delivery_method` change on a product that has bookings. Ignored when `delivery_method` is absent or unchanged, and never required under `dry_run`.
+	ConfirmTicketReissue *bool `json:"confirm_ticket_reissue,omitempty"`
+
 	// Currency Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change.
-	Currency    *string `json:"currency,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Displayable *bool   `json:"displayable,omitempty"`
-	DryRun      *bool   `json:"dry_run,omitempty"`
+	Currency *string `json:"currency,omitempty"`
+
+	// DeliveryMethod "Ticket type". CHANGING it requires the `update_delivery_method` permission and reissues the tickets of every existing booking in the next 10 years, invalidating the QR codes customers already hold without notifying them — so it is refused with `422 TICKET_REISSUE_NOT_CONFIRMED` unless `confirm_ticket_reissue: true` is sent alongside. Sending the value the product already has is not a change: no permission needed, nothing reissued, no `ticket_reissue` block.
+	DeliveryMethod *UpdateProductRequestDeliveryMethod `json:"delivery_method,omitempty"`
+	Description    *string                             `json:"description,omitempty"`
+	Displayable    *bool                               `json:"displayable,omitempty"`
+	DryRun         *bool                               `json:"dry_run,omitempty"`
 
 	// Exclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422.
 	Exclusions     *string `json:"exclusions,omitempty"`
@@ -3452,7 +3746,10 @@ type UpdateProductRequest struct {
 	Locale                         *string `json:"locale,omitempty"`
 	MustValidateCancellationPolicy *bool   `json:"must_validate_cancellation_policy,omitempty"`
 	ProductCode                    *string `json:"product_code,omitempty"`
-	Requirements                   *string `json:"requirements,omitempty"`
+
+	// RedemptionMethod How the customer is admitted. CHANGING it requires the `update_delivery_method` permission; echoing back the stored value does not. Changing it alone reissues nothing — it does not affect the tickets already issued.
+	RedemptionMethod *UpdateProductRequestRedemptionMethod `json:"redemption_method,omitempty"`
+	Requirements     *string                               `json:"requirements,omitempty"`
 
 	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
 	ScheduleType            *UpdateProductRequestScheduleType `json:"schedule_type,omitempty"`
@@ -3462,6 +3759,12 @@ type UpdateProductRequest struct {
 	Title                   *string                           `json:"title,omitempty"`
 	UseAlternateTierPricing *bool                             `json:"use_alternate_tier_pricing,omitempty"`
 }
+
+// UpdateProductRequestDeliveryMethod "Ticket type". CHANGING it requires the `update_delivery_method` permission and reissues the tickets of every existing booking in the next 10 years, invalidating the QR codes customers already hold without notifying them — so it is refused with `422 TICKET_REISSUE_NOT_CONFIRMED` unless `confirm_ticket_reissue: true` is sent alongside. Sending the value the product already has is not a change: no permission needed, nothing reissued, no `ticket_reissue` block.
+type UpdateProductRequestDeliveryMethod string
+
+// UpdateProductRequestRedemptionMethod How the customer is admitted. CHANGING it requires the `update_delivery_method` permission; echoing back the stored value does not. Changing it alone reissues nothing — it does not affect the tickets already issued.
+type UpdateProductRequestRedemptionMethod string
 
 // UpdateProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
 type UpdateProductRequestScheduleType string
@@ -3488,6 +3791,7 @@ type UpdateQuestionRequestType string
 
 // UpdateResourceRequest defines model for UpdateResourceRequest.
 type UpdateResourceRequest struct {
+	// Capacity Seats the resource can host. Refused (422) when the resource's category is (or becomes) `equipment`: capacity is what makes a resource the booking's single main resource, and equipment is never that.
 	Capacity *int                           `json:"capacity,omitempty"`
 	Category *UpdateResourceRequestCategory `json:"category,omitempty"`
 	DryRun   *bool                          `json:"dry_run,omitempty"`
@@ -6083,6 +6387,9 @@ type ClientInterface interface {
 	// ListAvailableBookingResources request
 	ListAvailableBookingResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAvailableBookingEquipmentResources request
+	ListAvailableBookingEquipmentResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListBookingTransactions request
 	ListBookingTransactions(ctx context.Context, id IdPath, params *ListBookingTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6770,6 +7077,18 @@ func (c *Client) ListAvailableBookingAuxiliaryResources(ctx context.Context, id 
 
 func (c *Client) ListAvailableBookingResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListAvailableBookingResourcesRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAvailableBookingEquipmentResources(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAvailableBookingEquipmentResourcesRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -9776,6 +10095,40 @@ func NewListAvailableBookingResourcesRequest(server string, id IdPath) (*http.Re
 	}
 
 	operationPath := fmt.Sprintf("/bookings/%s/resources/available", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAvailableBookingEquipmentResourcesRequest generates requests for ListAvailableBookingEquipmentResources
+func NewListAvailableBookingEquipmentResourcesRequest(server string, id IdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings/%s/resources/equipment/available", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -16060,6 +16413,9 @@ type ClientWithResponsesInterface interface {
 	// ListAvailableBookingResourcesWithResponse request
 	ListAvailableBookingResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingResourcesResponse, error)
 
+	// ListAvailableBookingEquipmentResourcesWithResponse request
+	ListAvailableBookingEquipmentResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingEquipmentResourcesResponse, error)
+
 	// ListBookingTransactionsWithResponse request
 	ListBookingTransactionsWithResponse(ctx context.Context, id IdPath, params *ListBookingTransactionsParams, reqEditors ...RequestEditorFn) (*ListBookingTransactionsResponse, error)
 
@@ -17194,6 +17550,34 @@ func (r ListAvailableBookingResourcesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListAvailableBookingResourcesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAvailableBookingEquipmentResourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data       []AssignedBookingResource `json:"data"`
+		Meta       Meta                      `json:"meta"`
+		Pagination *Pagination               `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAvailableBookingEquipmentResourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAvailableBookingEquipmentResourcesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -19117,6 +19501,7 @@ type CreateProductResponse struct {
 		Pagination *Pagination `json:"pagination,omitempty"`
 	}
 	JSON401 *Unauthenticated
+	JSON403 *Forbidden
 	JSON409 *IdempotencyConflict
 	JSON422 *ValidationError
 }
@@ -19203,16 +19588,55 @@ type UpdateProductResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// Data Common shape for mutation responses (and dry-run previews)
-		Data       MutationResult `json:"data"`
-		Meta       Meta           `json:"meta"`
-		Pagination *Pagination    `json:"pagination,omitempty"`
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                              `json:"identifier,omitempty"`
+				PayloadSummary *string                              `json:"payload_summary,omitempty"`
+				Type           *UpdateProduct200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// TicketReissue Present on `PATCH /products/{id}` — both the dry-run preview and the
+			// committed response — ONLY when the request moves `delivery_method`.
+			// Absent when the field is omitted, or carries the value the product
+			// already has (that is not a change and reissues nothing).
+			//
+			// `affected_bookings` is the number of bookings whose tickets the change
+			// deletes and reissues, counted over the same 10-year departure window
+			// `DeliverTicketOrVoucher` then walks. It is NOT scoped to the caller's
+			// business unit, because the job is not either — a scoped number would
+			// promise a smaller blast radius than the one that actually lands.
+			//
+			// The same four keys are returned as `error.details` on the `422
+			// TICKET_REISSUE_NOT_CONFIRMED` refusal, so a client can render one shape
+			// for both the preview and the refusal.
+			TicketReissue *TicketReissue `json:"ticket_reissue,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
 	}
 	JSON401 *Unauthenticated
+	JSON403 *Forbidden
 	JSON404 *NotFound
 	JSON409 *IdempotencyConflict
-	JSON422 *ValidationError
+	JSON422 *struct {
+		// Data Per-endpoint payload (overridden via allOf in concrete responses)
+		Data       interface{} `json:"data"`
+		Error      *Error      `json:"error,omitempty"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
 }
+type UpdateProduct200DataSideEffectsType string
 
 // Status returns HTTPResponse.Status
 func (r UpdateProductResponse) Status() string {
@@ -20598,6 +21022,15 @@ func (c *ClientWithResponses) ListAvailableBookingResourcesWithResponse(ctx cont
 		return nil, err
 	}
 	return ParseListAvailableBookingResourcesResponse(rsp)
+}
+
+// ListAvailableBookingEquipmentResourcesWithResponse request returning *ListAvailableBookingEquipmentResourcesResponse
+func (c *ClientWithResponses) ListAvailableBookingEquipmentResourcesWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ListAvailableBookingEquipmentResourcesResponse, error) {
+	rsp, err := c.ListAvailableBookingEquipmentResources(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAvailableBookingEquipmentResourcesResponse(rsp)
 }
 
 // ListBookingTransactionsWithResponse request returning *ListBookingTransactionsResponse
@@ -22890,6 +23323,50 @@ func ParseListAvailableBookingResourcesResponse(rsp *http.Response) (*ListAvaila
 	}
 
 	response := &ListAvailableBookingResourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data       []AssignedBookingResource `json:"data"`
+			Meta       Meta                      `json:"meta"`
+			Pagination *Pagination               `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAvailableBookingEquipmentResourcesResponse parses an HTTP response from a ListAvailableBookingEquipmentResourcesWithResponse call
+func ParseListAvailableBookingEquipmentResourcesResponse(rsp *http.Response) (*ListAvailableBookingEquipmentResourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAvailableBookingEquipmentResourcesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -25911,6 +26388,13 @@ func ParseCreateProductResponse(rsp *http.Response) (*CreateProductResponse, err
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest IdempotencyConflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -26039,10 +26523,41 @@ func ParseUpdateProductResponse(rsp *http.Response) (*UpdateProductResponse, err
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Data Common shape for mutation responses (and dry-run previews)
-			Data       MutationResult `json:"data"`
-			Meta       Meta           `json:"meta"`
-			Pagination *Pagination    `json:"pagination,omitempty"`
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                              `json:"identifier,omitempty"`
+					PayloadSummary *string                              `json:"payload_summary,omitempty"`
+					Type           *UpdateProduct200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// TicketReissue Present on `PATCH /products/{id}` — both the dry-run preview and the
+				// committed response — ONLY when the request moves `delivery_method`.
+				// Absent when the field is omitted, or carries the value the product
+				// already has (that is not a change and reissues nothing).
+				//
+				// `affected_bookings` is the number of bookings whose tickets the change
+				// deletes and reissues, counted over the same 10-year departure window
+				// `DeliverTicketOrVoucher` then walks. It is NOT scoped to the caller's
+				// business unit, because the job is not either — a scoped number would
+				// promise a smaller blast radius than the one that actually lands.
+				//
+				// The same four keys are returned as `error.details` on the `422
+				// TICKET_REISSUE_NOT_CONFIRMED` refusal, so a client can render one shape
+				// for both the preview and the refusal.
+				TicketReissue *TicketReissue `json:"ticket_reissue,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -26055,6 +26570,13 @@ func ParseUpdateProductResponse(rsp *http.Response) (*UpdateProductResponse, err
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -26071,7 +26593,13 @@ func ParseUpdateProductResponse(rsp *http.Response) (*UpdateProductResponse, err
 		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest ValidationError
+		var dest struct {
+			// Data Per-endpoint payload (overridden via allOf in concrete responses)
+			Data       interface{} `json:"data"`
+			Error      *Error      `json:"error,omitempty"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

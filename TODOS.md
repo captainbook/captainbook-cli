@@ -45,6 +45,39 @@ integer→int / boolean→bool / string→string for every GET command's flags.
 **Why:** the one drift class the spec-drift suite currently cannot see.
 **Priority:** P2 — a wrong choice ships a silently-empty filter.
 
+## ~~Every drift test runs CLI→spec, so a spec that grows is invisible~~ — DONE
+
+Implemented as `cmd/inventory/spec_coverage_test.go`, the reverse of
+`spec_drift_test.go`: that one proves every flag the CLI HAS exists in the
+spec, this one proves every operation and request field the SPEC has is
+reachable from the CLI. Together they are a biconditional.
+
+- `TestSpecCoverage_EveryOperationIsBound`: every `VERB /path` in
+  `api/inventory/cli-v1.yaml` must resolve to a command in the live `Cmd()`
+  tree. 115 operations, 115 bound. Verified by deletion: removing
+  `bookings available-equipment-resources` fails the test naming the exact
+  endpoint.
+- `TestSpecCoverage_EveryRequestFieldIsReachable`: every request-body property
+  must be settable by some flag, checked against BOTH the field map and the
+  live tree's flags (several commands build their body by hand and never
+  appear in a field map — see the entry below). 292 fields across 115
+  operations. Verified by deletion: removing `--delivery-method` fails the
+  test naming `delivery_method` on both product endpoints.
+
+Both are allow-list driven, and every entry carries the reason it is
+deliberately unexposed rather than a bare suppression. The first run surfaced
+30 candidates; triage found 4 genuine gaps, now fixed
+(`resources create/update --rating`,
+`pricing-categories create/update --is-internal`), and the rest were fields
+the server accepts and ignores ("Accepted but not stored — no column" on
+locations, legacy aliases on pricing-tiers), a free-form object reachable only
+via `--data`, or values encoded structurally (bulk-update's `setting` IS the
+subcommand name).
+
+**Why it mattered:** syncing the spec 1.4.0 → 1.6.0 produced zero test
+failures while the CLI was missing an entire endpoint and the whole product
+ticketing surface. Green tests were not evidence of sync.
+
 ## Body keys set outside JSONBodyFromArgs escape the field-map guard
 
 `TestSpecDrift_FieldMapKeysExistInSpec` extracts JSON keys only from the map

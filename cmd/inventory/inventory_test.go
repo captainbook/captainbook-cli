@@ -364,6 +364,59 @@ func TestJSONBodyFromArgs_DryRunInjection(t *testing.T) {
 	}
 }
 
+// TestTryParseDiffEnvelope_CommittedPayloads pins the envelope guard against
+// the spec's actual contract: `diff` is "always present on dry-run, optional on
+// commit", and would_apply is false exactly on commit. Keying the guard on the
+// diff alone dropped committed envelopes whose only payload was the
+// ticket-reissue block — silencing the warning on the one path that has already
+// stopped real customers' QR codes from scanning.
+func TestTryParseDiffEnvelope_CommittedPayloads(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{
+			name: "committed ticket reissue with no diff is kept",
+			body: `{"meta":{},"data":{"would_apply":false,"ticket_reissue":{"delivery_method_from":"VOUCHER","delivery_method_to":"TICKET","affected_bookings":12,"customers_notified":false}}}`,
+			want: true,
+		},
+		{
+			name: "committed side effects with no diff are kept",
+			body: `{"meta":{},"data":{"would_apply":false,"side_effects":[{"type":"job","identifier":"DeliverTicketOrVoucher","payload_summary":"12 bookings"}]}}`,
+			want: true,
+		},
+		{
+			name: "dry run with a diff is kept",
+			body: `{"meta":{},"data":{"would_apply":true,"diff":{"before":{"id":"1"},"after":{"id":"1"}}}}`,
+			want: true,
+		},
+		{
+			name: "committed diff is kept",
+			body: `{"meta":{},"data":{"would_apply":false,"diff":{"before":{"id":"1"},"after":{"id":"1"}}}}`,
+			want: true,
+		},
+		{
+			// An ordinary resource read is not a mutation result and must not
+			// be rendered as one.
+			name: "plain resource payload is not a diff envelope",
+			body: `{"meta":{},"data":{"id":"42","title":"Sunset Snorkeling"}}`,
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env, ok := tryParseDiffEnvelope([]byte(tc.body))
+			if ok != tc.want {
+				t.Fatalf("parsed = %v; want %v (env: %+v)", ok, tc.want, env)
+			}
+			if tc.want && env == nil {
+				t.Fatal("reported parsed but returned a nil envelope")
+			}
+		})
+	}
+}
+
 // TestErrorCode_Mapping covers the audit error_code mapping for each
 // typed error.
 func TestErrorCode_Mapping(t *testing.T) {
@@ -379,6 +432,7 @@ func TestErrorCode_Mapping(t *testing.T) {
 		"AVAILABILITY_HAS_CONFIRMED_BOOKING": &invpkg.AvailabilityHasConfirmedBookingError{},
 		"BOOKING_RESOURCE_STATE_STALE":       &invpkg.BookingResourceStateStaleError{},
 		"BOOKING_RESOURCE_CONFLICT":          &invpkg.BookingResourceConflictError{},
+		"TICKET_REISSUE_NOT_CONFIRMED":       &invpkg.TicketReissueNotConfirmedError{},
 		"PAYLOAD_TOO_LARGE":                  &invpkg.PayloadTooLargeError{},
 		"UNSUPPORTED_MEDIA_TYPE":             &invpkg.UnsupportedMediaTypeError{},
 		"RATE_LIMITED":                       &invpkg.RateLimitError{},
@@ -1133,56 +1187,78 @@ func TestBookingsSetResources_DesiredStateBody(t *testing.T) {
 // Any test that constructs RunArgs by hand is testing the closure, not the
 // command. For flag-parsing behavior, go through cobra.
 func TestBookingsSetResources_ClearAllThroughCobra(t *testing.T) {
-	var gotBody []byte
-	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
-		gotBody, _ = io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"data":{"applied":true},"meta":{"request_id":"r1"}}`))
-	})
+	// Both plural set-flags are desired-state and both document the same
+	// clear-all form, so both need the real parser exercised.
+	for _, tc := range []struct{ flag, key string }{
+		{"auxiliary-resource-ids", "auxiliary_resource_ids"},
+		{"equipment-resource-ids", "equipment_resource_ids"},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			var gotBody []byte
+			_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+				gotBody, _ = io.ReadAll(r.Body)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"data":{"applied":true},"meta":{"request_id":"r1"}}`))
+			})
 
-	root := &cobra.Command{Use: "root"}
-	root.PersistentFlags().String("profile", "", "")
-	root.PersistentFlags().Bool("verbose", false, "")
-	root.AddCommand(makeResourceParent("bookings", "", bookingsDefs(), runner))
-	root.SetOut(&bytes.Buffer{})
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{
-		"bookings", "set-resources", "bk_1",
-		"--auxiliary-resource-ids=",
-		"--expected-resource-state-token", "tok_abc",
-	})
+			root := &cobra.Command{Use: "root"}
+			root.PersistentFlags().String("profile", "", "")
+			root.PersistentFlags().Bool("verbose", false, "")
+			root.AddCommand(makeResourceParent("bookings", "", bookingsDefs(), runner))
+			root.SetOut(&bytes.Buffer{})
+			root.SetErr(&bytes.Buffer{})
+			root.SetArgs([]string{
+				"bookings", "set-resources", "bk_1",
+				"--" + tc.flag + "=",
+				"--expected-resource-state-token", "tok_abc",
+			})
 
-	if err := root.Execute(); err != nil {
-		t.Fatalf("the documented clear-all invocation must parse and run; got: %v", err)
-	}
+			if err := root.Execute(); err != nil {
+				t.Fatalf("the documented clear-all invocation must parse and run; got: %v", err)
+			}
 
-	var parsed map[string]any
-	if err := json.Unmarshal(gotBody, &parsed); err != nil {
-		t.Fatalf("unmarshal wire body %q: %v", gotBody, err)
-	}
-	aux, ok := parsed["auxiliary_resource_ids"]
-	if !ok {
-		t.Fatalf("auxiliary_resource_ids missing — clear-all must send [] (body: %s)", gotBody)
-	}
-	arr, isArr := aux.([]any)
-	if !isArr || len(arr) != 0 {
-		t.Errorf("auxiliary_resource_ids = %v; want [] (body: %s)", aux, gotBody)
+			var parsed map[string]any
+			if err := json.Unmarshal(gotBody, &parsed); err != nil {
+				t.Fatalf("unmarshal wire body %q: %v", gotBody, err)
+			}
+			got, ok := parsed[tc.key]
+			if !ok {
+				t.Fatalf("%s missing — clear-all must send [] (body: %s)", tc.key, gotBody)
+			}
+			arr, isArr := got.([]any)
+			if !isArr || len(arr) != 0 {
+				t.Errorf("%s = %v; want [] (body: %s)", tc.key, got, gotBody)
+			}
+		})
 	}
 }
 
-// TestBookingsSetResources_AuxIDsThroughCobra covers the populated case through
-// cobra too, and pins the JSON type: the flag is stringSlice at the cobra layer,
-// so a missing conversion would silently ship ["1","2"] instead of [1,2].
-func TestBookingsSetResources_AuxIDsThroughCobra(t *testing.T) {
+// TestBookingsSetResources_SetFlagIDsThroughCobra covers the populated case
+// through cobra, and pins the JSON type: both plural flags are stringSlice at
+// the cobra layer, so a missing conversion would silently ship ["1","2"]
+// instead of [1,2].
+//
+// Both flags are covered because one shared loop converts them. A loop that
+// reuses the wrong flag name would still convert correctly but misreport WHICH
+// flag was bad, so the rejection cases assert the message names the flag the
+// user actually typed.
+func TestBookingsSetResources_SetFlagIDsThroughCobra(t *testing.T) {
 	cases := []struct {
 		name    string
 		flag    string
+		key     string
 		wantErr string
 		wantIDs []any
 	}{
-		{name: "valid ids convert to JSON integers", flag: "--auxiliary-resource-ids=3,5", wantIDs: []any{float64(3), float64(5)}},
-		{name: "non-integer is rejected", flag: "--auxiliary-resource-ids=abc", wantErr: "not an integer"},
-		{name: "zero is rejected per spec minimum", flag: "--auxiliary-resource-ids=0", wantErr: ">= 1"},
+		{name: "auxiliary valid ids convert to JSON integers", flag: "--auxiliary-resource-ids=3,5", key: "auxiliary_resource_ids", wantIDs: []any{float64(3), float64(5)}},
+		{name: "auxiliary non-integer is rejected", flag: "--auxiliary-resource-ids=abc", wantErr: "not an integer"},
+		{name: "auxiliary zero is rejected per spec minimum", flag: "--auxiliary-resource-ids=0", wantErr: ">= 1"},
+		{name: "equipment valid ids convert to JSON integers", flag: "--equipment-resource-ids=3,5", key: "equipment_resource_ids", wantIDs: []any{float64(3), float64(5)}},
+		{name: "equipment non-integer is rejected", flag: "--equipment-resource-ids=abc", wantErr: "not an integer"},
+		{name: "equipment zero is rejected per spec minimum", flag: "--equipment-resource-ids=0", wantErr: ">= 1"},
+		// main_resource_id lost its `nullable: true` in spec 1.6.0, so 0 is
+		// not "unassign" — it is an invalid id, and must fail locally.
+		{name: "main resource zero is rejected per spec minimum", flag: "--main-resource-id=0", wantErr: ">= 1"},
 	}
 
 	for _, tc := range cases {
@@ -1215,6 +1291,11 @@ func TestBookingsSetResources_AuxIDsThroughCobra(t *testing.T) {
 				if !strings.Contains(err.Error(), tc.wantErr) {
 					t.Errorf("error = %v; want it to mention %q", err, tc.wantErr)
 				}
+				// The flag name in the message must be the one the user typed.
+				flagName := strings.SplitN(strings.TrimPrefix(tc.flag, "--"), "=", 2)[0]
+				if !strings.Contains(err.Error(), flagName) {
+					t.Errorf("error = %v; want it to name the offending flag %q", err, flagName)
+				}
 				if gotBody != nil {
 					t.Error("must reject before sending — a bad id should never reach the server")
 				}
@@ -1228,27 +1309,75 @@ func TestBookingsSetResources_AuxIDsThroughCobra(t *testing.T) {
 			if uerr := json.Unmarshal(gotBody, &parsed); uerr != nil {
 				t.Fatalf("unmarshal %q: %v", gotBody, uerr)
 			}
-			got, _ := parsed["auxiliary_resource_ids"].([]any)
+			got, _ := parsed[tc.key].([]any)
 			if !reflect.DeepEqual(got, tc.wantIDs) {
-				t.Errorf("auxiliary_resource_ids = %#v; want %#v (must be JSON ints, not strings)", got, tc.wantIDs)
+				t.Errorf("%s = %#v; want %#v (must be JSON ints, not strings)", tc.key, got, tc.wantIDs)
 			}
 		})
 	}
 }
 
-// TestBookingsAvailableResources_HitsCorrectPaths pins the two candidate-listing
+// TestBookingsSetResources_BothSetFlagsConvertTogether sends equipment AND
+// auxiliary ids in one request. Each is converted from cobra's stringSlice to
+// JSON ints by the same loop over a single copied flag map, so a mistake there
+// (copying per-flag and dropping the earlier rewrite, say) would ship one of
+// them as quoted strings while the other looked fine.
+func TestBookingsSetResources_BothSetFlagsConvertTogether(t *testing.T) {
+	var gotBody []byte
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{"applied":true},"meta":{}}`))
+	})
+
+	root := &cobra.Command{Use: "root"}
+	root.PersistentFlags().String("profile", "", "")
+	root.PersistentFlags().Bool("verbose", false, "")
+	root.AddCommand(makeResourceParent("bookings", "", bookingsDefs(), runner))
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SilenceErrors = true
+	root.SetArgs([]string{
+		"bookings", "set-resources", "bk_1",
+		"--main-resource-id", "91",
+		"--equipment-resource-ids=3,5",
+		"--auxiliary-resource-ids=7",
+		"--expected-resource-state-token", "tok_abc",
+	})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(gotBody, &parsed); err != nil {
+		t.Fatalf("unmarshal %q: %v", gotBody, err)
+	}
+	if got, _ := parsed["equipment_resource_ids"].([]any); !reflect.DeepEqual(got, []any{float64(3), float64(5)}) {
+		t.Errorf("equipment_resource_ids = %#v; want [3 5] as JSON ints", got)
+	}
+	if got, _ := parsed["auxiliary_resource_ids"].([]any); !reflect.DeepEqual(got, []any{float64(7)}) {
+		t.Errorf("auxiliary_resource_ids = %#v; want [7] as JSON ints", got)
+	}
+	// main_resource_id is a plain int flag and must stay a bare JSON number.
+	if got, _ := parsed["main_resource_id"].(float64); got != 91 {
+		t.Errorf("main_resource_id = %#v; want 91", parsed["main_resource_id"])
+	}
+}
+
+// TestBookingsAvailableResources_HitsCorrectPaths pins the three candidate-listing
 // reads to their spec paths. These are the endpoints the agent is told to consult
 // after a BOOKING_RESOURCE_CONFLICT, so pointing either at the wrong URL would
 // send it in a loop: retry, conflict, "check availability", retry.
 //
-// The main and auxiliary routes differ by one path segment, which is exactly the
-// kind of thing a copy-paste between two near-identical closures gets wrong.
+// The three routes differ by one path segment, which is exactly the kind of thing
+// a copy-paste between near-identical closures gets wrong.
 func TestBookingsAvailableResources_HitsCorrectPaths(t *testing.T) {
 	cases := []struct {
 		use      string
 		wantPath string
 	}{
 		{"bookings available-resources <id>", "/bookings/bk_1/resources/available"},
+		{"bookings available-equipment-resources <id>", "/bookings/bk_1/resources/equipment/available"},
 		{"bookings available-auxiliary-resources <id>", "/bookings/bk_1/resources/auxiliary/available"},
 	}
 
@@ -1288,6 +1417,27 @@ func TestBookingsAvailableResources_HitsCorrectPaths(t *testing.T) {
 // candidate read surfaces as a typed NotFoundError rather than an empty list.
 // Silently rendering "no candidates" for a bad booking id would read as "this
 // booking can't be reassigned" — the opposite of the truth.
+// All three candidate reads must propagate 404 — the equipment list is a
+// separate closure and would otherwise be the one that silently returns an
+// empty list for a bad booking id.
+func TestBookingsAvailableEquipmentResources_PropagatesNotFound(t *testing.T) {
+	def := bookingsDefFor(t, "bookings available-equipment-resources <id>")
+
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"meta":{},"error":{"code":"NOT_FOUND","message":"no such booking","details":{"resource_type":"booking","id":"bk_nope"}}}`))
+	})
+
+	_, err := def.Run(context.Background(), runner, RunArgs{PathArgs: []string{"bk_nope"}})
+	if err == nil {
+		t.Fatal("expected a NotFoundError, got nil — an empty list would read as \"no equipment available\"")
+	}
+	var nf *invpkg.NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("want *invpkg.NotFoundError, got %T: %v", err, err)
+	}
+}
+
 func TestBookingsAvailableResources_PropagatesNotFound(t *testing.T) {
 	def := bookingsDefFor(t, "bookings available-resources <id>")
 

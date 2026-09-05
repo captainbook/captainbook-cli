@@ -88,15 +88,17 @@ func pricingCategoriesDefs() []CommandDef {
 				{Name: "type", Type: "string", Description: "ADULT|CHILD|INFANT|YOUTH|STUDENT|SENIOR|TRAVELLER|EU_CITIZEN|MILITARY|EU_CITIZEN_STUDENT"},
 				{Name: "min-age", Type: "int", Description: "Minimum age (optional)"},
 				{Name: "max-age", Type: "int", Description: "Maximum age (optional)"},
+				{Name: "is-internal", Type: "bool", Description: "Internal categories are excluded from public-facing checkout flows."},
 			},
-			ForensicFields: []string{"product-id", "name", "type"},
+			ForensicFields: []string{"product-id", "name", "type", "is-internal"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"product-id": "product_id",
-					"name":       "name",
-					"type":       "type",
-					"min-age":    "min_age",
-					"max-age":    "max_age",
+					"product-id":  "product_id",
+					"name":        "name",
+					"type":        "type",
+					"min-age":     "min_age",
+					"max-age":     "max_age",
+					"is-internal": "is_internal",
 				})
 				if err != nil {
 					return nil, err
@@ -124,18 +126,20 @@ func pricingCategoriesDefs() []CommandDef {
 				{Name: "type", Type: "string", Description: "ADULT|CHILD|INFANT|YOUTH|STUDENT|SENIOR|TRAVELLER|EU_CITIZEN|MILITARY|EU_CITIZEN_STUDENT"},
 				{Name: "min-age", Type: "int", Description: "Minimum age"},
 				{Name: "max-age", Type: "int", Description: "Maximum age"},
+				{Name: "is-internal", Type: "bool", Description: "Internal categories are excluded from public-facing checkout flows."},
 			},
-			ForensicFields: []string{"name", "type"},
+			ForensicFields: []string{"name", "type", "is-internal"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":    "name",
-					"type":    "type",
-					"min-age": "min_age",
-					"max-age": "max_age",
+					"name":        "name",
+					"type":        "type",
+					"min-age":     "min_age",
+					"max-age":     "max_age",
+					"is-internal": "is_internal",
 				})
 				if err != nil {
 					return nil, err

@@ -462,28 +462,132 @@ func (e *BookingResourceStateStaleError) UserMessage() string {
 // Distinct from STATE_STALE: the caller's view of the world was current, the
 // selection itself is just not allowed. Re-reading won't help — pick a
 // different resource, which the /resources/available endpoints enumerate.
+//
+// The server does not short-circuit: it plans the whole write and reports
+// every refused id at once in `details.rejections[]`, so one round trip tells
+// you everything to fix. Each entry's `code` is `<FIELD>_RESOURCE_<PROBLEM>`,
+// where FIELD is the flag the id was sent in (MAIN / EQUIPMENT / AUXILIARY)
+// rather than what the resource turned out to be — so the code names both
+// halves of a wrong-field mistake.
 // -----------------------------------------------------------------------------
 
-type BookingResourceConflictError struct {
+// BookingResourceRejection is one entry in BookingResourceConflictError.
+// Code is one of <FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION,
+// <FIELD>_RESOURCE_IS_{MAIN,EQUIPMENT,AUXILIARY}, MAIN_RESOURCE_NOT_AVAILABLE
+// or AUXILIARY_RESOURCE_NOT_AVAILABLE. There is no equipment "not available":
+// equipment is never rationed per booking, so it is either on the option or it
+// is not.
+type BookingResourceRejection struct {
 	ResourceID string
-	Reason     string
+	Code       string
+	Message    string
+}
+
+// UnmarshalJSON tolerates `resource_id` arriving as a JSON string (what the
+// server sends today — it casts the integer id) or as a bare number, so a
+// change on that one field can't silently drop the id from the message.
+func (r *BookingResourceRejection) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		ResourceID json.RawMessage `json:"resource_id"`
+		Code       string          `json:"code"`
+		Message    string          `json:"message"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.Code, r.Message = raw.Code, raw.Message
+	r.ResourceID = RawJSONIDToString(raw.ResourceID)
+	return nil
+}
+
+type BookingResourceConflictError struct {
+	Rejections []BookingResourceRejection
+	// Message is the envelope's top-level message, rendered only when the
+	// server sent no rejections — otherwise it is the generic "not valid"
+	// sentence and the per-id entries say strictly more.
+	Message string
 }
 
 func (e *BookingResourceConflictError) Error() string {
-	return fmt.Sprintf("BOOKING_RESOURCE_CONFLICT: resource=%s reason=%s", e.ResourceID, e.Reason)
+	return fmt.Sprintf("BOOKING_RESOURCE_CONFLICT (%d rejections)", len(e.Rejections))
 }
 
 func (e *BookingResourceConflictError) UserMessage() string {
 	var b strings.Builder
 	b.WriteString("requested resource assignment is not allowed")
-	if e.ResourceID != "" {
-		b.WriteString(fmt.Sprintf(" (resource %s)", e.ResourceID))
+	if len(e.Rejections) == 0 {
+		if e.Message != "" {
+			b.WriteString(": ")
+			b.WriteString(e.Message)
+		}
+	} else {
+		b.WriteString(":")
+		for _, r := range e.Rejections {
+			b.WriteString("\n  - ")
+			if r.ResourceID != "" {
+				b.WriteString("resource " + r.ResourceID + ": ")
+			}
+			b.WriteString(r.Code)
+			if r.Message != "" {
+				b.WriteString("\n      " + r.Message)
+			}
+		}
 	}
-	if e.Reason != "" {
-		b.WriteString(": ")
-		b.WriteString(e.Reason)
+	b.WriteString("\n  List valid candidates with `bookings available-resources <id>` (main), " +
+		"`bookings available-equipment-resources <id>` (equipment) or " +
+		"`bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.")
+	return b.String()
+}
+
+// -----------------------------------------------------------------------------
+// 9g. TicketReissueNotConfirmedError — TICKET_REISSUE_NOT_CONFIRMED, 422
+//
+// Returned by PATCH /products/{id} when the request moves `delivery_method` on
+// a product that has bookings. Committing would delete every ticket on every
+// booking departing in the next 10 years and issue replacements, so the QR
+// codes those customers already hold stop scanning — and nothing notifies
+// them. The refusal is the confirmation modal the Ticketing form shows.
+//
+// `error.details` carries the same four keys the 200 returns under
+// `ticket_reissue`, so one renderer covers the preview and the refusal.
+//
+// Raised before the write, which means it releases its Idempotency-Key: the
+// retry carrying --confirm-ticket-reissue may reuse the same one.
+// -----------------------------------------------------------------------------
+
+type TicketReissueNotConfirmedError struct {
+	From             string
+	To               string
+	AffectedBookings int64
+	// CustomersNotified mirrors the same key the 200 returns. It is always
+	// false today, but the message is derived from it rather than hardcoded:
+	// if the server ever starts notifying, "you have to resend" becomes a lie
+	// told at the exact moment the operator is deciding whether to proceed.
+	CustomersNotified bool
+	Hint              string
+}
+
+func (e *TicketReissueNotConfirmedError) Error() string {
+	return fmt.Sprintf("TICKET_REISSUE_NOT_CONFIRMED: %s->%s bookings=%d", e.From, e.To, e.AffectedBookings)
+}
+
+func (e *TicketReissueNotConfirmedError) UserMessage() string {
+	var b strings.Builder
+	b.WriteString("changing the ticket type reissues tickets")
+	if e.From != "" && e.To != "" {
+		b.WriteString(fmt.Sprintf(" (%s -> %s)", e.From, e.To))
 	}
-	b.WriteString("\n  List valid candidates with `bookings available-resources <id>` (main) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.")
+	if e.AffectedBookings > 0 {
+		b.WriteString(fmt.Sprintf(" for %d existing booking(s), invalidating the tickets or vouchers those customers already received", e.AffectedBookings))
+	}
+	b.WriteString(".")
+	if !e.CustomersNotified {
+		b.WriteString("\n  Customers are NOT notified — you have to resend their tickets yourself.")
+	}
+	if e.Hint != "" {
+		b.WriteString("\n  hint: " + e.Hint)
+	}
+	b.WriteString("\n  Preview the blast radius with --dry-run (never refused), then resend with --confirm-ticket-reissue to go ahead. The refusal released the idempotency key, so the retry may reuse it.")
 	return b.String()
 }
 
@@ -761,19 +865,25 @@ func init() {
 		},
 
 		"BOOKING_RESOURCE_CONFLICT": func(status int, env errorEnvelope) error {
-			resourceID, _ := decodeStringField(env.Error.Details, "resource_id")
-			if resourceID == "" {
-				// Resource ids are integers on this surface; accept the numeric
-				// shape too rather than dropping the id from the message.
-				if n, ok := decodeIntField(env.Error.Details, "resource_id"); ok {
-					resourceID = strconv.FormatInt(n, 10)
-				}
+			rejections, _ := decodeResourceRejections(env.Error.Details, "rejections")
+			return &BookingResourceConflictError{
+				Rejections: rejections,
+				Message:    env.Error.Message,
 			}
-			reason, _ := decodeStringField(env.Error.Details, "reason")
-			if reason == "" {
-				reason = env.Error.Message
+		},
+
+		"TICKET_REISSUE_NOT_CONFIRMED": func(status int, env errorEnvelope) error {
+			from, _ := decodeStringField(env.Error.Details, "delivery_method_from")
+			to, _ := decodeStringField(env.Error.Details, "delivery_method_to")
+			affected, _ := decodeIntField(env.Error.Details, "affected_bookings")
+			notified, _ := decodeBoolField(env.Error.Details, "customers_notified")
+			return &TicketReissueNotConfirmedError{
+				From:              from,
+				To:                to,
+				AffectedBookings:  affected,
+				CustomersNotified: notified,
+				Hint:              env.Error.Hint,
 			}
-			return &BookingResourceConflictError{ResourceID: resourceID, Reason: reason}
 		},
 
 		"PAYLOAD_TOO_LARGE": func(status int, env errorEnvelope) error {
@@ -829,6 +939,69 @@ func decodeIntField(d map[string]json.RawMessage, key string) (int64, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+// decodeBoolField returns the bool at key, or false if absent / wrong type.
+// Absent reads as false, which is the safe default here: it keeps the
+// "customers are NOT notified" warning on rather than silently dropping it.
+func decodeBoolField(d map[string]json.RawMessage, key string) (bool, bool) {
+	raw, ok := d[key]
+	if !ok {
+		return false, false
+	}
+	var b bool
+	if err := json.Unmarshal(raw, &b); err != nil {
+		return false, false
+	}
+	return b, true
+}
+
+// decodeResourceRejections returns []BookingResourceRejection at key, or nil
+// if absent / wrong type. Used by the BOOKING_RESOURCE_CONFLICT registry
+// constructor to extract `details.rejections[]`.
+func decodeResourceRejections(d map[string]json.RawMessage, key string) ([]BookingResourceRejection, bool) {
+	raw, ok := d[key]
+	if !ok {
+		return nil, false
+	}
+	var rs []BookingResourceRejection
+	if err := json.Unmarshal(raw, &rs); err != nil {
+		return nil, false
+	}
+	return rs, true
+}
+
+// RawJSONIDToString converts a raw JSON id value to its string form,
+// preserving precision for large int64s that decoding through `any` would
+// lossily round-trip via float64. Strings come back unquoted; numbers come
+// back as their literal digits; null / empty / objects / arrays return "".
+//
+// Exported because both sides of the wire need it: response parsing in
+// cmd/inventory pulls ids out of envelopes, and the BOOKING_RESOURCE_CONFLICT
+// decoder below reads `rejections[].resource_id`, which the server sends as a
+// quoted string but which must not silently vanish if it ever arrives bare.
+// cmd/inventory imports this package, so this is the only direction the shared
+// helper can live in.
+func RawJSONIDToString(raw json.RawMessage) string {
+	s := strings.TrimSpace(string(raw))
+	if s == "" || s == "null" {
+		return ""
+	}
+	// Strings: "abc" -> abc (let json.Unmarshal handle escape sequences).
+	if s[0] == '"' {
+		var unq string
+		if err := json.Unmarshal(raw, &unq); err != nil {
+			return ""
+		}
+		return unq
+	}
+	// Objects / arrays: not a usable scalar id.
+	if s[0] == '{' || s[0] == '[' {
+		return ""
+	}
+	// Numbers (or bare tokens like `true`/`false`, returned as their literal
+	// form rather than silently dropped).
+	return s
 }
 
 // decodeActivationFailures returns []WorkflowActivationFailure at key, or nil

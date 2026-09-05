@@ -176,7 +176,7 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `pricing-tiers` | list, get, create, update, delete, restore |
 | `resources` | list, get, create, update, delete, restore, **attach**, **detach** |
 | `locations` | list, get, create, update, delete |
-| `bookings` | list, get, transactions, **available-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
+| `bookings` | list, get, transactions, **available-resources**, **available-equipment-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
 | `transactions` | list, get |
 | `customers` | list, get |
 | `guests` | list, get, update |

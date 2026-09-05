@@ -132,18 +132,69 @@ func TestUserMessages(t *testing.T) {
 				"  Re-read with `bookings get <id>` (or `bookings list --include resources`), confirm the assignment still makes sense, then resend with the fresh --expected-resource-state-token. Do NOT retry the same body.",
 		},
 		{
-			name:      "BookingResourceConflictError_full",
-			err:       &BookingResourceConflictError{ResourceID: "77", Reason: "double-booked"},
-			wantError: "BOOKING_RESOURCE_CONFLICT: resource=77 reason=double-booked",
-			wantMessage: "requested resource assignment is not allowed (resource 77): double-booked\n" +
-				"  List valid candidates with `bookings available-resources <id>` (main) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
+			name: "BookingResourceConflictError_full",
+			err: &BookingResourceConflictError{
+				Message: "The requested booking resource state is not valid.",
+				Rejections: []BookingResourceRejection{
+					{ResourceID: "77", Code: "EQUIPMENT_RESOURCE_IS_MAIN", Message: "A booking holds exactly one."},
+					{ResourceID: "91", Code: "AUXILIARY_RESOURCE_NOT_ON_PRODUCT_OPTION", Message: "Attach it to the product option first."},
+				},
+			},
+			wantError: "BOOKING_RESOURCE_CONFLICT (2 rejections)",
+			wantMessage: "requested resource assignment is not allowed:\n" +
+				"  - resource 77: EQUIPMENT_RESOURCE_IS_MAIN\n" +
+				"      A booking holds exactly one.\n" +
+				"  - resource 91: AUXILIARY_RESOURCE_NOT_ON_PRODUCT_OPTION\n" +
+				"      Attach it to the product option first.\n" +
+				"  List valid candidates with `bookings available-resources <id>` (main), `bookings available-equipment-resources <id>` (equipment) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
+		},
+		{
+			// No rejections: fall back to the envelope's own sentence rather
+			// than printing a bare heading with nothing under it.
+			name:      "BookingResourceConflictError_message_only",
+			err:       &BookingResourceConflictError{Message: "resource is not attached to this product option"},
+			wantError: "BOOKING_RESOURCE_CONFLICT (0 rejections)",
+			wantMessage: "requested resource assignment is not allowed: resource is not attached to this product option\n" +
+				"  List valid candidates with `bookings available-resources <id>` (main), `bookings available-equipment-resources <id>` (equipment) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
+		},
+		{
+			name:      "TicketReissueNotConfirmedError_full",
+			err:       &TicketReissueNotConfirmedError{From: "VOUCHER", To: "TICKET", AffectedBookings: 12, CustomersNotified: false, Hint: "Preview it with --dry-run."},
+			wantError: "TICKET_REISSUE_NOT_CONFIRMED: VOUCHER->TICKET bookings=12",
+			wantMessage: "changing the ticket type reissues tickets (VOUCHER -> TICKET) for 12 existing booking(s), " +
+				"invalidating the tickets or vouchers those customers already received.\n" +
+				"  Customers are NOT notified — you have to resend their tickets yourself.\n" +
+				"  hint: Preview it with --dry-run.\n" +
+				"  Preview the blast radius with --dry-run (never refused), then resend with --confirm-ticket-reissue to go ahead. The refusal released the idempotency key, so the retry may reuse it.",
+		},
+		{
+			// The renderer branches on customers_notified; so must the refusal.
+			// A hardcoded "NOT notified" becomes a lie the moment the server
+			// starts notifying — told exactly when the operator is deciding
+			// whether to destroy live tickets.
+			name:      "TicketReissueNotConfirmedError_customers_notified",
+			err:       &TicketReissueNotConfirmedError{From: "VOUCHER", To: "TICKET", AffectedBookings: 4, CustomersNotified: true},
+			wantError: "TICKET_REISSUE_NOT_CONFIRMED: VOUCHER->TICKET bookings=4",
+			wantMessage: "changing the ticket type reissues tickets (VOUCHER -> TICKET) for 4 existing booking(s), " +
+				"invalidating the tickets or vouchers those customers already received.\n" +
+				"  Preview the blast radius with --dry-run (never refused), then resend with --confirm-ticket-reissue to go ahead. The refusal released the idempotency key, so the retry may reuse it.",
+		},
+		{
+			// affected_bookings 0 is not a refusal the server raises, but the
+			// renderer must not claim "0 existing booking(s)" if it ever sees it.
+			name:      "TicketReissueNotConfirmedError_bare",
+			err:       &TicketReissueNotConfirmedError{},
+			wantError: "TICKET_REISSUE_NOT_CONFIRMED: -> bookings=0",
+			wantMessage: "changing the ticket type reissues tickets.\n" +
+				"  Customers are NOT notified — you have to resend their tickets yourself.\n" +
+				"  Preview the blast radius with --dry-run (never refused), then resend with --confirm-ticket-reissue to go ahead. The refusal released the idempotency key, so the retry may reuse it.",
 		},
 		{
 			name:      "BookingResourceConflictError_bare",
 			err:       &BookingResourceConflictError{},
-			wantError: "BOOKING_RESOURCE_CONFLICT: resource= reason=",
+			wantError: "BOOKING_RESOURCE_CONFLICT (0 rejections)",
 			wantMessage: "requested resource assignment is not allowed\n" +
-				"  List valid candidates with `bookings available-resources <id>` (main) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
+				"  List valid candidates with `bookings available-resources <id>` (main), `bookings available-equipment-resources <id>` (equipment) or `bookings available-auxiliary-resources <id>` (auxiliary) and pick from those.",
 		},
 		{
 			name:        "WorkflowNotEditableError_with_status_and_hint",
@@ -558,42 +609,57 @@ func TestParseError(t *testing.T) {
 			},
 		},
 		{
-			name:   "BOOKING_RESOURCE_CONFLICT with numeric resource_id",
+			// The wire shape the server actually sends: every refused id in one
+			// `rejections[]`, each with the code naming the field it was sent in.
+			name:   "BOOKING_RESOURCE_CONFLICT reports every rejection",
 			status: 409,
 			body: `{"meta":{},"error":{
-				"code":"BOOKING_RESOURCE_CONFLICT","message":"already assigned elsewhere","retriable":false,
-				"details":{"resource_id":77,"reason":"double-booked at 2026-08-04T09:00:00Z"}
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"The requested booking resource state is not valid.","retriable":false,
+				"details":{"rejections":[
+					{"resource_id":"77","code":"EQUIPMENT_RESOURCE_IS_MAIN","message":"A booking holds exactly one."},
+					{"resource_id":"91","code":"MAIN_RESOURCE_NOT_AVAILABLE","message":"Already on an overlapping departure."}
+				]}
 			}}`,
 			check: func(t *testing.T, err error) {
 				var e *BookingResourceConflictError
 				if !errors.As(err, &e) {
 					t.Fatalf("want *BookingResourceConflictError, got %T", err)
 				}
-				if e.ResourceID != "77" {
-					t.Errorf("wrong ResourceID: %q", e.ResourceID)
+				if len(e.Rejections) != 2 {
+					t.Fatalf("want 2 rejections, got %d", len(e.Rejections))
 				}
-				if e.Reason != "double-booked at 2026-08-04T09:00:00Z" {
-					t.Errorf("wrong Reason: %q", e.Reason)
+				if e.Rejections[0].ResourceID != "77" || e.Rejections[0].Code != "EQUIPMENT_RESOURCE_IS_MAIN" {
+					t.Errorf("wrong first rejection: %+v", e.Rejections[0])
+				}
+				if e.Rejections[1].ResourceID != "91" || e.Rejections[1].Code != "MAIN_RESOURCE_NOT_AVAILABLE" {
+					t.Errorf("wrong second rejection: %+v", e.Rejections[1])
+				}
+				// Both codes must survive into what the user reads — that is the
+				// whole point of decoding them.
+				msg := e.UserMessage()
+				for _, want := range []string{"EQUIPMENT_RESOURCE_IS_MAIN", "MAIN_RESOURCE_NOT_AVAILABLE", "77", "91"} {
+					if !strings.Contains(msg, want) {
+						t.Errorf("UserMessage missing %q:\n%s", want, msg)
+					}
 				}
 			},
 		},
 		{
-			name:   "BOOKING_RESOURCE_CONFLICT with string resource_id",
+			// resource_id is cast to a string server-side, but a bare number
+			// must not drop the id from the message.
+			name:   "BOOKING_RESOURCE_CONFLICT with numeric resource_id",
 			status: 409,
 			body: `{"meta":{},"error":{
-				"code":"BOOKING_RESOURCE_CONFLICT","message":"wrong category","retriable":false,
-				"details":{"resource_id":"res_77","reason":"auxiliary resource passed as main"}
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"not valid","retriable":false,
+				"details":{"rejections":[{"resource_id":77,"code":"MAIN_RESOURCE_NOT_ON_PRODUCT_OPTION","message":"Attach it first."}]}
 			}}`,
 			check: func(t *testing.T, err error) {
 				var e *BookingResourceConflictError
 				if !errors.As(err, &e) {
 					t.Fatalf("want *BookingResourceConflictError, got %T", err)
 				}
-				if e.ResourceID != "res_77" {
-					t.Errorf("wrong ResourceID: %q", e.ResourceID)
-				}
-				if e.Reason != "auxiliary resource passed as main" {
-					t.Errorf("wrong Reason: %q", e.Reason)
+				if len(e.Rejections) != 1 || e.Rejections[0].ResourceID != "77" {
+					t.Fatalf("wrong rejections: %+v", e.Rejections)
 				}
 			},
 		},
@@ -609,11 +675,85 @@ func TestParseError(t *testing.T) {
 				if !errors.As(err, &e) {
 					t.Fatalf("want *BookingResourceConflictError, got %T", err)
 				}
-				if e.ResourceID != "" {
-					t.Errorf("ResourceID should be empty: %q", e.ResourceID)
+				if len(e.Rejections) != 0 {
+					t.Errorf("Rejections should be empty: %+v", e.Rejections)
 				}
-				if e.Reason != "resource is not attached to this product option" {
-					t.Errorf("wrong Reason: %q", e.Reason)
+				if e.Message != "resource is not attached to this product option" {
+					t.Errorf("wrong Message: %q", e.Message)
+				}
+			},
+		},
+		{
+			// details carries the same four keys the 200 returns under
+			// `ticket_reissue`, so the preview and the refusal render alike.
+			name:   "TICKET_REISSUE_NOT_CONFIRMED carries the reissue block",
+			status: 422,
+			body: `{"meta":{},"error":{
+				"code":"TICKET_REISSUE_NOT_CONFIRMED","message":"Changing the ticket type reissues tickets.",
+				"hint":"Preview it with dry_run: true.","retriable":false,
+				"details":{"delivery_method_from":"VOUCHER","delivery_method_to":"TICKET","affected_bookings":12,"customers_notified":false}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *TicketReissueNotConfirmedError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *TicketReissueNotConfirmedError, got %T", err)
+				}
+				if e.From != "VOUCHER" || e.To != "TICKET" {
+					t.Errorf("wrong methods: %+v", e)
+				}
+				if e.AffectedBookings != 12 {
+					t.Errorf("wrong AffectedBookings: %d", e.AffectedBookings)
+				}
+				if !strings.Contains(e.UserMessage(), "12 existing booking(s)") {
+					t.Errorf("blast radius missing from message:\n%s", e.UserMessage())
+				}
+			},
+		},
+		{
+			// A rejections array of the wrong shape must not lose the error:
+			// fall back to the envelope message rather than returning nothing.
+			name:   "BOOKING_RESOURCE_CONFLICT tolerates a malformed rejections field",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"not valid","retriable":false,
+				"details":{"rejections":"not-an-array"}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceConflictError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceConflictError, got %T", err)
+				}
+				if len(e.Rejections) != 0 {
+					t.Errorf("want no rejections from a malformed field, got %+v", e.Rejections)
+				}
+				if !strings.Contains(e.UserMessage(), "not valid") {
+					t.Errorf("envelope message must survive:\n%s", e.UserMessage())
+				}
+			},
+		},
+		{
+			// A null id still carries a usable code; the message just omits
+			// the "resource N:" prefix rather than printing "resource <nil>".
+			name:   "BOOKING_RESOURCE_CONFLICT tolerates a null resource_id",
+			status: 409,
+			body: `{"meta":{},"error":{
+				"code":"BOOKING_RESOURCE_CONFLICT","message":"not valid","retriable":false,
+				"details":{"rejections":[{"resource_id":null,"code":"MAIN_RESOURCE_NOT_AVAILABLE","message":"busy"}]}
+			}}`,
+			check: func(t *testing.T, err error) {
+				var e *BookingResourceConflictError
+				if !errors.As(err, &e) {
+					t.Fatalf("want *BookingResourceConflictError, got %T", err)
+				}
+				if len(e.Rejections) != 1 || e.Rejections[0].ResourceID != "" {
+					t.Fatalf("want one rejection with an empty id, got %+v", e.Rejections)
+				}
+				msg := e.UserMessage()
+				if !strings.Contains(msg, "MAIN_RESOURCE_NOT_AVAILABLE") {
+					t.Errorf("code must survive a null id:\n%s", msg)
+				}
+				if strings.Contains(msg, "resource :") {
+					t.Errorf("empty id must not render a dangling prefix:\n%s", msg)
 				}
 			},
 		},

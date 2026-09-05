@@ -634,6 +634,8 @@ func errorCode(err error) string {
 		return "BOOKING_RESOURCE_STATE_STALE"
 	case *invpkg.BookingResourceConflictError:
 		return "BOOKING_RESOURCE_CONFLICT"
+	case *invpkg.TicketReissueNotConfirmedError:
+		return "TICKET_REISSUE_NOT_CONFIRMED"
 	case *invpkg.WorkflowNotEditableError:
 		return "WORKFLOW_NOT_EDITABLE"
 	case *invpkg.WorkflowNotActivatableError:
@@ -779,6 +781,21 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 			}
 			c.Annotations["verb"] = def.Verb
 			c.Annotations["path"] = def.Path
+		}
+
+		// Annotate the forensic-field allow-list. Not surfaced in --help; this
+		// exists so TestCommandDefIntegrity_ForensicFieldsNameRealFlags can
+		// check every entry against the flags the command really declares.
+		// Reading it here rather than from the CommandDef AST is what makes
+		// that check total: several commands build ForensicFields (and Flags)
+		// from a variable rather than an inline literal, and an AST-based test
+		// skips those silently — `availabilities bulk-update` assembles its
+		// list in a loop, so all five subcommands went unchecked.
+		if len(def.ForensicFields) > 0 {
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations["forensicFields"] = strings.Join(def.ForensicFields, ",")
 		}
 
 		c.RunE = makeRunE(def, runner)
@@ -1021,7 +1038,15 @@ func tryParseDiffEnvelope(body []byte) (*invpkg.DiffEnvelope, bool) {
 	if err := json.Unmarshal(body, &env); err != nil {
 		return nil, false
 	}
-	if env.Data.Diff.Before == nil && env.Data.Diff.After == nil && !env.Data.WouldApply {
+	// A dry run always carries a diff, but the spec makes `diff` OPTIONAL on
+	// commit — and a commit is exactly where would_apply is false. Keying the
+	// "this isn't a mutation result" test on the diff alone therefore discards
+	// real committed envelopes whose only payload is the ticket-reissue block
+	// or the side-effect list, which is the one path that has already
+	// invalidated the QR codes customers are holding. Keep the envelope when
+	// anything renderable survived.
+	if env.Data.Diff.Before == nil && env.Data.Diff.After == nil && !env.Data.WouldApply &&
+		env.Data.TicketReissue == nil && len(env.Data.SideEffects) == 0 {
 		return nil, false
 	}
 	cp := env.Data
@@ -1070,7 +1095,7 @@ func tryParseDataID(body []byte, resourceType string) string {
 		ID json.RawMessage `json:"id"`
 	}
 	if err := json.Unmarshal(env.Data, &direct); err == nil {
-		if s := rawJSONIDToString(direct.ID); s != "" {
+		if s := invpkg.RawJSONIDToString(direct.ID); s != "" {
 			return s
 		}
 	}
@@ -1096,34 +1121,7 @@ func tryParseDataID(body []byte, resourceType string) string {
 	if err := json.Unmarshal(raw, &inner); err != nil {
 		return ""
 	}
-	return rawJSONIDToString(inner.ID)
-}
-
-// rawJSONIDToString converts a raw JSON id value to its string form,
-// preserving precision for large int64s that JSON-decoding through any
-// would lossily round-trip via float64. Strings come back unquoted;
-// numbers come back as their literal digits; null / empty / objects /
-// arrays return "".
-func rawJSONIDToString(raw json.RawMessage) string {
-	s := strings.TrimSpace(string(raw))
-	if s == "" || s == "null" {
-		return ""
-	}
-	// Strings: "abc" → abc (let json.Unmarshal handle escape sequences).
-	if s[0] == '"' {
-		var unq string
-		if err := json.Unmarshal(raw, &unq); err != nil {
-			return ""
-		}
-		return unq
-	}
-	// Objects / arrays: not a usable scalar id.
-	if s[0] == '{' || s[0] == '[' {
-		return ""
-	}
-	// Numbers (or bare tokens like `true`/`false` which we'd rather
-	// return as their literal form than silently drop) — return as-is.
-	return s
+	return invpkg.RawJSONIDToString(inner.ID)
 }
 
 // pascalToSnake converts "ProductOption" → "product_option",
