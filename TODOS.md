@@ -45,33 +45,38 @@ integer→int / boolean→bool / string→string for every GET command's flags.
 **Why:** the one drift class the spec-drift suite currently cannot see.
 **Priority:** P2 — a wrong choice ships a silently-empty filter.
 
-## Every drift test runs CLI→spec, so a spec that grows is invisible
+## ~~Every drift test runs CLI→spec, so a spec that grows is invisible~~ — DONE
 
-`spec_drift_test.go` and `skills_drift_test.go` both assert one direction:
-every flag / JSON key / doc row the CLI *already has* must exist in the spec.
-Nothing asserts the reverse, so the spec can gain whole endpoints, request
-fields and error codes while the suite stays green.
-`TestSpecQueryParamsAreExposedAsFlags` is the sole exception, and only for
-query params on operations that are already wired.
+Implemented as `cmd/inventory/spec_coverage_test.go`, the reverse of
+`spec_drift_test.go`: that one proves every flag the CLI HAS exists in the
+spec, this one proves every operation and request field the SPEC has is
+reachable from the CLI. Together they are a biconditional.
 
-Measured, not hypothetical: syncing `cli-v1.yaml` from 1.4.0 to 1.6.0 (+368
-spec lines, +550 generated lines) and running `go test ./...` produced zero
-failures — while `bookings set-resources` still modelled two resource kinds
-against a server that had three, and the entire product ticketing surface
-(`delivery_method`, `redemption_method`, `TICKET_REISSUE_NOT_CONFIRMED`) was
-absent. Green tests were not evidence of sync.
+- `TestSpecCoverage_EveryOperationIsBound`: every `VERB /path` in
+  `api/inventory/cli-v1.yaml` must resolve to a command in the live `Cmd()`
+  tree. 115 operations, 115 bound. Verified by deletion: removing
+  `bookings available-equipment-resources` fails the test naming the exact
+  endpoint.
+- `TestSpecCoverage_EveryRequestFieldIsReachable`: every request-body property
+  must be settable by some flag, checked against BOTH the field map and the
+  live tree's flags (several commands build their body by hand and never
+  appear in a field map — see the entry below). 292 fields across 115
+  operations. Verified by deletion: removing `--delivery-method` fails the
+  test naming `delivery_method` on both product endpoints.
 
-**Fix:** add a spec→CLI coverage test that walks every operation in
-`api/inventory/cli-v1.yaml`, resolves it against the live `Cmd()` tree by
-verb+path, and fails on an operation no command binds. Same for request-body
-properties vs the field map, with an explicit allow-list for the fields the
-CLI deliberately omits (see the `--currency` entry, which is exactly such a
-case and already has its own test).
-**Why:** without it, the next upstream release is silent again, and the only
-thing standing between a stale CLI and production is someone remembering to
-diff the spec by hand.
-**Priority:** P2 — it does not break a shipped command, it just guarantees
-the next drift goes unnoticed.
+Both are allow-list driven, and every entry carries the reason it is
+deliberately unexposed rather than a bare suppression. The first run surfaced
+30 candidates; triage found 4 genuine gaps, now fixed
+(`resources create/update --rating`,
+`pricing-categories create/update --is-internal`), and the rest were fields
+the server accepts and ignores ("Accepted but not stored — no column" on
+locations, legacy aliases on pricing-tiers), a free-form object reachable only
+via `--data`, or values encoded structurally (bulk-update's `setting` IS the
+subcommand name).
+
+**Why it mattered:** syncing the spec 1.4.0 → 1.6.0 produced zero test
+failures while the CLI was missing an entire endpoint and the whole product
+ticketing surface. Green tests were not evidence of sync.
 
 ## Body keys set outside JSONBodyFromArgs escape the field-map guard
 

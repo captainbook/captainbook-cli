@@ -91,6 +91,7 @@ func resourcesDefs() []CommandDef {
 				{Name: "type", Type: "string", Required: true, Description: "Free-form label (Sailboat, Senior Guide, …)"},
 				{Name: "category", Type: "string", Required: true, Description: "guide|asset|equipment|auxiliary"},
 				{Name: "capacity", Type: "int", Description: "Seats the resource can host (omit = no per-resource cap). Refused with 422 when --category is equipment: capacity is what makes a resource a booking's single main resource, and equipment is never that."},
+				{Name: "rating", Type: "float", Description: "Quality/seniority rating (float, >= 0). Optional — omit to leave unrated."},
 			},
 			ForensicFields: []string{"name", "type", "category", "capacity"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -99,6 +100,7 @@ func resourcesDefs() []CommandDef {
 					"type":     "type",
 					"category": "category",
 					"capacity": "capacity",
+					"rating":   "rating",
 				})
 				if err != nil {
 					return nil, err
@@ -124,6 +126,7 @@ func resourcesDefs() []CommandDef {
 				{Name: "type", Type: "string", Description: "Free-form label"},
 				{Name: "category", Type: "string", Description: "guide|asset|equipment|auxiliary"},
 				{Name: "capacity", Type: "int", Description: "Seats the resource can host. Refused with 422 when the resource's category is (or becomes) equipment."},
+				{Name: "rating", Type: "float", Description: "Quality/seniority rating (float, >= 0). Optional — omit to leave unrated."},
 			},
 			ForensicFields: []string{"name", "category", "capacity"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -136,6 +139,7 @@ func resourcesDefs() []CommandDef {
 					"type":     "type",
 					"category": "category",
 					"capacity": "capacity",
+					"rating":   "rating",
 				})
 				if err != nil {
 					return nil, err
