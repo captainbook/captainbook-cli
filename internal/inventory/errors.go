@@ -496,7 +496,7 @@ func (r *BookingResourceRejection) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	r.Code, r.Message = raw.Code, raw.Message
-	r.ResourceID = decodeFlexibleID(raw.ResourceID)
+	r.ResourceID = RawJSONIDToString(raw.ResourceID)
 	return nil
 }
 
@@ -971,21 +971,37 @@ func decodeResourceRejections(d map[string]json.RawMessage, key string) ([]Booki
 	return rs, true
 }
 
-// decodeFlexibleID renders a JSON id that may be quoted or bare as a string.
-// Returns "" for null, absent, or any other shape.
-func decodeFlexibleID(raw json.RawMessage) string {
-	if len(raw) == 0 {
+// RawJSONIDToString converts a raw JSON id value to its string form,
+// preserving precision for large int64s that decoding through `any` would
+// lossily round-trip via float64. Strings come back unquoted; numbers come
+// back as their literal digits; null / empty / objects / arrays return "".
+//
+// Exported because both sides of the wire need it: response parsing in
+// cmd/inventory pulls ids out of envelopes, and the BOOKING_RESOURCE_CONFLICT
+// decoder below reads `rejections[].resource_id`, which the server sends as a
+// quoted string but which must not silently vanish if it ever arrives bare.
+// cmd/inventory imports this package, so this is the only direction the shared
+// helper can live in.
+func RawJSONIDToString(raw json.RawMessage) string {
+	s := strings.TrimSpace(string(raw))
+	if s == "" || s == "null" {
 		return ""
 	}
-	var s string
-	if err := json.Unmarshal(raw, &s); err == nil {
-		return s
+	// Strings: "abc" -> abc (let json.Unmarshal handle escape sequences).
+	if s[0] == '"' {
+		var unq string
+		if err := json.Unmarshal(raw, &unq); err != nil {
+			return ""
+		}
+		return unq
 	}
-	var n int64
-	if err := json.Unmarshal(raw, &n); err == nil {
-		return strconv.FormatInt(n, 10)
+	// Objects / arrays: not a usable scalar id.
+	if s[0] == '{' || s[0] == '[' {
+		return ""
 	}
-	return ""
+	// Numbers (or bare tokens like `true`/`false`, returned as their literal
+	// form rather than silently dropped).
+	return s
 }
 
 // decodeActivationFailures returns []WorkflowActivationFailure at key, or nil

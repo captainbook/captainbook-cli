@@ -1023,7 +1023,15 @@ func tryParseDiffEnvelope(body []byte) (*invpkg.DiffEnvelope, bool) {
 	if err := json.Unmarshal(body, &env); err != nil {
 		return nil, false
 	}
-	if env.Data.Diff.Before == nil && env.Data.Diff.After == nil && !env.Data.WouldApply {
+	// A dry run always carries a diff, but the spec makes `diff` OPTIONAL on
+	// commit — and a commit is exactly where would_apply is false. Keying the
+	// "this isn't a mutation result" test on the diff alone therefore discards
+	// real committed envelopes whose only payload is the ticket-reissue block
+	// or the side-effect list, which is the one path that has already
+	// invalidated the QR codes customers are holding. Keep the envelope when
+	// anything renderable survived.
+	if env.Data.Diff.Before == nil && env.Data.Diff.After == nil && !env.Data.WouldApply &&
+		env.Data.TicketReissue == nil && len(env.Data.SideEffects) == 0 {
 		return nil, false
 	}
 	cp := env.Data
@@ -1072,7 +1080,7 @@ func tryParseDataID(body []byte, resourceType string) string {
 		ID json.RawMessage `json:"id"`
 	}
 	if err := json.Unmarshal(env.Data, &direct); err == nil {
-		if s := rawJSONIDToString(direct.ID); s != "" {
+		if s := invpkg.RawJSONIDToString(direct.ID); s != "" {
 			return s
 		}
 	}
@@ -1098,34 +1106,7 @@ func tryParseDataID(body []byte, resourceType string) string {
 	if err := json.Unmarshal(raw, &inner); err != nil {
 		return ""
 	}
-	return rawJSONIDToString(inner.ID)
-}
-
-// rawJSONIDToString converts a raw JSON id value to its string form,
-// preserving precision for large int64s that JSON-decoding through any
-// would lossily round-trip via float64. Strings come back unquoted;
-// numbers come back as their literal digits; null / empty / objects /
-// arrays return "".
-func rawJSONIDToString(raw json.RawMessage) string {
-	s := strings.TrimSpace(string(raw))
-	if s == "" || s == "null" {
-		return ""
-	}
-	// Strings: "abc" → abc (let json.Unmarshal handle escape sequences).
-	if s[0] == '"' {
-		var unq string
-		if err := json.Unmarshal(raw, &unq); err != nil {
-			return ""
-		}
-		return unq
-	}
-	// Objects / arrays: not a usable scalar id.
-	if s[0] == '{' || s[0] == '[' {
-		return ""
-	}
-	// Numbers (or bare tokens like `true`/`false` which we'd rather
-	// return as their literal form than silently drop) — return as-is.
-	return s
+	return invpkg.RawJSONIDToString(inner.ID)
 }
 
 // pascalToSnake converts "ProductOption" → "product_option",

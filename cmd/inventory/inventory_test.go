@@ -364,6 +364,59 @@ func TestJSONBodyFromArgs_DryRunInjection(t *testing.T) {
 	}
 }
 
+// TestTryParseDiffEnvelope_CommittedPayloads pins the envelope guard against
+// the spec's actual contract: `diff` is "always present on dry-run, optional on
+// commit", and would_apply is false exactly on commit. Keying the guard on the
+// diff alone dropped committed envelopes whose only payload was the
+// ticket-reissue block — silencing the warning on the one path that has already
+// stopped real customers' QR codes from scanning.
+func TestTryParseDiffEnvelope_CommittedPayloads(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{
+			name: "committed ticket reissue with no diff is kept",
+			body: `{"meta":{},"data":{"would_apply":false,"ticket_reissue":{"delivery_method_from":"VOUCHER","delivery_method_to":"TICKET","affected_bookings":12,"customers_notified":false}}}`,
+			want: true,
+		},
+		{
+			name: "committed side effects with no diff are kept",
+			body: `{"meta":{},"data":{"would_apply":false,"side_effects":[{"type":"job","identifier":"DeliverTicketOrVoucher","payload_summary":"12 bookings"}]}}`,
+			want: true,
+		},
+		{
+			name: "dry run with a diff is kept",
+			body: `{"meta":{},"data":{"would_apply":true,"diff":{"before":{"id":"1"},"after":{"id":"1"}}}}`,
+			want: true,
+		},
+		{
+			name: "committed diff is kept",
+			body: `{"meta":{},"data":{"would_apply":false,"diff":{"before":{"id":"1"},"after":{"id":"1"}}}}`,
+			want: true,
+		},
+		{
+			// An ordinary resource read is not a mutation result and must not
+			// be rendered as one.
+			name: "plain resource payload is not a diff envelope",
+			body: `{"meta":{},"data":{"id":"42","title":"Sunset Snorkeling"}}`,
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env, ok := tryParseDiffEnvelope([]byte(tc.body))
+			if ok != tc.want {
+				t.Fatalf("parsed = %v; want %v (env: %+v)", ok, tc.want, env)
+			}
+			if tc.want && env == nil {
+				t.Fatal("reported parsed but returned a nil envelope")
+			}
+		})
+	}
+}
+
 // TestErrorCode_Mapping covers the audit error_code mapping for each
 // typed error.
 func TestErrorCode_Mapping(t *testing.T) {
