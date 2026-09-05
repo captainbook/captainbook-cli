@@ -45,6 +45,34 @@ integer→int / boolean→bool / string→string for every GET command's flags.
 **Why:** the one drift class the spec-drift suite currently cannot see.
 **Priority:** P2 — a wrong choice ships a silently-empty filter.
 
+## Every drift test runs CLI→spec, so a spec that grows is invisible
+
+`spec_drift_test.go` and `skills_drift_test.go` both assert one direction:
+every flag / JSON key / doc row the CLI *already has* must exist in the spec.
+Nothing asserts the reverse, so the spec can gain whole endpoints, request
+fields and error codes while the suite stays green.
+`TestSpecQueryParamsAreExposedAsFlags` is the sole exception, and only for
+query params on operations that are already wired.
+
+Measured, not hypothetical: syncing `cli-v1.yaml` from 1.4.0 to 1.6.0 (+368
+spec lines, +550 generated lines) and running `go test ./...` produced zero
+failures — while `bookings set-resources` still modelled two resource kinds
+against a server that had three, and the entire product ticketing surface
+(`delivery_method`, `redemption_method`, `TICKET_REISSUE_NOT_CONFIRMED`) was
+absent. Green tests were not evidence of sync.
+
+**Fix:** add a spec→CLI coverage test that walks every operation in
+`api/inventory/cli-v1.yaml`, resolves it against the live `Cmd()` tree by
+verb+path, and fails on an operation no command binds. Same for request-body
+properties vs the field map, with an explicit allow-list for the fields the
+CLI deliberately omits (see the `--currency` entry, which is exactly such a
+case and already has its own test).
+**Why:** without it, the next upstream release is silent again, and the only
+thing standing between a stale CLI and production is someone remembering to
+diff the spec by hand.
+**Priority:** P2 — it does not break a shipped command, it just guarantees
+the next drift goes unnoticed.
+
 ## Body keys set outside JSONBodyFromArgs escape the field-map guard
 
 `TestSpecDrift_FieldMapKeysExistInSpec` extracts JSON keys only from the map
