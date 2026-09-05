@@ -37,6 +37,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,6 +54,10 @@ type cmdLit struct {
 	Ability  string // "cli:read" / "cli:write" / "cli:cs"; "" when ungated (whoami)
 	Flags    []flagLit
 	FieldMap map[string]string // flag name → JSON key, from JSONBodyFromArgs map literal
+	// ForensicFields is the kebab-case flag-name allow-list copied into the
+	// audit entry's forensic_summary. Captured here so it can be checked
+	// against Flags — see TestCommandDefIntegrity_ForensicFieldsNameRealFlags.
+	ForensicFields []string
 }
 
 type flagLit struct {
@@ -127,6 +133,8 @@ func extractCmdLit(file string, cl *ast.CompositeLit) cmdLit {
 			lit.Ability = abilityConstValue(kv.Value)
 		case "Flags":
 			lit.Flags = parseFlagsLit(kv.Value)
+		case "ForensicFields":
+			lit.ForensicFields = parseStringSliceLit(kv.Value)
 		case "Run":
 			lit.FieldMap = parseRunFieldMap(kv.Value)
 		}
@@ -160,6 +168,23 @@ func stringLit(e ast.Expr) string {
 		s = s[1 : len(s)-1]
 	}
 	return s
+}
+
+// parseStringSliceLit extracts the elements of a []string{...} literal.
+// Non-literal elements (a const or a variable) yield "" and are skipped by the
+// caller rather than silently passing as a valid flag name.
+func parseStringSliceLit(e ast.Expr) []string {
+	cl, ok := e.(*ast.CompositeLit)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, elt := range cl.Elts {
+		if v := stringLit(elt); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func parseFlagsLit(e ast.Expr) []flagLit {
@@ -264,16 +289,16 @@ func parseRunFieldMap(e ast.Expr) map[string]string {
 // -----------------------------------------------------------------------------
 
 type specDoc struct {
-	ops     map[string]*opDef                 // "VERB /path" → op
-	schemas map[string]map[string]*specField  // ref name → field map
+	ops     map[string]*opDef                // "VERB /path" → op
+	schemas map[string]map[string]*specField // ref name → field map
 }
 
 type opDef struct {
-	Verb            string
-	Path            string
-	QueryParams     map[string]*specField // query-param name → field
-	BodyRef         string                // "#/components/schemas/X" (empty if inline)
-	BodyInline      map[string]*specField // populated when body is inline (not a $ref)
+	Verb        string
+	Path        string
+	QueryParams map[string]*specField // query-param name → field
+	BodyRef     string                // "#/components/schemas/X" (empty if inline)
+	BodyInline  map[string]*specField // populated when body is inline (not a $ref)
 }
 
 type specField struct {
@@ -553,6 +578,112 @@ func TestSpecDrift_FieldMapKeysExistInSpec(t *testing.T) {
 // package: any Params struct that declares a field literally typed
 // `*IdempotencyKey` is a mutation params and MUST have the field set
 // at construction.
+// sortedKeys returns a map's keys in sorted order, for deterministic messages.
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// TestCommandDefIntegrity_ForensicFieldsNameRealFlags asserts every
+// ForensicFields entry names a flag the command actually declares.
+//
+// This is not a style rule, it is a dead-config check, and the invariant is
+// exact. args.Flags is populated by exactly one loop, over def.Flags:
+//
+//	for _, fd := range def.Flags {
+//	    if !cmd.Flags().Changed(fd.Name) { continue }
+//	    args.Flags[fd.Name] = v
+//	}
+//
+// and forensicSummary emits a key only when args.Flags has it:
+//
+//	for _, name := range def.ForensicFields {
+//	    if v, ok := args.Flags[name]; ok { out[name] = v }
+//	}
+//
+// So an entry whose name is not in Flags can NEVER be emitted. It reads like
+// audit coverage and provides none — the worst kind of wrong, because the gap
+// is invisible until someone needs the log. This shipped once already: a
+// `confirm-ticket-reissue` entry sat in `products create` (which has no such
+// flag; only update does) and nothing caught it.
+//
+// What this test deliberately does NOT check is whether the RIGHT flags are
+// listed. "Business-meaningful" is a judgment call and belongs in review.
+func TestCommandDefIntegrity_ForensicFieldsNameRealFlags(t *testing.T) {
+	cmds := walkInventoryCmdLits(t)
+	if len(cmds) == 0 {
+		t.Fatal("no CommandDef literals found — AST walker broken")
+	}
+
+	// verb+path -> every flag name the live tree declares for it. Built from
+	// the live tree because several commands assign Flags from a shared
+	// package-level variable rather than an inline literal, and parseFlagsLit
+	// only understands literals — trusting the AST there reports flags as
+	// missing that are right there in --help. The live tree is also what
+	// actually populates args.Flags, which is what this invariant is about.
+	liveFlags := map[string]map[string]bool{}
+	var walk func(cm *cobra.Command)
+	walk = func(cm *cobra.Command) {
+		verb, path := cm.Annotations["verb"], cm.Annotations["path"]
+		if verb != "" && path != "" {
+			key := verb + " " + path
+			if liveFlags[key] == nil {
+				liveFlags[key] = map[string]bool{}
+			}
+			cm.Flags().VisitAll(func(f *pflag.Flag) { liveFlags[key][f.Name] = true })
+		}
+		for _, child := range cm.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+
+	checked := 0
+	for _, c := range cmds {
+		if len(c.ForensicFields) == 0 || c.Verb == "" || c.Path == "" {
+			continue
+		}
+		// Resolve the flag list from the LIVE cobra tree, not from the AST.
+		// Several commands assign Flags from a shared package-level variable
+		// (`Flags: resendBookingConfirmationFlags`) rather than an inline
+		// literal, and parseFlagsLit only understands literals — so trusting
+		// the AST here reports flags as missing that are right there in
+		// --help. The live tree is also what actually populates args.Flags,
+		// which is the thing this invariant is about.
+		// Matched by verb+path rather than by Use: a CommandDef's Use is
+		// relative to its resource group ("bulk-delete", not "availabilities
+		// bulk-delete"), so it does not resolve against the tree root, while
+		// verb+path is annotated on every command and is unambiguous.
+		declared := liveFlags[c.Verb+" "+c.Path]
+		if declared == nil {
+			t.Errorf("[%s] %q: no live command binds %s %s, so its ForensicFields cannot be checked",
+				c.File, c.Use, c.Verb, c.Path)
+			continue
+		}
+		for _, name := range c.ForensicFields {
+			checked++
+			if declared[name] {
+				continue
+			}
+			t.Errorf("[%s] %q: ForensicFields lists %q, but the command declares no such flag.\n"+
+				"  forensic_summary can only ever emit keys present in args.Flags, and args.Flags is\n"+
+				"  built solely from Flags — so this entry is dead and the audit log will silently\n"+
+				"  omit it. Either add the flag or drop the entry.\n"+
+				"  declared flags: %s",
+				c.File, c.Use, name, strings.Join(sortedKeys(declared), ", "))
+		}
+	}
+
+	if checked == 0 {
+		t.Fatal("checked 0 ForensicFields entries — the extractor is broken, not the commands")
+	}
+	t.Logf("verified %d ForensicFields entries across %d commands", checked, len(cmds))
+}
+
 func TestSpecDrift_IdempotencyKeyThreaded(t *testing.T) {
 	mutationParams := mutationParamsTypes(t)
 	if len(mutationParams) == 0 {
@@ -618,6 +749,7 @@ func TestSpecDrift_IdempotencyKeyThreaded(t *testing.T) {
 // is one of the two known-correct value expressions for Params.IdempotencyKey:
 //   - args.IdempotencyKeyUUID (the runMutation thread)
 //   - &parsedKey (the uploadCmd multipart outlier's local)
+//
 // Anything else (nil, &someOtherVar, helper-call, etc.) is a bug.
 func isAcceptedIdempotencyKeyExpr(e ast.Expr) bool {
 	if se, ok := e.(*ast.SelectorExpr); ok {
