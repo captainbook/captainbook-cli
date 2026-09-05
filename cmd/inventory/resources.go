@@ -90,7 +90,7 @@ func resourcesDefs() []CommandDef {
 				{Name: "name", Type: "string", Required: true, Description: "Resource name"},
 				{Name: "type", Type: "string", Required: true, Description: "Free-form label (Sailboat, Senior Guide, …)"},
 				{Name: "category", Type: "string", Required: true, Description: "guide|asset|equipment|auxiliary"},
-				{Name: "capacity", Type: "int", Description: "Default capacity (null = no per-resource cap)"},
+				{Name: "capacity", Type: "int", Description: "Seats the resource can host (omit = no per-resource cap). Refused with 422 when --category is equipment: capacity is what makes a resource a booking's single main resource, and equipment is never that."},
 			},
 			ForensicFields: []string{"name", "type", "category", "capacity"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -123,7 +123,7 @@ func resourcesDefs() []CommandDef {
 				{Name: "name", Type: "string", Description: "Resource name"},
 				{Name: "type", Type: "string", Description: "Free-form label"},
 				{Name: "category", Type: "string", Description: "guide|asset|equipment|auxiliary"},
-				{Name: "capacity", Type: "int", Description: "Default capacity"},
+				{Name: "capacity", Type: "int", Description: "Seats the resource can host. Refused with 422 when the resource's category is (or becomes) equipment."},
 			},
 			ForensicFields: []string{"name", "category", "capacity"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -195,7 +195,7 @@ func resourcesDefs() []CommandDef {
 				"pivot's optional fields (capacity / seniority).",
 			Flags: []FlagDef{
 				{Name: "resource-id", Type: "string", Required: true, Description: "Resource to attach"},
-				{Name: "capacity", Type: "int", Description: "Override the Resource's capacity for this attachment"},
+				{Name: "capacity", Type: "int", Description: "Override the Resource's capacity for this attachment. This is the capacity bookings read, so setting it makes the resource a candidate for the booking's single main slot — refused with 422 for an equipment resource."},
 				{Name: "seniority", Type: "int", Description: "Pivot-level seniority override"},
 			},
 			ForensicFields: []string{"resource-id", "capacity", "seniority"},

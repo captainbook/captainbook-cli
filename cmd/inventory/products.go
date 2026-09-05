@@ -114,6 +114,8 @@ func productsDefs() []CommandDef {
 				{Name: "product-code", Type: "string", Description: "Tenant SKU (auto-gen from title when omitted)"},
 				{Name: "status", Type: "string", Description: "draft|published"},
 				{Name: "schedule-type", Type: "string", Description: "date|datetime"},
+				{Name: "delivery-method", Type: "string", Description: "TICKET|VOUCHER — \"Ticket type\". VOUCHER (the default) = one ticket per booking; TICKET = one per guest. Asking for TICKET needs the update_delivery_method permission."},
+				{Name: "redemption-method", Type: "string", Description: "MANIFEST|DIGITAL|PRINT — how the customer is admitted. MANIFEST (the default) = no identification needed. Anything else needs the update_delivery_method permission."},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
 				{Name: "from-price-label", Type: "string", Description: "Caption next to from-price (e.g. \"From €50/person\")"},
@@ -130,7 +132,7 @@ func productsDefs() []CommandDef {
 				{Name: "cancellation-policy", Type: "string", Description: "Inline policy text (mutually exclusive with --cancellation-policy-link)"},
 				{Name: "cancellation-policy-link", Type: "string", Description: "External policy URL (mutually exclusive with --cancellation-policy)"},
 			},
-			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person"},
+			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person", "delivery-method", "redemption-method"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"title":                             "title",
@@ -143,6 +145,8 @@ func productsDefs() []CommandDef {
 					"product-code":                      "product_code",
 					"status":                            "status",
 					"schedule-type":                     "schedule_type",
+					"delivery-method":                   "delivery_method",
+					"redemption-method":                 "redemption_method",
 					"capacity":                          "capacity",
 					"from-price":                        "from_price",
 					"from-price-label":                  "from_price_label",
@@ -181,7 +185,20 @@ func productsDefs() []CommandDef {
 				"MutationResult.side_effects. Switching --schedule-type=date collapses Availability " +
 				"windows to full-day spans and deletes resourceables. Same implicit overrides as " +
 				"create: --must-validate-cancellation-policy=false nulls both policy fields; " +
-				"--is-private=false forces is_priced_per_person=true and use_alternate_tier_pricing=false.",
+				"--is-private=false forces is_priced_per_person=true and use_alternate_tier_pricing=false.\n\n" +
+				"CHANGING --delivery-method reissues the tickets of every booking departing in " +
+				"the next 10 years: the QR codes those customers are already holding stop " +
+				"scanning, and NOTHING notifies them — the operator has to resend. So the " +
+				"change is refused with TICKET_REISSUE_NOT_CONFIRMED unless you also pass " +
+				"--confirm-ticket-reissue. Run it under --dry-run first: that is never " +
+				"refused and it reports ticket_reissue.affected_bookings, which is how you " +
+				"find out the blast radius before deciding. The refusal is raised before the " +
+				"write, so it releases the idempotency key — the retry carrying the " +
+				"confirmation may reuse it.\n\n" +
+				"Changing --delivery-method or --redemption-method also requires the " +
+				"update_delivery_method permission. Sending back the value the product " +
+				"already has is not a change: no permission needed, nothing reissued, so an " +
+				"ordinary read-modify-write round trip stays safe without it.",
 			Flags: []FlagDef{
 				{Name: "title", Type: "string", Description: "Product title"},
 				{Name: "description", Type: "string", Description: "Product description (translatable rich text)"},
@@ -192,6 +209,9 @@ func productsDefs() []CommandDef {
 				{Name: "product-code", Type: "string", Description: "Tenant SKU"},
 				{Name: "status", Type: "string", Description: "draft|published"},
 				{Name: "schedule-type", Type: "string", Description: "date|datetime"},
+				{Name: "delivery-method", Type: "string", Description: "TICKET|VOUCHER — \"Ticket type\". CHANGING it reissues existing tickets and needs --confirm-ticket-reissue plus the update_delivery_method permission. Sending the stored value is not a change."},
+				{Name: "redemption-method", Type: "string", Description: "MANIFEST|DIGITAL|PRINT — how the customer is admitted. Changing it needs the update_delivery_method permission but reissues nothing."},
+				{Name: "confirm-ticket-reissue", Type: "bool", Description: "Acknowledge that changing --delivery-method invalidates the tickets customers already hold, un-notified. Nothing is stored. Ignored when --delivery-method is absent or unchanged, and never needed under --dry-run."},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
 				{Name: "from-price-label", Type: "string", Description: "Caption next to from-price"},
@@ -208,7 +228,7 @@ func productsDefs() []CommandDef {
 				{Name: "cancellation-policy", Type: "string", Description: "Inline policy text"},
 				{Name: "cancellation-policy-link", Type: "string", Description: "External policy URL"},
 			},
-			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person"},
+			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person", "delivery-method", "redemption-method", "confirm-ticket-reissue"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
@@ -224,6 +244,9 @@ func productsDefs() []CommandDef {
 					"product-code":                      "product_code",
 					"status":                            "status",
 					"schedule-type":                     "schedule_type",
+					"delivery-method":                   "delivery_method",
+					"redemption-method":                 "redemption_method",
+					"confirm-ticket-reissue":            "confirm_ticket_reissue",
 					"capacity":                          "capacity",
 					"from-price":                        "from_price",
 					"from-price-label":                  "from_price_label",

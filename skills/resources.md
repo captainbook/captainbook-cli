@@ -19,7 +19,7 @@ A `Resource` is a piece of physical or human inventory bound to a `ProductOption
 
 - `--category` (enum): `guide | asset | equipment | auxiliary` — the kind of resource. Used by the dashboard to filter and group.
 - `--type` (free-form string): the tenant-pickable label (`Sailboat`, `Senior Guide`, `Wetsuit Kit`, `Yoga Studio A`).
-- `--capacity` (optional int): null = no per-resource cap (the resource doesn't bound seat count by itself; capacity is option-level). Set this when the resource has its own seat limit (a 6-pax boat).
+- `--capacity` (optional int): null = no per-resource cap (the resource doesn't bound seat count by itself; capacity is option-level). Set this when the resource has its own seat limit (a 6-pax boat). **Refused with 422 for `--category equipment`** — capacity is what makes a resource a booking's single main resource, and equipment is never that.
 
 ## Worked examples
 
@@ -86,6 +86,7 @@ ceebee inventory resources restore 2
 
 - ⚠️ **Detach is hard, not soft.** No restore. Re-attach with the original `resource_id` if you need to undo.
 - ⚠️ **Pivot capacity vs Resource capacity** — `attach --capacity N` overrides the Resource's default for that one product option. Don't confuse them: setting `Resource.capacity=8` then `attach --capacity 2` means "this resource normally seats 8, but on THIS option only 2 of those seats are available."
+- ⚠️ **Pivot capacity is what makes a resource "main".** `Booking::attachResources()` reads the pivot capacity, so `attach --capacity N` doesn't just cap seats — it moves the resource into the single main slot the booking competes over. Setting it on an equipment resource is refused with 422 rather than silently nulled, because a resource that claims seats nothing downstream honours is worse than a rejected write.
 - ⚠️ **Re-attaching is a no-op rewrite.** Idempotent: posting attach twice with different `--capacity` values updates the pivot, doesn't error. Use this on purpose to bump capacity without explicitly detaching.
 - ⚠️ **No server-side dry-run on delete, restore, or detach.** CLI rejects `--dry-run` on those routes.
 - ⚠️ **`category` is not free-form.** Server validates against the enum (`guide|asset|equipment|auxiliary`). The CLI's enum gate catches bad values before sending. Free-form lives on `--type`.
@@ -102,13 +103,15 @@ Don't conflate these — they use different endpoints, different id spaces, and 
 | Shape | one resource per call, incremental | full desired state, replaces |
 | Concurrency guard | none (idempotent rewrite) | `expected_resource_state_token`, 409 on stale |
 
-Option-level attachment defines the *pool*; booking-level assignment picks *from* that pool for one trip. `bookings available-resources <id>` is what enumerates the legal picks — a resource that was never attached to the booking's ProductOption won't appear there, and forcing it anyway returns `BOOKING_RESOURCE_CONFLICT`.
+Option-level attachment defines the *pool*; booking-level assignment picks *from* that pool for one trip. The `bookings available-resources` / `available-equipment-resources` / `available-auxiliary-resources` lists enumerate the legal picks — a resource that was never attached to the booking's ProductOption won't appear in any of them, and forcing it anyway returns `BOOKING_RESOURCE_CONFLICT` with a `*_RESOURCE_NOT_ON_PRODUCT_OPTION` code.
+
+Which of the three lists a resource lands in is decided by the **pivot capacity**, not by `--category`: a non-auxiliary resource with a pivot capacity is the booking's single *main* resource, one without is *equipment*. That's why `attach-resource --capacity` is refused for an equipment resource — it would make the kit compete for the guide's slot.
 
 To answer "which trips is this auxiliary resource on?", resolve the id from `resources list --category auxiliary`, then pass it to `bookings list --resource-id <id> --from … --to …`.
 
 ## See also
 
-- [bookings.md](bookings.md) — assigning resources to an individual booking (`available-resources`, `set-resources`).
+- [bookings.md](bookings.md) — assigning resources to an individual booking (`available-resources`, `available-equipment-resources`, `available-auxiliary-resources`, `set-resources`).
 - [product-options.md](product-options.md) — the parent of resource attachments.
 - [availabilities.md](availabilities.md) — `create-rule` materializes Availability rows that honor attached Resources.
 - [products.md](products.md) — the schedule_type and is_private settings interact with resource constraints during booking.

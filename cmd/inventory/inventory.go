@@ -634,6 +634,8 @@ func errorCode(err error) string {
 		return "BOOKING_RESOURCE_STATE_STALE"
 	case *invpkg.BookingResourceConflictError:
 		return "BOOKING_RESOURCE_CONFLICT"
+	case *invpkg.TicketReissueNotConfirmedError:
+		return "TICKET_REISSUE_NOT_CONFIRMED"
 	case *invpkg.WorkflowNotEditableError:
 		return "WORKFLOW_NOT_EDITABLE"
 	case *invpkg.WorkflowNotActivatableError:

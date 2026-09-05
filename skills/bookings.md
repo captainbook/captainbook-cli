@@ -10,6 +10,7 @@ A `Booking` is a customer reservation against a `ProductOption` on a specific da
 | `inventory bookings get <id>` | GET /bookings/{id} | `cli:read` | n/a |
 | `inventory bookings transactions <id>` | GET /bookings/{id}/transactions | `cli:read` | n/a |
 | `inventory bookings available-resources <id>` | GET /bookings/{id}/resources/available | `cli:read` | n/a |
+| `inventory bookings available-equipment-resources <id>` | GET /bookings/{id}/resources/equipment/available | `cli:read` | n/a |
 | `inventory bookings available-auxiliary-resources <id>` | GET /bookings/{id}/resources/auxiliary/available | `cli:read` | n/a |
 | `inventory bookings set-resources <id>` | POST /bookings/{id}/resources | `cli:write` | body |
 | `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` | body |
@@ -99,19 +100,44 @@ ceebee inventory bookings set-resources bk_42 \
   --expected-resource-state-token "$TOKEN"
 ```
 
+A booking's resources come in **three** kinds. The split is the product option's pivot capacity, not the resource's `category`: a non-auxiliary resource *with* a capacity competes for the single main slot, one *without* is equipment.
+
+| kind | what it is | how many | flag |
+| --- | --- | --- | --- |
+| main | the guide or the asset (boat, vehicle, room) | exactly one | `--main-resource-id` |
+| equipment | the kit that goes out with every departure | many | `--equipment-resource-ids` |
+| auxiliary | everything else attached as auxiliary | many | `--auxiliary-resource-ids` |
+
 `set-resources` is a **desired-state** write, not a delta:
 
-- `--main-resource-id` switches the single primary (non-auxiliary) resource.
-- `--auxiliary-resource-ids` **replaces the entire auxiliary set**. Pass `--auxiliary-resource-ids=1,2` to end up with exactly those two; pass `--auxiliary-resource-ids=` (empty) to clear every auxiliary.
-- Omitting a flag leaves that half of the assignment untouched.
+- `--main-resource-id` **assigns** the single main resource: it replaces the current one if there is one, and makes the first assignment if the booking has none.
+- `--equipment-resource-ids` and `--auxiliary-resource-ids` each **replace their whole set**. Pass `--auxiliary-resource-ids=1,2` to end up with exactly those two; pass `--auxiliary-resource-ids=` (empty) to clear every auxiliary.
+- Omitting a flag leaves that kind untouched.
 
-Candidates come from `available-resources` (main) and `available-auxiliary-resources` (auxiliary), which apply the same availability and concurrency checks as the back-office switcher.
+Only `--main-resource-id` may name a capacity-bearing resource. Naming one under either plural flag is how you'd ask for a *second* guide or asset, and it's refused (`EQUIPMENT_RESOURCE_IS_MAIN` / `AUXILIARY_RESOURCE_IS_MAIN`).
+
+Candidates come from `available-resources` (main), `available-equipment-resources` (equipment) and `available-auxiliary-resources` (auxiliary). The main and auxiliary lists apply the same availability and concurrency checks as the back-office switcher; the equipment list applies none, because a null pivot capacity means the resource isn't rationed per booking — every candidate is always assignable.
 
 ### 5. Handling the two 409s from `set-resources`
 
 `BOOKING_RESOURCE_STATE_STALE` — someone changed the booking's resources between your read and your write. The token you sent is no longer current. **Re-read, re-decide, re-send.** Never blind-retry the same body: the state you based the decision on is gone, and the reason the server rejected you is precisely that it can't tell whether your intent still holds.
 
-`BOOKING_RESOURCE_CONFLICT` — your view was current, but the selection itself is illegal (resource double-booked at that slot, wrong category for the slot you put it in, not attached to the booking's ProductOption, or soft-deleted). Re-reading won't help. Re-run `available-resources` / `available-auxiliary-resources` and pick from what comes back.
+`BOOKING_RESOURCE_CONFLICT` — your view was current, but the selection itself is illegal. Re-reading won't help. Re-run the `available-*` lists and pick from what comes back.
+
+The server doesn't short-circuit: it plans the whole write and reports **every** refused id at once in `error.details.rejections[]`, so one round trip tells you everything to fix. Each entry's `code` is `<FIELD>_RESOURCE_<PROBLEM>`, where `<FIELD>` is the flag you put the id in (`MAIN` / `EQUIPMENT` / `AUXILIARY`) — not what the resource turned out to be. So a wrong-field mistake names both halves:
+
+| code | meaning |
+| --- | --- |
+| `<FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION` | the booking's product option doesn't carry that resource at all — attach it to the option first |
+| `<FIELD>_RESOURCE_IS_MAIN` | it's capacity-bearing. A booking holds one; use `--main-resource-id` |
+| `<FIELD>_RESOURCE_IS_EQUIPMENT` | it has no pivot capacity. Use `--equipment-resource-ids` |
+| `<FIELD>_RESOURCE_IS_AUXILIARY` | it's auxiliary. Use `--auxiliary-resource-ids` |
+| `MAIN_RESOURCE_NOT_AVAILABLE` | it *is* a main resource on the option, but can't take this booking — overlapping departure, party too large, or inside a cool-off window |
+| `AUXILIARY_RESOURCE_NOT_AVAILABLE` | it *is* auxiliary on the option, but is on an overlapping departure or can't host this party size |
+
+There is no `EQUIPMENT_RESOURCE_NOT_AVAILABLE`: equipment is never rationed per booking, so it's either on the option or it isn't.
+
+`MAIN_RESOURCE_NOT_AVAILABLE` can also land on a request whose dry run was clean — a concurrent booking can take the resource in between, and `--expected-resource-state-token` can't see that (it covers *this* booking's assignments, and none of them moved). Re-read the candidates and retry.
 
 ### 6. Cancel applying the product's policy (CS only)
 
@@ -181,6 +207,8 @@ A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` 
 - ⚠️ **`refund` defaults `notify_customer` to `false`**, opposite of `cancel` which defaults to `true`. Different ergonomics for different ops: cancellation customers expect an email; refund-debugging engineers don't want to spam them.
 - ⚠️ **Date-time vs date filters.** `bookings list --from 2026-05-01` matches bookings whose **start date** is May 1 or later (date, tenant TZ). `transactions list --from "2026-05-01T00:00:00Z"` is a UTC date-time on `Transaction.created_at`. Don't mix.
 - ⚠️ **`set-resources` replaces, it doesn't append.** `--auxiliary-resource-ids=7` on a booking that already has kits 3 and 5 leaves it with *only* kit 7. Read the current set first and send the full intended list.
+- ⚠️ **Moving the main resource silently restores the full equipment set.** Switching the main detaches and re-attaches the option's *whole* equipment set, so a booking you'd previously narrowed to a subset comes back with all of it. Send `--equipment-resource-ids` alongside `--main-resource-id` to keep a narrowed set. The dry run reports this faithfully — read it.
+- ⚠️ **An unrecognised field is now a 422, not a silent drop.** Every field on this request is optional, so a body carrying only a misspelt one used to validate, plan nothing, and return `200` with `before` equal to `after` — indistinguishable from a write that worked.
 - ⚠️ **The state token isn't optional and isn't reusable.** `--expected-resource-state-token` is required, and it's invalidated by any resource change on that booking — including your own successful write. Re-read before each subsequent `set-resources` on the same booking; the response's `data.resource_state_token` is the new one.
 - ⚠️ **Don't retry through a `BOOKING_RESOURCE_STATE_STALE`.** It means the world moved, not that the request was malformed. Retrying the identical body is how you clobber someone else's change the moment the guard happens to line up. Re-read and re-decide.
 - ⚠️ **`--resource-id` on list matches active resources only.** A soft-deleted resource yields an empty page, not a 404 — don't read that as "this resource was never used".

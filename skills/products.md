@@ -101,8 +101,36 @@ Delete does NOT support `--dry-run` server-side.
 
 `--schedule-type date` means customer picks a date only (whole-day slots). `--schedule-type datetime` means customer picks a date and a starting time. Switching from `datetime` to `date` cascades: existing Availability `from`/`to` windows collapse to full-day spans, and `resourceables` rows for the option are deleted (date products don't bind resources).
 
+### 8. Ticketing: change the ticket type safely
+
+`--delivery-method` is the dashboard's "Ticket type": `VOUCHER` (the default) issues one ticket for the whole booking, `TICKET` issues one per guest. It decides the shape of the QR tokens a booking carries, and therefore how attendance is counted. `--redemption-method` is how the customer proves they're booked: `MANIFEST` (default, no identification needed), `DIGITAL` (digital or printed accepted), or `PRINT` (printed only).
+
+Changing `--delivery-method` on a product that has bookings **deletes every ticket on every booking departing in the next 10 years and issues replacements**. The QR codes those customers already hold stop scanning, and *nothing notifies them* — the operator has to resend. So always read the blast radius first:
+
+```bash
+# 1. How many bookings would this invalidate? --dry-run is NEVER refused.
+ceebee inventory products update 42 \
+  --delivery-method TICKET \
+  --dry-run --format json | jq '.data.ticket_reissue'
+# → {"delivery_method_from":"VOUCHER","delivery_method_to":"TICKET",
+#    "affected_bookings":12,"customers_notified":false}
+
+# 2. Only then, and only if the operator accepts resending 12 sets of tickets:
+ceebee inventory products update 42 \
+  --delivery-method TICKET \
+  --confirm-ticket-reissue
+```
+
+Without `--confirm-ticket-reissue` step 2 is refused with `422 TICKET_REISSUE_NOT_CONFIRMED`, whose `error.details` carries the same four keys the dry run returns — so one renderer covers both. The refusal is raised *before* the write, so it releases its idempotency key: the retry carrying the confirmation may reuse the same one.
+
+Not refused when the product has no bookings in that window (`affected_bookings: 0` — nothing to invalidate), when the submitted value equals the stored one (not a change), or under `--dry-run`.
+
+`affected_bookings` is an **estimate, not an outcome**: it's counted just before the write, and the job re-reads its own window afterwards, so a booking taken in between is reissued without being counted. It is also *not* scoped to your business unit, because the job isn't either — a scoped number would promise a smaller blast radius than the one that actually lands.
+
 ## Pitfalls
 
+- ⚠️ **Changing either ticketing field needs the `update_delivery_method` permission** — the single permission the Ticketing form's Update button carries. The gate is on the *change*, not the key: both fields are on the read shape, so echoing back the stored value is free. That keeps the ordinary read-modify-write round trip, and "GET a product, POST it back to clone it", working for a caller who never touches ticketing. On `products create` there's no stored row to compare against, so the comparison is against the column default — sending `VOUCHER` / `MANIFEST`, or omitting the fields, needs nothing.
+- ⚠️ **`--redemption-method` reissues nothing.** Only `--delivery-method` invalidates tickets. Changing the redemption method alone still needs the permission, but no confirmation.
 - ⚠️ **Cascade on delete:** `Product::$cascadeDeletes = ['options']` — soft-deleting a Product cascades to its `ProductOption`s, and each option in turn cascades to its `virtualProductOption` and `discount`. **`PricingTier`s and `Availability` rows are NOT cascaded** — clean those up separately or restore later may leave orphans visible.
 - ⚠️ **`delete` has no server dry-run.** The CLI rejects `--dry-run` on `products delete` at parse time. To preview cascade impact, fetch the option count first: `ceebee inventory product-options list --product-id 42 --format json | jq '.data | length'`.
 - ⚠️ **Implicit-override traps:**
