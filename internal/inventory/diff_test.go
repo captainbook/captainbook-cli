@@ -207,7 +207,14 @@ func TestRenderDiff_WouldApplyFalse(t *testing.T) {
 	}
 	out := buf.String()
 	mustContain(t, out, "(would_apply: false)")
-	mustContain(t, out, "Server reports would_apply=false")
+	// The server sets would_apply=true on every dry run, so this branch is only
+	// reachable after a real commit. Telling the user it "will not be applied"
+	// there is a lie, and the most dangerous place for it is a committed ticket
+	// reissue that already invalidated live QR codes.
+	mustContain(t, out, "Committed")
+	if strings.Contains(out, "will not be applied") {
+		t.Errorf("would_apply=false is the COMMITTED path; must not claim the change was not applied:\n%s", out)
+	}
 	if strings.Contains(out, "Run without --dry-run") {
 		t.Errorf("would_apply=false should not show 'Run without --dry-run' line:\n%s", out)
 	}
@@ -273,6 +280,95 @@ func TestRenderDiff_SideEffects(t *testing.T) {
 	mustContain(t, out, "Side effects (would run on apply):")
 	mustContain(t, out, "mail GiftCertVoidedMail: to: alice@example.com")
 	mustContain(t, out, "stripe refund:re_xyz: amount: 5000 EUR")
+}
+
+// A delivery_method flip renders as an unremarkable one-line field change.
+// The blast radius only reaches the operator if the sibling ticket_reissue
+// block is parsed and printed, so assert it is.
+func TestRenderDiff_TicketReissue(t *testing.T) {
+	env := DiffEnvelope{
+		WouldApply: true,
+		Diff: DiffPayload{
+			Before: map[string]interface{}{"id": "42", "delivery_method": "VOUCHER"},
+			After:  map[string]interface{}{"id": "42", "delivery_method": "TICKET"},
+		},
+		TicketReissue: &TicketReissue{
+			From: "VOUCHER", To: "TICKET", AffectedBookings: 12, CustomersNotified: false,
+		},
+	}
+	var buf bytes.Buffer
+	if err := RenderProductDiff(&buf, "42", env); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := buf.String()
+	mustContain(t, out, "Ticket reissue: VOUCHER -> TICKET, reissuing tickets for 12 existing booking(s).")
+	mustContain(t, out, "NOT notified")
+	mustContain(t, out, "--confirm-ticket-reissue")
+}
+
+// customers_notified is always false today, but the renderer branches on it.
+// If the server ever starts notifying, the "you have to resend" line becomes a
+// lie — so it must be tied to the flag, not printed unconditionally.
+func TestRenderDiff_TicketReissueCustomersNotified(t *testing.T) {
+	env := DiffEnvelope{
+		WouldApply: true,
+		Diff: DiffPayload{
+			Before: map[string]interface{}{"id": "42", "delivery_method": "VOUCHER"},
+			After:  map[string]interface{}{"id": "42", "delivery_method": "TICKET"},
+		},
+		TicketReissue: &TicketReissue{
+			From: "VOUCHER", To: "TICKET", AffectedBookings: 3, CustomersNotified: true,
+		},
+	}
+	var buf bytes.Buffer
+	if err := RenderProductDiff(&buf, "42", env); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := buf.String()
+	mustContain(t, out, "Ticket reissue: VOUCHER -> TICKET, reissuing tickets for 3 existing booking(s).")
+	if strings.Contains(out, "NOT notified") {
+		t.Errorf("claimed customers are not notified when customers_notified=true:\n%s", out)
+	}
+}
+
+// affected_bookings 0 means nothing is currently invalidated and the server
+// does not require the confirmation, so the renderer must not demand it.
+func TestRenderDiff_TicketReissueZeroBookings(t *testing.T) {
+	env := DiffEnvelope{
+		WouldApply: true,
+		Diff: DiffPayload{
+			Before: map[string]interface{}{"id": "42", "delivery_method": "VOUCHER"},
+			After:  map[string]interface{}{"id": "42", "delivery_method": "TICKET"},
+		},
+		TicketReissue: &TicketReissue{From: "VOUCHER", To: "TICKET", AffectedBookings: 0},
+	}
+	var buf bytes.Buffer
+	if err := RenderProductDiff(&buf, "42", env); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if strings.Contains(buf.String(), "--confirm-ticket-reissue") {
+		t.Errorf("demanded confirmation for 0 affected bookings:\n%s", buf.String())
+	}
+}
+
+// No ticket_reissue block means the request never moved delivery_method —
+// nothing to warn about, and a stray warning here would train operators to
+// ignore it.
+func TestRenderDiff_NoTicketReissueWhenAbsent(t *testing.T) {
+	env := DiffEnvelope{
+		WouldApply: true,
+		Diff: DiffPayload{
+			Before: map[string]interface{}{"id": "42", "title": "Old"},
+			After:  map[string]interface{}{"id": "42", "title": "New"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := RenderProductDiff(&buf, "42", env); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if strings.Contains(buf.String(), "Ticket reissue") {
+		t.Errorf("unexpected reissue block:\n%s", buf.String())
+	}
 }
 
 func TestFormatMoney(t *testing.T) {

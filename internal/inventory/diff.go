@@ -60,6 +60,22 @@ type DiffEnvelope struct {
 	WouldApply  bool         `json:"would_apply"`
 	Diff        DiffPayload  `json:"diff"`
 	SideEffects []SideEffect `json:"side_effects,omitempty"`
+	// TicketReissue is present on PATCH /products/{id} — preview and commit
+	// alike — only when the request moves `delivery_method`. It is a sibling
+	// of `diff`, not a field inside it, so without parsing it here the field
+	// flip would render as an ordinary one-line change and the operator would
+	// never see how many customers it strands.
+	TicketReissue *TicketReissue `json:"ticket_reissue,omitempty"`
+}
+
+// TicketReissue mirrors the spec's `ticket_reissue` block: how many bookings
+// a `delivery_method` change reissues tickets for, and the standing fact that
+// none of those customers are told.
+type TicketReissue struct {
+	From              string `json:"delivery_method_from"`
+	To                string `json:"delivery_method_to"`
+	AffectedBookings  int64  `json:"affected_bookings"`
+	CustomersNotified bool   `json:"customers_notified"`
 }
 
 // DiffPayload mirrors the spec's `diff` sub-object.
@@ -253,6 +269,29 @@ func renderDiff(w io.Writer, env DiffEnvelope, opts renderOptions) error {
 		}
 	}
 
+	// Before side effects: this is the one thing on a product diff that
+	// destroys something the customer already holds, so it must not be read
+	// as just another row.
+	if tr := env.TicketReissue; tr != nil {
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Ticket reissue: %s -> %s, reissuing tickets for %d existing booking(s).\n",
+			tr.From, tr.To, tr.AffectedBookings); err != nil {
+			return err
+		}
+		if !tr.CustomersNotified {
+			if _, err := fmt.Fprintln(w, "  Those customers' existing tickets or vouchers stop scanning, and they are NOT notified — you have to resend."); err != nil {
+				return err
+			}
+		}
+		if env.WouldApply && tr.AffectedBookings > 0 {
+			if _, err := fmt.Fprintln(w, "  Applying this requires --confirm-ticket-reissue."); err != nil {
+				return err
+			}
+		}
+	}
+
 	if len(env.SideEffects) > 0 {
 		if _, err := fmt.Fprintln(w); err != nil {
 			return err
@@ -278,7 +317,13 @@ func renderDiff(w io.Writer, env DiffEnvelope, opts renderOptions) error {
 		_, err := fmt.Fprintln(w, "Run without --dry-run to apply.")
 		return err
 	}
-	_, err := fmt.Fprintln(w, "Server reports would_apply=false; this preview will not be applied.")
+	// would_apply is true for EVERY dry run (the server sets it unconditionally
+	// on that path), so this branch is reachable only on a committed mutation —
+	// where the server also ships an optional before/after diff. The old wording
+	// read false as "the preview was refused" and told the user the change would
+	// not be applied, which is exactly backwards on the one path that gets here:
+	// it already was.
+	_, err := fmt.Fprintln(w, "Committed (would_apply=false): this is the applied change, not a preview.")
 	return err
 }
 
