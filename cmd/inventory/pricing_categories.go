@@ -90,7 +90,7 @@ func pricingCategoriesDefs() []CommandDef {
 				{Name: "max-age", Type: "int", Description: "Maximum age (optional)"},
 				{Name: "is-internal", Type: "bool", Description: "Internal categories are excluded from public-facing checkout flows."},
 			},
-			ForensicFields: []string{"product-id", "name", "type"},
+			ForensicFields: []string{"product-id", "name", "type", "is-internal"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"product-id":  "product_id",
@@ -128,7 +128,7 @@ func pricingCategoriesDefs() []CommandDef {
 				{Name: "max-age", Type: "int", Description: "Maximum age"},
 				{Name: "is-internal", Type: "bool", Description: "Internal categories are excluded from public-facing checkout flows."},
 			},
-			ForensicFields: []string{"name", "type"},
+			ForensicFields: []string{"name", "type", "is-internal"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {

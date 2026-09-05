@@ -93,7 +93,7 @@ func resourcesDefs() []CommandDef {
 				{Name: "capacity", Type: "int", Description: "Seats the resource can host (omit = no per-resource cap). Refused with 422 when --category is equipment: capacity is what makes a resource a booking's single main resource, and equipment is never that."},
 				{Name: "rating", Type: "float", Description: "Quality/seniority rating (float, >= 0). Optional — omit to leave unrated."},
 			},
-			ForensicFields: []string{"name", "type", "category", "capacity"},
+			ForensicFields: []string{"name", "type", "category", "capacity", "rating"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"name":     "name",
@@ -128,7 +128,7 @@ func resourcesDefs() []CommandDef {
 				{Name: "capacity", Type: "int", Description: "Seats the resource can host. Refused with 422 when the resource's category is (or becomes) equipment."},
 				{Name: "rating", Type: "float", Description: "Quality/seniority rating (float, >= 0). Optional — omit to leave unrated."},
 			},
-			ForensicFields: []string{"name", "category", "capacity"},
+			ForensicFields: []string{"name", "category", "capacity", "rating"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
