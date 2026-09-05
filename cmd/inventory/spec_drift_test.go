@@ -54,10 +54,6 @@ type cmdLit struct {
 	Ability  string // "cli:read" / "cli:write" / "cli:cs"; "" when ungated (whoami)
 	Flags    []flagLit
 	FieldMap map[string]string // flag name → JSON key, from JSONBodyFromArgs map literal
-	// ForensicFields is the kebab-case flag-name allow-list copied into the
-	// audit entry's forensic_summary. Captured here so it can be checked
-	// against Flags — see TestCommandDefIntegrity_ForensicFieldsNameRealFlags.
-	ForensicFields []string
 }
 
 type flagLit struct {
@@ -133,8 +129,6 @@ func extractCmdLit(file string, cl *ast.CompositeLit) cmdLit {
 			lit.Ability = abilityConstValue(kv.Value)
 		case "Flags":
 			lit.Flags = parseFlagsLit(kv.Value)
-		case "ForensicFields":
-			lit.ForensicFields = parseStringSliceLit(kv.Value)
 		case "Run":
 			lit.FieldMap = parseRunFieldMap(kv.Value)
 		}
@@ -168,23 +162,6 @@ func stringLit(e ast.Expr) string {
 		s = s[1 : len(s)-1]
 	}
 	return s
-}
-
-// parseStringSliceLit extracts the elements of a []string{...} literal.
-// Non-literal elements (a const or a variable) yield "" and are skipped by the
-// caller rather than silently passing as a valid flag name.
-func parseStringSliceLit(e ast.Expr) []string {
-	cl, ok := e.(*ast.CompositeLit)
-	if !ok {
-		return nil
-	}
-	var out []string
-	for _, elt := range cl.Elts {
-		if v := stringLit(elt); v != "" {
-			out = append(out, v)
-		}
-	}
-	return out
 }
 
 func parseFlagsLit(e ast.Expr) []flagLit {
@@ -611,30 +588,43 @@ func sortedKeys(m map[string]bool) []string {
 // `confirm-ticket-reissue` entry sat in `products create` (which has no such
 // flag; only update does) and nothing caught it.
 //
+// Both sides are read from the LIVE cobra tree rather than the CommandDef AST,
+// and that is load-bearing rather than incidental. Commands may assign either
+// Flags or ForensicFields from a variable instead of an inline literal
+// (`Flags: resendBookingConfirmationFlags`; `availabilities bulk-update`
+// assembles its ForensicFields in a loop), and the AST parser only understands
+// literals. An AST-based check does not merely lose precision on those — it
+// skips them in silence, and a `checked == 0` guard cannot notice because the
+// literal-based commands keep the count healthy. The live tree has no such
+// blind spot, and it is also what actually populates args.Flags, which is what
+// this invariant is about.
+//
 // What this test deliberately does NOT check is whether the RIGHT flags are
 // listed. "Business-meaningful" is a judgment call and belongs in review.
 func TestCommandDefIntegrity_ForensicFieldsNameRealFlags(t *testing.T) {
-	cmds := walkInventoryCmdLits(t)
-	if len(cmds) == 0 {
-		t.Fatal("no CommandDef literals found — AST walker broken")
-	}
-
-	// verb+path -> every flag name the live tree declares for it. Built from
-	// the live tree because several commands assign Flags from a shared
-	// package-level variable rather than an inline literal, and parseFlagsLit
-	// only understands literals — trusting the AST there reports flags as
-	// missing that are right there in --help. The live tree is also what
-	// actually populates args.Flags, which is what this invariant is about.
-	liveFlags := map[string]map[string]bool{}
+	checked, commands := 0, 0
 	var walk func(cm *cobra.Command)
 	walk = func(cm *cobra.Command) {
-		verb, path := cm.Annotations["verb"], cm.Annotations["path"]
-		if verb != "" && path != "" {
-			key := verb + " " + path
-			if liveFlags[key] == nil {
-				liveFlags[key] = map[string]bool{}
+		if raw := cm.Annotations["forensicFields"]; raw != "" {
+			commands++
+			declared := map[string]bool{}
+			cm.Flags().VisitAll(func(f *pflag.Flag) { declared[f.Name] = true })
+			for _, name := range strings.Split(raw, ",") {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				checked++
+				if declared[name] {
+					continue
+				}
+				t.Errorf("%q: ForensicFields lists %q, but the command declares no such flag.\n"+
+					"  forensic_summary can only ever emit keys present in args.Flags, and args.Flags is\n"+
+					"  built solely from Flags — so this entry is dead and the audit log will silently\n"+
+					"  omit it. Either add the flag or drop the entry.\n"+
+					"  declared flags: %s",
+					cm.CommandPath(), name, strings.Join(sortedKeys(declared), ", "))
 			}
-			cm.Flags().VisitAll(func(f *pflag.Flag) { liveFlags[key][f.Name] = true })
 		}
 		for _, child := range cm.Commands() {
 			walk(child)
@@ -642,46 +632,10 @@ func TestCommandDefIntegrity_ForensicFieldsNameRealFlags(t *testing.T) {
 	}
 	walk(Cmd())
 
-	checked := 0
-	for _, c := range cmds {
-		if len(c.ForensicFields) == 0 || c.Verb == "" || c.Path == "" {
-			continue
-		}
-		// Resolve the flag list from the LIVE cobra tree, not from the AST.
-		// Several commands assign Flags from a shared package-level variable
-		// (`Flags: resendBookingConfirmationFlags`) rather than an inline
-		// literal, and parseFlagsLit only understands literals — so trusting
-		// the AST here reports flags as missing that are right there in
-		// --help. The live tree is also what actually populates args.Flags,
-		// which is the thing this invariant is about.
-		// Matched by verb+path rather than by Use: a CommandDef's Use is
-		// relative to its resource group ("bulk-delete", not "availabilities
-		// bulk-delete"), so it does not resolve against the tree root, while
-		// verb+path is annotated on every command and is unambiguous.
-		declared := liveFlags[c.Verb+" "+c.Path]
-		if declared == nil {
-			t.Errorf("[%s] %q: no live command binds %s %s, so its ForensicFields cannot be checked",
-				c.File, c.Use, c.Verb, c.Path)
-			continue
-		}
-		for _, name := range c.ForensicFields {
-			checked++
-			if declared[name] {
-				continue
-			}
-			t.Errorf("[%s] %q: ForensicFields lists %q, but the command declares no such flag.\n"+
-				"  forensic_summary can only ever emit keys present in args.Flags, and args.Flags is\n"+
-				"  built solely from Flags — so this entry is dead and the audit log will silently\n"+
-				"  omit it. Either add the flag or drop the entry.\n"+
-				"  declared flags: %s",
-				c.File, c.Use, name, strings.Join(sortedKeys(declared), ", "))
-		}
-	}
-
 	if checked == 0 {
-		t.Fatal("checked 0 ForensicFields entries — the extractor is broken, not the commands")
+		t.Fatal("checked 0 ForensicFields entries — the annotation or the walker is broken, not the commands")
 	}
-	t.Logf("verified %d ForensicFields entries across %d commands", checked, len(cmds))
+	t.Logf("verified %d ForensicFields entries across %d commands", checked, commands)
 }
 
 func TestSpecDrift_IdempotencyKeyThreaded(t *testing.T) {

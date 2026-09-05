@@ -783,6 +783,21 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 			c.Annotations["path"] = def.Path
 		}
 
+		// Annotate the forensic-field allow-list. Not surfaced in --help; this
+		// exists so TestCommandDefIntegrity_ForensicFieldsNameRealFlags can
+		// check every entry against the flags the command really declares.
+		// Reading it here rather than from the CommandDef AST is what makes
+		// that check total: several commands build ForensicFields (and Flags)
+		// from a variable rather than an inline literal, and an AST-based test
+		// skips those silently — `availabilities bulk-update` assembles its
+		// list in a loop, so all five subcommands went unchecked.
+		if len(def.ForensicFields) > 0 {
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations["forensicFields"] = strings.Join(def.ForensicFields, ",")
+		}
+
 		c.RunE = makeRunE(def, runner)
 		parent.AddCommand(c)
 	}
