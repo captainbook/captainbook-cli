@@ -12,6 +12,7 @@ Products are the top of the inventory hierarchy: a Product is "a thing the tenan
 | `inventory products update <id>` | PATCH /products/{id} | `cli:write` | body |
 | `inventory products delete <id>` | DELETE /products/{id} | `cli:write` | none |
 | `inventory products restore <id>` | POST /products/{id}/restore | `cli:write` | body |
+| `inventory products duplicate <id>` | POST /products/{id}/duplicate | `cli:write` | body |
 
 ## Worked examples
 
