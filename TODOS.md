@@ -688,7 +688,16 @@ union accepts both spellings), and add an `intSlice` path for bulk-update's list
 form. Note the spec refuses a list for `setting=pricing`.
 **Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
 
-## `stats` dates are resolved in the HOST's timezone, not the account's
+## ~~`stats` dates are resolved in the HOST's timezone, not the account's~~ — DONE
+
+Raised by Optibot on #27 as a blocker. Omitted `--from`/`--to` are now ABSENT from
+the query so the server applies its account-timezone defaults; `--compare` asks for
+an explicit period rather than guessing a bound host-side. `defaultFrom`/`defaultTo`
+are gone. Guarded by `TestStatsWire_OmittedPeriodIsLeftToTheServer`, which asserts
+which keys are absent — the assertion nothing had, and the reason a wrong date
+looked exactly like a right one.
+
+### Original entry
 
 `defaultFrom`/`defaultTo` in `cmd/stats.go` compute the default window from
 `time.Now()` on the machine running the CLI, and the values are then always sent.
@@ -760,7 +769,20 @@ generically.
 documented for `ForensicFields` and flag types.
 **Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
 
-## `resource-calendar` hides `unavailable_resources` in table and csv output
+## ~~`resource-calendar` hides `unavailable_resources` in table and csv output~~ — DONE
+
+Raised by Optibot on #27 as a blocker. Now emitted on stderr as
+`RESOURCE_CALENDAR_INCOMPLETE resource_id=<id> reasons=<...>`, in the same
+key=value shape as `BULK_UPDATE_ACCEPTED`, so stdout stays the data contract and
+the signal survives table, json and csv alike. Guarded by
+`TestWire_ResourceCalendarSignalsIncompleteAnswers`, which asserts the warning in
+all three formats AND that a complete answer stays silent — a signal that fires
+always is a signal that gets ignored.
+
+The general `meta`-is-dropped problem below is still open; this was the instance
+where the dropped field changed the MEANING of the result.
+
+### Original entry
 
 The spec gives `GET /resource-calendar` a top-level `unavailable_resources` field
 naming "every reason an answer is empty or partial" — a disconnected Google
@@ -920,3 +942,26 @@ install the whole chain, and assert chain MEMBERSHIP separately (see
 `TestNew_InstallsFlatErrorNormalizer` for the shape — behaviour tests on a layer
 cannot see the layer being unwired).
 **Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
+
+## The two doc-drift scanners still duplicate their scanning logic
+
+`internal/docscan` now holds the quote-aware shell cutter and `SameSet`, which fixed
+the real defect: `cmd/docs_drift_test.go` had reimplemented the cut with a naive
+`strings.Index` and reintroduced a truncation bug the inventory scanner was hardened
+against.
+
+The SCANNERS themselves are still two implementations — `scanDoc`/`parseInvocation`
+in `cmd/inventory/skills_drift_test.go` and `scanDocsForCeebee`/`parseDocInvocation`
+in `cmd/docs_drift_test.go`. They differ in more than the cutter: how the `ceebee`
+prefix is located, and which unprefixed tokens count as subcommands versus flag
+values.
+
+**Why not merged now:** reconciling those semantics means editing a working,
+load-bearing test helper on both sides at once, and a mistake there weakens doc
+validation silently rather than loudly. Sharing the cutter removed the correctness
+divergence, which was the part that mattered.
+
+**Fix:** move the fenced-block scanner into `internal/docscan` with one documented
+semantics, and have both suites pass in the root command they resolve against.
+**Raised by:** Optibot on #27 (non-blocking).
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
