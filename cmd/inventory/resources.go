@@ -26,7 +26,7 @@ func resourcesDefs() []CommandDef {
 			Use: "resources list", Short: "List resources",
 			Kind: KindRead, Verb: "GET", Path: "/resources", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "category", Type: "string", Description: "guide|asset|equipment|auxiliary"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},

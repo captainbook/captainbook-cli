@@ -65,7 +65,7 @@ func mediaDefs() []CommandDef {
 			// the item's created_at. Reading it as "created since" is the
 			// correct mental model; reading it as "edited since" is not.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on media_updated_at (surfaced as the item's created_at)"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
