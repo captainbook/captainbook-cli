@@ -41,6 +41,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 )
 
 // globalFlags are registered on the root command (cmd/root.go) or by
@@ -182,7 +184,7 @@ func parseInvocation(text string) (invocation, bool) {
 	if loc == nil {
 		return invocation{}, false
 	}
-	seg := cutAtShellOperator(text[loc[1]:])
+	seg := docscan.CutAtShellOperator(text[loc[1]:])
 	seg = strings.TrimSpace(seg)
 	if seg == "" {
 		return invocation{}, false
@@ -193,50 +195,6 @@ func parseInvocation(text string) (invocation, bool) {
 		Args:  strings.Fields(seg),
 		Flags: dedupe(flagRe.FindAllString(seg, -1)),
 	}, true
-}
-
-// shellOperators end an invocation when they appear outside quotes. `)` is
-// here for the `$(ceebee …)` capture idiom; the others end or redirect the
-// command.
-var shellOperators = []string{"&&", "||", "|", ";", "#", ">", ")"}
-
-// cutAtShellOperator truncates s at the first shell operator that is not
-// inside single or double quotes. Backslash escapes the next character
-// inside double quotes only, matching POSIX sh: inside single quotes a
-// backslash is literal, so `'\'` does not escape the closing quote.
-func cutAtShellOperator(s string) string {
-	var inSingle, inDouble bool
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		case inSingle:
-			if c == '\'' {
-				inSingle = false
-			}
-			continue
-		case inDouble:
-			if c == '\\' {
-				i++ // skip the escaped character
-				continue
-			}
-			if c == '"' {
-				inDouble = false
-			}
-			continue
-		case c == '\'':
-			inSingle = true
-			continue
-		case c == '"':
-			inDouble = true
-			continue
-		}
-		for _, op := range shellOperators {
-			if strings.HasPrefix(s[i:], op) {
-				return s[:i]
-			}
-		}
-	}
-	return s
 }
 
 func dedupe(in []string) []string {
@@ -576,8 +534,8 @@ func TestCutAtShellOperator(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := cutAtShellOperator(tc.in); got != tc.want {
-				t.Errorf("cutAtShellOperator(%q)\n = %q\nwant %q", tc.in, got, tc.want)
+			if got := docscan.CutAtShellOperator(tc.in); got != tc.want {
+				t.Errorf("docscan.CutAtShellOperator(%q)\n = %q\nwant %q", tc.in, got, tc.want)
 			}
 		})
 	}

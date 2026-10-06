@@ -356,6 +356,20 @@ type RunResult struct {
 	// response body for the audit entry.
 	ResponseID string
 
+	// Warnings are machine-readable side-channel lines written to stderr before
+	// the body is rendered, in the same key=value shape as BULK_UPDATE_ACCEPTED.
+	//
+	// They exist for response fields that change what the DATA MEANS but live
+	// outside `data`, which the table and csv renderers drop entirely. The first
+	// case is resource-calendar's `unavailable_resources`: its presence means the
+	// page is not the whole story for the ids it names, so without a signal an
+	// incomplete calendar is indistinguishable from a free resource — on a command
+	// whose entire job is answering when a resource is busy.
+	//
+	// stderr rather than stdout on purpose: stdout stays the data contract, so a
+	// script parsing JSON is unaffected while a human (and `2>&1`) still sees it.
+	Warnings []string
+
 	// AsyncJobID, when non-empty, indicates a 202 + job envelope (currently
 	// only BulkUpdateAvailabilities). The runner emits the stderr signal
 	// "BULK_UPDATE_ACCEPTED bulk_update_id=<uuid>" (D31) and exits 0.
@@ -425,6 +439,11 @@ func (r *Runner) renderResult(_ CommandDef, res *RunResult) error {
 	// continue with normal rendering of the response body.
 	if res.AsyncJobID != "" {
 		fmt.Fprintf(r.Err, "BULK_UPDATE_ACCEPTED bulk_update_id=%s\n", res.AsyncJobID)
+	}
+
+	// Side-channel warnings, before the body, for every output format.
+	for _, w := range res.Warnings {
+		fmt.Fprintln(r.Err, w)
 	}
 
 	// Dry-run with a diff envelope: in JSON mode, dump the raw body; in

@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 	"github.com/spf13/cobra"
 )
 
@@ -98,12 +99,10 @@ func parseDocInvocation(text string) (docInvocation, bool) {
 	if idx < 0 {
 		return docInvocation{}, false
 	}
-	rest := text[idx+len("ceebee "):]
-	for _, stop := range []string{"|", ">", "&&", ";", "2>"} {
-		if j := strings.Index(rest, stop); j >= 0 {
-			rest = rest[:j]
-		}
-	}
+	// Quote-aware cut, shared with the inventory scanner. A naive strings.Index
+	// truncates `--label "Shoe size (EU)"` at the `)` and then validates the
+	// prefix, so the test passes on a command it never finished reading.
+	rest := docscan.CutAtShellOperator(text[idx+len("ceebee "):])
 
 	inv := docInvocation{Text: strings.TrimSpace(text)}
 	for _, tok := range strings.Fields(rest) {

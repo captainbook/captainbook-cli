@@ -2,7 +2,10 @@ package inventory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -72,8 +75,48 @@ func resourceCalendarDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "ResourceCalendarEvent", "")
+				res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "ResourceCalendarEvent", "")
+				if res != nil {
+					// `unavailable_resources` sits OUTSIDE `data`, so the table and
+					// csv renderers drop it — and the spec is explicit that its
+					// presence "means the page is not the whole story for the ids it
+					// names". Without a signal, a disconnected calendar or a window
+					// past sync coverage renders as an empty list, which reads as
+					// "this resource is free". That is the one answer this command
+					// must never give by accident.
+					res.Warnings = append(res.Warnings, incompleteCalendarWarnings(resp.Body)...)
+				}
+				return res, perr
 			},
 		},
 	}
+}
+
+// incompleteCalendarWarnings reads the response's `unavailable_resources` map and
+// returns one machine-readable stderr line per affected resource.
+//
+// Absence of the field means every requested resource was answered completely, so
+// the quiet path stays quiet.
+func incompleteCalendarWarnings(body []byte) []string {
+	var envelope struct {
+		UnavailableResources map[string][]string `json:"unavailable_resources"`
+	}
+	if json.Unmarshal(body, &envelope) != nil || len(envelope.UnavailableResources) == 0 {
+		return nil
+	}
+
+	// Sorted so the output is stable across runs; a map would otherwise reorder.
+	ids := make([]string, 0, len(envelope.UnavailableResources))
+	for id := range envelope.UnavailableResources {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		reasons := envelope.UnavailableResources[id]
+		out = append(out, fmt.Sprintf(
+			"RESOURCE_CALENDAR_INCOMPLETE resource_id=%s reasons=%s", id, strings.Join(reasons, ",")))
+	}
+	return out
 }

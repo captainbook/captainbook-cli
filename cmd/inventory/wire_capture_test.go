@@ -1142,3 +1142,151 @@ func TestWire_FlatPlanGateErrorReachesTheUser(t *testing.T) {
 		t.Errorf("err = %q — the raw decoding failure leaked to the user", err.Error())
 	}
 }
+
+// TestWire_WorkflowNodesToleratesEmptyArrayConfig pins the one response shape that
+// made `workflows nodes` unusable by default.
+//
+// The spec types a node's `config` as an object, but Laravel serializes an EMPTY
+// config as `[]` rather than `{}`, and every trigger node has an empty config. The
+// strict typed decoder (ListWorkflowNodesWithResponse) therefore failed with
+// "cannot unmarshal array into ... config of type map[string]string" for the
+// default invocation — the very call this command's own help tells you to make
+// first — while `--kind action` and `--kind logic` happened to work because their
+// configs are populated.
+//
+// The remedy was already established five call sites away: `workflows list` and
+// `workflows get` read raw bytes for exactly this reason. This test exists because
+// the bug was first written off as upstream-only with no client remedy, which was
+// wrong, and nothing would have caught the typed path going back in.
+//
+// Value: protects=workflow-node listing survives config serialized as an empty ARRAY where the spec says object; fails_when=the closure switches back to the strict typed decoder, breaking the default invocation and --kind trigger; why_new=no test exercised this command against a realistic trigger payload, and the drift tests only compare declared flags and paths; seam=testNewRunner
+func TestWire_WorkflowNodesToleratesEmptyArrayConfig(t *testing.T) {
+	// Shaped like the real server: config is [] on triggers, populated on actions.
+	const body = `{
+	  "data": {
+	    "triggers": [
+	      {"step_type":"trigger","action_type":"booking_confirmed","name":"Booking Confirmed","config":[]}
+	    ],
+	    "actions": [
+	      {"step_type":"action","action_type":"send_notification","name":"Send Notification","config":{"template":"string"}}
+	    ]
+	  },
+	  "meta": {"request_id":"r1"}
+	}`
+
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	})
+
+	prevShared := sharedRunner
+	sharedRunner = &Runner{}
+	prev := testNewRunner
+	testNewRunner = func() (*Runner, error) { return runner, nil }
+	t.Cleanup(func() {
+		testNewRunner = prev
+		sharedRunner = prevShared
+	})
+
+	out := &bytes.Buffer{}
+	root := Cmd()
+	root.SetArgs([]string{"workflows", "nodes", "--format", "json"})
+	root.SetOut(out)
+	root.SetErr(&bytes.Buffer{})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("workflows nodes failed on a config: [] payload: %v\n"+
+			"This is the strict typed decoder rejecting Laravel's empty-config serialization. "+
+			"Read the response as raw bytes, as workflows list/get do.", err)
+	}
+
+	// The trigger must actually be rendered, not merely not-crash.
+	if got := out.String(); !strings.Contains(got, "booking_confirmed") {
+		t.Errorf("output does not carry the trigger node: %s", got)
+	}
+}
+
+// TestWire_ResourceCalendarSignalsIncompleteAnswers covers the field that decides
+// whether an empty calendar means "free" or "we could not see it".
+//
+// `unavailable_resources` sits OUTSIDE `data`, and the table and csv renderers
+// decode only `meta` and `data` — so in the DEFAULT output format for a read, a
+// disconnected Google calendar or a window past sync coverage rendered as an empty
+// list and exit 0. The spec is explicit that the field's presence "means the page
+// is not the whole story for the ids it names".
+//
+// Emitted on stderr, in the same key=value shape as BULK_UPDATE_ACCEPTED, so
+// stdout stays the data contract for scripts while the warning survives every
+// output format.
+//
+// Value: protects=an incomplete resource-calendar answer is signalled rather than rendering as an empty, complete-looking page; fails_when=the warning is dropped, or moved somewhere the table/csv path does not reach, so a partial calendar reads as a free resource; why_new=the field is outside `data` and no renderer or drift test looks at it; seam=testNewRunner
+func TestWire_ResourceCalendarSignalsIncompleteAnswers(t *testing.T) {
+	run := func(t *testing.T, body string, format string) (stdout, stderr string, err error) {
+		t.Helper()
+		_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(body))
+		})
+		prevShared := sharedRunner
+		sharedRunner = &Runner{}
+		prev := testNewRunner
+		testNewRunner = func() (*Runner, error) { return runner, nil }
+		t.Cleanup(func() {
+			testNewRunner = prev
+			sharedRunner = prevShared
+		})
+
+		outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
+		runner.Out, runner.Err = outBuf, errBuf
+		root := Cmd()
+		root.SetArgs([]string{"resource-calendar", "list", "--resource-id", "7", "--format", format})
+		root.SetOut(outBuf)
+		root.SetErr(errBuf)
+		err = root.Execute()
+		return outBuf.String(), errBuf.String(), err
+	}
+
+	const partial = `{
+	  "data": [],
+	  "unavailable_resources": {"9": ["window_exceeds_coverage"], "7": ["calendar_not_connected","no_linked_user"]},
+	  "meta": {"request_id":"r1"}
+	}`
+
+	// The signal must appear in EVERY format, since table is the default for reads
+	// and is the format that drops the field.
+	for _, format := range []string{"table", "json", "csv"} {
+		t.Run("warns in "+format, func(t *testing.T) {
+			_, stderr, err := run(t, partial, format)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(stderr, "RESOURCE_CALENDAR_INCOMPLETE") {
+				t.Fatalf("no incompleteness signal on stderr for --format %s.\n"+
+					"An empty page with unavailable_resources set is indistinguishable from a free resource.\nstderr: %q", format, stderr)
+			}
+			for _, want := range []string{"resource_id=7", "calendar_not_connected", "resource_id=9", "window_exceeds_coverage"} {
+				if !strings.Contains(stderr, want) {
+					t.Errorf("stderr missing %q: %s", want, stderr)
+				}
+			}
+			// Stable ordering: 7 before 9, or the output churns between runs.
+			if i, j := strings.Index(stderr, "resource_id=7"), strings.Index(stderr, "resource_id=9"); i > j {
+				t.Errorf("ids are not in sorted order: %s", stderr)
+			}
+		})
+	}
+
+	// A complete answer must stay quiet, or the signal becomes noise and gets
+	// ignored precisely when it matters.
+	t.Run("silent when the answer is complete", func(t *testing.T) {
+		_, stderr, err := run(t, `{"data":[],"meta":{"request_id":"r1"}}`, "table")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(stderr, "RESOURCE_CALENDAR_INCOMPLETE") {
+			t.Errorf("warned on a complete answer: %q", stderr)
+		}
+	})
+}

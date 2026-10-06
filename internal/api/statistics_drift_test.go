@@ -32,6 +32,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 )
 
 // specPathPrefix is the canonical mount the spec documents. The CLI calls the
@@ -284,7 +286,7 @@ func TestStatisticsDrift_EveryFlagExistsInSpec(t *testing.T) {
 				t.Errorf("filter %q is declared %q but the spec types it %q (want %q) on stats %s",
 					f, def.Type, sp.Type, want, ep.Name)
 			}
-			if len(sp.Enum) > 0 && !sameSet(def.Enum, sp.Enum) {
+			if len(sp.Enum) > 0 && !docscan.SameSet(def.Enum, sp.Enum) {
 				t.Errorf("filter %q enum %v does not match the spec's %v on stats %s",
 					f, def.Enum, sp.Enum, ep.Name)
 			}
@@ -303,7 +305,7 @@ func TestStatisticsDrift_EveryFlagExistsInSpec(t *testing.T) {
 				t.Errorf("stats %s --%s is declared %q but the spec types it %q (want %q)",
 					ep.Name, f.Name, f.Type, sp.Type, want)
 			}
-			if len(sp.Enum) > 0 && !sameSet(f.Enum, sp.Enum) {
+			if len(sp.Enum) > 0 && !docscan.SameSet(f.Enum, sp.Enum) {
 				t.Errorf("stats %s --%s enum %v does not match the spec's %v",
 					ep.Name, f.Name, f.Enum, sp.Enum)
 			}
@@ -330,22 +332,6 @@ func TestStatisticsDrift_FilterDefsCoverTheVocabulary(t *testing.T) {
 			t.Errorf("FilterDefs has an entry for %q that no endpoint uses — delete it or wire it up", f)
 		}
 	}
-}
-
-func sameSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	as := append([]string{}, a...)
-	bs := append([]string{}, b...)
-	sort.Strings(as)
-	sort.Strings(bs)
-	for i := range as {
-		if as[i] != bs[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // TestStatisticsDrift_CommonParamsAreCommon verifies the ASSUMPTION the other

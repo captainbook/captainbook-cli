@@ -107,12 +107,15 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 
 		from, _ := cmd.Flags().GetString("from")
 		to, _ := cmd.Flags().GetString("to")
-		if from == "" {
-			from = defaultFrom()
-		}
-		if to == "" {
-			to = defaultTo()
-		}
+		// An omitted bound is left ABSENT so the server applies its own default.
+		//
+		// The CLI used to fill both from time.Now() on the machine running it, but
+		// the spec defines every date as a day in the ACCOUNT's timezone and
+		// documents its own defaults in those terms ("30 days before the account's
+		// today"). Computing them host-side meant a host and a tenant on different
+		// calendar days silently got a window shifted by a day — and, because the
+		// values were then always sent, the server's correct defaults could never
+		// apply.
 		granularity, _ := cmd.Flags().GetString("granularity")
 		compareFrom, _ := cmd.Flags().GetString("compare-from")
 		compareTo, _ := cmd.Flags().GetString("compare-to")
@@ -131,9 +134,12 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 			return &api.ExitError{Err: err, Code: api.ExitValidation}
 		}
 
-		// Validate date range (max 365 days)
-		if err := validateDateRange(from, to); err != nil {
-			return &api.ExitError{Err: err, Code: api.ExitValidation}
+		// Validate the range only when BOTH bounds were given: there is nothing to
+		// compare a single bound against, and the server owns the other end.
+		if from != "" && to != "" {
+			if err := validateDateRange(from, to); err != nil {
+				return &api.ExitError{Err: err, Code: api.ExitValidation}
+			}
 		}
 
 		// Validate comparison flags
@@ -141,6 +147,19 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 			if compareFrom != "" || compareTo != "" {
 				return &api.ExitError{
 					Err:  fmt.Errorf("Cannot use --compare with --compare-from/--compare-to"),
+					Code: api.ExitValidation,
+				}
+			}
+			// Resolving a shorthand needs a concrete period to offset FROM. With a
+			// bound absent the only options are to guess it host-side — the bug
+			// just removed above — or to say so. Saying so is honest and the fix
+			// is one flag away.
+			if from == "" || to == "" {
+				return &api.ExitError{
+					Err: fmt.Errorf(
+						"--compare %s needs an explicit period: pass --from and --to "+
+							"(the default period is resolved in the account's timezone by the server, "+
+							"so it cannot be offset locally)", compareShorthand),
 					Code: api.ExitValidation,
 				}
 			}
@@ -287,14 +306,6 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 
 		return nil
 	}
-}
-
-func defaultFrom() string {
-	return time.Now().AddDate(0, 0, -30).Format("2006-01-02")
-}
-
-func defaultTo() string {
-	return time.Now().Format("2006-01-02")
 }
 
 func validateDateRange(from, to string) error {

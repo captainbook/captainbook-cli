@@ -371,3 +371,83 @@ func TestStatsWire_EveryDeclaredFilterReachesTheServer(t *testing.T) {
 		t.Fatal("asserted no filters — the endpoint table or the runner is broken, not the CLI")
 	}
 }
+
+// TestStatsWire_OmittedPeriodIsLeftToTheServer covers the timezone boundary.
+//
+// Every date in the statistics API is a day in the ACCOUNT's timezone, and the spec
+// documents its own defaults in those terms ("30 days before the account's today").
+// The CLI used to compute both bounds from time.Now() on the machine running it and
+// then always send them, so a host and a tenant on different calendar days silently
+// got a window shifted by a day — and the server's correct defaults could never
+// apply, because the keys were always present.
+//
+// Value: protects=omitted --from/--to are absent from the query so the server applies account-timezone defaults; fails_when=host-local defaults are reintroduced, shifting the reported period by a day for any host whose calendar date differs from the tenant's; why_new=nothing asserted which keys are ABSENT, and a wrong date looks exactly like a right one; seam=testNewRunner
+func TestStatsWire_OmittedPeriodIsLeftToTheServer(t *testing.T) {
+	t.Run("neither bound is sent when neither is given", func(t *testing.T) {
+		got, err := runStats(t, "stats", "revenue")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for _, key := range []string{"from", "to"} {
+			if got.Has(key) {
+				t.Errorf("%s=%q was sent without being asked for — the server owns this default and resolves it in the account's timezone (query: %v)",
+					key, got.Get(key), got)
+			}
+		}
+	})
+
+	t.Run("one bound given is the only one sent", func(t *testing.T) {
+		got, err := runStats(t, "stats", "revenue", "--from", "2026-03-01")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Get("from") != "2026-03-01" {
+			t.Errorf("from = %q, want 2026-03-01", got.Get("from"))
+		}
+		if got.Has("to") {
+			t.Errorf("to=%q was invented (query: %v)", got.Get("to"), got)
+		}
+	})
+
+	t.Run("both given are both sent and still range-checked", func(t *testing.T) {
+		got, err := runStats(t, "stats", "revenue", "--from", "2026-03-01", "--to", "2026-03-31")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Get("from") != "2026-03-01" || got.Get("to") != "2026-03-31" {
+			t.Errorf("period = %q..%q, want 2026-03-01..2026-03-31", got.Get("from"), got.Get("to"))
+		}
+
+		// The 365-day ceiling must still apply when both bounds are present.
+		if _, err := runStats(t, "stats", "revenue", "--from", "2024-01-01", "--to", "2026-01-01"); err == nil {
+			t.Error("a range over 365 days was accepted")
+		}
+	})
+
+	// A shorthand comparison needs a concrete period to offset from. Guessing the
+	// missing bound host-side is the bug above, so it must be refused instead.
+	t.Run("--compare without an explicit period is refused", func(t *testing.T) {
+		got, err := runStats(t, "stats", "revenue", "--compare", "year-ago")
+		if err == nil {
+			t.Fatal("--compare was accepted with no --from/--to; it would have to guess the period host-side")
+		}
+		if !strings.Contains(err.Error(), "--from") {
+			t.Errorf("error = %v, want it to name the flags that fix it", err)
+		}
+		if len(got) > 0 {
+			t.Errorf("the refused invocation still reached the wire: %v", got)
+		}
+	})
+
+	t.Run("--compare with an explicit period still resolves", func(t *testing.T) {
+		got, err := runStats(t, "stats", "revenue",
+			"--from", "2026-03-01", "--to", "2026-03-31", "--compare", "year-ago")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Get("compare_from") != "2025-03-01" || got.Get("compare_to") != "2025-03-31" {
+			t.Errorf("comparison = %q..%q, want 2025-03-01..2025-03-31 (query: %v)",
+				got.Get("compare_from"), got.Get("compare_to"), got)
+		}
+	})
+}

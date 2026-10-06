@@ -49,12 +49,11 @@ func workflowsDefs() []CommandDef {
 				"This route sits behind the workflows subscription gate, so a tenant whose " +
 				"plan does not include workflows gets a 404 carrying that reason — it is " +
 				"not a missing resource.\n\n" +
-				"KNOWN UPSTREAM BUG: every TRIGGER node is returned with config: [] (an " +
-				"empty JSON array) where the spec declares an object, so decoding fails " +
-				"with \"cannot unmarshal array into ... config of type map[string]string\". " +
-				"That makes the default invocation and --kind trigger unusable until the " +
-				"server casts the empty config to an object. --kind action and --kind logic " +
-				"work today. Tracked in TODOS.md.",
+				"Every TRIGGER node comes back with config: [] (an empty JSON array) " +
+				"where the spec declares an object, because Laravel serializes an empty " +
+				"config as [] rather than {}. The CLI reads this response as raw bytes " +
+				"for that reason, so the catalogue is fully usable; the spec mismatch is " +
+				"tracked in TODOS.md as an upstream fix.",
 			Flags: []FlagDef{
 				{Name: "kind", Type: "string", Description: "action|logic|trigger"},
 			},
@@ -64,11 +63,23 @@ func workflowsDefs() []CommandDef {
 					k := gen.ListWorkflowNodesParamsKind(v)
 					p.Kind = &k
 				}
-				resp, err := r.Client.ListWorkflowNodesWithResponse(ctx, p)
+				// Untyped read, exactly as workflows list/get do, and for the
+				// identical reason: the spec types config as `object` but Laravel
+				// serializes an empty one as `[]`, and the strict-typed decode
+				// fails with "cannot unmarshal array into ... config of type
+				// map[string]string". Every trigger node has an empty config, so
+				// the TYPED path made the default invocation — the one the Long
+				// text tells you to run first — fail outright, while --kind action
+				// and --kind logic happened to work.
+				//
+				// This was logged as an upstream-only problem. It is not: the
+				// remedy was already established in this file for the same cause,
+				// five call sites away. The renderers consume raw bytes either way.
+				resp, err := r.Client.ListWorkflowNodes(ctx, p)
 				if err != nil {
 					return nil, err
 				}
-				return ParseGenResponse(resp.Body, resp.HTTPResponse, "WorkflowNode", "")
+				return readRawResponse(resp, "WorkflowNode", "")
 			},
 		},
 		{
