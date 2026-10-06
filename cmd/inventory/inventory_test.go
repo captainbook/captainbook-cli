@@ -24,6 +24,8 @@ import (
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 	"github.com/spf13/cobra"
+
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 )
 
 // fakeServer returns an httptest.Server that returns canned responses
@@ -797,7 +799,7 @@ func TestBookingsCancel_IsCSGated(t *testing.T) {
 	// stops matching the spec. The enum IS the argument for a static gate,
 	// so pin the whole set.
 	wantEnum := []string{"none", "full", "partial"}
-	if !sameSet(f.Enum, wantEnum) {
+	if !docscan.SameValues(f.Enum, wantEnum) {
 		t.Errorf("spec refund_policy enum is now %v, was %v. The static cli:cs gate on "+
 			"bookings cancel rests on EVERY member being a CS-only policy override. "+
 			"A member that applies the product's own policy instead is operator-reachable "+
@@ -2078,7 +2080,7 @@ func TestProductsList_StatusGateRejectsArchived(t *testing.T) {
 		t.Fatalf("extractEnumTokens(%q) returned nil — the client-side enum gate "+
 			"in makeRunE is disabled for --status, so any value reaches the server", desc)
 	}
-	if !sameSet(tokens, []string{"draft", "published"}) {
+	if !docscan.SameValues(tokens, []string{"draft", "published"}) {
 		t.Errorf("--status allow-list is %v, want [draft published]. status filters the "+
 			"two-state is_active column and the server validates it with in:published,draft",
 			tokens)

@@ -40,6 +40,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
+
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 )
 
 // -----------------------------------------------------------------------------
@@ -483,22 +485,6 @@ func (s *specDoc) bodyField(op *opDef, jsonKey string) *specField {
 // because makeRunE uses it for client-side flag validation.
 // -----------------------------------------------------------------------------
 
-func sameSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	as := append([]string(nil), a...)
-	bs := append([]string(nil), b...)
-	sort.Strings(as)
-	sort.Strings(bs)
-	for i := range as {
-		if as[i] != bs[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func kebabToSnake(s string) string { return strings.ReplaceAll(s, "-", "_") }
 
 // -----------------------------------------------------------------------------
@@ -827,7 +813,7 @@ func TestSpecDrift_FlagDescriptionEnumsMatchSpec(t *testing.T) {
 				// but the server doesn't enforce. Skip.
 				continue
 			}
-			if !sameSet(tokens, specEnum) {
+			if !docscan.SameValues(tokens, specEnum) {
 				t.Errorf("[%s] %q (%s %s): flag --%s description tokens %v don't match spec enum %v",
 					c.File, c.Use, c.Verb, c.Path, f.Name, tokens, specEnum)
 			}

@@ -43,6 +43,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/captainbook/captainbook-cli/internal/docscan"
+	"slices"
 )
 
 // globalFlags are registered on the root command (cmd/root.go) or by
@@ -264,7 +265,7 @@ func TestSkillsDocDrift(t *testing.T) {
 
 			// Documenting --dry-run on an endpoint that rejects it produces
 			// an example that always errors.
-			if contains(inv.Flags, "--dry-run") && cmd.Annotations["dryRun"] == "none" {
+			if slices.Contains(inv.Flags, "--dry-run") && cmd.Annotations["dryRun"] == "none" {
 				t.Errorf("%s:%d: `%s` — command `%s` does not support --dry-run "+
 					"(DryRunNotSupported); the documented example would fail",
 					inv.File, inv.Line, inv.Text, cmd.CommandPath())
@@ -276,15 +277,6 @@ func TestSkillsDocDrift(t *testing.T) {
 		t.Fatal("scanned no ceebee invocations — the doc scanner is broken, not the docs")
 	}
 	t.Logf("validated %d `ceebee inventory` invocations across %d docs", checked, len(docs))
-}
-
-func contains(hay []string, needle string) bool {
-	for _, h := range hay {
-		if h == needle {
-			return true
-		}
-	}
-	return false
 }
 
 // -----------------------------------------------------------------------------
@@ -550,10 +542,10 @@ func TestParseInvocation_SeesFlagsAfterAQuotedParen(t *testing.T) {
 	if !ok {
 		t.Fatal("parseInvocation returned !ok")
 	}
-	if !contains(inv.Flags, "--position") {
+	if !slices.Contains(inv.Flags, "--position") {
 		t.Errorf("flags = %v; want them to include --position (the flag that slipped through)", inv.Flags)
 	}
-	if !contains(inv.Flags, "--dry-run") {
+	if !slices.Contains(inv.Flags, "--dry-run") {
 		t.Errorf("flags = %v; want them to include --dry-run", inv.Flags)
 	}
 }

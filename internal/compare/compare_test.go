@@ -1,6 +1,9 @@
 package compare
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestResolve(t *testing.T) {
 	tests := []struct {
@@ -104,7 +107,7 @@ func TestResolve(t *testing.T) {
 					t.Fatal("Resolve() expected error, got nil")
 				}
 				if tt.errContains != "" {
-					if got := err.Error(); !contains(got, tt.errContains) {
+					if got := err.Error(); !strings.Contains(got, tt.errContains) {
 						t.Errorf("error = %q, want substring %q", got, tt.errContains)
 					}
 				}
@@ -139,17 +142,4 @@ func TestResolve_PreviousDurationLogic(t *testing.T) {
 	if gotTo != "2026-03-09" {
 		t.Errorf("compareTo = %q, want %q", gotTo, "2026-03-09")
 	}
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsSubstring(s, sub))
-}
-
-func containsSubstring(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }
