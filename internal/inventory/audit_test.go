@@ -813,3 +813,78 @@ func TestFileLogger_CrossProcessRotation(t *testing.T) {
 		}
 	}
 }
+
+// TestAuditReader_OneHugeEntryDoesNotHideTheRest covers the failure mode where a
+// single oversized record made the ENTIRE audit log unreadable.
+//
+// readJSONL used a bufio.Scanner capped at 4 MB. A line over that cap returns
+// bufio.ErrTooLong, Reader.List propagates it, and `ceebee audit list` / `audit
+// show` then exit 1 for every key in the file — not just the big one. For an
+// append-only forensic log that is the worst possible failure: the entries you
+// most need during an incident are the ones you can no longer read, and the
+// record that broke it is the one someone just created.
+//
+// It became reachable when a ForensicFields flag gained the ability to be sourced
+// from a file (`--conditions @big.json`, `--steps @big.json`). Before that,
+// forensic_summary was bounded by ARG_MAX — roughly 1 MB of argv on macOS — so
+// the 4 MB cap could not be hit. The entry is also appended even when the
+// mutation FAILED, so a server-side 413 on an oversized body still wrote the
+// record that bricked the log.
+//
+// Value: protects=a single over-long audit line does not prevent reading every other entry; fails_when=readJSONL goes back to a fixed-capacity bufio.Scanner, or propagates a per-line length error as a whole-file failure; why_new=nothing wrote an oversized entry, so the cap was never crossed in a test; seam=temp file on disk
+func TestAuditReader_OneHugeEntryDoesNotHideTheRest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "audit.jsonl")
+
+	small := func(key string) string {
+		b, err := json.Marshal(AuditEntry{IdempotencyKey: key, Command: "bookings cancel"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	// Comfortably past the old 4 MB scanner cap.
+	huge, err := json.Marshal(AuditEntry{
+		IdempotencyKey:  "huge",
+		Command:         "segments create",
+		ForensicSummary: map[string]any{"conditions": strings.Repeat("x", 6*1024*1024)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	content := small("before") + "\n" + string(huge) + "\n" + small("after") + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(path)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+
+	entries, err := r.List(0)
+	if err != nil {
+		t.Fatalf("List returned %v — one oversized entry must not make the whole log unreadable", err)
+	}
+
+	got := map[string]bool{}
+	for _, e := range entries {
+		got[e.IdempotencyKey] = true
+	}
+	for _, want := range []string{"before", "after", "huge"} {
+		if !got[want] {
+			t.Errorf("entry %q missing from %d entries read: %v", want, len(entries), got)
+		}
+	}
+
+	// And a targeted lookup of an unrelated key must still work, which is the
+	// incident-response path.
+	e, err := r.Show("before")
+	if err != nil {
+		t.Fatalf("Show(\"before\") = %v — an unrelated entry must stay reachable", err)
+	}
+	if e == nil || e.IdempotencyKey != "before" {
+		t.Errorf("Show returned %#v, want the \"before\" entry", e)
+	}
+}

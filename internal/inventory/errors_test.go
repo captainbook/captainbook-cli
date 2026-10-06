@@ -1054,3 +1054,95 @@ func TestWithRetryAfter(t *testing.T) {
 		}
 	})
 }
+
+// TestParseError_FlatErrorStringBody covers the shape admission gates answer
+// with. WorkflowsIncludedInSubscription returns exactly this, with 404, for a
+// tenant whose plan excludes workflows — and `GET /workflow-nodes` is the only
+// way a caller learns the workflow vocabulary, so this is a path real users hit.
+//
+// Before the flat shape was handled, the envelope parser failed (its `error` is
+// an object) and the raw bytes became the message, so the user read a line of
+// JSON under a status that says "not found" when the real answer is "not on your
+// plan".
+func TestParseError_FlatErrorStringBody(t *testing.T) {
+	const msg = "Workflows are not included in your subscription plan."
+	err := ParseError(404, []byte(`{"error":"`+msg+`"}`))
+
+	var raw *RawAPIError
+	if !errors.As(err, &raw) {
+		t.Fatalf("ParseError returned %T, want *RawAPIError", err)
+	}
+	if raw.Message != msg {
+		t.Errorf("Message = %q, want %q", raw.Message, msg)
+	}
+	if raw.Code != "" {
+		t.Errorf("Code = %q, want empty so UserMessage prints the sentence alone", raw.Code)
+	}
+	// The whole point: the user reads the server's sentence, not JSON.
+	if got := raw.UserMessage(); got != msg {
+		t.Errorf("UserMessage() = %q, want %q", got, msg)
+	}
+	if strings.Contains(raw.UserMessage(), "{") {
+		t.Errorf("UserMessage() still looks like JSON: %q", raw.UserMessage())
+	}
+}
+
+// TestParseError_FlatShapeDoesNotShadowTheEnvelope pins the boundary. The flat
+// branch must not intercept bodies the registry already understands, and junk
+// must still reach the raw-body fallback — that arm exists so the user sees
+// SOMETHING rather than a generic "api error".
+func TestParseError_FlatShapeDoesNotShadowTheEnvelope(t *testing.T) {
+	t.Run("proper envelope still routes by code", func(t *testing.T) {
+		err := ParseError(404, []byte(`{"error":{"code":"NOT_FOUND","message":"gone","details":{"resource_type":"product","id":"p_1"}}}`))
+		var nf *NotFoundError
+		if !errors.As(err, &nf) {
+			t.Fatalf("ParseError returned %T, want *NotFoundError", err)
+		}
+		if nf.ResourceType != "product" || nf.ID != "p_1" {
+			t.Errorf("NotFoundError = %+v, want product/p_1", nf)
+		}
+	})
+
+	t.Run("junk body still preserves the raw bytes", func(t *testing.T) {
+		err := ParseError(400, []byte(`<html>502 upstream</html>`))
+		var raw *RawAPIError
+		if !errors.As(err, &raw) {
+			t.Fatalf("ParseError returned %T, want *RawAPIError", err)
+		}
+		if !strings.Contains(raw.Message, "502 upstream") {
+			t.Errorf("Message = %q, want the raw body preserved", raw.Message)
+		}
+	})
+
+	t.Run("non-string error value is not the flat shape", func(t *testing.T) {
+		// Neither the envelope nor the flat shape. It must not be reported as a
+		// message of "42"; the raw body is the honest answer.
+		err := ParseError(400, []byte(`{"error":42}`))
+		var raw *RawAPIError
+		if !errors.As(err, &raw) {
+			t.Fatalf("ParseError returned %T, want *RawAPIError", err)
+		}
+		if raw.Message != `{"error":42}` {
+			t.Errorf("Message = %q, want the raw body", raw.Message)
+		}
+	})
+
+	t.Run("empty error string is not a usable message", func(t *testing.T) {
+		err := ParseError(400, []byte(`{"error":"   "}`))
+		var raw *RawAPIError
+		if !errors.As(err, &raw) {
+			t.Fatalf("ParseError returned %T, want *RawAPIError", err)
+		}
+		if raw.Message != `{"error":"   "}` {
+			t.Errorf("Message = %q, want the raw body rather than a blank message", raw.Message)
+		}
+	})
+
+	t.Run("5xx still becomes ServerError", func(t *testing.T) {
+		err := ParseError(503, []byte(`{"error":"down for maintenance"}`))
+		var se *ServerError
+		if !errors.As(err, &se) {
+			t.Fatalf("ParseError returned %T, want *ServerError", err)
+		}
+	})
+}

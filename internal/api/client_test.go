@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -50,14 +51,8 @@ func TestBuildURL(t *testing.T) {
 		{
 			name:     "with business_unit_id",
 			endpoint: &Endpoint{Path: "/revenue"},
-			params:   &QueryParams{BusinessUnitID: 42},
+			params:   &QueryParams{Extra: map[string]string{"business_unit_id": "42"}},
 			wantSub:  "business_unit_id=42",
-		},
-		{
-			name:     "excluded product_id flag is omitted",
-			endpoint: &Endpoint{Path: "/gift-certificates", ExcludeCommonFlags: []string{"product_id"}},
-			params:   &QueryParams{ProductID: 99},
-			wantSub:  "/statistics/gift-certificates",
 		},
 		{
 			name:     "extra params with kebab-to-snake conversion",
@@ -91,15 +86,19 @@ func TestBuildURL(t *testing.T) {
 		})
 	}
 
-	// Verify excluded flag is NOT in the URL
-	t.Run("excluded product_id not in URL", func(t *testing.T) {
-		ep := &Endpoint{Path: "/gift-certificates", ExcludeCommonFlags: []string{"product_id"}}
-		got, err := c.buildURL(ep, &QueryParams{ProductID: 99})
+	// Per-metric gating is no longer buildURL's job. The server REFUSES an
+	// unsupported filter with 400 rather than ignoring it, so the decision moved
+	// up to cmd/stats.go, which declares only the flags an endpoint supports —
+	// a filter it does not support has no flag to set. buildURL now emits
+	// whatever it is handed. Endpoint.Filters is covered by TestSupportsFilter
+	// and pinned against the vendored spec by the statistics drift tests.
+	t.Run("buildURL emits what it is handed", func(t *testing.T) {
+		got, err := c.buildURL(&Endpoint{Path: "/gift-certificates"}, &QueryParams{Extra: map[string]string{"product_id": "99"}})
 		if err != nil {
 			t.Fatalf("buildURL() error: %v", err)
 		}
-		if strings.Contains(got, "product_id") {
-			t.Errorf("buildURL() = %q, should NOT contain product_id", got)
+		if !strings.Contains(got, "product_id=99") {
+			t.Errorf("buildURL() = %q, want product_id=99", got)
 		}
 	})
 }
@@ -212,6 +211,9 @@ func TestDoRequest_StatusCodes(t *testing.T) {
 			defer ts.Close()
 
 			c := NewClient(ts.URL, "tok")
+			// Retriable statuses (429, 5xx) back off between attempts; this
+			// table is about the resulting ERROR TYPE, not the wait.
+			fakeClock(c)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
@@ -226,6 +228,24 @@ func TestDoRequest_StatusCodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fakeClock replaces the retry loop's sleep so a test asserts the backoff
+// SCHEDULE rather than spending it. The four retry tests used to burn ~16s of
+// real wall time between them, which is almost all of this package's runtime;
+// the recorded durations are strictly more than they checked before.
+func fakeClock(c *Client) *[]time.Duration {
+	var slept []time.Duration
+	c.sleep = func(ctx context.Context, d time.Duration) error {
+		select {
+		case <-ctx.Done():
+			return &TimeoutError{Duration: "ctx"}
+		default:
+		}
+		slept = append(slept, d)
+		return nil
+	}
+	return &slept
 }
 
 func TestDoRequest_Retry(t *testing.T) {
@@ -243,12 +263,23 @@ func TestDoRequest_Retry(t *testing.T) {
 	defer ts.Close()
 
 	c := NewClient(ts.URL, "tok")
+	slept := fakeClock(c)
 	got, err := c.Do(context.Background(), &Endpoint{Path: "/test"}, &QueryParams{})
 	if err != nil {
 		t.Fatalf("Do() error: %v", err)
 	}
 	if attempts != 3 {
 		t.Errorf("attempts = %d, want 3", attempts)
+	}
+	// Two retries, backing off 1s then 2s.
+	want := []time.Duration{1 * time.Second, 2 * time.Second}
+	if len(*slept) != len(want) {
+		t.Fatalf("backoffs = %v, want %v", *slept, want)
+	}
+	for i, w := range want {
+		if (*slept)[i] != w {
+			t.Errorf("backoff %d = %s, want %s", i+1, (*slept)[i], w)
+		}
 	}
 	if string(got) != `{"ok":true}` {
 		t.Errorf("Do() = %q", string(got))
@@ -284,9 +315,13 @@ func TestDoRequest_MaxRetriesExhausted(t *testing.T) {
 	defer ts.Close()
 
 	c := NewClient(ts.URL, "tok")
+	slept := fakeClock(c)
 	_, err := c.Do(context.Background(), &Endpoint{Path: "/test"}, &QueryParams{})
 	if err == nil {
 		t.Fatal("expected error after max retries")
+	}
+	if len(*slept) != 2 {
+		t.Errorf("backoffs = %v, want 2 (one per retry)", *slept)
 	}
 	// maxRetries=2, so we expect 3 total attempts (initial + 2 retries)
 	if attempts != 3 {
@@ -335,12 +370,23 @@ func TestDoRequest_RateLimitRetryAfter(t *testing.T) {
 	defer ts.Close()
 
 	c := NewClient(ts.URL, "tok")
+	slept := fakeClock(c)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	_, err := c.Do(ctx, &Endpoint{Path: "/test"}, &QueryParams{})
 	if err == nil {
 		t.Fatal("expected error")
+	}
+	// Retry-After: 1 must DRIVE the backoff, not just be reported. Previously
+	// this test slept through it without ever checking the duration.
+	for i, d := range *slept {
+		if d != 1*time.Second {
+			t.Errorf("backoff %d = %s, want 1s from the Retry-After header", i+1, d)
+		}
+	}
+	if len(*slept) == 0 {
+		t.Error("no backoff was scheduled; the 429 should have been retried")
 	}
 	rlErr, ok := err.(*RateLimitError)
 	if !ok {
@@ -495,4 +541,124 @@ func TestTruncate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestClient_ValidationErrorIs400WithDetails pins the statistics lane's
+// validation-failure contract, which the CLI had wrong in two independent ways.
+//
+// The vendored statistics spec declares NO 422 anywhere: these routes sit under
+// `api/*`, where every validation failure renders as 400. The client handled only
+// 422, so a refusal fell through to the `default` arm and surfaced as
+// *UnexpectedStatusError / exit 18 with a truncated body — while skills/statistics.md
+// promised exit 12. And the per-field messages live under `details`, not the
+// conventional Laravel `errors`, so even a handled 400 dropped the field names.
+//
+// This matters most for the case the whole per-metric filter design rests on: an
+// unsupported filter is REFUSED rather than ignored, and the refusal names the
+// endpoints that do apply it. Mapped wrongly, the single most informative error
+// this API returns arrives as "Unexpected API response".
+//
+// Value: protects=statistics validation failures map to ValidationError/exit 12 with per-field details; fails_when=the 400 arm is dropped or the per-field key reverts to `errors` only; why_new=nothing exercised a 400 at all, and the 422 test passed against a status the spec never returns; seam=httptest
+func TestClient_ValidationErrorIs400WithDetails(t *testing.T) {
+	const body = `{"message":"product_id is not applied by /browsing. It applies to: /revenue, /bookings.","details":{"product_id":["This filter is not applied by this metric."]}}`
+
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnprocessableEntity} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(body))
+			}))
+			defer srv.Close()
+
+			_, err := NewClient(srv.URL, "tok").Do(context.Background(), &Endpoints[0], &QueryParams{})
+
+			var ve *ValidationError
+			if !errors.As(err, &ve) {
+				t.Fatalf("err = %v (%T), want *ValidationError", err, err)
+			}
+			if got := ExitCodeFor(err); got != ExitValidation {
+				t.Errorf("exit code = %d, want %d", got, ExitValidation)
+			}
+			// The message names which metrics DO apply the filter. Losing it
+			// leaves the user with no way to act on the refusal.
+			if !strings.Contains(ve.Message, "/revenue") {
+				t.Errorf("message = %q, want the server's sentence naming the applicable endpoints", ve.Message)
+			}
+			if got := ve.Errors["product_id"]; len(got) == 0 {
+				t.Errorf("per-field details were dropped: %#v — the statistics spec puts them under `details`, not `errors`", ve.Errors)
+			}
+		})
+	}
+
+	// A 400 whose shape the CLI does not model must NOT become a contentless
+	// ValidationError. json.Unmarshal into a struct succeeds for any JSON object,
+	// so the obvious `if Unmarshal(...) == nil` produced ValidationError{"", nil}
+	// and printed the bare words "Validation error" — discarding the server's
+	// reason, and strictly worse than the untyped fallback it replaced.
+	//
+	// The motivating case is the most actionable 400 this API sends: a plan gate
+	// answering `{"error":"Statistics are not included in your subscription plan."}`.
+	// The inventory lane learned to surface that flat shape in this same change;
+	// the statistics lane must not throw it away.
+	t.Run("flat error shape keeps its sentence", func(t *testing.T) {
+		const reason = "Statistics are not included in your subscription plan."
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"` + reason + `"}`))
+		}))
+		defer srv.Close()
+
+		_, err := NewClient(srv.URL, "tok").Do(context.Background(), &Endpoints[0], &QueryParams{})
+		if err == nil {
+			t.Fatal("expected an error")
+		}
+		if !strings.Contains(err.Error(), reason) {
+			t.Errorf("err = %q, want it to carry the server's sentence %q", err.Error(), reason)
+		}
+	})
+
+	// The invariant is that the error is never CONTENTLESS — not that it stops
+	// being a ValidationError. The status is what maps to exit 12, and a proxy
+	// answering an HTML 400 is still a validation failure, so the type must stay;
+	// losing the body is the actual defect.
+	t.Run("an unmodelled 400 body is never contentless", func(t *testing.T) {
+		for _, body := range []string{`null`, `{}`, `{"unexpected":{"nested":1}}`, `[]`, `not json at all`} {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(body))
+			}))
+			_, err := NewClient(srv.URL, "tok").Do(context.Background(), &Endpoints[0], &QueryParams{})
+			srv.Close()
+			if err == nil {
+				t.Errorf("body %s: expected an error", body)
+				continue
+			}
+			if got := ExitCodeFor(err); got != ExitValidation {
+				t.Errorf("body %s: exit = %d, want %d — the STATUS says validation failure regardless of body shape", body, got, ExitValidation)
+			}
+			if strings.TrimSpace(err.Error()) == "Validation error" {
+				t.Errorf("body %s printed the bare string %q with the server's response discarded", body, err.Error())
+			}
+		}
+	})
+
+	// The conventional `errors` spelling must still work, since FieldErrors
+	// prefers `details` only when it is populated.
+	t.Run("errors key still honoured", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"message":"m","errors":{"from":["required"]}}`))
+		}))
+		defer srv.Close()
+
+		_, err := NewClient(srv.URL, "tok").Do(context.Background(), &Endpoints[0], &QueryParams{})
+		var ve *ValidationError
+		if !errors.As(err, &ve) {
+			t.Fatalf("err = %v (%T), want *ValidationError", err, err)
+		}
+		if len(ve.Errors["from"]) == 0 {
+			t.Errorf("the `errors` spelling was dropped: %#v", ve.Errors)
+		}
+	})
 }
