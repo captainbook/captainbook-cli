@@ -709,11 +709,16 @@ func (e *ResponseDriftError) UserMessage() string {
 }
 
 // -----------------------------------------------------------------------------
-// 15. RawAPIError — fallback when code is set but unknown to our registry
+// 15. RawAPIError — fallback when code is set but unknown to our registry,
+//     and the carrier for the flat `{"error": "<string>"}` gate shape
 //
 // We never want to lose the server's message just because we haven't taught
 // the CLI a new code yet. RawAPIError preserves both the code and the
 // human-readable message; UserMessage just passes them through.
+//
+// It is also what a flat `{"error": "<string>"}` body becomes — see
+// flatErrorMessage. Code is empty there, so UserMessage prints the server's
+// sentence on its own, which is exactly what an admission gate wants to say.
 // -----------------------------------------------------------------------------
 
 type RawAPIError struct {
@@ -1042,6 +1047,8 @@ func decodeStringSliceField(d map[string]json.RawMessage, key string) ([]string,
 //	                                                 should only be invoked
 //	                                                 on non-success)
 //	4xx/5xx + valid envelope + known code         → registered constructor
+//	4xx + flat {"error": "<string>"} body          → RawAPIError carrying that
+//	                                                  sentence as the message
 //	4xx/5xx + valid envelope + unknown code on 5xx → ServerError
 //	4xx/5xx + valid envelope + unknown code on 4xx → RawAPIError (preserves
 //	                                                 code + message)
@@ -1067,6 +1074,25 @@ func ParseError(status int, body []byte) error {
 		if status >= 500 {
 			return &ServerError{Status: status, RequestID: ""}
 		}
+		// Before falling back to the raw bytes, try the FLAT shape:
+		//
+		//	{"error": "Workflows are not included in your subscription plan."}
+		//
+		// Admission gates answer this way rather than with the CLI envelope —
+		// WorkflowsIncludedInSubscription returns exactly that, with 404, for a
+		// tenant whose plan excludes workflows. The envelope's `error` is an
+		// object, so the flat spelling fails to unmarshal and used to land in the
+		// raw-body arm below, showing the user a line of JSON under a status that
+		// reads as "not found" when the real answer is "not on your plan".
+		//
+		// The sentence the server wrote is already the right thing to print, so
+		// surface it as the message and let UserMessage pass it through verbatim.
+		if msg, ok := flatErrorMessage(body); ok {
+			return &RawAPIError{
+				Status:  status,
+				Message: msg,
+			}
+		}
 		// 4xx with junk body — preserve raw body as the message so the user
 		// sees something rather than a generic "api error".
 		return &RawAPIError{
@@ -1089,6 +1115,25 @@ func ParseError(status int, body []byte) error {
 		Status:  status,
 		Message: env.Error.Message,
 	}
+}
+
+// flatErrorMessage extracts the message from the flat `{"error": "<string>"}`
+// shape some gates answer with, instead of the CLI's `{"error": {code, message}}`
+// envelope. It returns false for anything else — including `{"error": {...}}`,
+// which ParseError has already handled, and `{"error": 42}`, which is neither
+// shape — so the raw-body fallback keeps its job.
+func flatErrorMessage(body []byte) (string, bool) {
+	var flat struct {
+		Error *string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &flat); err != nil || flat.Error == nil {
+		return "", false
+	}
+	msg := strings.TrimSpace(*flat.Error)
+	if msg == "" {
+		return "", false
+	}
+	return msg, true
 }
 
 // WithRetryAfter sets the RetryAfter on a *RateLimitError if err wraps one.
