@@ -52,6 +52,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -173,7 +175,14 @@ type CommandDef struct {
 
 // FlagDef declares one flag bound to a CommandDef.
 //
-// Type is one of "string", "int", "bool", "stringSlice", "intSlice".
+// Type is one of "string", "int", "bool", "stringSlice", "intSlice",
+// "float", or "json".
+//
+// "json" carries a nested value — an array of objects or an object tree — that
+// no scalar flag can express: a workflow's `steps`, a recurrence rule's
+// `times`, a segment's `conditions`. It accepts a literal JSON document or
+// @file.json and is validated, never decoded, so the operator's bytes reach the
+// wire unchanged. See parseJSONFlag.
 type FlagDef struct {
 	Name        string
 	Short       string
@@ -181,6 +190,47 @@ type FlagDef struct {
 	Required    bool
 	Description string
 	Type        string
+
+	// Min is an inclusive lower bound for an `int` flag, mirroring the spec's
+	// `minimum`. Zero means unbounded.
+	//
+	// It is validated centrally in makeRunE, inside the collection loop that
+	// already skips flags the caller did not set — so only an explicitly-typed
+	// value is bounds-checked. That distinction is the whole point: an unset int
+	// flag reads 0, and 0-means-absent is how every closure says "unfiltered".
+	// Pinned by TestWire_UnsetIntFlagStillMeansUnfiltered. The spec
+	// types these query params as plain integers with `minimum: 1`, so a 0 the
+	// caller typed can only be a mistake — and the obvious unset-guard
+	// (`if v != 0`) drops it SILENTLY and widens the result set, which comes back
+	// looking like a real answer. That is the same believed-applied-but-absent
+	// failure as the renamed `time_from` filter.
+	//
+	// Declared here rather than written out per closure because it was written
+	// out per closure, sixteen times, with the same four-line comment — and that
+	// duplication is what hid the worst bug in this sync: the
+	// --product-id/--availability-id exclusion gate in pricing_tiers.go read two
+	// int flags with args.FlagString, which type-asserts to string and returns ""
+	// for an int flag, so the gate could never fire. The compiler, both drift
+	// directions and the whole suite stayed green. One declared rule has one place
+	// to be wrong, and the drift tests can read it.
+	Min int
+
+	// EnumList marks a string flag whose value is a COMMA-SEPARATED SUBSET of
+	// the enum in its description, not a single member of it.
+	//
+	// Opt-in rather than inferred, because inferring it would weaken the gate
+	// everywhere else: for a single-valued param, "booking,busy" IS an invalid
+	// value and refusing it is correct. Exactly one spec parameter is built this
+	// way today (GET /resource-calendar ?event_types=, whose own example is
+	// `busy,unavailable`), and leaving the gate single-valued made the
+	// documented multi-value form unreachable from the CLI — the request was
+	// refused locally and never sent, so narrowing to two of the three event
+	// families was impossible.
+	//
+	// The description keeps its "tok|tok|tok" run either way, so
+	// TestSpecDrift_FlagDescriptionEnumsMatchSpec still pins the token set
+	// against the spec.
+	EnumList bool
 }
 
 // RunArgs is the parsed input to a CommandDef.Run closure.
@@ -798,6 +848,22 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 			c.Annotations["forensicFields"] = strings.Join(def.ForensicFields, ",")
 		}
 
+		// Record the declared integer bounds, for the same reason: a test that
+		// wants to assert on FlagDef.Min has to read it from the LIVE command, not
+		// the AST. Encoded as "name=min,name=min".
+		var mins []string
+		for _, fd := range def.Flags {
+			if fd.Type == "int" && fd.Min != 0 {
+				mins = append(mins, fd.Name+"="+strconv.Itoa(fd.Min))
+			}
+		}
+		if len(mins) > 0 {
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations["intMins"] = strings.Join(mins, ",")
+		}
+
 		c.RunE = makeRunE(def, runner)
 		parent.AddCommand(c)
 	}
@@ -825,6 +891,18 @@ func declareFlag(c *cobra.Command, fd FlagDef) {
 			c.Flags().BoolP(fd.Name, fd.Short, def, fd.Description)
 		} else {
 			c.Flags().Bool(fd.Name, def, fd.Description)
+		}
+	case "json":
+		// Surface is a plain string flag; the value is parsed and validated
+		// when it is collected, so a bad document fails before any request.
+		var def string
+		if d, ok := fd.Default.(string); ok {
+			def = d
+		}
+		if fd.Short != "" {
+			c.Flags().StringP(fd.Name, fd.Short, def, fd.Description)
+		} else {
+			c.Flags().String(fd.Name, def, fd.Description)
 		}
 	case "stringSlice":
 		var def []string
@@ -904,6 +982,31 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 			switch fd.Type {
 			case "string":
 				v, _ := cmd.Flags().GetString(fd.Name)
+				// An explicitly EMPTY query filter is refused on reads. Reaching
+				// here means the caller typed the flag (the loop skips unset
+				// ones), and `--customer-id ""` is not a filter — the usual cause
+				// is an unset shell variable. The old `if v != ""` guard in each
+				// closure dropped it silently and returned the WHOLE tenant's
+				// rows presented as one customer's: an honest-looking answer to a
+				// question nobody asked. Verified against a live tenant before
+				// this guard existed: `guests list --customer-id ""` exited 0
+				// with a full unfiltered page.
+				//
+				// Reads only. On a mutation an empty string is a legitimate value
+				// — `--description ""` clears the field — so refusing it there
+				// would remove the only way to say that.
+				//
+				// The statistics lane has refused this since its per-metric filter
+				// rewrite; this closes the asymmetry between the two namespaces.
+				if v == "" && def.Kind == KindRead {
+					return &api.ExitError{
+						Err: fmt.Errorf(
+							"--%s was given an empty value; omit the flag to leave the result unfiltered",
+							fd.Name,
+						),
+						Code: api.ExitValidation,
+					}
+				}
 				args.Flags[fd.Name] = v
 				// Client-side enum gate: if the description leads with a
 				// "tok|tok|tok" run, validate the value before sending. Some
@@ -912,22 +1015,69 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 				// so a CLI typo would hand the agent wrong data with no
 				// signal. Better to fail loudly here.
 				if tokens := extractEnumTokens(fd.Description); tokens != nil && v != "" {
-					if !inSlice(v, tokens) {
-						return &api.ExitError{
-							Err: fmt.Errorf(
-								"invalid value for --%s: %q (allowed: %s)",
-								fd.Name, v, strings.Join(tokens, ", "),
-							),
-							Code: api.ExitValidation,
-						}
+					// EnumList flags carry a comma-separated SUBSET; check each
+					// element. Everything else is single-valued, where a comma
+					// makes the value invalid and refusing it is the point.
+					vals := []string{v}
+					if fd.EnumList {
+						vals = strings.Split(v, ",")
 					}
+					kept := make([]string, 0, len(vals))
+					for _, one := range vals {
+						one = strings.TrimSpace(one)
+						if one == "" {
+							return &api.ExitError{
+								Err: fmt.Errorf(
+									"invalid value for --%s: %q (empty element; allowed: %s)",
+									fd.Name, v, strings.Join(tokens, ", "),
+								),
+								Code: api.ExitValidation,
+							}
+						}
+						if !slices.Contains(tokens, one) {
+							return &api.ExitError{
+								Err: fmt.Errorf(
+									"invalid value for --%s: %q (allowed: %s)",
+									fd.Name, one, strings.Join(tokens, ", "),
+								),
+								Code: api.ExitValidation,
+							}
+						}
+						kept = append(kept, one)
+					}
+					// Send what was VALIDATED, not what was typed. Trimming for
+					// the check only meant `--event-types "busy, unavailable"`
+					// passed and then shipped `busy,+unavailable`, whose second
+					// member the server reads as " unavailable" — accepted
+					// locally, wrong on the wire, which is precisely what this
+					// gate exists to prevent. Also drops duplicates, so
+					// "busy,busy" normalises to one member.
+					args.Flags[fd.Name] = strings.Join(dedupeStable(kept), ",")
 				}
 			case "int":
 				v, _ := cmd.Flags().GetInt(fd.Name)
+				// No Changed() check needed: the loop above already skips every
+				// flag the caller did not set, which is what keeps an unset int
+				// flag (reading 0) meaning "unfiltered" rather than failing the
+				// bound. Repeating the check here would read as if THIS line
+				// provided that guarantee. See FlagDef.Min.
+				if fd.Min != 0 && v < fd.Min {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s must be >= %d (got %d)", fd.Name, fd.Min, v),
+						Code: api.ExitValidation,
+					}
+				}
 				args.Flags[fd.Name] = v
 			case "bool":
 				v, _ := cmd.Flags().GetBool(fd.Name)
 				args.Flags[fd.Name] = v
+			case "json":
+				v, _ := cmd.Flags().GetString(fd.Name)
+				raw, err := parseJSONFlag(fd.Name, v)
+				if err != nil {
+					return &api.ExitError{Err: err, Code: api.ExitValidation}
+				}
+				args.Flags[fd.Name] = raw
 			case "stringSlice":
 				v, _ := cmd.Flags().GetStringSlice(fd.Name)
 				args.Flags[fd.Name] = v
@@ -956,6 +1106,47 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 		}
 		return nil
 	}
+}
+
+// parseJSONFlag turns a "json"-typed flag value into the bytes that will ride
+// on the wire. It accepts a literal JSON document or @file.json, reusing
+// readDataFlag so this package keeps exactly one @file reader.
+//
+// The value is VALIDATED, never decoded. Decoding into `any` would route every
+// number through float64 and silently round anything past 2^53 —
+// 9007199254740993 ships as ...992 — which is the same reason parseFaresFlag
+// returns RawMessage, and the same bug TODOS.md records as still open on the
+// --data path. Unmarshalling into json.RawMessage checks syntax (and reports the
+// offset on failure) without touching any value, and JSONBodyFromArgs marshals a
+// RawMessage verbatim, so the operator's bytes reach the server unchanged.
+//
+// An empty value is an error rather than a silent no-op: a caller who passes
+// --steps "" meant to pass steps.
+func parseJSONFlag(name, value string) (json.RawMessage, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, fmt.Errorf("--%s: empty value (expected a JSON document or @file.json)", name)
+	}
+	b, err := readDataFlag(value)
+	if err != nil {
+		return nil, fmt.Errorf("--%s: %w", name, err)
+	}
+	var probe json.RawMessage
+	if err := json.Unmarshal(b, &probe); err != nil {
+		return nil, fmt.Errorf("--%s: invalid JSON: %w", name, err)
+	}
+	// Syntax alone is not enough: json.RawMessage accepts bare scalars, so
+	// `--conditions 42` and `--conditions null` were well-formed JSON and went
+	// straight to the wire (and into the audit trail) as a type error for the
+	// server to catch. Every field this type serves is declared an object or an
+	// array in the spec, and a `null` on a field that elsewhere means "clear
+	// this" is a bad accident to ship.
+	switch first := firstJSONByte(b); first {
+	case '{', '[':
+	default:
+		return nil, fmt.Errorf(
+			"--%s: expected a JSON object or array, got %q", name, string(first))
+	}
+	return probe, nil
 }
 
 // readDataFlag returns the bytes named by a --data flag value. A leading
@@ -1253,6 +1444,9 @@ func Cmd() *cobra.Command {
 	cmd.AddCommand(makeResourceParent("locations", "Manage locations (start, end, meeting points)", locationsDefs(), sharedRunner))
 	cmd.AddCommand(mediaCmd(sharedRunner))
 	cmd.AddCommand(makeResourceParent("notifications", "Send notifications", notificationsDefs(), sharedRunner))
+	cmd.AddCommand(makeResourceParent("partners", "Read partners (selling and channel partners)", partnersDefs(), sharedRunner))
+	cmd.AddCommand(makeResourceParent("segments", "Manage customer segments", segmentsDefs(), sharedRunner))
+	cmd.AddCommand(makeResourceParent("resource-calendar", "Read a resource's busy time", resourceCalendarDefs(), sharedRunner))
 	cmd.AddCommand(workflowsCmd(sharedRunner))
 	cmd.AddCommand(workflowExecutionsCmd(sharedRunner))
 
@@ -1374,6 +1568,39 @@ func newRunner(c *cobra.Command) (*Runner, error) {
 // transport / config without touching disk or env.
 var testNewRunner func() (*Runner, error)
 
+// firstJSONByte returns the first byte of b that is not JSON whitespace, or 0.
+func firstJSONByte(b []byte) byte {
+	for _, c := range b {
+		switch c {
+		case ' ', '\t', '\n', '\r':
+			continue
+		}
+		return c
+	}
+	return 0
+}
+
+// dedupeStable returns xs with duplicates removed, ORDER PRESERVED.
+//
+// Distinct from the dedupe helper in skills_drift_test.go, which sorts: this one
+// feeds a wire value, where reordering what the caller typed is a change they did
+// not ask for.
+func dedupeStable(xs []string) []string {
+	if len(xs) < 2 {
+		return xs
+	}
+	seen := make(map[string]struct{}, len(xs))
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		if _, ok := seen[x]; ok {
+			continue
+		}
+		seen[x] = struct{}{}
+		out = append(out, x)
+	}
+	return out
+}
+
 // extractEnumTokens returns the leading "tok|tok|tok" run of a description,
 // split into individual tokens. Returns nil if the leading run is not
 // pipe-delimited. Tokens accept [A-Za-z0-9_]. Used by makeRunE to gate
@@ -1409,13 +1636,4 @@ func extractEnumTokens(desc string) []string {
 		return nil
 	}
 	return out
-}
-
-func inSlice(v string, xs []string) bool {
-	for _, x := range xs {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }

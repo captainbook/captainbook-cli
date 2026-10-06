@@ -31,9 +31,9 @@ func pricingCategoriesDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListPricingCategoriesParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
-				{Name: "product-id", Type: "string", Description: "Filter by parent product"},
+				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by parent product"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -44,7 +44,8 @@ func pricingCategoriesDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-id"); v != "" {
+				if args.FlagSet("product-id") {
+					v := args.FlagInt("product-id")
 					p.ProductId = &v
 				}
 				if args.FlagBool("include-trashed") {

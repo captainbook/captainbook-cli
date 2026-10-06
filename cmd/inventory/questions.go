@@ -24,8 +24,8 @@ func questionsDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListQuestionsParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "product-option-id", Type: "string", Description: "Filter by option"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "product-option-id", Type: "int", Min: 1, Description: "Filter by option"},
 				{Name: "required", Type: "bool", Description: "Filter required-only"},
 				{Name: "include-trashed", Type: "bool"},
 			},
@@ -37,7 +37,8 @@ func questionsDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-option-id"); v != "" {
+				if args.FlagSet("product-option-id") {
+					v := args.FlagInt("product-option-id")
 					p.ProductOptionId = &v
 				}
 				if args.FlagSet("required") {
@@ -94,7 +95,9 @@ func questionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateQuestionWithBodyWithResponse(ctx, &gen.CreateQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", "")
 				if res != nil {
 					res.WireBody = body
@@ -128,7 +131,9 @@ func questionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateQuestionWithBodyWithResponse(ctx, id, &gen.UpdateQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
 				if res != nil {
 					res.WireBody = body
@@ -166,7 +171,9 @@ func questionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreQuestionWithBodyWithResponse(ctx, id, &gen.RestoreQuestionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Question", id)
 				if res != nil {
 					res.WireBody = body

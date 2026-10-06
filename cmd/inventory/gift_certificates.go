@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -19,6 +21,7 @@ import (
 //   - list-issued / get-issued work on /gift-certs/issued.
 //   - issue posts to /gift-certs/issue.
 //   - void / resend operate on /gift-certs/{id}/...
+//
 // Spec abilities: gift-certs available CRUD, issue and resend require
 // cli:write. void is the exception — spec 1.1.0 moved it to cli:cs,
 // alongside booking cancel/comp/refund/confirmation-resend.
@@ -28,7 +31,8 @@ func giftCertificatesDefs() []CommandDef {
 			Use: "gift-certificates list-available", Short: "List available (template) gift certs",
 			Kind: KindRead, Verb: "GET", Path: "/gift-certs/available", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListAvailableGiftCertsParams{}
@@ -37,6 +41,13 @@ func giftCertificatesDefs() []CommandDef {
 				}
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
 				}
 				resp, err := r.Client.ListAvailableGiftCertsWithResponse(ctx, p)
 				if err != nil {
@@ -71,7 +82,9 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateAvailableGiftCertWithBodyWithResponse(ctx, &gen.CreateAvailableGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				// Spec response: data.available_gift_certificate.id —
 				// pascalToSnake("AvailableGiftCertificate") yields the right key.
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", "")
@@ -122,7 +135,9 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateAvailableGiftCertWithBodyWithResponse(ctx, id, &gen.UpdateAvailableGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "AvailableGiftCertificate", id)
 				if res != nil {
 					res.WireBody = body
@@ -158,10 +173,12 @@ func giftCertificatesDefs() []CommandDef {
 			Use: "gift-certificates list-issued", Short: "List issued gift certs",
 			Kind: KindRead, Verb: "GET", Path: "/gift-certs/issued", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
 				{Name: "status", Type: "string", Description: "active|redeemed|partial|void|expired"},
 				{Name: "recipient-email", Type: "string", Description: "Filter by recipient email"},
 				{Name: "code", Type: "string", Description: "Filter by code"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListIssuedGiftCertsParams{}
@@ -181,6 +198,17 @@ func giftCertificatesDefs() []CommandDef {
 				}
 				if v := args.FlagString("code"); v != "" {
 					p.Code = &v
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
+				}
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
 				}
 				resp, err := r.Client.ListIssuedGiftCertsWithResponse(ctx, p)
 				if err != nil {
@@ -233,7 +261,9 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.IssueGiftCertWithBodyWithResponse(ctx, &gen.IssueGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", "")
 				if res != nil {
 					res.WireBody = body
@@ -249,8 +279,8 @@ func giftCertificatesDefs() []CommandDef {
 			// mutations rather than with the rest of gift-cert editing. The
 			// server also runs GiftCertificatePolicy::delete on top, so a CS
 			// token whose user lacks delete_gift_certificate still gets a 403.
-			Ability:    invpkg.CS,
-			DryRunMode: DryRunBody,
+			Ability:        invpkg.CS,
+			DryRunMode:     DryRunBody,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
 				{Name: "reason", Type: "string", Required: true, Description: "Void reason (required)"},
@@ -270,7 +300,9 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.VoidGiftCertWithBodyWithResponse(ctx, id, &gen.VoidGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
 				if res != nil {
 					res.WireBody = body
@@ -299,7 +331,9 @@ func giftCertificatesDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.ResendGiftCertWithBodyWithResponse(ctx, id, &gen.ResendGiftCertParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "GiftCertificate", id)
 				if res != nil {
 					res.WireBody = body
@@ -309,4 +343,3 @@ func giftCertificatesDefs() []CommandDef {
 		},
 	}
 }
-

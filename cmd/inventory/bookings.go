@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -34,7 +37,7 @@ func bookingsDefs() []CommandDef {
 			Use: "bookings list", Short: "List bookings", Kind: KindRead,
 			Verb: "GET", Path: "/bookings", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"},
+				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "booking-status", Type: "string", Description: "ON_HOLD|CONFIRMED|EXPIRED|CANCELLED (uppercase per spec)"},
@@ -42,10 +45,35 @@ func bookingsDefs() []CommandDef {
 				{Name: "to", Type: "string", Description: "Booking start date <= (YYYY-MM-DD)"},
 				{Name: "customer-email", Type: "string", Description: "Filter by customer email"},
 				{Name: "reference", Type: "string", Description: "Filter by booking reference"},
-				{Name: "product-option-id", Type: "string", Description: "Filter by product option"},
-				{Name: "resource-id", Type: "int", Description: "Filter to bookings this resource is assigned to (active resources only)"},
-				{Name: "include", Type: "string", Description: "Comma-separated expansions; only 'resources' is supported (adds assigned resources + resource_state_token)"},
+				{Name: "product-option-id", Type: "int", Min: 1, Description: "Filter by product option"},
+				{Name: "resource-id", Type: "int", Min: 1, Description: "Filter to bookings this resource is assigned to (active resources only)"},
+				// `resources` is the only expansion the spec defines, so this is a
+				// single value and not a list. The help used to say
+				// "Comma-separated expansions", which promised a form the closure
+				// cannot produce and nothing validated — `--include resources,bogus`
+				// went to the wire as one opaque string.
+				// Written as a pipe run so the generic enum gate actually fires.
+				// extractEnumTokens requires a "|" and at least two tokens, so a
+				// one-member list reads as prose and is NOT validated — which is
+				// how `--include bogus` reached the wire while the help text
+				// claimed otherwise. The empty second token is dropped by
+				// extractEnumTokens, leaving exactly {resources}.
+				{Name: "include", Type: "string", Description: "resources| — adds assigned resources + resource_state_token"},
 				{Name: "include-cancelled", Type: "bool", Description: "Lift the CancellingScope filter so cancelled bookings appear alongside active ones"},
+				{Name: "customer-id", Type: "string", Description: "Bookings whose booker is this customer (UUID)"},
+				// Carries the same pipe-run as --booking-status so the generic enum
+				// gate covers it too. With the prose-only description it had, the
+				// gate did not fire: `--status cnofirmed` went to the wire
+				// verbatim while `--booking-status cnofirmed` was refused by name.
+				// The gate exists because some endpoints ignore an unknown enum
+				// value and answer with unfiltered data, which is the worst
+				// possible result for a typo.
+				{Name: "status", Type: "string", Description: "ON_HOLD|CONFIRMED|EXPIRED|CANCELLED — alias of --booking-status"},
+				{Name: "date-field", Type: "string", Description: "starts_at|confirmed_at|created_at"},
+				{Name: "origin-type", Type: "string", Description: "ota|direct_online|direct_offline|indirect_offline|reseller|other"},
+				{Name: "partner-id", Type: "int", Min: 1, Description: "Bookings involving this partner on either side"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListBookingsParams{}
@@ -77,13 +105,13 @@ func bookingsDefs() []CommandDef {
 					p.To = &d
 				}
 				if v := args.FlagString("customer-email"); v != "" {
-					e := openapi_types.Email(v)
-					p.CustomerEmail = &e
+					p.CustomerEmail = &v
 				}
 				if v := args.FlagString("reference"); v != "" {
 					p.Reference = &v
 				}
-				if v := args.FlagString("product-option-id"); v != "" {
+				if args.FlagSet("product-option-id") {
+					v := args.FlagInt("product-option-id")
 					p.ProductOptionId = &v
 				}
 				if args.FlagSet("resource-id") {
@@ -94,17 +122,64 @@ func bookingsDefs() []CommandDef {
 					// that as "this resource is on all of them". Same
 					// wrong-data-with-no-signal failure the enum gate exists
 					// to prevent, so fail loudly here too.
-					if v < 1 {
-						return nil, fmt.Errorf("--resource-id must be >= 1 (got %d)", v)
-					}
 					p.ResourceId = &v
 				}
 				if v := args.FlagString("include"); v != "" {
-					p.Include = &v
+					// 1.29.0 spells include as "one value or a list of them", so the
+					// generated type is a union. The CLI sends the scalar spelling;
+					// the list spelling stays reachable through the same union.
+					var inc gen.ListBookingsIncludeParam
+					if err := inc.FromListBookingsIncludeParam0(gen.ListBookingsIncludeParam0(v)); err != nil {
+						return nil, fmt.Errorf("--include: %w", err)
+					}
+					p.Include = &inc
 				}
 				if args.FlagBool("include-cancelled") {
 					t := true
 					p.IncludeCancelled = &t
+				}
+				if v := args.FlagString("customer-id"); v != "" {
+					id, err := uuid.Parse(v)
+					if err != nil {
+						return nil, fmt.Errorf("--customer-id: invalid UUID: %w", err)
+					}
+					p.CustomerId = &id
+				}
+				if v := args.FlagString("status"); v != "" {
+					// --status and --booking-status are the same server-side
+					// filter under two names. Sent together they are two
+					// contradictory values of one filter, and the spec states no
+					// precedence, so which one wins is the server's business and
+					// unknowable here. Refuse rather than guess.
+					if args.FlagSet("booking-status") {
+						return nil, fmt.Errorf("--status and --booking-status are the same filter; pass only one")
+					}
+					p.Status = &v
+				}
+				if v := args.FlagString("date-field"); v != "" {
+					d := gen.ListBookingsParamsDateField(v)
+					p.DateField = &d
+				}
+				if v := args.FlagString("origin-type"); v != "" {
+					o := gen.ListBookingsParamsOriginType(v)
+					p.OriginType = &o
+				}
+				if args.FlagSet("partner-id") {
+					v := args.FlagInt("partner-id")
+					// Spec pins partner_id to minimum 1; a 0 would otherwise be
+					// dropped by the unset-guard and silently widen the page.
+					p.PartnerId = &v
+				}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
+				}
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
 				}
 				resp, err := r.Client.ListBookingsWithResponse(ctx, p)
 				if err != nil {
@@ -134,8 +209,9 @@ func bookingsDefs() []CommandDef {
 			Kind: KindRead, Verb: "GET", Path: "/bookings/{id}/transactions",
 			Ability: invpkg.Read, PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
@@ -143,6 +219,13 @@ func bookingsDefs() []CommandDef {
 					return nil, err
 				}
 				p := &gen.ListBookingTransactionsParams{}
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					p.Since = &t
+				}
 				if v := args.FlagInt("limit"); v != 0 {
 					p.Limit = &v
 				}
@@ -408,7 +491,9 @@ func bookingsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CancelBookingWithBodyWithResponse(ctx, id, &gen.CancelBookingParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
 				if res != nil {
 					res.WireBody = body
@@ -446,7 +531,9 @@ func bookingsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RefundBookingWithBodyWithResponse(ctx, id, &gen.RefundBookingParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
 				if res != nil {
 					res.WireBody = body
@@ -480,7 +567,9 @@ func bookingsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CompBookingWithBodyWithResponse(ctx, id, &gen.CompBookingParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Booking", id)
 				if res != nil {
 					res.WireBody = body

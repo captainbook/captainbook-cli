@@ -24,10 +24,10 @@ func productsDefs() []CommandDef {
 			Use: "products list", Short: "List products", Kind: KindRead,
 			Verb: "GET", Path: "/products", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size (1-200, default 50)"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size (1-200, default 50)"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
-				{Name: "category", Type: "string", Description: "Filter by category slug or ID"},
+				{Name: "category", Type: "int", Min: 1, Description: "Filter by category ID (a ProductCategory id; 0 is refused rather than ignored)"},
 				// Two-state on purpose: `status` filters the `is_active`
 				// boolean (published → true, draft → false) and the server
 				// validates it with `in:published,draft`. There is no
@@ -51,7 +51,8 @@ func productsDefs() []CommandDef {
 				if v := args.FlagString("q"); v != "" {
 					params.Q = &v
 				}
-				if v := args.FlagString("category"); v != "" {
+				if args.FlagSet("category") {
+					v := args.FlagInt("category")
 					params.Category = &v
 				}
 				if v := args.FlagString("status"); v != "" {
@@ -167,7 +168,9 @@ func productsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateProductWithBodyWithResponse(ctx, &gen.CreateProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", "")
 				if res != nil {
 					res.WireBody = body
@@ -267,12 +270,63 @@ func productsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateProductWithBodyWithResponse(ctx, id, &gen.UpdateProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
 				if res != nil {
 					res.WireBody = body
 				}
 				return res, err
+			},
+		},
+		{
+			Use: "products duplicate <id>", Short: "Duplicate a product and everything under it",
+			Kind: KindMutation, Verb: "POST", Path: "/products/{id}/duplicate",
+			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"id"},
+			Long: "Copies one product. --include selects which related collections come " +
+				"with it; omit it for the server's default set. Use --dry-run first: the " +
+				"blast radius of this command is whatever --include names, and the audit " +
+				"records only that list, not the resulting rows.",
+			Flags: []FlagDef{
+				{Name: "title", Type: "string", Description: "Title for the copy (defaults to the source title with a suffix)"},
+				{Name: "product-code", Type: "string", Description: "Product code for the copy"},
+				// All twelve spec sections, in the spec's own order. The earlier
+				// list named only eight, and because `include` REPLACES the
+				// defaults rather than adding to them, a caller following the
+				// help text produced a copy with no schedules, no pricing and
+				// no resources — three sections the server copies by DEFAULT.
+				// An incomplete list here is not a documentation nit; it
+				// silently narrows what the operator can ask for.
+				{Name: "include", Type: "stringSlice", Description: "Sections to copy, comma-separated. REPLACES the defaults (details, schedules, photos, pricing, documents, resources, deposit). One or more of: details, schedules, photos, pricing, departures, locations, documents, resources, extras, questions, deposit, faq"},
+			},
+			// invariant: --include decides what this irreversible-ish copy
+			// actually duplicates, and the audit keeps only body_sha256, so
+			// omitting it here would leave an incident responder unable to tell
+			// what was copied.
+			ForensicFields: []string{"title", "product-code", "include"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				id, err := pathArg(args)
+				if err != nil {
+					return nil, err
+				}
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"title":        "title",
+					"product-code": "product_code",
+					"include":      "include",
+				})
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.DuplicateProductWithBodyWithResponse(ctx, id, &gen.DuplicateProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
+				res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, perr
 			},
 		},
 		{
@@ -310,7 +364,9 @@ func productsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreProductWithBodyWithResponse(ctx, id, &gen.RestoreProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", id)
 				if res != nil {
 					res.WireBody = body
@@ -320,4 +376,3 @@ func productsDefs() []CommandDef {
 		},
 	}
 }
-

@@ -139,6 +139,27 @@ func (e AvailabilityStatus) Valid() bool {
 	}
 }
 
+// Defines values for AvailabilityRulePreviewCapacitySource.
+const (
+	AvailabilityRulePreviewCapacitySourceProductOption AvailabilityRulePreviewCapacitySource = "product_option"
+	AvailabilityRulePreviewCapacitySourceResources     AvailabilityRulePreviewCapacitySource = "resources"
+	AvailabilityRulePreviewCapacitySourceRule          AvailabilityRulePreviewCapacitySource = "rule"
+)
+
+// Valid indicates whether the value is a known member of the AvailabilityRulePreviewCapacitySource enum.
+func (e AvailabilityRulePreviewCapacitySource) Valid() bool {
+	switch e {
+	case AvailabilityRulePreviewCapacitySourceProductOption:
+		return true
+	case AvailabilityRulePreviewCapacitySourceResources:
+		return true
+	case AvailabilityRulePreviewCapacitySourceRule:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BookingBookingStatus.
 const (
 	BookingBookingStatusCANCELLED BookingBookingStatus = "CANCELLED"
@@ -186,25 +207,25 @@ func (e BulkUpdateAvailabilityRequestNewValue1Operator) Valid() bool {
 
 // Defines values for BulkUpdateAvailabilityRequestSetting.
 const (
-	BookingStatus BulkUpdateAvailabilityRequestSetting = "booking_status"
-	Capacity      BulkUpdateAvailabilityRequestSetting = "capacity"
-	EndTime       BulkUpdateAvailabilityRequestSetting = "end_time"
-	Pricing       BulkUpdateAvailabilityRequestSetting = "pricing"
-	StartTime     BulkUpdateAvailabilityRequestSetting = "start_time"
+	BulkUpdateAvailabilityRequestSettingBookingStatus BulkUpdateAvailabilityRequestSetting = "booking_status"
+	BulkUpdateAvailabilityRequestSettingCapacity      BulkUpdateAvailabilityRequestSetting = "capacity"
+	BulkUpdateAvailabilityRequestSettingEndTime       BulkUpdateAvailabilityRequestSetting = "end_time"
+	BulkUpdateAvailabilityRequestSettingPricing       BulkUpdateAvailabilityRequestSetting = "pricing"
+	BulkUpdateAvailabilityRequestSettingStartTime     BulkUpdateAvailabilityRequestSetting = "start_time"
 )
 
 // Valid indicates whether the value is a known member of the BulkUpdateAvailabilityRequestSetting enum.
 func (e BulkUpdateAvailabilityRequestSetting) Valid() bool {
 	switch e {
-	case BookingStatus:
+	case BulkUpdateAvailabilityRequestSettingBookingStatus:
 		return true
-	case Capacity:
+	case BulkUpdateAvailabilityRequestSettingCapacity:
 		return true
-	case EndTime:
+	case BulkUpdateAvailabilityRequestSettingEndTime:
 		return true
-	case Pricing:
+	case BulkUpdateAvailabilityRequestSettingPricing:
 		return true
-	case StartTime:
+	case BulkUpdateAvailabilityRequestSettingStartTime:
 		return true
 	default:
 		return false
@@ -226,6 +247,51 @@ func (e CancelBookingRequestRefundPolicy) Valid() bool {
 	case CancelBookingRequestRefundPolicyNone:
 		return true
 	case CancelBookingRequestRefundPolicyPartial:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComposedWorkflowStepBranchType.
+const (
+	ComposedWorkflowStepBranchTypeFalse ComposedWorkflowStepBranchType = "false"
+	ComposedWorkflowStepBranchTypeTrue  ComposedWorkflowStepBranchType = "true"
+)
+
+// Valid indicates whether the value is a known member of the ComposedWorkflowStepBranchType enum.
+func (e ComposedWorkflowStepBranchType) Valid() bool {
+	switch e {
+	case ComposedWorkflowStepBranchTypeFalse:
+		return true
+	case ComposedWorkflowStepBranchTypeTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ComposedWorkflowStepStepType.
+const (
+	ComposedWorkflowStepStepTypeAction     ComposedWorkflowStepStepType = "action"
+	ComposedWorkflowStepStepTypeCondition  ComposedWorkflowStepStepType = "condition"
+	ComposedWorkflowStepStepTypeDelay      ComposedWorkflowStepStepType = "delay"
+	ComposedWorkflowStepStepTypeDelayUntil ComposedWorkflowStepStepType = "delay_until"
+	ComposedWorkflowStepStepTypeLoop       ComposedWorkflowStepStepType = "loop"
+)
+
+// Valid indicates whether the value is a known member of the ComposedWorkflowStepStepType enum.
+func (e ComposedWorkflowStepStepType) Valid() bool {
+	switch e {
+	case ComposedWorkflowStepStepTypeAction:
+		return true
+	case ComposedWorkflowStepStepTypeCondition:
+		return true
+	case ComposedWorkflowStepStepTypeDelay:
+		return true
+	case ComposedWorkflowStepStepTypeDelayUntil:
+		return true
+	case ComposedWorkflowStepStepTypeLoop:
 		return true
 	default:
 		return false
@@ -451,6 +517,24 @@ func (e CreateResourceRequestCategory) Valid() bool {
 	}
 }
 
+// Defines values for CreateSegmentRequestConditionsLogic.
+const (
+	CreateSegmentRequestConditionsLogicAnd CreateSegmentRequestConditionsLogic = "and"
+	CreateSegmentRequestConditionsLogicOr  CreateSegmentRequestConditionsLogic = "or"
+)
+
+// Valid indicates whether the value is a known member of the CreateSegmentRequestConditionsLogic enum.
+func (e CreateSegmentRequestConditionsLogic) Valid() bool {
+	switch e {
+	case CreateSegmentRequestConditionsLogicAnd:
+		return true
+	case CreateSegmentRequestConditionsLogicOr:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateWorkflowStepRequestBranchType.
 const (
 	CreateWorkflowStepRequestBranchTypeFalse CreateWorkflowStepRequestBranchType = "false"
@@ -610,6 +694,36 @@ func (e GiftCertificateStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListBookingsIncludeItem.
+const (
+	ListBookingsIncludeItemResources ListBookingsIncludeItem = "resources"
+)
+
+// Valid indicates whether the value is a known member of the ListBookingsIncludeItem enum.
+func (e ListBookingsIncludeItem) Valid() bool {
+	switch e {
+	case ListBookingsIncludeItemResources:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBookingsIncludeParam0.
+const (
+	Resources ListBookingsIncludeParam0 = "resources"
+)
+
+// Valid indicates whether the value is a known member of the ListBookingsIncludeParam0 enum.
+func (e ListBookingsIncludeParam0) Valid() bool {
+	switch e {
+	case Resources:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LocationType.
 const (
 	LocationTypeEND       LocationType = "END"
@@ -676,6 +790,24 @@ func (e MutationResultSideEffectsType) Valid() bool {
 	case Mail:
 		return true
 	case Stripe:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PartnerPartnerType.
+const (
+	PartnerPartnerTypeChannel        PartnerPartnerType = "channel"
+	PartnerPartnerTypeSellingPartner PartnerPartnerType = "selling_partner"
+)
+
+// Valid indicates whether the value is a known member of the PartnerPartnerType enum.
+func (e PartnerPartnerType) Valid() bool {
+	switch e {
+	case PartnerPartnerTypeChannel:
+		return true
+	case PartnerPartnerTypeSellingPartner:
 		return true
 	default:
 		return false
@@ -901,6 +1033,156 @@ func (e ResourceCategory) Valid() bool {
 	}
 }
 
+// Defines values for ResourceCalendarEventEventType.
+const (
+	ResourceCalendarEventEventTypeBooking     ResourceCalendarEventEventType = "booking"
+	ResourceCalendarEventEventTypeBusy        ResourceCalendarEventEventType = "busy"
+	ResourceCalendarEventEventTypeUnavailable ResourceCalendarEventEventType = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the ResourceCalendarEventEventType enum.
+func (e ResourceCalendarEventEventType) Valid() bool {
+	switch e {
+	case ResourceCalendarEventEventTypeBooking:
+		return true
+	case ResourceCalendarEventEventTypeBusy:
+		return true
+	case ResourceCalendarEventEventTypeUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceCalendarEventResourceCategory.
+const (
+	ResourceCalendarEventResourceCategoryAsset     ResourceCalendarEventResourceCategory = "asset"
+	ResourceCalendarEventResourceCategoryAuxiliary ResourceCalendarEventResourceCategory = "auxiliary"
+	ResourceCalendarEventResourceCategoryGuide     ResourceCalendarEventResourceCategory = "guide"
+)
+
+// Valid indicates whether the value is a known member of the ResourceCalendarEventResourceCategory enum.
+func (e ResourceCalendarEventResourceCategory) Valid() bool {
+	switch e {
+	case ResourceCalendarEventResourceCategoryAsset:
+		return true
+	case ResourceCalendarEventResourceCategoryAuxiliary:
+		return true
+	case ResourceCalendarEventResourceCategoryGuide:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceCalendarEventSource.
+const (
+	CaptainBook    ResourceCalendarEventSource = "CaptainBook"
+	GoogleCalendar ResourceCalendarEventSource = "Google Calendar"
+)
+
+// Valid indicates whether the value is a known member of the ResourceCalendarEventSource enum.
+func (e ResourceCalendarEventSource) Valid() bool {
+	switch e {
+	case CaptainBook:
+		return true
+	case GoogleCalendar:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceCalendarPageUnavailableResources.
+const (
+	BookingsRestrictedToOwn ResourceCalendarPageUnavailableResources = "bookings_restricted_to_own"
+	CalendarNotConnected    ResourceCalendarPageUnavailableResources = "calendar_not_connected"
+	CalendarSyncReset       ResourceCalendarPageUnavailableResources = "calendar_sync_reset"
+	NoLinkedUser            ResourceCalendarPageUnavailableResources = "no_linked_user"
+	WindowExceedsCoverage   ResourceCalendarPageUnavailableResources = "window_exceeds_coverage"
+)
+
+// Valid indicates whether the value is a known member of the ResourceCalendarPageUnavailableResources enum.
+func (e ResourceCalendarPageUnavailableResources) Valid() bool {
+	switch e {
+	case BookingsRestrictedToOwn:
+		return true
+	case CalendarNotConnected:
+		return true
+	case CalendarSyncReset:
+		return true
+	case NoLinkedUser:
+		return true
+	case WindowExceedsCoverage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SegmentConditionsLogic.
+const (
+	SegmentConditionsLogicAnd SegmentConditionsLogic = "and"
+	SegmentConditionsLogicOr  SegmentConditionsLogic = "or"
+)
+
+// Valid indicates whether the value is a known member of the SegmentConditionsLogic enum.
+func (e SegmentConditionsLogic) Valid() bool {
+	switch e {
+	case SegmentConditionsLogicAnd:
+		return true
+	case SegmentConditionsLogicOr:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SegmentStatus.
+const (
+	SegmentStatusActive      SegmentStatus = "active"
+	SegmentStatusArchived    SegmentStatus = "archived"
+	SegmentStatusBackfilling SegmentStatus = "backfilling"
+	SegmentStatusDraft       SegmentStatus = "draft"
+	SegmentStatusErrored     SegmentStatus = "errored"
+)
+
+// Valid indicates whether the value is a known member of the SegmentStatus enum.
+func (e SegmentStatus) Valid() bool {
+	switch e {
+	case SegmentStatusActive:
+		return true
+	case SegmentStatusArchived:
+		return true
+	case SegmentStatusBackfilling:
+		return true
+	case SegmentStatusDraft:
+		return true
+	case SegmentStatusErrored:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SegmentType.
+const (
+	SegmentTypeSmart  SegmentType = "smart"
+	SegmentTypeStatic SegmentType = "static"
+)
+
+// Valid indicates whether the value is a known member of the SegmentType enum.
+func (e SegmentType) Valid() bool {
+	switch e {
+	case SegmentTypeSmart:
+		return true
+	case SegmentTypeStatic:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TicketReissueDeliveryMethodFrom.
 const (
 	TicketReissueDeliveryMethodFromTICKET  TicketReissueDeliveryMethodFrom = "TICKET"
@@ -969,13 +1251,13 @@ func (e TransactionMethod) Valid() bool {
 
 // Defines values for TransactionStatus.
 const (
-	TransactionStatusSucceeded TransactionStatus = "succeeded"
+	Succeeded TransactionStatus = "succeeded"
 )
 
 // Valid indicates whether the value is a known member of the TransactionStatus enum.
 func (e TransactionStatus) Valid() bool {
 	switch e {
-	case TransactionStatusSucceeded:
+	case Succeeded:
 		return true
 	default:
 		return false
@@ -1303,18 +1585,48 @@ func (e WorkflowExecutionLogStatus) Valid() bool {
 	}
 }
 
+// Defines values for WorkflowNodeStepType.
+const (
+	WorkflowNodeStepTypeAction     WorkflowNodeStepType = "action"
+	WorkflowNodeStepTypeCondition  WorkflowNodeStepType = "condition"
+	WorkflowNodeStepTypeDelay      WorkflowNodeStepType = "delay"
+	WorkflowNodeStepTypeDelayUntil WorkflowNodeStepType = "delay_until"
+	WorkflowNodeStepTypeLoop       WorkflowNodeStepType = "loop"
+	WorkflowNodeStepTypeTrigger    WorkflowNodeStepType = "trigger"
+)
+
+// Valid indicates whether the value is a known member of the WorkflowNodeStepType enum.
+func (e WorkflowNodeStepType) Valid() bool {
+	switch e {
+	case WorkflowNodeStepTypeAction:
+		return true
+	case WorkflowNodeStepTypeCondition:
+		return true
+	case WorkflowNodeStepTypeDelay:
+		return true
+	case WorkflowNodeStepTypeDelayUntil:
+		return true
+	case WorkflowNodeStepTypeLoop:
+		return true
+	case WorkflowNodeStepTypeTrigger:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkflowStepBranchType.
 const (
-	WorkflowStepBranchTypeFalse WorkflowStepBranchType = "false"
-	WorkflowStepBranchTypeTrue  WorkflowStepBranchType = "true"
+	False WorkflowStepBranchType = "false"
+	True  WorkflowStepBranchType = "true"
 )
 
 // Valid indicates whether the value is a known member of the WorkflowStepBranchType enum.
 func (e WorkflowStepBranchType) Valid() bool {
 	switch e {
-	case WorkflowStepBranchTypeFalse:
+	case False:
 		return true
-	case WorkflowStepBranchTypeTrue:
+	case True:
 		return true
 	default:
 		return false
@@ -1390,6 +1702,27 @@ func (e ListAnswersParamsGranularity) Valid() bool {
 	}
 }
 
+// Defines values for ListBookingsParamsDateField.
+const (
+	ConfirmedAt ListBookingsParamsDateField = "confirmed_at"
+	CreatedAt   ListBookingsParamsDateField = "created_at"
+	StartsAt    ListBookingsParamsDateField = "starts_at"
+)
+
+// Valid indicates whether the value is a known member of the ListBookingsParamsDateField enum.
+func (e ListBookingsParamsDateField) Valid() bool {
+	switch e {
+	case ConfirmedAt:
+		return true
+	case CreatedAt:
+		return true
+	case StartsAt:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListBookingsParamsBookingStatus.
 const (
 	ListBookingsParamsBookingStatusCANCELLED ListBookingsParamsBookingStatus = "CANCELLED"
@@ -1408,6 +1741,36 @@ func (e ListBookingsParamsBookingStatus) Valid() bool {
 	case ListBookingsParamsBookingStatusEXPIRED:
 		return true
 	case ListBookingsParamsBookingStatusONHOLD:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBookingsParamsOriginType.
+const (
+	DirectOffline   ListBookingsParamsOriginType = "direct_offline"
+	DirectOnline    ListBookingsParamsOriginType = "direct_online"
+	IndirectOffline ListBookingsParamsOriginType = "indirect_offline"
+	Ota             ListBookingsParamsOriginType = "ota"
+	Other           ListBookingsParamsOriginType = "other"
+	Reseller        ListBookingsParamsOriginType = "reseller"
+)
+
+// Valid indicates whether the value is a known member of the ListBookingsParamsOriginType enum.
+func (e ListBookingsParamsOriginType) Valid() bool {
+	switch e {
+	case DirectOffline:
+		return true
+	case DirectOnline:
+		return true
+	case IndirectOffline:
+		return true
+	case Ota:
+		return true
+	case Other:
+		return true
+	case Reseller:
 		return true
 	default:
 		return false
@@ -1486,18 +1849,105 @@ func (e ListLocationsParamsType) Valid() bool {
 	}
 }
 
+// Defines values for ListPartnersParamsPartnerType.
+const (
+	ListPartnersParamsPartnerTypeChannel        ListPartnersParamsPartnerType = "channel"
+	ListPartnersParamsPartnerTypeSellingPartner ListPartnersParamsPartnerType = "selling_partner"
+)
+
+// Valid indicates whether the value is a known member of the ListPartnersParamsPartnerType enum.
+func (e ListPartnersParamsPartnerType) Valid() bool {
+	switch e {
+	case ListPartnersParamsPartnerTypeChannel:
+		return true
+	case ListPartnersParamsPartnerTypeSellingPartner:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListProductsParamsStatus.
 const (
-	Draft     ListProductsParamsStatus = "draft"
-	Published ListProductsParamsStatus = "published"
+	ListProductsParamsStatusDraft     ListProductsParamsStatus = "draft"
+	ListProductsParamsStatusPublished ListProductsParamsStatus = "published"
 )
 
 // Valid indicates whether the value is a known member of the ListProductsParamsStatus enum.
 func (e ListProductsParamsStatus) Valid() bool {
 	switch e {
-	case Draft:
+	case ListProductsParamsStatusDraft:
 		return true
-	case Published:
+	case ListProductsParamsStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DuplicateProductJSONBodyInclude.
+const (
+	DuplicateProductJSONBodyIncludeDepartures DuplicateProductJSONBodyInclude = "departures"
+	DuplicateProductJSONBodyIncludeDeposit    DuplicateProductJSONBodyInclude = "deposit"
+	DuplicateProductJSONBodyIncludeDetails    DuplicateProductJSONBodyInclude = "details"
+	DuplicateProductJSONBodyIncludeDocuments  DuplicateProductJSONBodyInclude = "documents"
+	DuplicateProductJSONBodyIncludeExtras     DuplicateProductJSONBodyInclude = "extras"
+	DuplicateProductJSONBodyIncludeFaq        DuplicateProductJSONBodyInclude = "faq"
+	DuplicateProductJSONBodyIncludeLocations  DuplicateProductJSONBodyInclude = "locations"
+	DuplicateProductJSONBodyIncludePhotos     DuplicateProductJSONBodyInclude = "photos"
+	DuplicateProductJSONBodyIncludePricing    DuplicateProductJSONBodyInclude = "pricing"
+	DuplicateProductJSONBodyIncludeQuestions  DuplicateProductJSONBodyInclude = "questions"
+	DuplicateProductJSONBodyIncludeResources  DuplicateProductJSONBodyInclude = "resources"
+	DuplicateProductJSONBodyIncludeSchedules  DuplicateProductJSONBodyInclude = "schedules"
+)
+
+// Valid indicates whether the value is a known member of the DuplicateProductJSONBodyInclude enum.
+func (e DuplicateProductJSONBodyInclude) Valid() bool {
+	switch e {
+	case DuplicateProductJSONBodyIncludeDepartures:
+		return true
+	case DuplicateProductJSONBodyIncludeDeposit:
+		return true
+	case DuplicateProductJSONBodyIncludeDetails:
+		return true
+	case DuplicateProductJSONBodyIncludeDocuments:
+		return true
+	case DuplicateProductJSONBodyIncludeExtras:
+		return true
+	case DuplicateProductJSONBodyIncludeFaq:
+		return true
+	case DuplicateProductJSONBodyIncludeLocations:
+		return true
+	case DuplicateProductJSONBodyIncludePhotos:
+		return true
+	case DuplicateProductJSONBodyIncludePricing:
+		return true
+	case DuplicateProductJSONBodyIncludeQuestions:
+		return true
+	case DuplicateProductJSONBodyIncludeResources:
+		return true
+	case DuplicateProductJSONBodyIncludeSchedules:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListResourceCalendarParamsEventTypes.
+const (
+	ListResourceCalendarParamsEventTypesBooking     ListResourceCalendarParamsEventTypes = "booking"
+	ListResourceCalendarParamsEventTypesBusy        ListResourceCalendarParamsEventTypes = "busy"
+	ListResourceCalendarParamsEventTypesUnavailable ListResourceCalendarParamsEventTypes = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the ListResourceCalendarParamsEventTypes enum.
+func (e ListResourceCalendarParamsEventTypes) Valid() bool {
+	switch e {
+	case ListResourceCalendarParamsEventTypesBooking:
+		return true
+	case ListResourceCalendarParamsEventTypesBusy:
+		return true
+	case ListResourceCalendarParamsEventTypesUnavailable:
 		return true
 	default:
 		return false
@@ -1506,46 +1956,67 @@ func (e ListProductsParamsStatus) Valid() bool {
 
 // Defines values for ListResourcesParamsCategory.
 const (
-	ListResourcesParamsCategoryAsset     ListResourcesParamsCategory = "asset"
-	ListResourcesParamsCategoryAuxiliary ListResourcesParamsCategory = "auxiliary"
-	ListResourcesParamsCategoryEquipment ListResourcesParamsCategory = "equipment"
-	ListResourcesParamsCategoryGuide     ListResourcesParamsCategory = "guide"
+	Asset     ListResourcesParamsCategory = "asset"
+	Auxiliary ListResourcesParamsCategory = "auxiliary"
+	Equipment ListResourcesParamsCategory = "equipment"
+	Guide     ListResourcesParamsCategory = "guide"
 )
 
 // Valid indicates whether the value is a known member of the ListResourcesParamsCategory enum.
 func (e ListResourcesParamsCategory) Valid() bool {
 	switch e {
-	case ListResourcesParamsCategoryAsset:
+	case Asset:
 		return true
-	case ListResourcesParamsCategoryAuxiliary:
+	case Auxiliary:
 		return true
-	case ListResourcesParamsCategoryEquipment:
+	case Equipment:
 		return true
-	case ListResourcesParamsCategoryGuide:
+	case Guide:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for ListTransactionsParamsStatus.
+// Defines values for ListSegmentsParamsStatus.
 const (
-	ListTransactionsParamsStatusFailed    ListTransactionsParamsStatus = "failed"
-	ListTransactionsParamsStatusPartial   ListTransactionsParamsStatus = "partial"
-	ListTransactionsParamsStatusPending   ListTransactionsParamsStatus = "pending"
-	ListTransactionsParamsStatusSucceeded ListTransactionsParamsStatus = "succeeded"
+	ListSegmentsParamsStatusActive      ListSegmentsParamsStatus = "active"
+	ListSegmentsParamsStatusArchived    ListSegmentsParamsStatus = "archived"
+	ListSegmentsParamsStatusBackfilling ListSegmentsParamsStatus = "backfilling"
+	ListSegmentsParamsStatusDraft       ListSegmentsParamsStatus = "draft"
+	ListSegmentsParamsStatusErrored     ListSegmentsParamsStatus = "errored"
 )
 
-// Valid indicates whether the value is a known member of the ListTransactionsParamsStatus enum.
-func (e ListTransactionsParamsStatus) Valid() bool {
+// Valid indicates whether the value is a known member of the ListSegmentsParamsStatus enum.
+func (e ListSegmentsParamsStatus) Valid() bool {
 	switch e {
-	case ListTransactionsParamsStatusFailed:
+	case ListSegmentsParamsStatusActive:
 		return true
-	case ListTransactionsParamsStatusPartial:
+	case ListSegmentsParamsStatusArchived:
 		return true
-	case ListTransactionsParamsStatusPending:
+	case ListSegmentsParamsStatusBackfilling:
 		return true
-	case ListTransactionsParamsStatusSucceeded:
+	case ListSegmentsParamsStatusDraft:
+		return true
+	case ListSegmentsParamsStatusErrored:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListSegmentsParamsType.
+const (
+	ListSegmentsParamsTypeSmart  ListSegmentsParamsType = "smart"
+	ListSegmentsParamsTypeStatic ListSegmentsParamsType = "static"
+)
+
+// Valid indicates whether the value is a known member of the ListSegmentsParamsType enum.
+func (e ListSegmentsParamsType) Valid() bool {
+	switch e {
+	case ListSegmentsParamsTypeSmart:
+		return true
+	case ListSegmentsParamsTypeStatic:
 		return true
 	default:
 		return false
@@ -1555,7 +2026,6 @@ func (e ListTransactionsParamsStatus) Valid() bool {
 // Defines values for ListTransactionsParamsType.
 const (
 	ListTransactionsParamsTypeCharge ListTransactionsParamsType = "charge"
-	ListTransactionsParamsTypeComp   ListTransactionsParamsType = "comp"
 	ListTransactionsParamsTypeRefund ListTransactionsParamsType = "refund"
 )
 
@@ -1563,8 +2033,6 @@ const (
 func (e ListTransactionsParamsType) Valid() bool {
 	switch e {
 	case ListTransactionsParamsTypeCharge:
-		return true
-	case ListTransactionsParamsTypeComp:
 		return true
 	case ListTransactionsParamsTypeRefund:
 		return true
@@ -1600,21 +2068,42 @@ func (e ListWorkflowExecutionsParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListWorkflowNodesParamsKind.
+const (
+	Action  ListWorkflowNodesParamsKind = "action"
+	Logic   ListWorkflowNodesParamsKind = "logic"
+	Trigger ListWorkflowNodesParamsKind = "trigger"
+)
+
+// Valid indicates whether the value is a known member of the ListWorkflowNodesParamsKind enum.
+func (e ListWorkflowNodesParamsKind) Valid() bool {
+	switch e {
+	case Action:
+		return true
+	case Logic:
+		return true
+	case Trigger:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListWorkflowsParamsStatus.
 const (
-	ListWorkflowsParamsStatusActive ListWorkflowsParamsStatus = "active"
-	ListWorkflowsParamsStatusDraft  ListWorkflowsParamsStatus = "draft"
-	ListWorkflowsParamsStatusPaused ListWorkflowsParamsStatus = "paused"
+	Active ListWorkflowsParamsStatus = "active"
+	Draft  ListWorkflowsParamsStatus = "draft"
+	Paused ListWorkflowsParamsStatus = "paused"
 )
 
 // Valid indicates whether the value is a known member of the ListWorkflowsParamsStatus enum.
 func (e ListWorkflowsParamsStatus) Valid() bool {
 	switch e {
-	case ListWorkflowsParamsStatusActive:
+	case Active:
 		return true
-	case ListWorkflowsParamsStatusDraft:
+	case Draft:
 		return true
-	case ListWorkflowsParamsStatusPaused:
+	case Paused:
 		return true
 	default:
 		return false
@@ -1751,10 +2240,26 @@ type AssignedBookingResource struct {
 // Resource-level defaults.
 type AttachResourceRequest struct {
 	// Capacity Overrides the Resource's capacity for this specific ProductOption attachment. This is the capacity `Booking::attachResources()` reads, so setting it makes the resource a candidate for the booking's single main slot — refused (422) for an `equipment` resource.
-	Capacity   *int   `json:"capacity,omitempty"`
-	DryRun     *bool  `json:"dry_run,omitempty"`
-	ResourceId string `json:"resource_id"`
-	Seniority  *int   `json:"seniority,omitempty"`
+	Capacity *int  `json:"capacity,omitempty"`
+	DryRun   *bool `json:"dry_run,omitempty"`
+
+	// ResourceId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ResourceId PositiveIntegerId `json:"resource_id"`
+	Seniority  *int              `json:"seniority,omitempty"`
 }
 
 // Availability Mirrors `AvailabilityResource::toArray()`. A single bookable
@@ -1862,20 +2367,90 @@ type AvailabilityPage struct {
 // AvailabilityRulePreview Echo of the recurrence rule the server expanded plus a small sample
 // of the resulting (from, to) windows for human inspection.
 type AvailabilityRulePreview struct {
-	AddDaysCount    *int                `json:"add_days_count,omitempty"`
-	EndDate         *openapi_types.Date `json:"end_date,omitempty"`
-	EndTime         *string             `json:"end_time,omitempty"`
-	ProductOptionId *string             `json:"product_option_id,omitempty"`
-	SampleDates     *[]struct {
+	AddDaysCount *int `json:"add_days_count,omitempty"`
+
+	// Capacity Seats every departure will be created with — the EFFECTIVE value, so it is present whether or not the request named one. It reads the product option's own capacity when the request named none, and the total this option's resources impose when they are what decides (see `capacity_source`). This is the number a commit puts on sale; read it on the dry run.
+	Capacity *int `json:"capacity,omitempty"`
+
+	// CapacitySource Which of three things decided `capacity`. `rule` — the request named it. `product_option` — it did not, so the option's own column applies. `resources` — this option takes its capacity from its resources (guides, or auxiliary inventory), so `availabilities.capacity` is written but never consulted and the figure above is the resource total.
+	//
+	// The figure alone cannot distinguish these, and they differ in where an operator goes to change it. Sending `capacity` for an option in the `resources` state is refused with 422 rather than stored and ignored; omitting it is accepted and reported here.
+	CapacitySource *AvailabilityRulePreviewCapacitySource `json:"capacity_source,omitempty"`
+	EndDate        *openapi_types.Date                    `json:"end_date,omitempty"`
+
+	// EndTime The FIRST departure time's end.
+	EndTime         *string `json:"end_time,omitempty"`
+	ProductOptionId *string `json:"product_option_id,omitempty"`
+
+	// SampleDates Up to three of the windows that would be CREATED — not the first three the rule matched — so it is empty whenever `would_create` is 0. The digits are the product's local wall clock, relabelled with the product's `timezone` through the same helper `GET /availabilities` uses — so a departure reads identically on both surfaces, including when that zone is unusable.
+	// Relabelling can MOVE the digits in one case: a stored wall clock that does not exist in the product's zone, which is to say inside a DST gap. A rule sent as `start_time: 02:30` on an `America/New_York` product stores `02:30` and publishes `03:30:00-04:00` — 03:30 at offset -04:00, not a range — because there is no 02:30 that day and Carbon normalises forward to a real instant. `GET /availabilities` does the same, so the two still agree.
+	// `products.timezone` is not validated as a timezone on write, so an unusable value falls back to `+00:00` on both surfaces — whether `DateTimeZone` refuses it outright (`Not/AZone`) or parses it as an offset so wide that no `date-time` consumer could read it (`"99"`, which used to publish `+99:00`). A legitimate numeric offset inside `±23:59` (`+05:30`, `-0300`) is honoured as written. Validating the column itself is tracked separately.
+	SampleDates *[]struct {
 		From *time.Time `json:"from,omitempty"`
 		To   *time.Time `json:"to,omitempty"`
 	} `json:"sample_dates,omitempty"`
-	StartDate    *openapi_types.Date `json:"start_date,omitempty"`
-	StartTime    *string             `json:"start_time,omitempty"`
-	TotalMatched *int                `json:"total_matched,omitempty"`
+	StartDate *openapi_types.Date `json:"start_date,omitempty"`
+
+	// StartTime The FIRST departure time, so a rule sent in the scalar shape reads back in it. With `times`, see `times[].start_time` for the rest.
+	StartTime *string `json:"start_time,omitempty"`
+
+	// Times This rule's departure times, with each one's own counts. Always
+	// present and never empty: the scalar `start_time` / `end_time`
+	// shape is reported as a single entry.
+	//
+	// Every other number on this response is a SUM — `would_create`
+	// adds the times together and a calendar view groups by date — so
+	// a time that contributed nothing is invisible behind its
+	// siblings. Adding a third daily departure to a season that
+	// already has two is the ordinary case, and without this breakdown
+	// the preview reports "62 of 186" and says nothing about which two
+	// thirds were already there.
+	Times *[]struct {
+		AddDaysCount *int `json:"add_days_count,omitempty"`
+
+		// AlreadyExists Of those, how many this option already has.
+		AlreadyExists *int    `json:"already_exists,omitempty"`
+		EndTime       *string `json:"end_time,omitempty"`
+		StartTime     *string `json:"start_time,omitempty"`
+
+		// TotalMatched Dates this time matched.
+		TotalMatched *int `json:"total_matched,omitempty"`
+
+		// WouldCreate Of those, how many will be written for this time.
+		WouldCreate *int `json:"would_create,omitempty"`
+	} `json:"times,omitempty"`
+
+	// TotalMatched (date, time) pairs the rule matched, summed over `times`.
+	TotalMatched *int `json:"total_matched,omitempty"`
 
 	// Weekdays PHP `format('w')` — Sunday=0 through Saturday=6.
 	Weekdays *[]int `json:"weekdays,omitempty"`
+
+	// WouldCreate Of those, how many will actually be written, summed over `times`. An occurrence whose (from, to) the option already has is skipped, so a re-run of the same rule creates nothing. Read THIS, not `total_matched`, to know what a commit will do.
+	WouldCreate *int `json:"would_create,omitempty"`
+}
+
+// AvailabilityRulePreviewCapacitySource Which of three things decided `capacity`. `rule` — the request named it. `product_option` — it did not, so the option's own column applies. `resources` — this option takes its capacity from its resources (guides, or auxiliary inventory), so `availabilities.capacity` is written but never consulted and the figure above is the resource total.
+//
+// The figure alone cannot distinguish these, and they differ in where an operator goes to change it. Sending `capacity` for an option in the `resources` state is refused with 422 rather than stored and ignored; omitting it is accepted and reported here.
+type AvailabilityRulePreviewCapacitySource string
+
+// AvailabilityRuleSkipReasons Why matched occurrences will not be written, by reason. Omitted entirely when nothing is skipped — never sent as an empty object.
+type AvailabilityRuleSkipReasons struct {
+	// AlreadyExists Occurrences whose `(from, to)` the product option already has. `createAvailability` has no unique index behind it, so these would otherwise be written a second time on every re-run.
+	AlreadyExists *int `json:"already_exists,omitempty"`
+}
+
+// AvailabilityRuleTime One departure time of a recurrence rule.
+type AvailabilityRuleTime struct {
+	// AddDaysCount Days this departure spans. Defaults to the rule's top-level `add_days_count`.
+	AddDaysCount *int `json:"add_days_count,omitempty"`
+
+	// EndTime `HH:MM`, product-local wall clock.
+	EndTime string `json:"end_time"`
+
+	// StartTime `HH:MM`, product-local wall clock.
+	StartTime string `json:"start_time"`
 }
 
 // AvailableGiftCertPage defines model for AvailableGiftCertPage.
@@ -1937,7 +2512,34 @@ type Booking struct {
 	// pivot rows (with `applied_at` timestamps). Updated by
 	// `POST /discounts/{id}/apply`.
 	AppliedDiscountIds *[]string `json:"applied_discount_ids,omitempty"`
-	AvailabilityId     *string   `json:"availability_id,omitempty"`
+
+	// Attribution Campaign attribution captured at checkout (`utm_*`).
+	//
+	// DISTINCT from the booking's origin: origin says which SURFACE
+	// created the booking, this says which campaign brought the customer
+	// to it. A widget booking that came from a paid ad has a `google` /
+	// `cpc` last touch.
+	//
+	// Two touches, never one — `first_touch` is the campaign that
+	// ACQUIRED the customer and is written once, `last_touch` is the
+	// campaign that closed THIS booking and is overwritten on each later
+	// visit. Collapsing them into a single "the" campaign picks a side of
+	// the attribution argument, so the wire shape does not.
+	//
+	// Keys are the stored short names, not the `utm_`-prefixed query
+	// names they arrive as: `source`, `medium`, `campaign`, `term`,
+	// `content`, `id`. Any subset may be present — a link carrying only
+	// `utm_source` yields a touch with only `source`.
+	//
+	// `null` (not an empty object) when the tenant does not have the
+	// customer-event spine, mirroring the operator back office, where
+	// attribution is a CRM v2 section. Both touches are null for a
+	// booking that carried no campaign.
+	Attribution *struct {
+		FirstTouch *map[string]string `json:"first_touch,omitempty"`
+		LastTouch  *map[string]string `json:"last_touch,omitempty"`
+	} `json:"attribution,omitempty"`
+	AvailabilityId *string `json:"availability_id,omitempty"`
 
 	// BookingStatus Computed accessor (`getBookingStatusAttribute()` on the Booking model).
 	// Mapping:
@@ -2047,9 +2649,25 @@ type BookingPage struct {
 // delete instead. Range is half-open: rows where `from >= from AND
 // from < to` are matched.
 type BulkDeleteAvailabilityRequest struct {
-	DryRun          *bool              `json:"dry_run,omitempty"`
-	From            openapi_types.Date `json:"from"`
-	ProductOptionId string             `json:"product_option_id"`
+	DryRun *bool              `json:"dry_run,omitempty"`
+	From   openapi_types.Date `json:"from"`
+
+	// ProductOptionId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductOptionId PositiveIntegerId  `json:"product_option_id"`
 	To              openapi_types.Date `json:"to"`
 }
 
@@ -2058,15 +2676,52 @@ type BulkDeleteAvailabilityRequest struct {
 // capacity AND bookable status), make multiple calls. Server fan-outs
 // chunks of ~1000 IDs into `inventory` queue jobs; response returns 202
 // with `bulk_update_id`.
+//
+// **Two scopes, exactly one of them.** Either `availability_ids`, or
+// `product_option_id` + `from` + `to`. Sending both is a 422; sending
+// neither is a 422.
+//
+// Use `availability_ids` whenever the request has an EXCEPTION in it —
+// "close everything that day except the one that is booked" cannot be
+// written as a date range at all. It also makes the preview exact:
+// `would_update` is the length of the list rather than something
+// derived from date arithmetic.
 type BulkUpdateAvailabilityRequest struct {
-	DryRun          *bool                                  `json:"dry_run,omitempty"`
-	From            openapi_types.Date                     `json:"from"`
-	NewValue        BulkUpdateAvailabilityRequest_NewValue `json:"new_value"`
-	ProductOptionId string                                 `json:"product_option_id"`
+	// AvailabilityIds The exact departures to change. Mutually exclusive with
+	// `product_option_id` / `from` / `to`.
+	//
+	// An id that does not resolve to a live availability of a product
+	// option — deleted, mistyped, or belonging to a `Resource` rather
+	// than a `ProductOption` — is a `422` naming it. It is NOT dropped:
+	// the whole value of naming ids is that the count is exact, and a
+	// silently narrowed list is a card the operator approves for
+	// departures that were never in scope.
+	//
+	// The cap matches the job's chunk size. A list longer than that is
+	// a date range wearing the wrong shape.
+	AvailabilityIds *[]int `json:"availability_ids,omitempty"`
+	DryRun          *bool  `json:"dry_run,omitempty"`
+
+	// From Inclusive. Required with `product_option_id`.
+	From     *openapi_types.Date                    `json:"from,omitempty"`
+	NewValue BulkUpdateAvailabilityRequest_NewValue `json:"new_value"`
+
+	// ProductOptionId One product option, or a LIST of them — "close these nine
+	// options for all of October". A list is refused for
+	// `setting=pricing`: each product has its own pricing tiers, so
+	// there is no shared answer to which tier a fare belongs to. (An
+	// `availability_ids` list spanning more than one option is refused
+	// for the same reason, and for the same setting.)
+	ProductOptionId *BulkUpdateAvailabilityRequest_ProductOptionId `json:"product_option_id,omitempty"`
 
 	// Setting Discriminator for `new_value` shape. Maps to `BulkAvailabilityUpdateJob::$setting`.
 	Setting BulkUpdateAvailabilityRequestSetting `json:"setting"`
-	To      openapi_types.Date                   `json:"to"`
+
+	// To EXCLUSIVE, and must be strictly after `from`. One day means `to`
+	// = the NEXT day. `from == to` is a `422` as of 1.18.0: the range
+	// is half-open, so it matched nothing and answered a cheerful 200
+	// with `total_matched: 0`, which reads as a successful change.
+	To *openapi_types.Date `json:"to,omitempty"`
 }
 
 // BulkUpdateAvailabilityRequestNewValue0 When `setting=booking_status`.
@@ -2113,6 +2768,19 @@ type BulkUpdateAvailabilityRequestNewValue3 struct {
 
 // BulkUpdateAvailabilityRequest_NewValue defines model for BulkUpdateAvailabilityRequest.NewValue.
 type BulkUpdateAvailabilityRequest_NewValue struct {
+	union json.RawMessage
+}
+
+// BulkUpdateAvailabilityRequestProductOptionId1 defines model for .
+type BulkUpdateAvailabilityRequestProductOptionId1 = []int
+
+// BulkUpdateAvailabilityRequest_ProductOptionId One product option, or a LIST of them — "close these nine
+// options for all of October". A list is refused for
+// `setting=pricing`: each product has its own pricing tiers, so
+// there is no shared answer to which tier a fare belongs to. (An
+// `availability_ids` list spanning more than one option is refused
+// for the same reason, and for the same setting.)
+type BulkUpdateAvailabilityRequest_ProductOptionId struct {
 	union json.RawMessage
 }
 
@@ -2187,20 +2855,175 @@ type CategoryPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
-// CreateAvailabilityRuleRequest Mirrors `CreateAvailabilityRuleRequest::rules()`. `start_time` and
-// `end_time` are required for `datetime` products; ignored for
-// `date`-only products. Weekday values use PHP's `format('w')`
-// convention — Sunday=0, Saturday=6.
+// ComposedWorkflowStep One step, written alongside the workflow. Same shape as
+// `CreateWorkflowStepRequest` except that `parent_step_id` is replaced by
+// `parent_ref`: none of these steps exists yet, so there is no id to
+// reference.
+type ComposedWorkflowStep struct {
+	// ActionType Required for `action`, `delay` and `delay_until`. See
+	// GET /workflow-nodes.
+	ActionType *string `json:"action_type,omitempty"`
+
+	// BranchType Required with `parent_ref`.
+	BranchType *ComposedWorkflowStepBranchType `json:"branch_type,omitempty"`
+
+	// ConditionType Required for `condition`.
+	ConditionType *string `json:"condition_type,omitempty"`
+
+	// Config Validated against the node's own `rules()`. A shape that does not
+	// match is a 422 `INVALID_STEP_CONFIG`, in dry-run as well as on
+	// commit.
+	Config *map[string]interface{} `json:"config,omitempty"`
+
+	// Order Defaults to the step's position in the list, 1-based.
+	Order *int `json:"order,omitempty"`
+
+	// ParentRef The `ref` of an EARLIER step in this same list. A forward or unknown
+	// ref is a 422 — never a branch silently flattened onto the main line.
+	ParentRef *string `json:"parent_ref,omitempty"`
+
+	// Ref A caller-chosen name for this step, so a later step can point at it.
+	// Must be unique within the request.
+	Ref *string `json:"ref,omitempty"`
+
+	// StepType `trigger` is not accepted here — the trigger is a singleton and has
+	// its own `trigger` key on the request.
+	StepType ComposedWorkflowStepStepType `json:"step_type"`
+}
+
+// ComposedWorkflowStepBranchType Required with `parent_ref`.
+type ComposedWorkflowStepBranchType string
+
+// ComposedWorkflowStepStepType `trigger` is not accepted here — the trigger is a singleton and has
+// its own `trigger` key on the request.
+type ComposedWorkflowStepStepType string
+
+// ComposedWorkflowTrigger The trigger, written alongside the workflow. Same shape as
+// `CreateWorkflowTriggerRequest`; the trigger is a singleton and always
+// takes order 0.
+type ComposedWorkflowTrigger struct {
+	// ActionType A TriggerType — see GET /workflow-nodes.
+	ActionType string                  `json:"action_type"`
+	Config     *map[string]interface{} `json:"config,omitempty"`
+}
+
+// CreateAvailabilityRequest `date`, `start_time` and `end_time` are the PRODUCT'S LOCAL wall
+// clock and are stored verbatim — see the endpoint description. Do not
+// send an offset or a UTC-converted time.
+type CreateAvailabilityRequest struct {
+	// Capacity Seats on this departure. 0 is legitimate — a departure can be
+	// published and closed; `is_bookable` decides whether it sells.
+	Capacity int `json:"capacity"`
+
+	// Date Departure date, YYYY-MM-DD, product-local.
+	Date openapi_types.Date `json:"date"`
+
+	// DayCount Whole days from `date` to the day this ONE departure ends on. `0`
+	// for an ordinary same-day session, `1` for an overnight, `9` for a
+	// nine-day expedition. This does NOT create one departure per day —
+	// use `POST /availability-rules` for that. Mutually exclusive with
+	// `end_date`. A JSON boolean is a 422, not `1`, here and on
+	// `PATCH /availabilities/{id}`.
+	DayCount *int  `json:"day_count,omitempty"`
+	DryRun   *bool `json:"dry_run,omitempty"`
+
+	// EndDate DEPRECATED spelling of `day_count`. Date this ONE departure ENDS
+	// on; defaults to `date`, must not be earlier than it, and must not
+	// be more than ONE day after it — a longer span is a 422 naming
+	// `POST /availability-rules` and `day_count`. Mutually exclusive
+	// with `day_count`.
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	EndDate    *openapi_types.Date `json:"end_date,omitempty"`
+	EndTime    string              `json:"end_time"`
+	IsBookable *bool               `json:"is_bookable,omitempty"`
+
+	// ProductOptionId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductOptionId PositiveIntegerId `json:"product_option_id"`
+	StartTime       string            `json:"start_time"`
+}
+
+// CreateAvailabilityRuleRequest Mirrors `CreateAvailabilityRuleRequest::rules()`. A departure time is
+// required for `datetime` products — either the scalar `start_time` /
+// `end_time` pair or `times[]`, never both — and ignored for `date`-only
+// products. Weekday values use PHP's `format('w')` convention —
+// Sunday=0, Saturday=6.
 type CreateAvailabilityRuleRequest struct {
 	// AddDaysCount Multi-day events: number of days to add to the `to` timestamp.
-	AddDaysCount    *int               `json:"add_days_count,omitempty"`
-	DryRun          *bool              `json:"dry_run,omitempty"`
-	EndDate         openapi_types.Date `json:"end_date"`
-	EndTime         *string            `json:"end_time,omitempty"`
-	ProductOptionId string             `json:"product_option_id"`
+	// With `times`, this is the DEFAULT for every entry that does not
+	// carry its own — so three overnight departures need it once.
+	AddDaysCount *int `json:"add_days_count,omitempty"`
+
+	// Capacity Seats for EVERY departure this rule creates. Omit it and each one
+	// inherits the product option's own `capacity`, which is what this
+	// endpoint did unconditionally before `1.27.0`.
+	//
+	// `0` is legitimate and means published but closed — `is_bookable`
+	// decides whether a departure sells — so do not read this field with
+	// a truthiness test. The resolved value is echoed on every response
+	// as `rule.capacity`, sent or not.
+	//
+	// Applies uniformly: there is no per-`times[]` capacity. A rule whose
+	// departure times need different numbers is several rules, or one
+	// rule followed by `bulk-update`.
+	Capacity *int               `json:"capacity,omitempty"`
+	DryRun   *bool              `json:"dry_run,omitempty"`
+	EndDate  openapi_types.Date `json:"end_date"`
+
+	// EndTime `HH:MM`, product-local wall clock. Mutually exclusive with `times`.
+	EndTime *string `json:"end_time,omitempty"`
+
+	// ProductOptionId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductOptionId PositiveIntegerId  `json:"product_option_id"`
 	StartDate       openapi_types.Date `json:"start_date"`
-	StartTime       *string            `json:"start_time,omitempty"`
-	Weekdays        []int              `json:"weekdays"`
+
+	// StartTime `HH:MM`, product-local wall clock. Mutually exclusive with `times`.
+	StartTime *string `json:"start_time,omitempty"`
+
+	// Times SEVERAL departure times for one rule, one departure each per
+	// matching day. Mutually exclusive with the scalar `start_time` /
+	// `end_time` pair — sending both is a 422, because a payload
+	// carrying two answers is a season that comes out wrong either way.
+	//
+	// Two entries naming the same `(start_time, end_time)` are a 422
+	// too: the job skips an occurrence whose `(from, to)` already
+	// exists and checks that at write time, so the second copy would be
+	// skipped by the first one it just wrote while the preview counted
+	// both.
+	//
+	// A `date`-only product accepts at most ONE entry. Its departures
+	// span the whole day, so every entry would widen to the same slot.
+	Times *[]AvailabilityRuleTime `json:"times,omitempty"`
+
+	// Weekdays A LIST of whole numbers, Sunday=0 through Saturday=6. An object keyed by day name is refused with 422 — it used to be accepted and read two different ways by the preview and the job.
+	Weekdays []int `json:"weekdays"`
 }
 
 // CreateAvailableGiftCertRequest Mirrors `CreateAvailableGiftCertRequest::rules()`. `currency` is
@@ -2227,21 +3050,19 @@ type CreateAvailableGiftCertRequest struct {
 // are provided. `product_option_id` null = global discount; otherwise
 // scoped to one option.
 type CreateDiscountRequest struct {
-	AutoApply     *bool    `json:"auto_apply,omitempty"`
-	Code          string   `json:"code"`
-	DiscountImage *string  `json:"discount_image,omitempty"`
-	DiscountPct   *float32 `json:"discount_pct,omitempty"`
-	DiscountText  *string  `json:"discount_text,omitempty"`
-
-	// DiscountedPrice Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	DiscountedPrice *Money     `json:"discounted_price,omitempty"`
-	DryRun          *bool      `json:"dry_run,omitempty"`
-	EndDate         *time.Time `json:"end_date,omitempty"`
-	NbOffers        *int       `json:"nb_offers,omitempty"`
-	ProductOptionId *string    `json:"product_option_id,omitempty"`
-	StartDate       *time.Time `json:"start_date,omitempty"`
-	ValidityEnd     *time.Time `json:"validity_end,omitempty"`
-	ValidityStart   time.Time  `json:"validity_start"`
+	AutoApply       *bool              `json:"auto_apply,omitempty"`
+	Code            string             `json:"code"`
+	DiscountImage   *string            `json:"discount_image,omitempty"`
+	DiscountPct     *float32           `json:"discount_pct,omitempty"`
+	DiscountText    *string            `json:"discount_text,omitempty"`
+	DiscountedPrice *Money             `json:"discounted_price,omitempty"`
+	DryRun          *bool              `json:"dry_run,omitempty"`
+	EndDate         *time.Time         `json:"end_date,omitempty"`
+	NbOffers        *int               `json:"nb_offers,omitempty"`
+	ProductOptionId *PositiveIntegerId `json:"product_option_id,omitempty"`
+	StartDate       *time.Time         `json:"start_date,omitempty"`
+	ValidityEnd     *time.Time         `json:"validity_end,omitempty"`
+	ValidityStart   time.Time          `json:"validity_start"`
 }
 
 // CreateExtraRequest Mirrors `CreateExtraRequest::rules()`. The controller maps `name` →
@@ -2264,8 +3085,22 @@ type CreateExtraRequest struct {
 	// Name Persisted as the translatable `title` column.
 	Name string `json:"name"`
 
-	// ProductId Persisted as the morph (`product_id`, `product_type=Product`).
-	ProductId string `json:"product_id"`
+	// ProductId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductId PositiveIntegerId `json:"product_id"`
 }
 
 // CreateLocationRequest Mirrors `CreateLocationRequest::rules()`. Every Location must be
@@ -2285,7 +3120,13 @@ type CreateLocationRequest struct {
 	// AttachTo Kind of record this location belongs to. The CLI never exposes Eloquent FQCNs.
 	AttachTo CreateLocationRequestAttachTo `json:"attach_to"`
 
-	// AttachToId Id of the `attach_to` record.
+	// AttachToId Id of the `attach_to` record. Declared as a string because this
+	// field is polymorphic in KEY TYPE — `product` and `partner` ids
+	// are integers, an `organisation` id is the tenant key — so neither
+	// `integer` nor `PositiveIntegerId` describes it. An integer is
+	// accepted too, and deliberately not advertised: the string
+	// spelling covers every `attach_to`, so a client generated from
+	// this document can always send one.
 	AttachToId    string   `json:"attach_to_id"`
 	City          *string  `json:"city,omitempty"`
 	CountryCode   *string  `json:"country_code,omitempty"`
@@ -2317,13 +3158,29 @@ type CreateLocationRequestType string
 // CreatePricingCategoryRequest Mirrors `CreatePricingCategoryRequest::rules()`. `name` is
 // translatable — accepts a bare string, persisted as `{"en": "..."}`.
 type CreatePricingCategoryRequest struct {
-	DryRun     *bool                             `json:"dry_run,omitempty"`
-	IsInternal *bool                             `json:"is_internal,omitempty"`
-	MaxAge     *int                              `json:"max_age,omitempty"`
-	MinAge     *int                              `json:"min_age,omitempty"`
-	Name       string                            `json:"name"`
-	ProductId  string                            `json:"product_id"`
-	Type       *CreatePricingCategoryRequestType `json:"type,omitempty"`
+	DryRun     *bool  `json:"dry_run,omitempty"`
+	IsInternal *bool  `json:"is_internal,omitempty"`
+	MaxAge     *int   `json:"max_age,omitempty"`
+	MinAge     *int   `json:"min_age,omitempty"`
+	Name       string `json:"name"`
+
+	// ProductId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductId PositiveIntegerId                 `json:"product_id"`
+	Type      *CreatePricingCategoryRequestType `json:"type,omitempty"`
 }
 
 // CreatePricingCategoryRequestType defines model for CreatePricingCategoryRequest.Type.
@@ -2342,7 +3199,7 @@ type CreatePricingTierRequest struct {
 	Amount int `json:"amount"`
 
 	// AvailabilityId Legacy alias accepted for compat. Availability scoping is M:N via the `availability_pricing_tier` pivot, not a column. Ignored.
-	AvailabilityId *string `json:"availability_id,omitempty"`
+	AvailabilityId *PositiveIntegerId `json:"availability_id,omitempty"`
 
 	// Currency No per-row column, so it is dropped on persist — but it must equal the account currency (`meta.currency`) or the request is refused with 422.
 	Currency *string `json:"currency,omitempty"`
@@ -2357,27 +3214,59 @@ type CreatePricingTierRequest struct {
 	// Name Legacy alias accepted for compat — belongs on the parent `PricingCategory`, not the tier. Ignored.
 	Name *string `json:"name,omitempty"`
 
-	// PricingCategoryId Required parent `PricingCategory` row.
-	PricingCategoryId string `json:"pricing_category_id"`
+	// PricingCategoryId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	PricingCategoryId PositiveIntegerId `json:"pricing_category_id"`
 
 	// ProductOptionId Legacy alias accepted for compat. Ignored — tiers don't link to ProductOption directly.
-	ProductOptionId *string `json:"product_option_id,omitempty"`
+	ProductOptionId *PositiveIntegerId `json:"product_option_id,omitempty"`
 }
 
 // CreateProductOptionRequest Mirrors `CreateProductOptionRequest::rules()`. `title` is mapped onto
 // the `name` column by the controller. `option_code` is optional —
 // when omitted, the server auto-generates one from the title slug plus
-// a random suffix. ProductOption has no description or published/draft
-// flag of its own — those live on the parent Product.
+// a random suffix, **on the real write only**; a `dry_run` echoes null,
+// for the same reason `product_code` does. ProductOption has no
+// description or published/draft flag of its own — those live on the
+// parent Product.
 type CreateProductOptionRequest struct {
 	Capacity *int  `json:"capacity,omitempty"`
 	DryRun   *bool `json:"dry_run,omitempty"`
 	MaxAge   *int  `json:"max_age,omitempty"`
 	MinAge   *int  `json:"min_age,omitempty"`
 
-	// OptionCode Tenant-supplied SKU. Auto-generated from title when omitted.
+	// OptionCode Tenant-supplied SKU. Auto-generated from title when omitted, on the real write only — a dry run echoes null.
 	OptionCode *string `json:"option_code,omitempty"`
-	ProductId  string  `json:"product_id"`
+
+	// ProductId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductId PositiveIntegerId `json:"product_id"`
 
 	// Title Persisted as the `name` column.
 	Title string `json:"title"`
@@ -2385,7 +3274,11 @@ type CreateProductOptionRequest struct {
 
 // CreateProductRequest Mirrors `CreateProductRequest::rules()`. `product_code` is optional —
 // when omitted, the server auto-generates one from the title slug plus
-// a random suffix (`SUNSET-SAILING-TOUR-AB12CD`). `description` is
+// a random suffix (`SUNSET-SAILING-TOUR-AB12CD`) **on the real write
+// only**. A `dry_run` returns `product_code: null` rather than a code the
+// commit will not use: the value is minted per request, so previewing one
+// would both promise the caller an identifier the write then replaces and
+// make two dry runs of the same payload disagree. `description` is
 // optional on the wire but is materialized as `{"en": ""}` server-side
 // when omitted, because `central_products.description` is NOT NULL.
 // Translatable text fields (`description`, `instructions`,
@@ -2395,14 +3288,32 @@ type CreateProductOptionRequest struct {
 // (HTML accepted). `inclusions` and `exclusions` are plain text — the
 // server rejects payloads containing HTML tags with 422; use a newline
 // between each bullet item.
+//
+// Every text field below is capped and a larger value is rejected with
+// 422. The cap is about embedded binaries, not prose: an image pasted
+// into the dashboard's editor arrives as an inline base64 data URI, and
+// the product edit page renders each of these fields twice, so a single
+// 2.5 MB screenshot produced a 7.4 MB response the platform refused to
+// serve — leaving the operator unable to open the page and undo it.
+//
+// The limit is 64 KiB (65,535 BYTES) and it satisfies two constraints at
+// once: three of these fields mirror into marketplace `TEXT` columns of
+// exactly that width on a non-strict database, which would otherwise
+// truncate a longer value mid-UTF-8 silently; and six fields at this cap
+// render to a 3.4 MB dashboard page in the worst case, measured with the
+// character that costs most after escaping.
+//
+// Measured in BYTES. `maxLength` here is a character count, so for
+// non-ASCII text the server may refuse a value this schema accepts —
+// validate on byte length if you gate locally.
 type CreateProductRequest struct {
-	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`.
+	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
 
 	// CancellationPolicyLink External URL with the policy. Mutually exclusive with `cancellation_policy`.
-	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
-	Capacity               *int    `json:"capacity,omitempty"`
-	CategoryIds            *[]int  `json:"category_ids,omitempty"`
+	CancellationPolicyLink *string              `json:"cancellation_policy_link,omitempty"`
+	Capacity               *int                 `json:"capacity,omitempty"`
+	CategoryIds            *[]PositiveIntegerId `json:"category_ids,omitempty"`
 
 	// Currency Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose.
 	Currency string `json:"currency"`
@@ -2410,14 +3321,14 @@ type CreateProductRequest struct {
 	// DeliveryMethod "Ticket type". `VOUCHER` = one ticket per booking; `TICKET` = one per guest. Asking for `TICKET` requires the `update_delivery_method` permission; sending `VOUCHER`, or omitting the field, does not — both take the column default.
 	DeliveryMethod *CreateProductRequestDeliveryMethod `json:"delivery_method,omitempty"`
 
-	// Description Defaults to empty string server-side when omitted (central_products.description is NOT NULL).
+	// Description Defaults to empty string server-side when omitted (central_products.description is NOT NULL). Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Description *string `json:"description,omitempty"`
 
 	// Displayable Whether the product is shown in widgets / catalog.
 	Displayable *bool `json:"displayable,omitempty"`
 	DryRun      *bool `json:"dry_run,omitempty"`
 
-	// Exclusions Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422.
+	// Exclusions Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Exclusions *string `json:"exclusions,omitempty"`
 
 	// FromPrice Minor units.
@@ -2426,10 +3337,10 @@ type CreateProductRequest struct {
 	// FromPriceLabel Caption shown next to `from_price` (e.g., `From €50/person`).
 	FromPriceLabel *string `json:"from_price_label,omitempty"`
 
-	// Inclusions Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422.
+	// Inclusions Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Inclusions *string `json:"inclusions,omitempty"`
 
-	// Instructions Rich text shown to confirmed customers. Translatable.
+	// Instructions Rich text shown to confirmed customers. Translatable. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Instructions *string `json:"instructions,omitempty"`
 
 	// IsPricedPerPerson `true` = price applies per traveler; `false` = price applies per group/booking. Implicitly forced to `true` when `is_private=false`.
@@ -2447,13 +3358,13 @@ type CreateProductRequest struct {
 	// MustValidateCancellationPolicy Customer must explicitly accept the cancellation policy at checkout. When `false`, both `cancellation_policy` and `cancellation_policy_link` are nulled regardless of what the caller supplied — set `true` to retain a policy.
 	MustValidateCancellationPolicy *bool `json:"must_validate_cancellation_policy,omitempty"`
 
-	// ProductCode Tenant-supplied SKU. Auto-generated from title when omitted.
+	// ProductCode Tenant-supplied SKU. Auto-generated from title when omitted, on the real write only — a dry run echoes null.
 	ProductCode *string `json:"product_code,omitempty"`
 
 	// RedemptionMethod How the customer is admitted. Asking for `DIGITAL` or `PRINT` requires the `update_delivery_method` permission — the same one gates both ticketing fields, matching the form they live on. Sending `MANIFEST`, or omitting the field, does not.
 	RedemptionMethod *CreateProductRequestRedemptionMethod `json:"redemption_method,omitempty"`
 
-	// Requirements Rich text — what the customer needs. Translatable.
+	// Requirements Rich text — what the customer needs. Translatable. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Requirements *string `json:"requirements,omitempty"`
 
 	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
@@ -2467,7 +3378,7 @@ type CreateProductRequest struct {
 	Timezone *string                     `json:"timezone,omitempty"`
 	Title    string                      `json:"title"`
 
-	// UseAlternateTierPricing Alternate tier-pricing rendering / calculation. Implicitly forced to `false` when `is_private=false`.
+	// UseAlternateTierPricing Keys the pricing tier on the TOTAL party size instead of the per-category quantity. Only valid on a product that is both `is_priced_per_person: true` and `is_tier_priced: true` — anything else is refused with 422. Implicitly forced to `false` when `is_private=false`, so in practice this only applies to private products.
 	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
 
@@ -2504,8 +3415,22 @@ type CreateQuestionRequest struct {
 	// Options For type=select
 	Options *[]string `json:"options,omitempty"`
 
-	// ProductOptionId Persisted as `questionable_id` with `questionable_type=ProductOption`.
-	ProductOptionId string `json:"product_option_id"`
+	// ProductOptionId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ProductOptionId PositiveIntegerId `json:"product_option_id"`
 
 	// Required Persisted as `is_required`.
 	Required *bool `json:"required,omitempty"`
@@ -2533,19 +3458,64 @@ type CreateResourceRequest struct {
 // CreateResourceRequestCategory defines model for CreateResourceRequest.Category.
 type CreateResourceRequestCategory string
 
+// CreateSegmentRequest defines model for CreateSegmentRequest.
+type CreateSegmentRequest struct {
+	// Conditions At least one filter. An empty filter list matches NOBODY — the
+	// evaluator and the preview both read it as no-match, deliberately, so
+	// that opening the builder does not show an operator their whole
+	// customer base — so an empty tree would create a segment that is
+	// permanently empty. Refused at the edge instead.
+	Conditions struct {
+		Filters []map[string]interface{} `json:"filters"`
+
+		// Logic How the top-level filters combine. Defaults to `and`.
+		Logic *CreateSegmentRequestConditionsLogic `json:"logic,omitempty"`
+	} `json:"conditions"`
+	Description *string `json:"description,omitempty"`
+	DryRun      *bool   `json:"dry_run,omitempty"`
+	Name        string  `json:"name"`
+}
+
+// CreateSegmentRequestConditionsLogic How the top-level filters combine. Defaults to `and`.
+type CreateSegmentRequestConditionsLogic string
+
 // CreateWorkflowRequest Mirrors `CreateWorkflowRequest::rules()`. The workflow is created
-// in DRAFT status — there is no way to skip straight to ACTIVE. Add
-// trigger + steps, then POST /activate.
+// in DRAFT status — there is no way to skip straight to ACTIVE, whether
+// or not `trigger` and `steps` are sent. Compose the whole draft here,
+// then POST /activate.
 type CreateWorkflowRequest struct {
-	// BusinessUnitId Defaults to the calling user's current_business_unit_id when omitted.
-	BusinessUnitId *int    `json:"business_unit_id,omitempty"`
-	Description    *string `json:"description,omitempty"`
-	DryRun         *bool   `json:"dry_run,omitempty"`
+	// BusinessUnitId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	BusinessUnitId *PositiveIntegerId `json:"business_unit_id,omitempty"`
+	Description    *string            `json:"description,omitempty"`
+	DryRun         *bool              `json:"dry_run,omitempty"`
 
 	// MaxCreditsPerRun Defaults to 50 when omitted.
 	MaxCreditsPerRun *int   `json:"max_credits_per_run,omitempty"`
 	Name             string `json:"name"`
 	NotifyOnFail     *bool  `json:"notify_on_fail,omitempty"`
+
+	// Steps The workflow's steps, in order. Omit to create a shell and add them
+	// later with `POST /workflows/{id}/steps`.
+	Steps *[]ComposedWorkflowStep `json:"steps,omitempty"`
+
+	// Trigger The trigger, written alongside the workflow. Same shape as
+	// `CreateWorkflowTriggerRequest`; the trigger is a singleton and always
+	// takes order 0.
+	Trigger *ComposedWorkflowTrigger `json:"trigger,omitempty"`
 }
 
 // CreateWorkflowStepRequest Mirrors `CreateWorkflowStepRequest::rules()`. step_type=TRIGGER
@@ -2573,7 +3543,7 @@ type CreateWorkflowStepRequest struct {
 	Config        *map[string]interface{}                 `json:"config,omitempty"`
 	DryRun        *bool                                   `json:"dry_run,omitempty"`
 	Order         int                                     `json:"order"`
-	ParentStepId  *int                                    `json:"parent_step_id,omitempty"`
+	ParentStepId  *PositiveIntegerId                      `json:"parent_step_id,omitempty"`
 	StepType      CreateWorkflowStepRequestStepType       `json:"step_type"`
 }
 
@@ -2662,6 +3632,21 @@ type CustomerPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+// DepartureSpanNotes Non-blocking facts about a change that is going ahead, the opposite
+// of `skip_reasons`. ABSENT when there is nothing to say — a note on
+// every ordinary create costs exactly the attention the unusual one
+// needs.
+type DepartureSpanNotes struct {
+	Notes *struct {
+		// DepartureSpansDays Whole days this ONE departure runs, emitted only above 0. A
+		// multi-day departure is legitimate and is also what a caller
+		// writes when it meant a range, and nothing in the payload can
+		// tell the two apart — so it is stated rather than refused. The
+		// operator assistant renders this on the confirmation card.
+		DepartureSpansDays *int `json:"departure_spans_days,omitempty"`
+	} `json:"notes,omitempty"`
+}
+
 // Discount `Bmbltd\LaravelBookings\Models\Discount`. Soft-deletable (no
 // explicit status enum — soft-delete IS the cancellation). The
 // `discounted_price` column is set for fixed-amount discounts;
@@ -2688,7 +3673,7 @@ type Discount struct {
 	// DiscountText Translatable customer-facing text (English value returned)
 	DiscountText *string `json:"discount_text,omitempty"`
 
-	// DiscountedPrice Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
+	// DiscountedPrice Fixed-amount discount in tenant currency minor units. Mutually exclusive with `discount_pct`.
 	DiscountedPrice *Money `json:"discounted_price,omitempty"`
 
 	// EndDate Promotional period end
@@ -2755,14 +3740,43 @@ type Envelope struct {
 
 // Error defines model for Error.
 type Error struct {
-	// Code Machine-readable error code. Stable across versions. Examples:
+	// Code Machine-readable error code. Stable across versions, and the ONLY
+	// part of a refusal to branch on — never the `message`.
+	//
+	// Deliberately `type: string` rather than an `enum`: a client must
+	// tolerate a code it does not know, because a new domain refusal can
+	// ship in a minor version. Treat an unrecognised code as
+	// non-retriable and surface `message` plus `hint`.
+	//
+	// The list below is COMPLETE as of this version — every refusal the
+	// API can return is named here, and
+	// `tests/Architecture/CliErrorCodeSpecParityTest.php` fails the build
+	// if a code the server raises is missing from it.
+	//
+	// Transport and envelope:
 	// UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED,
-	// IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_UNKNOWN,
-	// BOOKING_ALREADY_CANCELLED, GIFT_CERT_ALREADY_REDEEMED,
-	// REFUND_AMOUNT_EXCEEDS_CHARGE, RESOURCE_IN_USE,
-	// AVAILABILITY_HAS_CONFIRMED_BOOKING, BOOKING_RESOURCE_STATE_STALE,
-	// BOOKING_RESOURCE_CONFLICT, TICKET_REISSUE_NOT_CONFIRMED,
 	// RATE_LIMITED, INTERNAL_ERROR.
+	//
+	// Idempotency (see `#/components/responses/IdempotencyConflict`):
+	// IDEMPOTENCY_CONFLICT, IDEMPOTENCY_IN_PROGRESS (retriable),
+	// IDEMPOTENCY_UNKNOWN.
+	//
+	// Bookings and money:
+	// BOOKING_ALREADY_CANCELLED, REFUND_AMOUNT_EXCEEDS_CHARGE,
+	// REFUND_REQUIRES_STRIPE_CHARGE, NO_CHARGE_FOUND,
+	// POLICY_AUTO_NOT_READY, BOOKING_RESOURCE_STATE_STALE,
+	// BOOKING_RESOURCE_CONFLICT, GIFT_CERT_ALREADY_REDEEMED,
+	// DISCOUNT_NOT_APPLICABLE.
+	//
+	// Catalogue and inventory:
+	// PRODUCT_BEING_DUPLICATED, TICKET_REISSUE_NOT_CONFIRMED,
+	// AVAILABILITY_HAS_ACTIVE_BOOKING, AVAILABILITY_HAS_CONFIRMED_BOOKING,
+	// RESOURCE_IN_USE.
+	//
+	// Workflows:
+	// WORKFLOW_NOT_ACTIVATABLE, WORKFLOW_NOT_EDITABLE,
+	// WORKFLOW_HAS_EXECUTIONS, WORKFLOW_TRIGGER_MISSING,
+	// INVALID_STEP_CONFIG.
 	Code string `json:"code"`
 
 	// Details Per-field validation errors or domain-specific context
@@ -2906,8 +3920,10 @@ type GuestPage struct {
 // IssueGiftCertRequest defines model for IssueGiftCertRequest.
 type IssueGiftCertRequest struct {
 	// Amount Amount in minor units of the tenant currency (cents for EUR/USD; whole units for JPY/HUF/etc)
-	Amount                     Money  `json:"amount"`
-	AvailableGiftCertificateId string `json:"available_gift_certificate_id"`
+	Amount Money `json:"amount"`
+
+	// AvailableGiftCertificateId `available_gift_certificates.id` is a UUID, not an integer id.
+	AvailableGiftCertificateId openapi_types.UUID `json:"available_gift_certificate_id"`
 
 	// Currency Optional. Not stored — `gift_certificates` has no currency column — but it must equal the account currency (`meta.currency`) or the request is refused with 422.
 	Currency       *string             `json:"currency,omitempty"`
@@ -2923,6 +3939,20 @@ type IssueGiftCertRequest struct {
 	SendNow       *bool   `json:"send_now,omitempty"`
 	SenderMessage *string `json:"sender_message,omitempty"`
 }
+
+// ListBookingsIncludeItem defines model for ListBookingsIncludeItem.
+type ListBookingsIncludeItem string
+
+// ListBookingsIncludeParam defines model for ListBookingsIncludeParam.
+type ListBookingsIncludeParam struct {
+	union json.RawMessage
+}
+
+// ListBookingsIncludeParam0 defines model for ListBookingsIncludeParam.0.
+type ListBookingsIncludeParam0 string
+
+// ListBookingsIncludeParam1 defines model for .
+type ListBookingsIncludeParam1 = []ListBookingsIncludeItem
 
 // Location Mirrors `LocationResource::toArray()`. The `locations.type` column is
 // a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
@@ -3043,6 +4073,65 @@ type Pagination struct {
 	Limit      int     `json:"limit"`
 }
 
+// Partner Mirrors `PartnerResource::toArray()`. A selling partner (an agency
+// that books on a traveller's behalf) or a channel partner. Read-only
+// over the CLI: creating one sets a commission rate, and the web form
+// carries plan-limit rules a CLI create would have to restate.
+//
+// A partner can be a booking's PROVIDER or its CUSTOMER; both report
+// `origin.type = indirect_offline` on the booking, which carries a null
+// `origin.channel_id` — so `GET /bookings?partner_id=` is the only way
+// to go from a partner to their bookings.
+type Partner struct {
+	// Commission Per cent of the fare the partner keeps. A RATE, not money — unlike
+	// every priced field on this API it is a float and carries no
+	// currency.
+	Commission  *float32            `json:"commission,omitempty"`
+	CreatedAt   *time.Time          `json:"created_at,omitempty"`
+	DeletedAt   *time.Time          `json:"deleted_at,omitempty"`
+	Email       *string             `json:"email,omitempty"`
+	Id          *string             `json:"id,omitempty"`
+	Name        *string             `json:"name,omitempty"`
+	PartnerType *PartnerPartnerType `json:"partner_type,omitempty"`
+	Phone       *string             `json:"phone,omitempty"`
+	UpdatedAt   *time.Time          `json:"updated_at,omitempty"`
+}
+
+// PartnerPartnerType defines model for Partner.PartnerType.
+type PartnerPartnerType string
+
+// PartnerPage defines model for PartnerPage.
+type PartnerPage struct {
+	Data       []Partner   `json:"data"`
+	Meta       Meta        `json:"meta"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+}
+
+// PositiveIntegerId A positive integer id, in either spelling this API accepts.
+//
+// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+// STRINGIFIES first — so a digit string is accepted as readily as a
+// number, and the operator assistant sends one (`(string) $option->id`).
+// Measured against the real validator: `5` and `"5"` are accepted;
+// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+//
+// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+// `filter_var`, and are deliberately NOT described here: a contract
+// that advertises them invites a client to rely on them. So this schema
+// is narrower than the validator on exactly those two spellings, which
+// is the safe direction — both still work if sent, and nothing a client
+// generates from this document can fail to be accepted.
+type PositiveIntegerId struct {
+	union json.RawMessage
+}
+
+// PositiveIntegerId0 defines model for .
+type PositiveIntegerId0 = int
+
+// PositiveIntegerId1 defines model for .
+type PositiveIntegerId1 = string
+
 // PricingCategory Parent bucket that one or more `PricingTier` rows live under. Carries
 // the named label (`Adults`, `Children`, ...) — translatable, returned
 // in English. Soft-deleted rows cascade-delete their pricing tiers.
@@ -3154,6 +4243,14 @@ type PricingTierPage struct {
 // list, splitting on newlines. `status` is derived from `is_active`
 // (`is_active` is also surfaced directly for clients that prefer the
 // canonical boolean).
+//
+// A value READ here can exceed the 65,535-byte cap the write schemas
+// enforce. The cap arrived in 1.17.0 and rows written before it were not
+// rewritten, and an image pasted into the dashboard editor lands as an
+// inline base64 data URI. So a read-modify-write that echoes one of these
+// fields back unchanged is a 422 naming that field, on a request that
+// meant to change something else entirely. Shorten or clear the named
+// field; retrying the same body cannot succeed.
 type Product struct {
 	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link` in the UI.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
@@ -3375,8 +4472,8 @@ type RefundBookingRequest struct {
 	NotifyCustomer *bool  `json:"notify_customer,omitempty"`
 	Reason         string `json:"reason"`
 
-	// TransactionId Specific charge to refund (otherwise newest succeeded charge)
-	TransactionId *string `json:"transaction_id,omitempty"`
+	// TransactionId Specific charge to refund (otherwise newest succeeded charge). `booking_transactions.id` is a UUID.
+	TransactionId *openapi_types.UUID `json:"transaction_id,omitempty"`
 }
 
 // Resource Physical or human inventory bound to a ProductOption (a boat, a
@@ -3399,9 +4496,166 @@ type Resource struct {
 // ResourceCategory defines model for Resource.Category.
 type ResourceCategory string
 
+// ResourceCalendarEvent defines model for ResourceCalendarEvent.
+type ResourceCalendarEvent struct {
+	// AllDay DERIVED, not stored, and always false for a booking. A timed span of
+	// exactly 24 or 48 hours reports true, and durations from 24h00m to
+	// 24h59m all read as all-day because the hour count is truncated. A
+	// multi-day all-day block crossing a DST transition is 71 or 73 elapsed
+	// hours and therefore reports FALSE despite being all-day.
+	AllDay *bool `json:"all_day,omitempty"`
+
+	// AppliesToSchedule The schedule a BLOCK narrows to, or null when it blocks every
+	// schedule. A different fact from `product_id`, deliberately not
+	// sharing its name.
+	AppliesToSchedule *string    `json:"applies_to_schedule,omitempty"`
+	BookingId         *string    `json:"booking_id,omitempty"`
+	EndsAt            *time.Time `json:"ends_at,omitempty"`
+
+	// EventType `booking` a confirmed booking this resource is assigned to;
+	// `busy` synced Google Calendar time; `unavailable` an operator block.
+	EventType *ResourceCalendarEventEventType `json:"event_type,omitempty"`
+
+	// OccupiedFrom `starts_at` padded by the resource's prep time. Equal to `starts_at`
+	// on a busy or unavailable row, which has no product option and
+	// therefore no buffer.
+	OccupiedFrom *time.Time `json:"occupied_from,omitempty"`
+	OccupiedTo   *time.Time `json:"occupied_to,omitempty"`
+
+	// ProductId What was SOLD. Booking rows only.
+	ProductId        *string                                `json:"product_id,omitempty"`
+	ProductOptionId  *string                                `json:"product_option_id,omitempty"`
+	ResourceCategory *ResourceCalendarEventResourceCategory `json:"resource_category,omitempty"`
+	ResourceId       *string                                `json:"resource_id,omitempty"`
+
+	// ResourceName Truncated to 180 encoded bytes for the wire; read-time value, not canonical.
+	ResourceName *string `json:"resource_name,omitempty"`
+
+	// SchedulesCount True number of schedules the block covers.
+	SchedulesCount *int `json:"schedules_count,omitempty"`
+
+	// SchedulesCovered Preview, capped at 20. Not authoritative -- use `product_option_id`.
+	SchedulesCovered   *[]string                    `json:"schedules_covered,omitempty"`
+	SchedulesTruncated *bool                        `json:"schedules_truncated,omitempty"`
+	Source             *ResourceCalendarEventSource `json:"source,omitempty"`
+
+	// StartsAt ISO 8601 with offset. A booking is relabelled in its own PRODUCT's
+	// timezone (the slot is wall clock); a busy or unavailable row is
+	// converted from its UTC instant into the tenant's timezone.
+	StartsAt *time.Time `json:"starts_at,omitempty"`
+
+	// Status Normalised label. For a synced Google event this is always "Busy" --
+	// the event's own title is the guide's private calendar entry and is
+	// never published. An operator block shows its own note.
+	Status *string `json:"status,omitempty"`
+}
+
+// ResourceCalendarEventEventType `booking` a confirmed booking this resource is assigned to;
+// `busy` synced Google Calendar time; `unavailable` an operator block.
+type ResourceCalendarEventEventType string
+
+// ResourceCalendarEventResourceCategory defines model for ResourceCalendarEvent.ResourceCategory.
+type ResourceCalendarEventResourceCategory string
+
+// ResourceCalendarEventSource defines model for ResourceCalendarEvent.Source.
+type ResourceCalendarEventSource string
+
+// ResourceCalendarPage defines model for ResourceCalendarPage.
+type ResourceCalendarPage struct {
+	Data       []ResourceCalendarEvent `json:"data"`
+	Meta       Meta                    `json:"meta"`
+	Pagination *Pagination             `json:"pagination,omitempty"`
+
+	// UnavailableResources Present ONLY when at least one requested resource's answer is
+	// empty or partial, keyed by resource id. Its absence means every
+	// requested resource was answered completely; its presence means
+	// the page is not the whole story for the ids it names.
+	UnavailableResources *map[string][]ResourceCalendarPageUnavailableResources `json:"unavailable_resources,omitempty"`
+}
+
+// ResourceCalendarPageUnavailableResources defines model for ResourceCalendarPage.UnavailableResources.
+type ResourceCalendarPageUnavailableResources string
+
 // ResourcePage defines model for ResourcePage.
 type ResourcePage struct {
 	Data       []Resource  `json:"data"`
+	Meta       Meta        `json:"meta"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+}
+
+// Segment defines model for Segment.
+type Segment struct {
+	BusinessUnitId *int `json:"business_unit_id,omitempty"`
+
+	// Conditions The rule, as `{logic: and|or, filters: [...]}`.
+	//
+	// The filter grammar is deliberately NOT specified here. The legal
+	// fields are per-tenant (custom attributes are operator-defined, and
+	// behavioural fields exist only where the customer-event spine is on),
+	// so a schema published in this file would be wrong for most tenants
+	// and would drift from the evaluator that actually reads it. Read an
+	// existing segment to see the shape; the create endpoint validates
+	// against the live catalogue and names what it rejects.
+	Conditions *struct {
+		Filters *[]map[string]interface{} `json:"filters,omitempty"`
+		Logic   *SegmentConditionsLogic   `json:"logic,omitempty"`
+	} `json:"conditions,omitempty"`
+	CreatedAt   *time.Time          `json:"created_at,omitempty"`
+	Description *string             `json:"description,omitempty"`
+	Id          *openapi_types.UUID `json:"id,omitempty"`
+	IsDefault   *bool               `json:"is_default,omitempty"`
+
+	// MembersCount Present on list. `null` means NOT COUNTED on this endpoint — it does
+	// not mean zero, and zero is a legitimate answer (a backfilling
+	// segment, or a rule nobody currently matches).
+	MembersCount *int    `json:"members_count,omitempty"`
+	Name         *string `json:"name,omitempty"`
+
+	// ReferencedFields Derived from `conditions` on write, never supplied. The
+	// machine-readable answer to "what does this segment look at", which
+	// is how a caller confirms the tree it sent was understood the way it
+	// meant.
+	ReferencedFields *[]string `json:"referenced_fields,omitempty"`
+
+	// Status `backfilling` means the membership recompute has not finished, so
+	// `members_count` is not yet the answer. A freshly created segment is
+	// always `backfilling`.
+	Status *SegmentStatus `json:"status,omitempty"`
+
+	// Type `smart` is a live rule evaluated against `conditions`. `static` is a
+	// fixed list uploaded as CSV — readable here, not creatable here.
+	Type      *SegmentType `json:"type,omitempty"`
+	UpdatedAt *time.Time   `json:"updated_at,omitempty"`
+}
+
+// SegmentConditionsLogic defines model for Segment.Conditions.Logic.
+type SegmentConditionsLogic string
+
+// SegmentStatus `backfilling` means the membership recompute has not finished, so
+// `members_count` is not yet the answer. A freshly created segment is
+// always `backfilling`.
+type SegmentStatus string
+
+// SegmentType `smart` is a live rule evaluated against `conditions`. `static` is a
+// fixed list uploaded as CSV — readable here, not creatable here.
+type SegmentType string
+
+// SegmentMutationResult defines model for SegmentMutationResult.
+type SegmentMutationResult struct {
+	Data struct {
+		After   *Segment `json:"after,omitempty"`
+		Segment *Segment `json:"segment,omitempty"`
+
+		// WouldApply `true` on a dry run (nothing written), `false` on a real create.
+		WouldApply *bool `json:"would_apply,omitempty"`
+	} `json:"data"`
+	Meta       Meta        `json:"meta"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+}
+
+// SegmentPage defines model for SegmentPage.
+type SegmentPage struct {
+	Data       []Segment   `json:"data"`
 	Meta       Meta        `json:"meta"`
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
@@ -3497,17 +4751,30 @@ type TransactionPage struct {
 
 // UpdateAvailabilityRequest defines model for UpdateAvailabilityRequest.
 type UpdateAvailabilityRequest struct {
-	Capacity *int  `json:"capacity,omitempty"`
+	Capacity *int `json:"capacity,omitempty"`
+
+	// DayCount Whole days from the departure's own date to the date it ends on.
+	// `0` for an ordinary same-day session, `1` for an overnight.
+	// Requires `end_time`. Omitted, the slot keeps the span it has.
+	DayCount *int  `json:"day_count,omitempty"`
 	DryRun   *bool `json:"dry_run,omitempty"`
+
+	// EndTime New end time, product-local wall clock `HH:MM`. Omitted, the
+	// duration is preserved.
+	EndTime *string `json:"end_time,omitempty"`
 
 	// Fares Per-slot pricing overrides for THIS availability only. Tiers not
 	// listed are left alone. `amount: null` deletes the override row so
 	// the slot follows the catalogue price again. An empty array is a
 	// 422, not a no-op — send no `fares` key at all to leave pricing
 	// untouched.
-	Fares      *[]AvailabilityFare              `json:"fares,omitempty"`
-	IsBookable *bool                            `json:"is_bookable,omitempty"`
-	Status     *UpdateAvailabilityRequestStatus `json:"status,omitempty"`
+	Fares      *[]AvailabilityFare `json:"fares,omitempty"`
+	IsBookable *bool               `json:"is_bookable,omitempty"`
+
+	// StartTime New departure time, product-local wall clock `HH:MM`. Sent alone it
+	// shifts the slot and preserves its current duration.
+	StartTime *string                          `json:"start_time,omitempty"`
+	Status    *UpdateAvailabilityRequestStatus `json:"status,omitempty"`
 }
 
 // UpdateAvailabilityRequestStatus defines model for UpdateAvailabilityRequest.Status.
@@ -3601,15 +4868,31 @@ type UpdateAvailableGiftCertRequest struct {
 // candidates and retry.
 type UpdateBookingResourcesRequest struct {
 	// AuxiliaryResourceIds Full desired auxiliary set. Omit to leave auxiliary resources untouched.
-	AuxiliaryResourceIds *[]int `json:"auxiliary_resource_ids,omitempty"`
-	DryRun               *bool  `json:"dry_run,omitempty"`
+	AuxiliaryResourceIds *[]PositiveIntegerId `json:"auxiliary_resource_ids,omitempty"`
+	DryRun               *bool                `json:"dry_run,omitempty"`
 
 	// EquipmentResourceIds Full desired equipment set. Omit to leave equipment untouched.
-	EquipmentResourceIds *[]int `json:"equipment_resource_ids,omitempty"`
+	EquipmentResourceIds *[]PositiveIntegerId `json:"equipment_resource_ids,omitempty"`
 
 	// ExpectedResourceStateToken Aggregate token from the latest booking read with resources included.
 	ExpectedResourceStateToken string `json:"expected_resource_state_token"`
-	MainResourceId             *int   `json:"main_resource_id,omitempty"`
+
+	// MainResourceId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	MainResourceId *PositiveIntegerId `json:"main_resource_id,omitempty"`
 }
 
 // UpdateExtraRequest Mirrors `UpdateExtraRequest::rules()`. Same field-to-column mappings
@@ -3694,8 +4977,22 @@ type UpdatePricingTierRequest struct {
 	// Name Legacy alias — ignored.
 	Name *string `json:"name,omitempty"`
 
-	// PricingCategoryId Reparent the tier under a different PricingCategory.
-	PricingCategoryId *string `json:"pricing_category_id,omitempty"`
+	// PricingCategoryId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	PricingCategoryId *PositiveIntegerId `json:"pricing_category_id,omitempty"`
 }
 
 // UpdateProductOptionRequest Mirrors `UpdateProductOptionRequest::rules()`. Same field semantics as
@@ -3713,10 +5010,11 @@ type UpdateProductOptionRequest struct {
 // `CreateProductRequest`. Every field is optional — only supplied
 // keys are updated.
 type UpdateProductRequest struct {
-	CancellationPolicy     *string `json:"cancellation_policy,omitempty"`
-	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
-	Capacity               *int    `json:"capacity,omitempty"`
-	CategoryIds            *[]int  `json:"category_ids,omitempty"`
+	// CancellationPolicy Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	CancellationPolicy     *string              `json:"cancellation_policy,omitempty"`
+	CancellationPolicyLink *string              `json:"cancellation_policy_link,omitempty"`
+	Capacity               *int                 `json:"capacity,omitempty"`
+	CategoryIds            *[]PositiveIntegerId `json:"category_ids,omitempty"`
 
 	// ConfirmTicketReissue Acknowledgement, not a field — nothing is stored. Required to commit a `delivery_method` change on a product that has bookings. Ignored when `delivery_method` is absent or unchanged, and never required under `dry_run`.
 	ConfirmTicketReissue *bool `json:"confirm_ticket_reissue,omitempty"`
@@ -3726,17 +5024,21 @@ type UpdateProductRequest struct {
 
 	// DeliveryMethod "Ticket type". CHANGING it requires the `update_delivery_method` permission and reissues the tickets of every existing booking in the next 10 years, invalidating the QR codes customers already hold without notifying them — so it is refused with `422 TICKET_REISSUE_NOT_CONFIRMED` unless `confirm_ticket_reissue: true` is sent alongside. Sending the value the product already has is not a change: no permission needed, nothing reissued, no `ticket_reissue` block.
 	DeliveryMethod *UpdateProductRequestDeliveryMethod `json:"delivery_method,omitempty"`
-	Description    *string                             `json:"description,omitempty"`
-	Displayable    *bool                               `json:"displayable,omitempty"`
-	DryRun         *bool                               `json:"dry_run,omitempty"`
 
-	// Exclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422.
+	// Description Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Description *string `json:"description,omitempty"`
+	Displayable *bool   `json:"displayable,omitempty"`
+	DryRun      *bool   `json:"dry_run,omitempty"`
+
+	// Exclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Exclusions     *string `json:"exclusions,omitempty"`
 	FromPrice      *int    `json:"from_price,omitempty"`
 	FromPriceLabel *string `json:"from_price_label,omitempty"`
 
-	// Inclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422.
-	Inclusions        *string `json:"inclusions,omitempty"`
+	// Inclusions Plain text — one bullet per newline. NOT rich-text — payloads containing HTML tags are rejected with 422. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Inclusions *string `json:"inclusions,omitempty"`
+
+	// Instructions Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	Instructions      *string `json:"instructions,omitempty"`
 	IsPricedPerPerson *bool   `json:"is_priced_per_person,omitempty"`
 
@@ -3749,15 +5051,19 @@ type UpdateProductRequest struct {
 
 	// RedemptionMethod How the customer is admitted. CHANGING it requires the `update_delivery_method` permission; echoing back the stored value does not. Changing it alone reissues nothing — it does not affect the tickets already issued.
 	RedemptionMethod *UpdateProductRequestRedemptionMethod `json:"redemption_method,omitempty"`
-	Requirements     *string                               `json:"requirements,omitempty"`
+
+	// Requirements Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Requirements *string `json:"requirements,omitempty"`
 
 	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
-	ScheduleType            *UpdateProductRequestScheduleType `json:"schedule_type,omitempty"`
-	ShowLastTier            *bool                             `json:"show_last_tier,omitempty"`
-	Status                  *UpdateProductRequestStatus       `json:"status,omitempty"`
-	Timezone                *string                           `json:"timezone,omitempty"`
-	Title                   *string                           `json:"title,omitempty"`
-	UseAlternateTierPricing *bool                             `json:"use_alternate_tier_pricing,omitempty"`
+	ScheduleType *UpdateProductRequestScheduleType `json:"schedule_type,omitempty"`
+	ShowLastTier *bool                             `json:"show_last_tier,omitempty"`
+	Status       *UpdateProductRequestStatus       `json:"status,omitempty"`
+	Timezone     *string                           `json:"timezone,omitempty"`
+	Title        *string                           `json:"title,omitempty"`
+
+	// UseAlternateTierPricing Keys the pricing tier on the TOTAL party size instead of the per-category quantity. The effective post-write state must be per-person AND tier priced, or the request is refused with 422 — see the endpoint description for the exemption that keeps a read-modify-write round trip working on an already-conflicting row.
+	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
 
 // UpdateProductRequestDeliveryMethod "Ticket type". CHANGING it requires the `update_delivery_method` permission and reissues the tickets of every existing booking in the next 10 years, invalidating the QR codes customers already hold without notifying them — so it is refused with `422 TICKET_REISSUE_NOT_CONFIRMED` unless `confirm_ticket_reissue: true` is sent alongside. Sending the value the product already has is not a change: no permission needed, nothing reissued, no `ticket_reissue` block.
@@ -3968,6 +5274,31 @@ type WorkflowExecutionPage struct {
 	Pagination *Pagination          `json:"pagination,omitempty"`
 }
 
+// WorkflowNode One trigger, action or logic node, described for a machine.
+type WorkflowNode struct {
+	// ActionType The `action_type` to send, or null for a node discriminated some
+	// other way — a condition carries `condition_type`, a loop carries
+	// neither.
+	ActionType *string `json:"action_type"`
+	Category   string  `json:"category"`
+
+	// Config `field => "required|string|in:a,b"`, from the node's own `rules()`.
+	// An empty object means the node takes no config.
+	Config      map[string]string `json:"config"`
+	Description string            `json:"description"`
+	Name        string            `json:"name"`
+
+	// StepType The `step_type` to send when using this node. Stated per node
+	// because `delay` and `delay_until` are ActionTypes whose step_type is
+	// their own name rather than `action`.
+	StepType WorkflowNodeStepType `json:"step_type"`
+}
+
+// WorkflowNodeStepType The `step_type` to send when using this node. Stated per node
+// because `delay` and `delay_until` are ActionTypes whose step_type is
+// their own name rather than `action`.
+type WorkflowNodeStepType string
+
 // WorkflowPage defines model for WorkflowPage.
 type WorkflowPage struct {
 	Data       *[]Workflow `json:"data,omitempty"`
@@ -4050,6 +5381,9 @@ type Forbidden = ErrorEnvelope
 // IdempotencyConflict defines model for IdempotencyConflict.
 type IdempotencyConflict = ErrorEnvelope
 
+// IdempotencyConflictOrProductBeingDuplicated defines model for IdempotencyConflictOrProductBeingDuplicated.
+type IdempotencyConflictOrProductBeingDuplicated = ErrorEnvelope
+
 // InternalError defines model for InternalError.
 type InternalError = ErrorEnvelope
 
@@ -4118,12 +5452,29 @@ type ListAvailabilitiesParams struct {
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
-	Since           *Since              `form:"since,omitempty" json:"since,omitempty"`
-	ProductOptionId *string             `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
-	From            *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
-	To              *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
-	HasCapacity     *bool               `form:"has_capacity,omitempty" json:"has_capacity,omitempty"`
+	Since           *Since `form:"since,omitempty" json:"since,omitempty"`
+	ProductOptionId *int   `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+
+	// ProductId Departures for every option of this product. Use this when you have a product id; passing one as product_option_id matches an unrelated option and silently returns nothing.
+	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+
+	// From Departure start >= this. Product-local wall clock.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Departure start <= this. A bare date covers the WHOLE day; a value carrying a time is an exclusive instant.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// HasCapacity When true, only departures with `vacancies > 0`. `false` is no
+	// filter, NOT "only full departures".
+	HasCapacity *bool `form:"has_capacity,omitempty" json:"has_capacity,omitempty"`
 
 	// IncludePricing When true, embed `pricing_tiers[]` on each availability with
 	// effective `amount` (per-slot override from
@@ -4133,6 +5484,24 @@ type ListAvailabilitiesParams struct {
 	// page (product-option lookup, product tiers, pivot overrides) —
 	// no per-row N+1 regardless of page size.
 	IncludePricing *bool `form:"include_pricing,omitempty" json:"include_pricing,omitempty"`
+}
+
+// CreateAvailabilityParams defines parameters for CreateAvailability.
+type CreateAvailabilityParams struct {
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // BulkDeleteAvailabilitiesParams defines parameters for BulkDeleteAvailabilities.
@@ -4240,8 +5609,40 @@ type ListBookingsParams struct {
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// Q Free-text search across primary string fields (name, email, reference)
-	Q *Q `form:"q,omitempty" json:"q,omitempty"`
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
+
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
+	// Q Free-text search. Matches a booking id by prefix, a
+	// `reseller_reference` by prefix, and the booker's name or email by
+	// substring (a booker that is a Customer, soft-deleted ones
+	// included; agent- and partner-made bookings match on the first two
+	// only). `%` and `_` are matched literally. A term matching more
+	// than 500 customers is refused with 422 rather than truncated;
+	// narrow it or use `customer_id`. Searching identity requires
+	// `view_booker_of_booking`: without it the request is refused with
+	// 403 rather than silently narrowed, and the message points at
+	// `reference`, which needs no such permission.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// CustomerId Bookings whose booker is this customer (the id `/customers` and a
+	// booking's `customer.id` carry). Needs no identity permission:
+	// the id is already on every redacted booking.
+	CustomerId *openapi_types.UUID `form:"customer_id,omitempty" json:"customer_id,omitempty"`
+
+	// Status Alias of `booking_status`, case-insensitive.
+	Status *string `form:"status,omitempty" json:"status,omitempty"`
+
+	// DateField Which date `from`/`to` bound. `starts_at` (default) is the trip's
+	// departure; `confirmed_at` and `created_at` are the booking row's
+	// own timestamps, matching the statistics endpoints.
+	DateField *ListBookingsParamsDateField `form:"date_field,omitempty" json:"date_field,omitempty"`
 
 	// BookingStatus Filter by computed status. Server translates to SQL conditions on
 	// `confirmed_at`/`cancelled_at`/`expires_at` (status is an accessor,
@@ -4260,10 +5661,19 @@ type ListBookingsParams struct {
 	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
 
 	// To Booking start date <= this
-	To              *openapi_types.Date  `form:"to,omitempty" json:"to,omitempty"`
-	CustomerEmail   *openapi_types.Email `form:"customer_email,omitempty" json:"customer_email,omitempty"`
-	Reference       *string              `form:"reference,omitempty" json:"reference,omitempty"`
-	ProductOptionId *string              `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// CustomerEmail Exact match on the booker's email. Requires
+	// `view_booker_of_booking` (403 otherwise), for the same reason as
+	// `q`. An address shared by more than 500 customers is refused with
+	// 422, like an over-broad `q`. Until 1.15.0 this parameter was documented and ignored, so
+	// every request returned the unfiltered list.
+	CustomerEmail *string `form:"customer_email,omitempty" json:"customer_email,omitempty"`
+
+	// Reference Exact match on `reseller_reference`. A reference of `0` filters;
+	// it used to be read as no filter and answer with every booking.
+	Reference       *string `form:"reference,omitempty" json:"reference,omitempty"`
+	ProductOptionId *int    `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
 
 	// ResourceId Filter to bookings a specific resource is assigned to (via the
 	// `booking_resource` pivot). Combine with `GET /resources?category=auxiliary`
@@ -4273,15 +5683,46 @@ type ListBookingsParams struct {
 	// soft-deleted resource returns no rows.
 	ResourceId *int `form:"resource_id,omitempty" json:"resource_id,omitempty"`
 
-	// Include Optional comma-separated expansions. `include=resources` enriches
-	// each booking row with assigned resources plus a
-	// `resource_state_token` suitable for stale-state guarded writes.
-	// Omit it for the lightest list payload.
-	Include *string `form:"include,omitempty" json:"include,omitempty"`
+	// OriginType Filter by the surface that sold the booking, in the same
+	// vocabulary a booking's own `origin.type` reports. Not the raw
+	// `provider_type` morph: that block hides the class names on
+	// purpose, so there would be no response a caller could learn them
+	// from. A value outside the enum is a 422, not a 200 over the
+	// unfiltered list.
+	OriginType *ListBookingsParamsOriginType `form:"origin_type,omitempty" json:"origin_type,omitempty"`
+
+	// PartnerId Bookings involving one partner, matched on **either** side of the
+	// morph — where the partner is the booking's provider (they sold it)
+	// or its customer (they are billed for it). Both report
+	// `origin.type = indirect_offline`, so matching one column alone
+	// would answer with a subset. A retired (soft-deleted) partner still
+	// matches; its bookings stay on the books.
+	//
+	// Requires `view_any_partner` (403 otherwise). `GET /partners` is
+	// the only route from a partner's name to this id, so without the
+	// permission this filter would be a way to probe for that mapping an
+	// id at a time. The refusal names `origin_type`, which needs no
+	// permission. Resolve the id from `GET /partners?q=`.
+	PartnerId *int `form:"partner_id,omitempty" json:"partner_id,omitempty"`
+
+	// Include Optional expansions, as a comma-separated string or a list
+	// (`include[]=resources`). `resources` is the only value, and it
+	// enriches each booking row with assigned resources plus a
+	// `resource_state_token` suitable for stale-state guarded writes. Any
+	// other value is a 422: a misspelling used to come back as a 200 with
+	// no resources and nothing saying why. Omit it for the lightest list
+	// payload.
+	Include *ListBookingsIncludeParam `form:"include,omitempty" json:"include,omitempty"`
 }
+
+// ListBookingsParamsDateField defines parameters for ListBookings.
+type ListBookingsParamsDateField string
 
 // ListBookingsParamsBookingStatus defines parameters for ListBookings.
 type ListBookingsParamsBookingStatus string
+
+// ListBookingsParamsOriginType defines parameters for ListBookings.
+type ListBookingsParamsOriginType string
 
 // CancelBookingParams defines parameters for CancelBooking.
 type CancelBookingParams struct {
@@ -4399,6 +5840,9 @@ type ListBookingTransactionsParams struct {
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
 }
 
 // ListCategoriesParams defines parameters for ListCategories.
@@ -4418,7 +5862,9 @@ type ListCustomersParams struct {
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// Q Free-text search across primary string fields (name, email, reference)
+	// Q Free-text search across primary string fields (name, email, reference).
+	// `%` and `_` in the term are matched literally, so `?q=%` finds the rows
+	// containing a percent sign rather than every row.
 	Q *Q `form:"q,omitempty" json:"q,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
@@ -4427,6 +5873,8 @@ type ListCustomersParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed      `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 	Email          *openapi_types.Email `form:"email,omitempty" json:"email,omitempty"`
 	Country        *string              `form:"country,omitempty" json:"country,omitempty"`
@@ -4446,10 +5894,21 @@ type ListDiscountsParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
-	IncludeTrashed  *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
-	Code            *string         `form:"code,omitempty" json:"code,omitempty"`
-	ProductOptionId *string         `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
-	AutoApply       *bool           `form:"auto_apply,omitempty" json:"auto_apply,omitempty"`
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+	Code           *string         `form:"code,omitempty" json:"code,omitempty"`
+
+	// ProductOptionId A product option id, or the literal STRING `null` for global
+	// discounts (scoped to no option). An empty value, including a JSON
+	// `null` through MCP, is no filter at all and lists every discount.
+	// Anything else — `0`, a boolean, a name — is a 422 naming both
+	// accepted shapes.
+	ProductOptionId *string `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+
+	// AutoApply `true` returns only auto-applied discounts, `false` only the
+	// code-entered ones. Omit it, or send it empty, for both.
+	AutoApply *bool `form:"auto_apply,omitempty" json:"auto_apply,omitempty"`
 
 	// ValidAt Returns discounts whose `validity_start <= valid_at < validity_end`
 	// (or where `validity_end IS NULL`). Useful for "what discounts are
@@ -4550,14 +6009,16 @@ type ListExtrasParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
-	Since     *Since  `form:"since,omitempty" json:"since,omitempty"`
-	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+	Since     *Since `form:"since,omitempty" json:"since,omitempty"`
+	ProductId *int   `form:"product_id,omitempty" json:"product_id,omitempty"`
 }
 
 // CreateExtraParams defines parameters for CreateExtra.
@@ -4644,6 +6105,9 @@ type ListAvailableGiftCertsParams struct {
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
 }
 
 // CreateAvailableGiftCertParams defines parameters for CreateAvailableGiftCert.
@@ -4706,7 +6170,17 @@ type ListIssuedGiftCertsParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
-	Cursor         *Cursor                          `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
+
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed                  `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 	Status         *ListIssuedGiftCertsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 	RecipientEmail *openapi_types.Email             `form:"recipient_email,omitempty" json:"recipient_email,omitempty"`
 	Code           *string                          `form:"code,omitempty" json:"code,omitempty"`
@@ -4792,6 +6266,18 @@ type ListGuestsParams struct {
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor    *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 	BookingId *string `form:"booking_id,omitempty" json:"booking_id,omitempty"`
+
+	// CustomerId Guests whose traveller record is this customer. That is the
+	// traveller, not the booker: list the booker's trips with
+	// `GET /bookings?customer_id=`.
+	CustomerId *openapi_types.UUID `form:"customer_id,omitempty" json:"customer_id,omitempty"`
+
+	// Q Matches the traveller's name or email by substring; `%` and `_` are
+	// matched literally. Reaches the same travellers as `customer_id`,
+	// soft-deleted customer records included. A term matching more than
+	// 500 customers is refused with 422 rather than truncated; narrow it,
+	// or use `customer_id` or `booking_id`.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
 // UpdateGuestParams defines parameters for UpdateGuest.
@@ -4900,6 +6386,43 @@ type DeleteMediaParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListPartnersParams defines parameters for ListPartners.
+type ListPartnersParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
+
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
+	// Q Substring match on the partner's name or email. `%` and `_` are
+	// matched literally.
+	Q           *string                        `form:"q,omitempty" json:"q,omitempty"`
+	PartnerType *ListPartnersParamsPartnerType `form:"partner_type,omitempty" json:"partner_type,omitempty"`
+}
+
+// ListPartnersParamsPartnerType defines parameters for ListPartners.
+type ListPartnersParamsPartnerType string
+
+// ShowPartnerParams defines parameters for ShowPartner.
+type ShowPartnerParams struct {
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+}
+
 // ListPricingCategoriesParams defines parameters for ListPricingCategories.
 type ListPricingCategoriesParams struct {
 	// Limit Page size (1-200, default 50)
@@ -4908,11 +6431,13 @@ type ListPricingCategoriesParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor    *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
-	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+	ProductId *int    `form:"product_id,omitempty" json:"product_id,omitempty"`
 }
 
 // CreatePricingCategoryParams defines parameters for CreatePricingCategory.
@@ -4995,18 +6520,20 @@ type ListPricingTiersParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// ProductId Returns tiers belonging to this product (via the pricing_category relation).
-	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+	ProductId *int `form:"product_id,omitempty" json:"product_id,omitempty"`
 
 	// AvailabilityId Returns tiers reachable from this availability's product
 	// with per-slot overrides overlaid onto `amount`. Mutually
 	// exclusive with `product_id`.
-	AvailabilityId *string `form:"availability_id,omitempty" json:"availability_id,omitempty"`
+	AvailabilityId *int `form:"availability_id,omitempty" json:"availability_id,omitempty"`
 }
 
 // CreatePricingTierParams defines parameters for CreatePricingTier.
@@ -5047,10 +6574,17 @@ type DeletePricingTierParams struct {
 
 // ShowPricingTierParams defines parameters for ShowPricingTier.
 type ShowPricingTierParams struct {
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
 	// AvailabilityId Overlay the per-slot override for this availability onto
 	// `amount`. Returns 404 if the tier isn't reachable from the
 	// availability's product.
-	AvailabilityId *string `form:"availability_id,omitempty" json:"availability_id,omitempty"`
+	AvailabilityId *int `form:"availability_id,omitempty" json:"availability_id,omitempty"`
 }
 
 // UpdatePricingTierParams defines parameters for UpdatePricingTier.
@@ -5102,11 +6636,16 @@ type ListProductOptionsParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
-	Cursor    *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
-	ProductId *string `form:"product_id,omitempty" json:"product_id,omitempty"`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since     *Since `form:"since,omitempty" json:"since,omitempty"`
+	ProductId *int   `form:"product_id,omitempty" json:"product_id,omitempty"`
 }
 
 // CreateProductOptionParams defines parameters for CreateProductOption.
@@ -5230,12 +6769,16 @@ type ListProductsParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// Q Free-text search across primary string fields (name, email, reference)
+	// Q Free-text search across primary string fields (name, email, reference).
+	// `%` and `_` in the term are matched literally, so `?q=%` finds the rows
+	// containing a percent sign rather than every row.
 	Q *Q `form:"q,omitempty" json:"q,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
@@ -5244,8 +6787,10 @@ type ListProductsParams struct {
 	// Status Filters on the `is_active` column (`published` → true, `draft` →
 	// false). `is_active` is a two-state boolean, so there is no archived
 	// state; any other value returns 422 `VALIDATION_FAILED`.
-	Status   *ListProductsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
-	Category *string                   `form:"category,omitempty" json:"category,omitempty"`
+	Status *ListProductsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Category A `ProductCategory` id. `0` is refused rather than ignored.
+	Category *int `form:"category,omitempty" json:"category,omitempty"`
 }
 
 // ListProductsParamsStatus defines parameters for ListProducts.
@@ -5304,6 +6849,41 @@ type UpdateProductParams struct {
 	// same key is sent on two real calls, normal idempotency rules apply.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
+
+// DuplicateProductJSONBody defines parameters for DuplicateProduct.
+type DuplicateProductJSONBody struct {
+	DryRun *bool `json:"dry_run,omitempty"`
+
+	// Include Sections to copy. Replaces the defaults. Omit for details, schedules, photos, pricing, documents, resources, deposit.
+	Include *[]DuplicateProductJSONBodyInclude `json:"include,omitempty"`
+
+	// ProductCode Code for the copy. Defaults to "<CODE>-COPY". Not checked for uniqueness — duplicating twice without one yields two products with the same code, matching the web UI.
+	ProductCode *string `json:"product_code,omitempty"`
+
+	// Title Name for the copy. Defaults to "<title> copy".
+	Title *string `json:"title,omitempty"`
+}
+
+// DuplicateProductParams defines parameters for DuplicateProduct.
+type DuplicateProductParams struct {
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DuplicateProductJSONBodyInclude defines parameters for DuplicateProduct.
+type DuplicateProductJSONBodyInclude string
 
 // ListProductMediaParams defines parameters for ListProductMedia.
 type ListProductMediaParams struct {
@@ -5379,12 +6959,17 @@ type ListQuestionsParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor          *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
-	ProductOptionId *string `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
-	Required        *bool   `form:"required,omitempty" json:"required,omitempty"`
+	ProductOptionId *int    `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+
+	// Required `true` returns only mandatory questions, `false` only the optional
+	// ones. Omit it, or send it empty, for both.
+	Required *bool `form:"required,omitempty" json:"required,omitempty"`
 }
 
 // CreateQuestionParams defines parameters for CreateQuestion.
@@ -5464,6 +7049,54 @@ type RestoreQuestionParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListResourceCalendarParams defines parameters for ListResourceCalendar.
+type ListResourceCalendarParams struct {
+	// ResourceId One or more resource ids. Comma-separated over HTTP
+	// (`?resource_id=7,9`), or a JSON array over MCP. At most 10 per call.
+	ResourceId string `form:"resource_id" json:"resource_id"`
+
+	// From Start of the window, a bare `YYYY-MM-DD` day in the tenant's
+	// calendar. Omit both bounds for today through today+30; supply one and
+	// the other is implied 30 days away. The window spans at most 92 days.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To End of the window. Must not precede `from`.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// EventTypes Narrow to some of the three families. Comma-separated or a JSON
+	// array; omitted means all three. A `busy`-only response omits
+	// bookings entirely and therefore proves even less about availability.
+	EventTypes *ListResourceCalendarParamsEventTypes `form:"event_types,omitempty" json:"event_types,omitempty"`
+
+	// ProductOptionId Narrow to one schedule. This affects ALL THREE families, not only
+	// blocks, and each differently:
+	//
+	// - BOOKINGS are narrowed to departures on this schedule, so a
+	//   booking on a sibling schedule is dropped from the page.
+	// - BLOCKS are narrowed to this schedule, PLUS any block that applies
+	//   to every schedule (a block with no schedule of its own).
+	// - SYNCED GOOGLE TIME is NOT narrowed. A calendar event carries no
+	//   schedule; it is not about one, it is time the resource is
+	//   unavailable for any of them. Filtering it away would report the
+	//   resource free for this schedule while its own calendar disagrees.
+	//
+	// So this is the authoritative way to ask whether a block stops a
+	// particular trip, but the response is not "everything about this
+	// schedule" — it is still every reason this resource is busy, with
+	// the schedule-specific reasons narrowed.
+	ProductOptionId *int `form:"product_option_id,omitempty" json:"product_option_id,omitempty"`
+
+	// Limit Page size, 1-25, default 25. Lower than other list endpoints
+	// because a row carries two timestamp pairs and a schedule list.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListResourceCalendarParamsEventTypes defines parameters for ListResourceCalendar.
+type ListResourceCalendarParamsEventTypes string
+
 // ListResourcesParams defines parameters for ListResources.
 type ListResourcesParams struct {
 	// Limit Page size (1-200, default 50)
@@ -5472,6 +7105,8 @@ type ListResourcesParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
@@ -5557,6 +7192,35 @@ type RestoreResourceParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListSegmentsParams defines parameters for ListSegments.
+type ListSegmentsParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
+	Since  *Since                    `form:"since,omitempty" json:"since,omitempty"`
+	Status *ListSegmentsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+	Type   *ListSegmentsParamsType   `form:"type,omitempty" json:"type,omitempty"`
+}
+
+// ListSegmentsParamsStatus defines parameters for ListSegments.
+type ListSegmentsParamsStatus string
+
+// ListSegmentsParamsType defines parameters for ListSegments.
+type ListSegmentsParamsType string
+
+// ListSegmentMembersParams defines parameters for ListSegmentMembers.
+type ListSegmentMembersParams struct {
+	// Limit Page size (1-200, default 50)
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // ListTransactionsParams defines parameters for ListTransactions.
 type ListTransactionsParams struct {
 	// Limit Page size (1-200, default 50)
@@ -5566,15 +7230,23 @@ type ListTransactionsParams struct {
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
-	Since  *Since                        `form:"since,omitempty" json:"since,omitempty"`
-	Status *ListTransactionsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
-	Type   *ListTransactionsParamsType   `form:"type,omitempty" json:"type,omitempty"`
-	From   *time.Time                    `form:"from,omitempty" json:"from,omitempty"`
-	To     *time.Time                    `form:"to,omitempty" json:"to,omitempty"`
-}
+	Since *Since `form:"since,omitempty" json:"since,omitempty"`
 
-// ListTransactionsParamsStatus defines parameters for ListTransactions.
-type ListTransactionsParamsStatus string
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
+
+	// Type `refund` is a row with a `refund_for`; `charge` is any other.
+	// There is no `status` filter: a transaction row is only ever
+	// written for a payment that succeeded, so there is nothing for it
+	// to select (until 1.15.0 it was documented and ignored).
+	Type *ListTransactionsParamsType `form:"type,omitempty" json:"type,omitempty"`
+	From *time.Time                  `form:"from,omitempty" json:"from,omitempty"`
+	To   *time.Time                  `form:"to,omitempty" json:"to,omitempty"`
+}
 
 // ListTransactionsParamsType defines parameters for ListTransactions.
 type ListTransactionsParamsType string
@@ -5606,6 +7278,17 @@ type ListWorkflowExecutionLogsParams struct {
 	StepId *int    `form:"step_id,omitempty" json:"step_id,omitempty"`
 }
 
+// ListWorkflowNodesParams defines parameters for ListWorkflowNodes.
+type ListWorkflowNodesParams struct {
+	// Kind Narrow the catalogue. Omitted, all three groups are returned, which
+	// is a large payload for a caller that already knows which half it
+	// wants.
+	Kind *ListWorkflowNodesParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+}
+
+// ListWorkflowNodesParamsKind defines parameters for ListWorkflowNodes.
+type ListWorkflowNodesParamsKind string
+
 // ListWorkflowsParams defines parameters for ListWorkflows.
 type ListWorkflowsParams struct {
 	// Limit Page size (1-200, default 50)
@@ -5617,6 +7300,8 @@ type ListWorkflowsParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
@@ -5673,6 +7358,8 @@ type ShowWorkflowParams struct {
 	// IncludeTrashed Include soft-deleted rows in the response (default false).
 	// Only applies to resources that use Laravel's `SoftDeletes` trait
 	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
 	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 }
 
@@ -5858,6 +7545,9 @@ type CreateWorkflowTriggerParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateAvailabilityJSONRequestBody defines body for CreateAvailability for application/json ContentType.
+type CreateAvailabilityJSONRequestBody = CreateAvailabilityRequest
+
 // BulkDeleteAvailabilitiesJSONRequestBody defines body for BulkDeleteAvailabilities for application/json ContentType.
 type BulkDeleteAvailabilitiesJSONRequestBody = BulkDeleteAvailabilityRequest
 
@@ -5960,6 +7650,9 @@ type CreateProductJSONRequestBody = CreateProductRequest
 // UpdateProductJSONRequestBody defines body for UpdateProduct for application/json ContentType.
 type UpdateProductJSONRequestBody = UpdateProductRequest
 
+// DuplicateProductJSONRequestBody defines body for DuplicateProduct for application/json ContentType.
+type DuplicateProductJSONRequestBody DuplicateProductJSONBody
+
 // UploadProductMediaMultipartRequestBody defines body for UploadProductMedia for multipart/form-data ContentType.
 type UploadProductMediaMultipartRequestBody UploadProductMediaMultipartBody
 
@@ -5980,6 +7673,9 @@ type CreateResourceJSONRequestBody = CreateResourceRequest
 
 // UpdateResourceJSONRequestBody defines body for UpdateResource for application/json ContentType.
 type UpdateResourceJSONRequestBody = UpdateResourceRequest
+
+// CreateSegmentJSONRequestBody defines body for CreateSegment for application/json ContentType.
+type CreateSegmentJSONRequestBody = CreateSegmentRequest
 
 // CreateWorkflowJSONRequestBody defines body for CreateWorkflow for application/json ContentType.
 type CreateWorkflowJSONRequestBody = CreateWorkflowRequest
@@ -6242,6 +7938,192 @@ func (t *BulkUpdateAvailabilityRequest_NewValue) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsPositiveIntegerId returns the union data inside the BulkUpdateAvailabilityRequest_ProductOptionId as a PositiveIntegerId
+func (t BulkUpdateAvailabilityRequest_ProductOptionId) AsPositiveIntegerId() (PositiveIntegerId, error) {
+	var body PositiveIntegerId
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPositiveIntegerId overwrites any union data inside the BulkUpdateAvailabilityRequest_ProductOptionId as the provided PositiveIntegerId
+func (t *BulkUpdateAvailabilityRequest_ProductOptionId) FromPositiveIntegerId(v PositiveIntegerId) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePositiveIntegerId performs a merge with any union data inside the BulkUpdateAvailabilityRequest_ProductOptionId, using the provided PositiveIntegerId
+func (t *BulkUpdateAvailabilityRequest_ProductOptionId) MergePositiveIntegerId(v PositiveIntegerId) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsBulkUpdateAvailabilityRequestProductOptionId1 returns the union data inside the BulkUpdateAvailabilityRequest_ProductOptionId as a BulkUpdateAvailabilityRequestProductOptionId1
+func (t BulkUpdateAvailabilityRequest_ProductOptionId) AsBulkUpdateAvailabilityRequestProductOptionId1() (BulkUpdateAvailabilityRequestProductOptionId1, error) {
+	var body BulkUpdateAvailabilityRequestProductOptionId1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBulkUpdateAvailabilityRequestProductOptionId1 overwrites any union data inside the BulkUpdateAvailabilityRequest_ProductOptionId as the provided BulkUpdateAvailabilityRequestProductOptionId1
+func (t *BulkUpdateAvailabilityRequest_ProductOptionId) FromBulkUpdateAvailabilityRequestProductOptionId1(v BulkUpdateAvailabilityRequestProductOptionId1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeBulkUpdateAvailabilityRequestProductOptionId1 performs a merge with any union data inside the BulkUpdateAvailabilityRequest_ProductOptionId, using the provided BulkUpdateAvailabilityRequestProductOptionId1
+func (t *BulkUpdateAvailabilityRequest_ProductOptionId) MergeBulkUpdateAvailabilityRequestProductOptionId1(v BulkUpdateAvailabilityRequestProductOptionId1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t BulkUpdateAvailabilityRequest_ProductOptionId) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *BulkUpdateAvailabilityRequest_ProductOptionId) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsListBookingsIncludeParam0 returns the union data inside the ListBookingsIncludeParam as a ListBookingsIncludeParam0
+func (t ListBookingsIncludeParam) AsListBookingsIncludeParam0() (ListBookingsIncludeParam0, error) {
+	var body ListBookingsIncludeParam0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListBookingsIncludeParam0 overwrites any union data inside the ListBookingsIncludeParam as the provided ListBookingsIncludeParam0
+func (t *ListBookingsIncludeParam) FromListBookingsIncludeParam0(v ListBookingsIncludeParam0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListBookingsIncludeParam0 performs a merge with any union data inside the ListBookingsIncludeParam, using the provided ListBookingsIncludeParam0
+func (t *ListBookingsIncludeParam) MergeListBookingsIncludeParam0(v ListBookingsIncludeParam0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsListBookingsIncludeParam1 returns the union data inside the ListBookingsIncludeParam as a ListBookingsIncludeParam1
+func (t ListBookingsIncludeParam) AsListBookingsIncludeParam1() (ListBookingsIncludeParam1, error) {
+	var body ListBookingsIncludeParam1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListBookingsIncludeParam1 overwrites any union data inside the ListBookingsIncludeParam as the provided ListBookingsIncludeParam1
+func (t *ListBookingsIncludeParam) FromListBookingsIncludeParam1(v ListBookingsIncludeParam1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListBookingsIncludeParam1 performs a merge with any union data inside the ListBookingsIncludeParam, using the provided ListBookingsIncludeParam1
+func (t *ListBookingsIncludeParam) MergeListBookingsIncludeParam1(v ListBookingsIncludeParam1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListBookingsIncludeParam) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListBookingsIncludeParam) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPositiveIntegerId0 returns the union data inside the PositiveIntegerId as a PositiveIntegerId0
+func (t PositiveIntegerId) AsPositiveIntegerId0() (PositiveIntegerId0, error) {
+	var body PositiveIntegerId0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPositiveIntegerId0 overwrites any union data inside the PositiveIntegerId as the provided PositiveIntegerId0
+func (t *PositiveIntegerId) FromPositiveIntegerId0(v PositiveIntegerId0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePositiveIntegerId0 performs a merge with any union data inside the PositiveIntegerId, using the provided PositiveIntegerId0
+func (t *PositiveIntegerId) MergePositiveIntegerId0(v PositiveIntegerId0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPositiveIntegerId1 returns the union data inside the PositiveIntegerId as a PositiveIntegerId1
+func (t PositiveIntegerId) AsPositiveIntegerId1() (PositiveIntegerId1, error) {
+	var body PositiveIntegerId1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPositiveIntegerId1 overwrites any union data inside the PositiveIntegerId as the provided PositiveIntegerId1
+func (t *PositiveIntegerId) FromPositiveIntegerId1(v PositiveIntegerId1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePositiveIntegerId1 performs a merge with any union data inside the PositiveIntegerId, using the provided PositiveIntegerId1
+func (t *PositiveIntegerId) MergePositiveIntegerId1(v PositiveIntegerId1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PositiveIntegerId) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PositiveIntegerId) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -6323,6 +8205,11 @@ type ClientInterface interface {
 
 	// ListAvailabilities request
 	ListAvailabilities(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAvailabilityWithBody request with any body
+	CreateAvailabilityWithBody(ctx context.Context, params *CreateAvailabilityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAvailability(ctx context.Context, params *CreateAvailabilityParams, body CreateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BulkDeleteAvailabilitiesWithBody request with any body
 	BulkDeleteAvailabilitiesWithBody(ctx context.Context, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6529,6 +8416,12 @@ type ClientInterface interface {
 	// ShowMedia request
 	ShowMedia(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListPartners request
+	ListPartners(ctx context.Context, params *ListPartnersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShowPartner request
+	ShowPartner(ctx context.Context, id IdPath, params *ShowPartnerParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPricingCategories request
 	ListPricingCategories(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6626,6 +8519,11 @@ type ClientInterface interface {
 
 	UpdateProduct(ctx context.Context, id IdPath, params *UpdateProductParams, body UpdateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DuplicateProductWithBody request with any body
+	DuplicateProductWithBody(ctx context.Context, id IdPath, params *DuplicateProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DuplicateProduct(ctx context.Context, id IdPath, params *DuplicateProductParams, body DuplicateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListProductMedia request
 	ListProductMedia(ctx context.Context, id IdPath, params *ListProductMediaParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6661,6 +8559,9 @@ type ClientInterface interface {
 
 	RestoreQuestion(ctx context.Context, id IdPath, params *RestoreQuestionParams, body RestoreQuestionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListResourceCalendar request
+	ListResourceCalendar(ctx context.Context, params *ListResourceCalendarParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListResources request
 	ListResources(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6683,6 +8584,23 @@ type ClientInterface interface {
 	// RestoreResource request
 	RestoreResource(ctx context.Context, id IdPath, params *RestoreResourceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSegmentFields request
+	ListSegmentFields(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSegments request
+	ListSegments(ctx context.Context, params *ListSegmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSegmentWithBody request with any body
+	CreateSegmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateSegment(ctx context.Context, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShowSegment request
+	ShowSegment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSegmentMembers request
+	ListSegmentMembers(ctx context.Context, id openapi_types.UUID, params *ListSegmentMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListTransactions request
 	ListTransactions(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6700,6 +8618,9 @@ type ClientInterface interface {
 
 	// ListWorkflowExecutionLogs request
 	ListWorkflowExecutionLogs(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkflowNodes request
+	ListWorkflowNodes(ctx context.Context, params *ListWorkflowNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkflows request
 	ListWorkflows(ctx context.Context, params *ListWorkflowsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6789,6 +8710,30 @@ func (c *Client) GetAnswer(ctx context.Context, id string, reqEditors ...Request
 
 func (c *Client) ListAvailabilities(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListAvailabilitiesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAvailabilityWithBody(ctx context.Context, params *CreateAvailabilityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAvailabilityRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAvailability(ctx context.Context, params *CreateAvailabilityParams, body CreateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAvailabilityRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7711,6 +9656,30 @@ func (c *Client) ShowMedia(ctx context.Context, id IdPath, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListPartners(ctx context.Context, params *ListPartnersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPartnersRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ShowPartner(ctx context.Context, id IdPath, params *ShowPartnerParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowPartnerRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListPricingCategories(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPricingCategoriesRequest(c.Server, params)
 	if err != nil {
@@ -8143,6 +10112,30 @@ func (c *Client) UpdateProduct(ctx context.Context, id IdPath, params *UpdatePro
 	return c.Client.Do(req)
 }
 
+func (c *Client) DuplicateProductWithBody(ctx context.Context, id IdPath, params *DuplicateProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateProductRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateProduct(ctx context.Context, id IdPath, params *DuplicateProductParams, body DuplicateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateProductRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListProductMedia(ctx context.Context, id IdPath, params *ListProductMediaParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListProductMediaRequest(c.Server, id, params)
 	if err != nil {
@@ -8299,6 +10292,18 @@ func (c *Client) RestoreQuestion(ctx context.Context, id IdPath, params *Restore
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListResourceCalendar(ctx context.Context, params *ListResourceCalendarParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListResourceCalendarRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListResources(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListResourcesRequest(c.Server, params)
 	if err != nil {
@@ -8395,6 +10400,78 @@ func (c *Client) RestoreResource(ctx context.Context, id IdPath, params *Restore
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListSegmentFields(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSegmentFieldsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListSegments(ctx context.Context, params *ListSegmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSegmentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateSegmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSegmentRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateSegment(ctx context.Context, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSegmentRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ShowSegment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowSegmentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListSegmentMembers(ctx context.Context, id openapi_types.UUID, params *ListSegmentMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSegmentMembersRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListTransactions(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListTransactionsRequest(c.Server, params)
 	if err != nil {
@@ -8457,6 +10534,18 @@ func (c *Client) ShowWorkflowExecution(ctx context.Context, id int, reqEditors .
 
 func (c *Client) ListWorkflowExecutionLogs(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWorkflowExecutionLogsRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkflowNodes(ctx context.Context, params *ListWorkflowNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkflowNodesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -9036,6 +11125,22 @@ func NewListAvailabilitiesRequest(server string, params *ListAvailabilitiesParam
 
 		}
 
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.Since != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
@@ -9054,7 +11159,23 @@ func NewListAvailabilitiesRequest(server string, params *ListAvailabilitiesParam
 
 		if params.ProductOptionId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProductId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -9138,6 +11259,61 @@ func NewListAvailabilitiesRequest(server string, params *ListAvailabilitiesParam
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAvailabilityRequest calls the generic CreateAvailability builder with application/json body
+func NewCreateAvailabilityRequest(server string, params *CreateAvailabilityParams, body CreateAvailabilityJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAvailabilityRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateAvailabilityRequestWithBody generates requests for CreateAvailability with any type of body
+func NewCreateAvailabilityRequestWithBody(server string, params *CreateAvailabilityParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/availabilities")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -9529,9 +11705,89 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 
 		}
 
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.Q != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.CustomerId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "customer_id", *params.CustomerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.DateField != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "date_field", *params.DateField, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -9611,7 +11867,7 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 
 		if params.CustomerEmail != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "customer_email", *params.CustomerEmail, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "email"}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "customer_email", *params.CustomerEmail, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -9643,7 +11899,7 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 
 		if params.ProductOptionId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -9673,9 +11929,41 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 
 		}
 
+		if params.OriginType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "origin_type", *params.OriginType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PartnerId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "partner_id", *params.PartnerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.Include != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include", *params.Include, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include", *params.Include, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -10194,6 +12482,22 @@ func NewListBookingTransactionsRequest(server string, id IdPath, params *ListBoo
 		if params.Cursor != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -11029,7 +13333,7 @@ func NewListExtrasRequest(server string, params *ListExtrasParams) (*http.Reques
 
 		if params.ProductId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -11370,6 +13674,22 @@ func NewListAvailableGiftCertsRequest(server string, params *ListAvailableGiftCe
 
 		}
 
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -11622,6 +13942,38 @@ func NewListIssuedGiftCertsRequest(server string, params *ListIssuedGiftCertsPar
 		if params.Cursor != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -11964,6 +14316,38 @@ func NewListGuestsRequest(server string, params *ListGuestsParams) (*http.Reques
 		if params.BookingId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "booking_id", *params.BookingId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.CustomerId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "customer_id", *params.CustomerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -12464,6 +14848,191 @@ func NewShowMediaRequest(server string, id IdPath) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListPartnersRequest generates requests for ListPartners
+func NewListPartnersRequest(server string, params *ListPartnersParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/partners")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PartnerType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "partner_type", *params.PartnerType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewShowPartnerRequest generates requests for ShowPartner
+func NewShowPartnerRequest(server string, id IdPath, params *ShowPartnerParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/partners/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListPricingCategoriesRequest generates requests for ListPricingCategories
 func NewListPricingCategoriesRequest(server string, params *ListPricingCategoriesParams) (*http.Request, error) {
 	var err error
@@ -12536,7 +15105,7 @@ func NewListPricingCategoriesRequest(server string, params *ListPricingCategorie
 
 		if params.ProductId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -12882,7 +15451,7 @@ func NewListPricingTiersRequest(server string, params *ListPricingTiersParams) (
 
 		if params.ProductId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -12898,7 +15467,7 @@ func NewListPricingTiersRequest(server string, params *ListPricingTiersParams) (
 
 		if params.AvailabilityId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -13056,9 +15625,25 @@ func NewShowPricingTierRequest(server string, id IdPath, params *ShowPricingTier
 	if params != nil {
 		queryValues := queryURL.Query()
 
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.AvailabilityId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "availability_id", *params.AvailabilityId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -13277,9 +15862,25 @@ func NewListProductOptionsRequest(server string, params *ListProductOptionsParam
 
 		}
 
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		if params.ProductId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_id", *params.ProductId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -13804,7 +16405,7 @@ func NewListProductsRequest(server string, params *ListProductsParams) (*http.Re
 
 		if params.Category != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "category", *params.Category, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "category", *params.Category, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -14005,6 +16606,68 @@ func NewUpdateProductRequestWithBody(server string, id IdPath, params *UpdatePro
 	}
 
 	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewDuplicateProductRequest calls the generic DuplicateProduct builder with application/json body
+func NewDuplicateProductRequest(server string, id IdPath, params *DuplicateProductParams, body DuplicateProductJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDuplicateProductRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewDuplicateProductRequestWithBody generates requests for DuplicateProduct with any type of body
+func NewDuplicateProductRequestWithBody(server string, id IdPath, params *DuplicateProductParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/products/%s/duplicate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -14302,7 +16965,7 @@ func NewListQuestionsRequest(server string, params *ListQuestionsParams) (*http.
 
 		if params.ProductOptionId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -14600,6 +17263,147 @@ func NewRestoreQuestionRequestWithBody(server string, id IdPath, params *Restore
 			req.Header.Set("Idempotency-Key", headerParam0)
 		}
 
+	}
+
+	return req, nil
+}
+
+// NewListResourceCalendarRequest generates requests for ListResourceCalendar
+func NewListResourceCalendarRequest(server string, params *ListResourceCalendarParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/resource-calendar")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "resource_id", params.ResourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.EventTypes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "event_types", *params.EventTypes, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProductOptionId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "product_option_id", *params.ProductOptionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -14967,6 +17771,292 @@ func NewRestoreResourceRequest(server string, id IdPath, params *RestoreResource
 	return req, nil
 }
 
+// NewListSegmentFieldsRequest generates requests for ListSegmentFields
+func NewListSegmentFieldsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/segment-fields")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSegmentsRequest generates requests for ListSegments
+func NewListSegmentsRequest(server string, params *ListSegmentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/segments")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Type != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "type", *params.Type, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSegmentRequest calls the generic CreateSegment builder with application/json body
+func NewCreateSegmentRequest(server string, body CreateSegmentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSegmentRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateSegmentRequestWithBody generates requests for CreateSegment with any type of body
+func NewCreateSegmentRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/segments")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewShowSegmentRequest generates requests for ShowSegment
+func NewShowSegmentRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/segments/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSegmentMembersRequest generates requests for ListSegmentMembers
+func NewListSegmentMembersRequest(server string, id openapi_types.UUID, params *ListSegmentMembersParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/segments/%s/members", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListTransactionsRequest generates requests for ListTransactions
 func NewListTransactionsRequest(server string, params *ListTransactionsParams) (*http.Request, error) {
 	var err error
@@ -15037,9 +18127,9 @@ func NewListTransactionsRequest(server string, params *ListTransactionsParams) (
 
 		}
 
-		if params.Status != nil {
+		if params.IncludeTrashed != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -15416,6 +18506,55 @@ func NewListWorkflowExecutionLogsRequest(server string, id int, params *ListWork
 		if params.StepId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "step_id", *params.StepId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListWorkflowNodesRequest generates requests for ListWorkflowNodes
+func NewListWorkflowNodesRequest(server string, params *ListWorkflowNodesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workflow-nodes")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", *params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -16350,6 +19489,11 @@ type ClientWithResponsesInterface interface {
 	// ListAvailabilitiesWithResponse request
 	ListAvailabilitiesWithResponse(ctx context.Context, params *ListAvailabilitiesParams, reqEditors ...RequestEditorFn) (*ListAvailabilitiesResponse, error)
 
+	// CreateAvailabilityWithBodyWithResponse request with any body
+	CreateAvailabilityWithBodyWithResponse(ctx context.Context, params *CreateAvailabilityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAvailabilityResponse, error)
+
+	CreateAvailabilityWithResponse(ctx context.Context, params *CreateAvailabilityParams, body CreateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAvailabilityResponse, error)
+
 	// BulkDeleteAvailabilitiesWithBodyWithResponse request with any body
 	BulkDeleteAvailabilitiesWithBodyWithResponse(ctx context.Context, params *BulkDeleteAvailabilitiesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteAvailabilitiesResponse, error)
 
@@ -16555,6 +19699,12 @@ type ClientWithResponsesInterface interface {
 	// ShowMediaWithResponse request
 	ShowMediaWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowMediaResponse, error)
 
+	// ListPartnersWithResponse request
+	ListPartnersWithResponse(ctx context.Context, params *ListPartnersParams, reqEditors ...RequestEditorFn) (*ListPartnersResponse, error)
+
+	// ShowPartnerWithResponse request
+	ShowPartnerWithResponse(ctx context.Context, id IdPath, params *ShowPartnerParams, reqEditors ...RequestEditorFn) (*ShowPartnerResponse, error)
+
 	// ListPricingCategoriesWithResponse request
 	ListPricingCategoriesWithResponse(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*ListPricingCategoriesResponse, error)
 
@@ -16652,6 +19802,11 @@ type ClientWithResponsesInterface interface {
 
 	UpdateProductWithResponse(ctx context.Context, id IdPath, params *UpdateProductParams, body UpdateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProductResponse, error)
 
+	// DuplicateProductWithBodyWithResponse request with any body
+	DuplicateProductWithBodyWithResponse(ctx context.Context, id IdPath, params *DuplicateProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateProductResponse, error)
+
+	DuplicateProductWithResponse(ctx context.Context, id IdPath, params *DuplicateProductParams, body DuplicateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateProductResponse, error)
+
 	// ListProductMediaWithResponse request
 	ListProductMediaWithResponse(ctx context.Context, id IdPath, params *ListProductMediaParams, reqEditors ...RequestEditorFn) (*ListProductMediaResponse, error)
 
@@ -16687,6 +19842,9 @@ type ClientWithResponsesInterface interface {
 
 	RestoreQuestionWithResponse(ctx context.Context, id IdPath, params *RestoreQuestionParams, body RestoreQuestionJSONRequestBody, reqEditors ...RequestEditorFn) (*RestoreQuestionResponse, error)
 
+	// ListResourceCalendarWithResponse request
+	ListResourceCalendarWithResponse(ctx context.Context, params *ListResourceCalendarParams, reqEditors ...RequestEditorFn) (*ListResourceCalendarResponse, error)
+
 	// ListResourcesWithResponse request
 	ListResourcesWithResponse(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*ListResourcesResponse, error)
 
@@ -16709,6 +19867,23 @@ type ClientWithResponsesInterface interface {
 	// RestoreResourceWithResponse request
 	RestoreResourceWithResponse(ctx context.Context, id IdPath, params *RestoreResourceParams, reqEditors ...RequestEditorFn) (*RestoreResourceResponse, error)
 
+	// ListSegmentFieldsWithResponse request
+	ListSegmentFieldsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSegmentFieldsResponse, error)
+
+	// ListSegmentsWithResponse request
+	ListSegmentsWithResponse(ctx context.Context, params *ListSegmentsParams, reqEditors ...RequestEditorFn) (*ListSegmentsResponse, error)
+
+	// CreateSegmentWithBodyWithResponse request with any body
+	CreateSegmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error)
+
+	CreateSegmentWithResponse(ctx context.Context, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error)
+
+	// ShowSegmentWithResponse request
+	ShowSegmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*ShowSegmentResponse, error)
+
+	// ListSegmentMembersWithResponse request
+	ListSegmentMembersWithResponse(ctx context.Context, id openapi_types.UUID, params *ListSegmentMembersParams, reqEditors ...RequestEditorFn) (*ListSegmentMembersResponse, error)
+
 	// ListTransactionsWithResponse request
 	ListTransactionsWithResponse(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*ListTransactionsResponse, error)
 
@@ -16726,6 +19901,9 @@ type ClientWithResponsesInterface interface {
 
 	// ListWorkflowExecutionLogsWithResponse request
 	ListWorkflowExecutionLogsWithResponse(ctx context.Context, id int, params *ListWorkflowExecutionLogsParams, reqEditors ...RequestEditorFn) (*ListWorkflowExecutionLogsResponse, error)
+
+	// ListWorkflowNodesWithResponse request
+	ListWorkflowNodesWithResponse(ctx context.Context, params *ListWorkflowNodesParams, reqEditors ...RequestEditorFn) (*ListWorkflowNodesResponse, error)
 
 	// ListWorkflowsWithResponse request
 	ListWorkflowsWithResponse(ctx context.Context, params *ListWorkflowsParams, reqEditors ...RequestEditorFn) (*ListWorkflowsResponse, error)
@@ -16798,6 +19976,7 @@ type ListAnswersResponse struct {
 		Pagination *Pagination `json:"pagination,omitempty"`
 	}
 	JSON403 *Forbidden
+	JSON422 *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -16858,6 +20037,7 @@ type ListAvailabilitiesResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *AvailabilityPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -16870,6 +20050,89 @@ func (r ListAvailabilitiesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListAvailabilitiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAvailabilityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+			Notes *struct {
+				// DepartureSpansDays Whole days this ONE departure runs, emitted only above 0. A
+				// multi-day departure is legitimate and is also what a caller
+				// writes when it meant a range, and nothing in the payload can
+				// tell the two apart — so it is stated rather than refused. The
+				// operator assistant renders this on the confirmation card.
+				DepartureSpansDays *int `json:"departure_spans_days,omitempty"`
+			} `json:"notes,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                   `json:"identifier,omitempty"`
+				PayloadSummary *string                                   `json:"payload_summary,omitempty"`
+				Type           *CreateAvailability200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON201 *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+			Notes *struct {
+				// DepartureSpansDays Whole days this ONE departure runs, emitted only above 0. A
+				// multi-day departure is legitimate and is also what a caller
+				// writes when it meant a range, and nothing in the payload can
+				// tell the two apart — so it is stated rather than refused. The
+				// operator assistant renders this on the confirmation card.
+				DepartureSpansDays *int `json:"departure_spans_days,omitempty"`
+			} `json:"notes,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                   `json:"identifier,omitempty"`
+				PayloadSummary *string                                   `json:"payload_summary,omitempty"`
+				Type           *CreateAvailability201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON422 *ErrorEnvelope
+}
+type CreateAvailability200DataSideEffectsType string
+type CreateAvailability201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateAvailabilityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAvailabilityResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -16945,6 +20208,18 @@ type BulkUpdateAvailabilitiesResponse struct {
 				} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
 
+			// Notes Dry-run only, and the OPPOSITE of
+			// `skip_reasons`: facts about rows that will
+			// change anyway. Always present, often empty.
+			// `has_live_bookings` counts matched
+			// departures that are sold, and is emitted
+			// only when closing (`setting=booking_status`,
+			// `is_bookable: false`) — opening a sold
+			// departure is unremarkable, and everywhere
+			// else the same question is already answered
+			// by a refusal in `skip_reasons`.
+			Notes *map[string]int `json:"notes,omitempty"`
+
 			// PreviewLimit `setting=pricing` dry-run only. How many slots `diff` spells out.
 			PreviewLimit *int `json:"preview_limit,omitempty"`
 
@@ -16957,7 +20232,10 @@ type BulkUpdateAvailabilitiesResponse struct {
 				PayloadSummary *string                                         `json:"payload_summary,omitempty"`
 				Type           *BulkUpdateAvailabilities200DataSideEffectsType `json:"type,omitempty"`
 			} `json:"side_effects,omitempty"`
-			Status *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
+
+			// SkipReasons Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`.
+			SkipReasons *map[string]int                        `json:"skip_reasons,omitempty"`
+			Status      *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
 
 			// TotalChanged `setting=pricing` dry-run only. Matched slots whose fares would actually move.
 			TotalChanged *int `json:"total_changed,omitempty"`
@@ -16965,6 +20243,12 @@ type BulkUpdateAvailabilitiesResponse struct {
 
 			// WouldApply True only when the request was a dry-run
 			WouldApply *bool `json:"would_apply,omitempty"`
+
+			// WouldSkip Dry-run only. Matched rows the setting will refuse.
+			WouldSkip *int `json:"would_skip,omitempty"`
+
+			// WouldUpdate Dry-run only. Matched rows that will actually change; `total_matched` minus everything the setting refuses.
+			WouldUpdate *int `json:"would_update,omitempty"`
 		} `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -17117,7 +20401,7 @@ type UpdateAvailabilityResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *ErrorEnvelope
 	JSON422 *ValidationError
 }
 
@@ -17158,11 +20442,21 @@ type CreateAvailabilityRuleResponse struct {
 				PayloadSummary *string                                       `json:"payload_summary,omitempty"`
 				Type           *CreateAvailabilityRule200DataSideEffectsType `json:"type,omitempty"`
 			} `json:"side_effects,omitempty"`
-			Status       *CreateAvailabilityRule200DataStatus `json:"status,omitempty"`
-			TotalMatched *int                                 `json:"total_matched,omitempty"`
+
+			// SkipReasons Why matched occurrences will not be written, by reason. Omitted entirely when nothing is skipped — never sent as an empty object.
+			SkipReasons *AvailabilityRuleSkipReasons `json:"skip_reasons,omitempty"`
+
+			// Status Present on a no-op; absent on a dry-run preview.
+			Status *CreateAvailabilityRule200DataStatus `json:"status,omitempty"`
+
+			// TotalMatched (date, time) pairs the rule matched. Non-zero on a no-op whose matches all already exist.
+			TotalMatched *int `json:"total_matched,omitempty"`
 
 			// WouldApply True only when the request was a dry-run
 			WouldApply *bool `json:"would_apply,omitempty"`
+
+			// WouldCreate Of those, how many would be materialized. Zero on a no-op.
+			WouldCreate *int `json:"would_create,omitempty"`
 		} `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -17185,13 +20479,19 @@ type CreateAvailabilityRuleResponse struct {
 				PayloadSummary *string                                       `json:"payload_summary,omitempty"`
 				Type           *CreateAvailabilityRule202DataSideEffectsType `json:"type,omitempty"`
 			} `json:"side_effects,omitempty"`
-			Status *CreateAvailabilityRule202DataStatus `json:"status,omitempty"`
 
-			// TotalMatched Number of (date, time) pairs that will be materialized.
+			// SkipReasons Why matched occurrences will not be written, by reason. Omitted entirely when nothing is skipped — never sent as an empty object.
+			SkipReasons *AvailabilityRuleSkipReasons         `json:"skip_reasons,omitempty"`
+			Status      *CreateAvailabilityRule202DataStatus `json:"status,omitempty"`
+
+			// TotalMatched (date, time) pairs the rule matched.
 			TotalMatched *int `json:"total_matched,omitempty"`
 
 			// WouldApply True only when the request was a dry-run
 			WouldApply *bool `json:"would_apply,omitempty"`
+
+			// WouldCreate Of those, how many will be materialized. Always > 0 here.
+			WouldCreate *int `json:"would_create,omitempty"`
 		} `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -17227,6 +20527,8 @@ type ListBookingsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *BookingPage
 	JSON401      *Unauthenticated
+	JSON403      *Forbidden
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -17301,8 +20603,8 @@ type CancelBookingResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
-	JSON422 *ValidationError
+	JSON409 *ErrorEnvelope
+	JSON422 *ErrorEnvelope
 }
 type CancelBooking200DataSideEffectsType string
 
@@ -17429,7 +20731,7 @@ type RefundBookingResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *ErrorEnvelope
 	JSON422 *ValidationError
 }
 type RefundBooking200DataSideEffectsType string
@@ -17590,6 +20892,7 @@ type ListBookingTransactionsResponse struct {
 	JSON200      *TransactionPage
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -17673,6 +20976,7 @@ type ListCustomersResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *CustomerPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -17729,6 +21033,7 @@ type ListDiscountsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *DiscountPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -17925,6 +21230,7 @@ type ListExtrasResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ExtraPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -18128,6 +21434,7 @@ type ListAvailableGiftCertsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *AvailableGiftCertPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -18209,7 +21516,7 @@ type DeleteAvailableGiftCertificateResponse struct {
 	HTTPResponse *http.Response
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
-	JSON409      *IdempotencyConflict
+	JSON409      *ErrorEnvelope
 }
 
 // Status returns HTTPResponse.Status
@@ -18301,6 +21608,7 @@ type ListIssuedGiftCertsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *GiftCertificatePage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -18448,7 +21756,7 @@ type VoidGiftCertResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *ErrorEnvelope
 }
 
 // Status returns HTTPResponse.Status
@@ -18558,6 +21866,7 @@ type ListLocationsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *LocationPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -18765,6 +22074,70 @@ func (r ShowMediaResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ShowMediaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListPartnersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PartnerPage
+	JSON401      *Unauthenticated
+	JSON403      *Forbidden
+	JSON422      *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPartnersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPartnersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ShowPartnerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Mirrors `PartnerResource::toArray()`. A selling partner (an agency
+		// that books on a traveller's behalf) or a channel partner. Read-only
+		// over the CLI: creating one sets a commission rate, and the web form
+		// carries plan-limit rules a CLI create would have to restate.
+		//
+		// A partner can be a booking's PROVIDER or its CUSTOMER; both report
+		// `origin.type = indirect_offline` on the booking, which carries a null
+		// `origin.channel_id` — so `GET /bookings?partner_id=` is the only way
+		// to go from a partner to their bookings.
+		Data       Partner     `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON403 *Forbidden
+	JSON404 *NotFound
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ShowPartnerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShowPartnerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -19110,6 +22483,7 @@ type ShowPricingTierResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
+	JSON422 *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -19194,6 +22568,7 @@ type ListProductOptionsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ProductOptionPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -19246,7 +22621,7 @@ type CreateProductOptionResponse struct {
 		Pagination *Pagination `json:"pagination,omitempty"`
 	}
 	JSON401 *Unauthenticated
-	JSON409 *IdempotencyConflict
+	JSON409 *IdempotencyConflictOrProductBeingDuplicated
 	JSON422 *ValidationError
 }
 type CreateProductOption201DataSideEffectsType string
@@ -19272,7 +22647,7 @@ type DeleteProductOptionResponse struct {
 	HTTPResponse *http.Response
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
-	JSON409      *IdempotencyConflict
+	JSON409      *IdempotencyConflictOrProductBeingDuplicated
 }
 
 // Status returns HTTPResponse.Status
@@ -19337,7 +22712,7 @@ type UpdateProductOptionResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *IdempotencyConflictOrProductBeingDuplicated
 	JSON422 *ValidationError
 }
 
@@ -19399,7 +22774,7 @@ type RestoreProductOptionResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *IdempotencyConflictOrProductBeingDuplicated
 }
 
 // Status returns HTTPResponse.Status
@@ -19446,6 +22821,7 @@ type ListProductsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ProductPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 	JSON429      *RateLimited
 }
 
@@ -19485,6 +22861,14 @@ type CreateProductResponse struct {
 			// list, splitting on newlines. `status` is derived from `is_active`
 			// (`is_active` is also surfaced directly for clients that prefer the
 			// canonical boolean).
+			//
+			// A value READ here can exceed the 65,535-byte cap the write schemas
+			// enforce. The cap arrived in 1.17.0 and rows written before it were not
+			// rewritten, and an image pasted into the dashboard editor lands as an
+			// inline base64 data URI. So a read-modify-write that echoes one of these
+			// fields back unchanged is a 422 naming that field, on a request that
+			// meant to change something else entirely. Shorten or clear the named
+			// field; retrying the same body cannot succeed.
 			Product *Product `json:"product,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -19528,7 +22912,7 @@ type DeleteProductResponse struct {
 	HTTPResponse *http.Response
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
-	JSON409      *IdempotencyConflict
+	JSON409      *IdempotencyConflictOrProductBeingDuplicated
 }
 
 // Status returns HTTPResponse.Status
@@ -19560,6 +22944,14 @@ type ShowProductResponse struct {
 		// list, splitting on newlines. `status` is derived from `is_active`
 		// (`is_active` is also surfaced directly for clients that prefer the
 		// canonical boolean).
+		//
+		// A value READ here can exceed the 65,535-byte cap the write schemas
+		// enforce. The cap arrived in 1.17.0 and rows written before it were not
+		// rewritten, and an image pasted into the dashboard editor lands as an
+		// inline base64 data URI. So a read-modify-write that echoes one of these
+		// fields back unchanged is a 422 naming that field, on a request that
+		// meant to change something else entirely. Shorten or clear the named
+		// field; retrying the same body cannot succeed.
 		Data       Product     `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -19627,14 +23019,8 @@ type UpdateProductResponse struct {
 	JSON401 *Unauthenticated
 	JSON403 *Forbidden
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
-	JSON422 *struct {
-		// Data Per-endpoint payload (overridden via allOf in concrete responses)
-		Data       interface{} `json:"data"`
-		Error      *Error      `json:"error,omitempty"`
-		Meta       Meta        `json:"meta"`
-		Pagination *Pagination `json:"pagination,omitempty"`
-	}
+	JSON409 *IdempotencyConflictOrProductBeingDuplicated
+	JSON422 *ErrorEnvelope
 }
 type UpdateProduct200DataSideEffectsType string
 
@@ -19654,12 +23040,51 @@ func (r UpdateProductResponse) StatusCode() int {
 	return 0
 }
 
+type DuplicateProductResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON202 *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON403 *Forbidden
+	JSON404 *NotFound
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r DuplicateProductResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DuplicateProductResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListProductMediaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *MediaPage
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -19738,7 +23163,7 @@ type RestoreProductResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *IdempotencyConflictOrProductBeingDuplicated
 }
 
 // Status returns HTTPResponse.Status
@@ -19960,11 +23385,37 @@ func (r RestoreQuestionResponse) StatusCode() int {
 	return 0
 }
 
+type ListResourceCalendarResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ResourceCalendarPage
+	JSON401      *Unauthenticated
+	JSON403      *Forbidden
+	JSON422      *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListResourceCalendarResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListResourceCalendarResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListResourcesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *ResourcePage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -20152,11 +23603,149 @@ func (r RestoreResourceResponse) StatusCode() int {
 	return 0
 }
 
+type ListSegmentFieldsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			Attribute *string   `json:"attribute,omitempty"`
+			Label     *string   `json:"label,omitempty"`
+			Operators *[]string `json:"operators,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSegmentFieldsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSegmentFieldsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListSegmentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SegmentPage
+	JSON401      *Unauthenticated
+	JSON404      *NotFound
+	JSON422      *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSegmentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSegmentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateSegmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SegmentMutationResult
+	JSON201      *SegmentMutationResult
+	JSON401      *Unauthenticated
+	JSON403      *Forbidden
+	JSON404      *NotFound
+	JSON422      *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSegmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSegmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ShowSegmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data *Segment `json:"data,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ShowSegmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShowSegmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListSegmentMembersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CustomerPage
+	JSON401      *Unauthenticated
+	JSON403      *Forbidden
+	JSON404      *NotFound
+	JSON422      *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSegmentMembersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSegmentMembersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListTransactionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *TransactionPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -20235,6 +23824,7 @@ type ListWorkflowExecutionsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *WorkflowExecutionPage
 	JSON401      *Unauthenticated
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -20296,6 +23886,7 @@ type ListWorkflowExecutionLogsResponse struct {
 	JSON200      *WorkflowExecutionLogPage
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -20314,12 +23905,46 @@ func (r ListWorkflowExecutionLogsResponse) StatusCode() int {
 	return 0
 }
 
+type ListWorkflowNodesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			Actions  *[]WorkflowNode `json:"actions,omitempty"`
+			Logic    *[]WorkflowNode `json:"logic,omitempty"`
+			Triggers *[]WorkflowNode `json:"triggers,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON404 *NotFound
+	JSON422 *ValidationError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkflowNodesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkflowNodesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkflowsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *WorkflowPage
 	JSON401      *Unauthenticated
 	JSON404      *NotFound
+	JSON422      *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -20399,7 +24024,7 @@ type DestroyWorkflowResponse struct {
 	}
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
-	JSON409 *IdempotencyConflict
+	JSON409 *ErrorEnvelope
 }
 
 // Status returns HTTPResponse.Status
@@ -20815,6 +24440,23 @@ func (c *ClientWithResponses) ListAvailabilitiesWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseListAvailabilitiesResponse(rsp)
+}
+
+// CreateAvailabilityWithBodyWithResponse request with arbitrary body returning *CreateAvailabilityResponse
+func (c *ClientWithResponses) CreateAvailabilityWithBodyWithResponse(ctx context.Context, params *CreateAvailabilityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAvailabilityResponse, error) {
+	rsp, err := c.CreateAvailabilityWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAvailabilityResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAvailabilityWithResponse(ctx context.Context, params *CreateAvailabilityParams, body CreateAvailabilityJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAvailabilityResponse, error) {
+	rsp, err := c.CreateAvailability(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAvailabilityResponse(rsp)
 }
 
 // BulkDeleteAvailabilitiesWithBodyWithResponse request with arbitrary body returning *BulkDeleteAvailabilitiesResponse
@@ -21478,6 +25120,24 @@ func (c *ClientWithResponses) ShowMediaWithResponse(ctx context.Context, id IdPa
 	return ParseShowMediaResponse(rsp)
 }
 
+// ListPartnersWithResponse request returning *ListPartnersResponse
+func (c *ClientWithResponses) ListPartnersWithResponse(ctx context.Context, params *ListPartnersParams, reqEditors ...RequestEditorFn) (*ListPartnersResponse, error) {
+	rsp, err := c.ListPartners(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPartnersResponse(rsp)
+}
+
+// ShowPartnerWithResponse request returning *ShowPartnerResponse
+func (c *ClientWithResponses) ShowPartnerWithResponse(ctx context.Context, id IdPath, params *ShowPartnerParams, reqEditors ...RequestEditorFn) (*ShowPartnerResponse, error) {
+	rsp, err := c.ShowPartner(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShowPartnerResponse(rsp)
+}
+
 // ListPricingCategoriesWithResponse request returning *ListPricingCategoriesResponse
 func (c *ClientWithResponses) ListPricingCategoriesWithResponse(ctx context.Context, params *ListPricingCategoriesParams, reqEditors ...RequestEditorFn) (*ListPricingCategoriesResponse, error) {
 	rsp, err := c.ListPricingCategories(ctx, params, reqEditors...)
@@ -21791,6 +25451,23 @@ func (c *ClientWithResponses) UpdateProductWithResponse(ctx context.Context, id 
 	return ParseUpdateProductResponse(rsp)
 }
 
+// DuplicateProductWithBodyWithResponse request with arbitrary body returning *DuplicateProductResponse
+func (c *ClientWithResponses) DuplicateProductWithBodyWithResponse(ctx context.Context, id IdPath, params *DuplicateProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateProductResponse, error) {
+	rsp, err := c.DuplicateProductWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateProductResponse(rsp)
+}
+
+func (c *ClientWithResponses) DuplicateProductWithResponse(ctx context.Context, id IdPath, params *DuplicateProductParams, body DuplicateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateProductResponse, error) {
+	rsp, err := c.DuplicateProduct(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateProductResponse(rsp)
+}
+
 // ListProductMediaWithResponse request returning *ListProductMediaResponse
 func (c *ClientWithResponses) ListProductMediaWithResponse(ctx context.Context, id IdPath, params *ListProductMediaParams, reqEditors ...RequestEditorFn) (*ListProductMediaResponse, error) {
 	rsp, err := c.ListProductMedia(ctx, id, params, reqEditors...)
@@ -21904,6 +25581,15 @@ func (c *ClientWithResponses) RestoreQuestionWithResponse(ctx context.Context, i
 	return ParseRestoreQuestionResponse(rsp)
 }
 
+// ListResourceCalendarWithResponse request returning *ListResourceCalendarResponse
+func (c *ClientWithResponses) ListResourceCalendarWithResponse(ctx context.Context, params *ListResourceCalendarParams, reqEditors ...RequestEditorFn) (*ListResourceCalendarResponse, error) {
+	rsp, err := c.ListResourceCalendar(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListResourceCalendarResponse(rsp)
+}
+
 // ListResourcesWithResponse request returning *ListResourcesResponse
 func (c *ClientWithResponses) ListResourcesWithResponse(ctx context.Context, params *ListResourcesParams, reqEditors ...RequestEditorFn) (*ListResourcesResponse, error) {
 	rsp, err := c.ListResources(ctx, params, reqEditors...)
@@ -21974,6 +25660,59 @@ func (c *ClientWithResponses) RestoreResourceWithResponse(ctx context.Context, i
 	return ParseRestoreResourceResponse(rsp)
 }
 
+// ListSegmentFieldsWithResponse request returning *ListSegmentFieldsResponse
+func (c *ClientWithResponses) ListSegmentFieldsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSegmentFieldsResponse, error) {
+	rsp, err := c.ListSegmentFields(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSegmentFieldsResponse(rsp)
+}
+
+// ListSegmentsWithResponse request returning *ListSegmentsResponse
+func (c *ClientWithResponses) ListSegmentsWithResponse(ctx context.Context, params *ListSegmentsParams, reqEditors ...RequestEditorFn) (*ListSegmentsResponse, error) {
+	rsp, err := c.ListSegments(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSegmentsResponse(rsp)
+}
+
+// CreateSegmentWithBodyWithResponse request with arbitrary body returning *CreateSegmentResponse
+func (c *ClientWithResponses) CreateSegmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error) {
+	rsp, err := c.CreateSegmentWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSegmentResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateSegmentWithResponse(ctx context.Context, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error) {
+	rsp, err := c.CreateSegment(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSegmentResponse(rsp)
+}
+
+// ShowSegmentWithResponse request returning *ShowSegmentResponse
+func (c *ClientWithResponses) ShowSegmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*ShowSegmentResponse, error) {
+	rsp, err := c.ShowSegment(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShowSegmentResponse(rsp)
+}
+
+// ListSegmentMembersWithResponse request returning *ListSegmentMembersResponse
+func (c *ClientWithResponses) ListSegmentMembersWithResponse(ctx context.Context, id openapi_types.UUID, params *ListSegmentMembersParams, reqEditors ...RequestEditorFn) (*ListSegmentMembersResponse, error) {
+	rsp, err := c.ListSegmentMembers(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSegmentMembersResponse(rsp)
+}
+
 // ListTransactionsWithResponse request returning *ListTransactionsResponse
 func (c *ClientWithResponses) ListTransactionsWithResponse(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*ListTransactionsResponse, error) {
 	rsp, err := c.ListTransactions(ctx, params, reqEditors...)
@@ -22026,6 +25765,15 @@ func (c *ClientWithResponses) ListWorkflowExecutionLogsWithResponse(ctx context.
 		return nil, err
 	}
 	return ParseListWorkflowExecutionLogsResponse(rsp)
+}
+
+// ListWorkflowNodesWithResponse request returning *ListWorkflowNodesResponse
+func (c *ClientWithResponses) ListWorkflowNodesWithResponse(ctx context.Context, params *ListWorkflowNodesParams, reqEditors ...RequestEditorFn) (*ListWorkflowNodesResponse, error) {
+	rsp, err := c.ListWorkflowNodes(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkflowNodesResponse(rsp)
 }
 
 // ListWorkflowsWithResponse request returning *ListWorkflowsResponse
@@ -22265,6 +26013,13 @@ func ParseListAnswersResponse(rsp *http.Response) (*ListAnswersResponse, error) 
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -22350,6 +26105,116 @@ func ParseListAvailabilitiesResponse(rsp *http.Response) (*ListAvailabilitiesRes
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAvailabilityResponse parses an HTTP response from a CreateAvailabilityWithResponse call
+func ParseCreateAvailabilityResponse(rsp *http.Response) (*CreateAvailabilityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAvailabilityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+				Notes *struct {
+					// DepartureSpansDays Whole days this ONE departure runs, emitted only above 0. A
+					// multi-day departure is legitimate and is also what a caller
+					// writes when it meant a range, and nothing in the payload can
+					// tell the two apart — so it is stated rather than refused. The
+					// operator assistant renders this on the confirmation card.
+					DepartureSpansDays *int `json:"departure_spans_days,omitempty"`
+				} `json:"notes,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                   `json:"identifier,omitempty"`
+					PayloadSummary *string                                   `json:"payload_summary,omitempty"`
+					Type           *CreateAvailability200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+				Notes *struct {
+					// DepartureSpansDays Whole days this ONE departure runs, emitted only above 0. A
+					// multi-day departure is legitimate and is also what a caller
+					// writes when it meant a range, and nothing in the payload can
+					// tell the two apart — so it is stated rather than refused. The
+					// operator assistant renders this on the confirmation card.
+					DepartureSpansDays *int `json:"departure_spans_days,omitempty"`
+				} `json:"notes,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                   `json:"identifier,omitempty"`
+					PayloadSummary *string                                   `json:"payload_summary,omitempty"`
+					Type           *CreateAvailability201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -22457,6 +26322,18 @@ func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvail
 					} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
 
+				// Notes Dry-run only, and the OPPOSITE of
+				// `skip_reasons`: facts about rows that will
+				// change anyway. Always present, often empty.
+				// `has_live_bookings` counts matched
+				// departures that are sold, and is emitted
+				// only when closing (`setting=booking_status`,
+				// `is_bookable: false`) — opening a sold
+				// departure is unremarkable, and everywhere
+				// else the same question is already answered
+				// by a refusal in `skip_reasons`.
+				Notes *map[string]int `json:"notes,omitempty"`
+
 				// PreviewLimit `setting=pricing` dry-run only. How many slots `diff` spells out.
 				PreviewLimit *int `json:"preview_limit,omitempty"`
 
@@ -22469,7 +26346,10 @@ func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvail
 					PayloadSummary *string                                         `json:"payload_summary,omitempty"`
 					Type           *BulkUpdateAvailabilities200DataSideEffectsType `json:"type,omitempty"`
 				} `json:"side_effects,omitempty"`
-				Status *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
+
+				// SkipReasons Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`.
+				SkipReasons *map[string]int                        `json:"skip_reasons,omitempty"`
+				Status      *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
 
 				// TotalChanged `setting=pricing` dry-run only. Matched slots whose fares would actually move.
 				TotalChanged *int `json:"total_changed,omitempty"`
@@ -22477,6 +26357,12 @@ func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvail
 
 				// WouldApply True only when the request was a dry-run
 				WouldApply *bool `json:"would_apply,omitempty"`
+
+				// WouldSkip Dry-run only. Matched rows the setting will refuse.
+				WouldSkip *int `json:"would_skip,omitempty"`
+
+				// WouldUpdate Dry-run only. Matched rows that will actually change; `total_matched` minus everything the setting refuses.
+				WouldUpdate *int `json:"would_update,omitempty"`
 			} `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -22709,7 +26595,7 @@ func ParseUpdateAvailabilityResponse(rsp *http.Response) (*UpdateAvailabilityRes
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -22760,11 +26646,21 @@ func ParseCreateAvailabilityRuleResponse(rsp *http.Response) (*CreateAvailabilit
 					PayloadSummary *string                                       `json:"payload_summary,omitempty"`
 					Type           *CreateAvailabilityRule200DataSideEffectsType `json:"type,omitempty"`
 				} `json:"side_effects,omitempty"`
-				Status       *CreateAvailabilityRule200DataStatus `json:"status,omitempty"`
-				TotalMatched *int                                 `json:"total_matched,omitempty"`
+
+				// SkipReasons Why matched occurrences will not be written, by reason. Omitted entirely when nothing is skipped — never sent as an empty object.
+				SkipReasons *AvailabilityRuleSkipReasons `json:"skip_reasons,omitempty"`
+
+				// Status Present on a no-op; absent on a dry-run preview.
+				Status *CreateAvailabilityRule200DataStatus `json:"status,omitempty"`
+
+				// TotalMatched (date, time) pairs the rule matched. Non-zero on a no-op whose matches all already exist.
+				TotalMatched *int `json:"total_matched,omitempty"`
 
 				// WouldApply True only when the request was a dry-run
 				WouldApply *bool `json:"would_apply,omitempty"`
+
+				// WouldCreate Of those, how many would be materialized. Zero on a no-op.
+				WouldCreate *int `json:"would_create,omitempty"`
 			} `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -22793,13 +26689,19 @@ func ParseCreateAvailabilityRuleResponse(rsp *http.Response) (*CreateAvailabilit
 					PayloadSummary *string                                       `json:"payload_summary,omitempty"`
 					Type           *CreateAvailabilityRule202DataSideEffectsType `json:"type,omitempty"`
 				} `json:"side_effects,omitempty"`
-				Status *CreateAvailabilityRule202DataStatus `json:"status,omitempty"`
 
-				// TotalMatched Number of (date, time) pairs that will be materialized.
+				// SkipReasons Why matched occurrences will not be written, by reason. Omitted entirely when nothing is skipped — never sent as an empty object.
+				SkipReasons *AvailabilityRuleSkipReasons         `json:"skip_reasons,omitempty"`
+				Status      *CreateAvailabilityRule202DataStatus `json:"status,omitempty"`
+
+				// TotalMatched (date, time) pairs the rule matched.
 				TotalMatched *int `json:"total_matched,omitempty"`
 
 				// WouldApply True only when the request was a dry-run
 				WouldApply *bool `json:"would_apply,omitempty"`
+
+				// WouldCreate Of those, how many will be materialized. Always > 0 here.
+				WouldCreate *int `json:"would_create,omitempty"`
 			} `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -22869,6 +26771,20 @@ func ParseListBookingsResponse(rsp *http.Response) (*ListBookingsResponse, error
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -22977,14 +26893,14 @@ func ParseCancelBookingResponse(rsp *http.Response) (*CancelBookingResponse, err
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest ValidationError
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -23175,7 +27091,7 @@ func ParseRefundBookingResponse(rsp *http.Response) (*RefundBookingResponse, err
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -23437,6 +27353,13 @@ func ParseListBookingTransactionsResponse(rsp *http.Response) (*ListBookingTrans
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -23562,6 +27485,13 @@ func ParseListCustomersResponse(rsp *http.Response) (*ListCustomersResponse, err
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -23643,6 +27573,13 @@ func ParseListDiscountsResponse(rsp *http.Response) (*ListDiscountsResponse, err
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -23952,6 +27889,13 @@ func ParseListExtrasResponse(rsp *http.Response) (*ListExtrasResponse, error) {
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -24263,6 +28207,13 @@ func ParseListAvailableGiftCertsResponse(rsp *http.Response) (*ListAvailableGift
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -24376,7 +28327,7 @@ func ParseDeleteAvailableGiftCertificateResponse(rsp *http.Response) (*DeleteAva
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -24520,6 +28471,13 @@ func ParseListIssuedGiftCertsResponse(rsp *http.Response) (*ListIssuedGiftCertsR
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -24744,7 +28702,7 @@ func ParseVoidGiftCertResponse(rsp *http.Response) (*VoidGiftCertResponse, error
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -24928,6 +28886,13 @@ func ParseListLocationsResponse(rsp *http.Response) (*ListLocationsResponse, err
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -25224,6 +29189,120 @@ func ParseShowMediaResponse(rsp *http.Response) (*ShowMediaResponse, error) {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPartnersResponse parses an HTTP response from a ListPartnersWithResponse call
+func ParseListPartnersResponse(rsp *http.Response) (*ListPartnersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPartnersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PartnerPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShowPartnerResponse parses an HTTP response from a ShowPartnerWithResponse call
+func ParseShowPartnerResponse(rsp *http.Response) (*ShowPartnerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShowPartnerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Mirrors `PartnerResource::toArray()`. A selling partner (an agency
+			// that books on a traveller's behalf) or a channel partner. Read-only
+			// over the CLI: creating one sets a commission rate, and the web form
+			// carries plan-limit rules a CLI create would have to restate.
+			//
+			// A partner can be a booking's PROVIDER or its CUSTOMER; both report
+			// `origin.type = indirect_offline` on the booking, which carries a null
+			// `origin.channel_id` — so `GET /bookings?partner_id=` is the only way
+			// to go from a partner to their bookings.
+			Data       Partner     `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -25770,6 +29849,13 @@ func ParseShowPricingTierResponse(rsp *http.Response) (*ShowPricingTierResponse,
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -25914,6 +30000,13 @@ func ParseListProductOptionsResponse(rsp *http.Response) (*ListProductOptionsRes
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -25977,7 +30070,7 @@ func ParseCreateProductOptionResponse(rsp *http.Response) (*CreateProductOptionR
 		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest IdempotencyConflictOrProductBeingDuplicated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -26024,7 +30117,7 @@ func ParseDeleteProductOptionResponse(rsp *http.Response) (*DeleteProductOptionR
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest IdempotencyConflictOrProductBeingDuplicated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -26127,7 +30220,7 @@ func ParseUpdateProductOptionResponse(rsp *http.Response) (*UpdateProductOptionR
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest IdempotencyConflictOrProductBeingDuplicated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -26245,7 +30338,7 @@ func ParseRestoreProductOptionResponse(rsp *http.Response) (*RestoreProductOptio
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest IdempotencyConflictOrProductBeingDuplicated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -26317,6 +30410,13 @@ func ParseListProductsResponse(rsp *http.Response) (*ListProductsResponse, error
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest RateLimited
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -26361,6 +30461,14 @@ func ParseCreateProductResponse(rsp *http.Response) (*CreateProductResponse, err
 				// list, splitting on newlines. `status` is derived from `is_active`
 				// (`is_active` is also surfaced directly for clients that prefer the
 				// canonical boolean).
+				//
+				// A value READ here can exceed the 65,535-byte cap the write schemas
+				// enforce. The cap arrived in 1.17.0 and rows written before it were not
+				// rewritten, and an image pasted into the dashboard editor lands as an
+				// inline base64 data URI. So a read-modify-write that echoes one of these
+				// fields back unchanged is a 422 naming that field, on a request that
+				// meant to change something else entirely. Shorten or clear the named
+				// field; retrying the same body cannot succeed.
 				Product *Product `json:"product,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -26443,7 +30551,7 @@ func ParseDeleteProductResponse(rsp *http.Response) (*DeleteProductResponse, err
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest IdempotencyConflictOrProductBeingDuplicated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -26479,6 +30587,14 @@ func ParseShowProductResponse(rsp *http.Response) (*ShowProductResponse, error) 
 			// list, splitting on newlines. `status` is derived from `is_active`
 			// (`is_active` is also surfaced directly for clients that prefer the
 			// canonical boolean).
+			//
+			// A value READ here can exceed the 65,535-byte cap the write schemas
+			// enforce. The cap arrived in 1.17.0 and rows written before it were not
+			// rewritten, and an image pasted into the dashboard editor lands as an
+			// inline base64 data URI. So a read-modify-write that echoes one of these
+			// fields back unchanged is a 422 naming that field, on a request that
+			// meant to change something else entirely. Shorten or clear the named
+			// field; retrying the same body cannot succeed.
 			Data       Product     `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -26586,6 +30702,84 @@ func ParseUpdateProductResponse(rsp *http.Response) (*UpdateProductResponse, err
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflictOrProductBeingDuplicated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDuplicateProductResponse parses an HTTP response from a DuplicateProductWithResponse call
+func ParseDuplicateProductResponse(rsp *http.Response) (*DuplicateProductResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DuplicateProductResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest IdempotencyConflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -26593,13 +30787,7 @@ func ParseUpdateProductResponse(rsp *http.Response) (*UpdateProductResponse, err
 		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest struct {
-			// Data Per-endpoint payload (overridden via allOf in concrete responses)
-			Data       interface{} `json:"data"`
-			Error      *Error      `json:"error,omitempty"`
-			Meta       Meta        `json:"meta"`
-			Pagination *Pagination `json:"pagination,omitempty"`
-		}
+		var dest ValidationError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -26644,6 +30832,13 @@ func ParseListProductMediaResponse(rsp *http.Response) (*ListProductMediaRespons
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -26773,7 +30968,7 @@ func ParseRestoreProductResponse(rsp *http.Response) (*RestoreProductResponse, e
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest IdempotencyConflictOrProductBeingDuplicated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -27094,6 +31289,53 @@ func ParseRestoreQuestionResponse(rsp *http.Response) (*RestoreQuestionResponse,
 	return response, nil
 }
 
+// ParseListResourceCalendarResponse parses an HTTP response from a ListResourceCalendarWithResponse call
+func ParseListResourceCalendarResponse(rsp *http.Response) (*ListResourceCalendarResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListResourceCalendarResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ResourceCalendarPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListResourcesResponse parses an HTTP response from a ListResourcesWithResponse call
 func ParseListResourcesResponse(rsp *http.Response) (*ListResourcesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27121,6 +31363,13 @@ func ParseListResourcesResponse(rsp *http.Response) (*ListResourcesResponse, err
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27387,6 +31636,265 @@ func ParseRestoreResourceResponse(rsp *http.Response) (*RestoreResourceResponse,
 	return response, nil
 }
 
+// ParseListSegmentFieldsResponse parses an HTTP response from a ListSegmentFieldsWithResponse call
+func ParseListSegmentFieldsResponse(rsp *http.Response) (*ListSegmentFieldsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSegmentFieldsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				Attribute *string   `json:"attribute,omitempty"`
+				Label     *string   `json:"label,omitempty"`
+				Operators *[]string `json:"operators,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSegmentsResponse parses an HTTP response from a ListSegmentsWithResponse call
+func ParseListSegmentsResponse(rsp *http.Response) (*ListSegmentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSegmentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SegmentPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSegmentResponse parses an HTTP response from a CreateSegmentWithResponse call
+func ParseCreateSegmentResponse(rsp *http.Response) (*CreateSegmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSegmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SegmentMutationResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SegmentMutationResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShowSegmentResponse parses an HTTP response from a ShowSegmentWithResponse call
+func ParseShowSegmentResponse(rsp *http.Response) (*ShowSegmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShowSegmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data *Segment `json:"data,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSegmentMembersResponse parses an HTTP response from a ListSegmentMembersWithResponse call
+func ParseListSegmentMembersResponse(rsp *http.Response) (*ListSegmentMembersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSegmentMembersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CustomerPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListTransactionsResponse parses an HTTP response from a ListTransactionsWithResponse call
 func ParseListTransactionsResponse(rsp *http.Response) (*ListTransactionsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27414,6 +31922,13 @@ func ParseListTransactionsResponse(rsp *http.Response) (*ListTransactionsRespons
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27529,6 +32044,13 @@ func ParseListWorkflowExecutionsResponse(rsp *http.Response) (*ListWorkflowExecu
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -27622,6 +32144,68 @@ func ParseListWorkflowExecutionLogsResponse(rsp *http.Response) (*ListWorkflowEx
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkflowNodesResponse parses an HTTP response from a ListWorkflowNodesWithResponse call
+func ParseListWorkflowNodesResponse(rsp *http.Response) (*ListWorkflowNodesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkflowNodesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				Actions  *[]WorkflowNode `json:"actions,omitempty"`
+				Logic    *[]WorkflowNode `json:"logic,omitempty"`
+				Triggers *[]WorkflowNode `json:"triggers,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -27661,6 +32245,13 @@ func ParseListWorkflowsResponse(rsp *http.Response) (*ListWorkflowsResponse, err
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27785,7 +32376,7 @@ func ParseDestroyWorkflowResponse(rsp *http.Response) (*DestroyWorkflowResponse,
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest IdempotencyConflict
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
