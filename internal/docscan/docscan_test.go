@@ -26,23 +26,32 @@ func TestCutAtShellOperator_IsQuoteAware(t *testing.T) {
 	}
 }
 
-// TestSameSet covers the order- and duplicate-insensitive comparison the two
-// spec-drift suites share.
-func TestSameSet(t *testing.T) {
+// TestSameValues pins the comparison the two spec-drift suites share — including
+// its DUPLICATE sensitivity, which an earlier extraction of this helper silently
+// removed by reaching for a map.
+//
+// Both callers compare a spec enum against a CLI enum. A value repeated on one side
+// and not the other is itself drift, so a set comparison that ignores it makes the
+// guard strictly more permissive and stops reporting a real mismatch.
+func TestSameValues(t *testing.T) {
 	cases := []struct {
+		name string
 		a, b []string
 		want bool
 	}{
-		{[]string{"a", "b"}, []string{"b", "a"}, true},
-		{[]string{"a", "a", "b"}, []string{"b", "a"}, true},
-		{[]string{"a"}, []string{"a", "b"}, false},
-		{[]string{"a", "b"}, []string{"a", "c"}, false},
-		{nil, nil, true},
-		{[]string{"a"}, nil, false},
+		{"same values, different order", []string{"a", "b"}, []string{"b", "a"}, true},
+		{"a duplicate on one side only is DRIFT", []string{"a", "a", "b"}, []string{"b", "a"}, false},
+		{"equal duplicates match", []string{"a", "a", "b"}, []string{"a", "b", "a"}, true},
+		{"missing value", []string{"a"}, []string{"a", "b"}, false},
+		{"different value", []string{"a", "b"}, []string{"a", "c"}, false},
+		{"both empty", nil, nil, true},
+		{"one empty", []string{"a"}, nil, false},
 	}
 	for _, tc := range cases {
-		if got := SameSet(tc.a, tc.b); got != tc.want {
-			t.Errorf("SameSet(%v, %v) = %v, want %v", tc.a, tc.b, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if got := SameValues(tc.a, tc.b); got != tc.want {
+				t.Errorf("SameValues(%v, %v) = %v, want %v", tc.a, tc.b, got, tc.want)
+			}
+		})
 	}
 }

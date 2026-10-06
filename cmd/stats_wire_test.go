@@ -451,3 +451,49 @@ func TestStatsWire_OmittedPeriodIsLeftToTheServer(t *testing.T) {
 		}
 	})
 }
+
+// TestStatsWire_SingleMalformedBoundIsRefused closes the gap that leaving omitted
+// bounds absent opened.
+//
+// validateDateRange needs both bounds, so once an omitted bound stopped being
+// filled in, a lone malformed date stopped being checked at all — `--from
+// 2026-13-45` became a round trip to learn what the CLI already knew. Format is now
+// checked per bound, independently of ordering and the 365-day ceiling.
+//
+// Value: protects=a malformed date is refused locally even when its partner bound is omitted; fails_when=per-bound format validation is folded back inside the both-present guard; why_new=before omitted bounds were left absent, both were always populated so always validated — the gap is new; seam=testNewRunner
+func TestStatsWire_SingleMalformedBoundIsRefused(t *testing.T) {
+	for _, tc := range []struct{ name, flag, value string }{
+		{"impossible month and day", "--from", "2026-13-45"},
+		{"not a date at all", "--from", "yesterday"},
+		{"wrong separator", "--to", "2026/03/01"},
+		{"lone malformed to", "--to", "2026-02-30"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := runStats(t, "stats", "revenue", tc.flag, tc.value)
+			if err == nil {
+				t.Fatalf("%s %s was accepted with no partner bound", tc.flag, tc.value)
+			}
+			if !strings.Contains(err.Error(), strings.TrimPrefix(tc.flag, "--")) {
+				t.Errorf("error = %v, want it to name %s", err, tc.flag)
+			}
+			if len(got) > 0 {
+				t.Errorf("the malformed date still reached the wire: %v", got)
+			}
+		})
+	}
+
+	// A single WELL-FORMED bound must still be accepted and sent alone, or this
+	// guard would have undone the fix it accompanies.
+	t.Run("a lone valid bound is still sent", func(t *testing.T) {
+		got, err := runStats(t, "stats", "revenue", "--from", "2026-03-01")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Get("from") != "2026-03-01" {
+			t.Errorf("from = %q, want 2026-03-01", got.Get("from"))
+		}
+		if got.Has("to") {
+			t.Errorf("to was invented: %v", got)
+		}
+	})
+}

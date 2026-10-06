@@ -13,7 +13,10 @@
 // not public API.
 package docscan
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // ShellOperators end an invocation when they appear outside quotes.
 //
@@ -67,22 +70,26 @@ func CutAtShellOperator(s string) string {
 	return s
 }
 
-// SameSet reports whether a and b contain the same elements, ignoring order and
-// duplicates.
-func SameSet(a, b []string) bool {
-	seen := make(map[string]struct{}, len(a))
-	for _, x := range a {
-		seen[x] = struct{}{}
-	}
-	other := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		other[x] = struct{}{}
-	}
-	if len(seen) != len(other) {
+// SameValues reports whether a and b hold the same values in any order, counting
+// DUPLICATES: ["a","a","b"] and ["a","b"] are different.
+//
+// Duplicate sensitivity is deliberate and was nearly lost. Both callers compare a
+// spec enum against a CLI enum, where a repeated value on one side and not the
+// other is itself a defect — exactly the drift these tests exist to report. A
+// map-based set comparison (which an earlier extraction of this helper used) makes
+// the check strictly more permissive and silently stops failing on it.
+//
+// Named SameValues rather than SameSet because "set" is what invited that mistake.
+func SameValues(a, b []string) bool {
+	if len(a) != len(b) {
 		return false
 	}
-	for x := range seen {
-		if _, ok := other[x]; !ok {
+	as := append([]string(nil), a...)
+	bs := append([]string(nil), b...)
+	sort.Strings(as)
+	sort.Strings(bs)
+	for i := range as {
+		if as[i] != bs[i] {
 			return false
 		}
 	}

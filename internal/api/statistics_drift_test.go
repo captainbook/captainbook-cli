@@ -286,7 +286,7 @@ func TestStatisticsDrift_EveryFlagExistsInSpec(t *testing.T) {
 				t.Errorf("filter %q is declared %q but the spec types it %q (want %q) on stats %s",
 					f, def.Type, sp.Type, want, ep.Name)
 			}
-			if len(sp.Enum) > 0 && !docscan.SameSet(def.Enum, sp.Enum) {
+			if len(sp.Enum) > 0 && !docscan.SameValues(def.Enum, sp.Enum) {
 				t.Errorf("filter %q enum %v does not match the spec's %v on stats %s",
 					f, def.Enum, sp.Enum, ep.Name)
 			}
@@ -305,7 +305,7 @@ func TestStatisticsDrift_EveryFlagExistsInSpec(t *testing.T) {
 				t.Errorf("stats %s --%s is declared %q but the spec types it %q (want %q)",
 					ep.Name, f.Name, f.Type, sp.Type, want)
 			}
-			if len(sp.Enum) > 0 && !docscan.SameSet(f.Enum, sp.Enum) {
+			if len(sp.Enum) > 0 && !docscan.SameValues(f.Enum, sp.Enum) {
 				t.Errorf("stats %s --%s enum %v does not match the spec's %v",
 					ep.Name, f.Name, f.Enum, sp.Enum)
 			}

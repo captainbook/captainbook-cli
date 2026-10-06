@@ -134,8 +134,22 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 			return &api.ExitError{Err: err, Code: api.ExitValidation}
 		}
 
-		// Validate the range only when BOTH bounds were given: there is nothing to
-		// compare a single bound against, and the server owns the other end.
+		// FORMAT is checked per bound, whatever else is present. Leaving omitted
+		// bounds absent meant the range check below no longer runs when only one
+		// was given — and with it went the only local check on that one bound, so
+		// `--from 2026-13-45` became a round trip to learn what the CLI already
+		// knew.
+		for _, b := range []struct{ flag, value string }{{"from", from}, {"to", to}} {
+			if b.value == "" {
+				continue
+			}
+			if err := validateDateFormat(b.flag, b.value); err != nil {
+				return &api.ExitError{Err: err, Code: api.ExitValidation}
+			}
+		}
+
+		// Ordering and the 365-day ceiling need BOTH bounds: there is nothing to
+		// compare one against, and the server owns the other end.
 		if from != "" && to != "" {
 			if err := validateDateRange(from, to); err != nil {
 				return &api.ExitError{Err: err, Code: api.ExitValidation}
@@ -306,6 +320,15 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 
 		return nil
 	}
+}
+
+// validateDateFormat checks one bound in isolation, so a malformed date is caught
+// whether or not its partner was supplied.
+func validateDateFormat(flag, value string) error {
+	if _, err := time.Parse("2006-01-02", value); err != nil {
+		return fmt.Errorf("invalid --%s date %q: %w", flag, value, err)
+	}
+	return nil
 }
 
 func validateDateRange(from, to string) error {
