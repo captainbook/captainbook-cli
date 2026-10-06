@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -42,11 +43,25 @@ func makeEndpointCmd(ep *api.Endpoint) *cobra.Command {
 	cmd.Flags().String("to", "", "Period end date (YYYY-MM-DD, default: today)")
 	cmd.Flags().String("granularity", "day", "Time series bucket: day|week|month|quarter|year")
 
-	if !ep.HasExcludedFlag("business_unit_id") {
-		cmd.Flags().Int("business-unit-id", 0, "Filter by business unit")
-	}
-	if !ep.HasExcludedFlag("product_id") {
-		cmd.Flags().Int("product-id", 0, "Filter by product")
+	// Only the filters this metric actually applies. The server REFUSES an
+	// unsupported filter with 400 rather than ignoring it, so offering one here
+	// would turn a deliberate refusal into a routine user error.
+	for _, f := range ep.Filters {
+		fd, ok := api.FilterDefs[f]
+		if !ok {
+			continue
+		}
+		name := api.FlagName(f)
+		desc := fd.Desc
+		if len(fd.Enum) > 0 {
+			desc += " [" + joinEnum(fd.Enum) + "]"
+		}
+		switch fd.Type {
+		case "int":
+			cmd.Flags().Int(name, 0, desc)
+		default:
+			cmd.Flags().String(name, "", desc)
+		}
 	}
 
 	cmd.Flags().String("compare-from", "", "Comparison period start (YYYY-MM-DD)")
@@ -141,33 +156,105 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 			}
 		}
 
+		// The comparison period gets the same checks as the primary one. It was
+		// only checked for being supplied in pairs: format, ordering and the
+		// 365-day ceiling went unvalidated, so a reversed or malformed comparison
+		// window was forwarded and came back as a server-side refusal for
+		// something the CLI already knew was wrong.
+		if compareFrom != "" {
+			if err := validateDateRange(compareFrom, compareTo); err != nil {
+				return &api.ExitError{
+					Err:  fmt.Errorf("comparison period: %w", err),
+					Code: api.ExitValidation,
+				}
+			}
+		}
+
 		// Validate enum flags
 		if err := validateEnumFlags(cmd, ep); err != nil {
 			return &api.ExitError{Err: err, Code: api.ExitValidation}
 		}
 
-		var businessUnitID, productID int
-		if cmd.Flags().Lookup("business-unit-id") != nil {
-			businessUnitID, _ = cmd.Flags().GetInt("business-unit-id")
-		}
-		if cmd.Flags().Lookup("product-id") != nil {
-			productID, _ = cmd.Flags().GetInt("product-id")
-		}
-
-		// Collect extra flags
+		// Collect the per-metric filters and the endpoint-specific extras.
+		//
+		// Both loops distinguish "flag absent" from "flag set to a zero-ish
+		// value". An absent flag means unfiltered, which is correct. A flag the
+		// caller explicitly set to "" or to 0 is a mistake, and dropping it
+		// silently returns a WIDER result set presented as a filtered one — the
+		// same failure as sending a query key the server never accepted.
 		extra := make(map[string]string)
+		for _, f := range ep.Filters {
+			fd, ok := api.FilterDefs[f]
+			if !ok {
+				continue
+			}
+			name := api.FlagName(f)
+			if !cmd.Flags().Changed(name) {
+				continue
+			}
+			switch fd.Type {
+			case "int":
+				v, _ := cmd.Flags().GetInt(name)
+				if v < 1 {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s must be >= 1 (got %d)", name, v),
+						Code: api.ExitValidation,
+					}
+				}
+				extra[f] = strconv.Itoa(v)
+			default:
+				v, _ := cmd.Flags().GetString(name)
+				if v == "" {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s was given an empty value; omit the flag to leave the result unfiltered", name),
+						Code: api.ExitValidation,
+					}
+				}
+				if len(fd.Enum) > 0 && !slices.Contains(fd.Enum, v) {
+					return &api.ExitError{
+						Err:  enumError(v, name, fd.Enum),
+						Code: api.ExitValidation,
+					}
+				}
+				extra[f] = v
+			}
+		}
 		for _, f := range ep.ExtraFlags {
+			if !cmd.Flags().Changed(f.Name) {
+				continue
+			}
 			switch f.Type {
 			case "string":
 				v, _ := cmd.Flags().GetString(f.Name)
-				if v != "" {
-					extra[f.Name] = v
+				if v == "" {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s was given an empty value; omit the flag to leave the result unfiltered", f.Name),
+						Code: api.ExitValidation,
+					}
 				}
+				extra[f.Name] = v
 			case "int":
 				v, _ := cmd.Flags().GetInt(f.Name)
-				if v != 0 {
-					extra[f.Name] = strconv.Itoa(v)
+				// Min == 0 means UNBOUNDED, exactly as FlagDef.Min does in the
+				// inventory lane. It previously defaulted to 1 here, so the same
+				// field name meant opposite things in the two lanes and any future
+				// statistics int flag where 0 is meaningful would be refused.
+				if f.Min != 0 && v < f.Min {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s must be >= %d (got %d)", f.Name, f.Min, v),
+						Code: api.ExitValidation,
+					}
 				}
+				// The spec's upper bound, refused locally rather than spent on a
+				// round trip that comes back as a validation failure for a value
+				// the flag's own help text already called out of range.
+				if f.Max > 0 && v > f.Max {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s must be <= %d (got %d)", f.Name, f.Max, v),
+						Code: api.ExitValidation,
+					}
+				}
+				extra[f.Name] = strconv.Itoa(v)
 			case "bool":
 				v, _ := cmd.Flags().GetBool(f.Name)
 				if v {
@@ -177,14 +264,12 @@ func makeRunFunc(ep *api.Endpoint) func(*cobra.Command, []string) error {
 		}
 
 		params := &api.QueryParams{
-			From:           from,
-			To:             to,
-			Granularity:    granularity,
-			BusinessUnitID: businessUnitID,
-			ProductID:      productID,
-			CompareFrom:    compareFrom,
-			CompareTo:      compareTo,
-			Extra:          extra,
+			From:        from,
+			To:          to,
+			Granularity: granularity,
+			CompareFrom: compareFrom,
+			CompareTo:   compareTo,
+			Extra:       extra,
 		}
 
 		ctx := context.Background()
@@ -250,18 +335,19 @@ func validateEnumFlags(cmd *cobra.Command, ep *api.Endpoint) error {
 		if v == "" {
 			continue
 		}
-		valid := false
-		for _, allowed := range f.Enum {
-			if v == allowed {
-				valid = true
-				break
-			}
-		}
-		if !valid {
-			return fmt.Errorf("invalid value %q for --%s (use %s)", v, f.Name, strings.Join(f.Enum, ", "))
+		if !slices.Contains(f.Enum, v) {
+			return enumError(v, f.Name, f.Enum)
 		}
 	}
 	return nil
+}
+
+// enumError is the one place the invalid-enum-value message is written. It had
+// two independent copies, in the two loops that validate enums for the same
+// command, so a wording change (or making matching case-insensitive) had to be
+// made twice or the two halves of one command's validation diverged.
+func enumError(value, flag string, allowed []string) error {
+	return fmt.Errorf("invalid value %q for --%s (use %s)", value, flag, strings.Join(allowed, ", "))
 }
 
 func joinEnum(values []string) string {

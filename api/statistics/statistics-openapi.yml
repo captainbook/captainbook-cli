@@ -1,0 +1,2011 @@
+openapi: 3.1.0
+info:
+  title: CaptainBook Statistics API
+  version: 1.4.0
+  description: |
+    Analytics and reporting API for CaptainBook booking platform.
+    Provides revenue, bookings, products, resources, customers, channels,
+    occupancy, extras, discounts, gift certificates, summary, and browsing
+    statistics.
+
+    All monetary values are returned in the tenant's currency display units
+    (e.g. 150.00 for EUR, 15000 for JPY).
+
+    All endpoints support period comparison by passing `compare_from` and `compare_to`.
+    Time series are bucketed by the `granularity` parameter (day/week/month/quarter/year).
+
+    Every date parameter is a DAY IN THE ACCOUNT'S OWN TIMEZONE, and so is every
+    bucket in a time series. A period of `from=2026-01-01&to=2026-01-01` for an
+    account in Europe/Athens covers 2025-12-31T22:00Z to 2026-01-01T22:00Z, and
+    `day_of_week=sat` means Saturday where the operator is on the endpoints whose own date
+    is an instant. ANYTHING READ OFF A DEPARTURE IS PRODUCT-LOCAL WALL CLOCK instead,
+    because that is what an availability stores rather than an instant -- which covers the
+    window under `date_basis=trip`, `day_of_week` and `time_of_day_*` wherever a metric
+    reads the departure, and occupancy throughout. When
+    `meta.dated_by.event` is `trip_departure` the period was interpreted in the
+    PRODUCT's calendar rather than the account's.
+
+  contact:
+    name: CaptainBook Engineering
+
+servers:
+  - url: "{scheme}://{tenant_domain}"
+    description: Tenant domain
+    variables:
+      scheme:
+        default: https
+      tenant_domain:
+        default: demo.captainbook.io
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Revenue
+    description: Transaction-based revenue metrics
+  - name: Bookings
+    description: Booking volume and status breakdown
+  - name: Products
+    description: Ranked product performance
+  - name: Resources
+    description: Ranked resource utilisation
+  - name: Customers
+    description: Customer acquisition, retention, and top spenders
+  - name: Locations
+    description: Ranked performance by where the trip departs from
+  - name: Channels
+    description: Booking channel distribution
+  - name: Occupancy
+    description: Slot occupancy and capacity utilisation
+  - name: Extras
+    description: Extra/add-on sales performance
+  - name: Discounts
+    description: Discount code usage
+  - name: Gift Certificates
+    description: Gift certificate issuance and redemption
+  - name: Summary
+    description: High-level dashboard summary
+  - name: Browsing
+    description: >-
+      Pre-booking visitor behaviour, read from the customer-event spine rather
+      than from bookings
+
+paths:
+  /api/v1/statistics/revenue:
+    get:
+      operationId: getRevenue
+      summary: Revenue statistics
+      tags: [Revenue]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/day_of_week"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - name: payment_method
+          in: query
+          schema:
+            type: string
+            enum: [card, cash, paypal, gift, voucher]
+        - name: origin
+          in: query
+          schema:
+            type: string
+            enum: [WIDGET, BACK_OFFICE, MARKETPLACE, WEBSITE_BUILDER, CHANNEL_MANAGER]
+      responses:
+        "200":
+          description: Revenue data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/RevenueData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/RevenueSeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/bookings:
+    get:
+      operationId: getBookings
+      summary: Booking statistics
+      tags: [Bookings]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/date_basis"
+        - $ref: "#/components/parameters/day_of_week"
+        - $ref: "#/components/parameters/time_of_day_from"
+        - $ref: "#/components/parameters/time_of_day_to"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [confirmed, cancelled, pending, expired]
+        - name: product_option_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Booking data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BookingData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/BookingSeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/products:
+    get:
+      operationId: getProducts
+      summary: Product ranking statistics
+      tags: [Products]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/date_basis"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - $ref: "#/components/parameters/sort_by"
+        - $ref: "#/components/parameters/sort_direction"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Ranked product data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ProductItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/resources:
+    get:
+      operationId: getResources
+      summary: Resource ranking statistics
+      tags: [Resources]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/date_basis"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - $ref: "#/components/parameters/sort_by"
+        - $ref: "#/components/parameters/sort_direction"
+        - $ref: "#/components/parameters/limit"
+        - name: resource_category
+          in: query
+          schema:
+            type: string
+            enum: [GUIDE, ASSET, EQUIPMENT, AUXILIARY]
+      responses:
+        "200":
+          description: Ranked resource data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ResourceItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/customers:
+    get:
+      operationId: getCustomers
+      summary: Customer statistics
+      tags: [Customers]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/date_basis"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - $ref: "#/components/parameters/sort_direction"
+        - $ref: "#/components/parameters/limit"
+        - name: sort_by
+          in: query
+          description: Sort top customers by
+          schema:
+            type: string
+            enum: [spending, bookings, recent]
+            default: spending
+        - name: returning_only
+          in: query
+          description: Only include returning customers in top list
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Customer data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CustomerData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/CustomerSeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/locations:
+    get:
+      operationId: getLocations
+      summary: Location ranking statistics
+      description: >-
+        Bookings, guests and revenue grouped by where the trip departs from —
+        the breakdown `location_id` drills into, and the only place that id is
+        published.
+
+
+        ONE LOCATION PER PRODUCT. A product carries up to four location rows
+        (`PRIMARY`, `START`, `END` and any number of `VISITED`), and a scheduled
+        task copies a product's `PRIMARY` into a separate `START` row with its own
+        id — so each product is reduced to exactly one location, `PRIMARY` if it
+        has one and otherwise `START`, before anything is grouped. Without that a
+        place appears two or more times, each row carrying the booking's full
+        value, and the breakdown sums to a multiple of real revenue while every
+        figure on it looks ordinary.
+
+
+        A product with neither a `PRIMARY` nor a `START` location cannot be placed,
+        so its bookings are absent and this metric's totals legitimately fall short
+        of /revenue's for the same window. `data.unlocated_bookings` is how many
+        were left out; a client that reports these totals should report it too
+        whenever it is not zero.
+      tags: [Locations]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/date_basis"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - $ref: "#/components/parameters/sort_direction"
+        - $ref: "#/components/parameters/limit"
+        - name: sort_by
+          in: query
+          description: Which column the ranking is ordered by
+          schema:
+            type: string
+            enum: [bookings, revenue, guests]
+            default: bookings
+      responses:
+        "200":
+          description: Ranked location data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/LocationData"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/channels:
+    get:
+      operationId: getChannels
+      summary: Channel distribution statistics
+      tags: [Channels]
+      description: >-
+        How each sales channel performed over the period, dated by when the
+        booking was SOLD.
+
+
+        `day_of_week` is the exception to that dating: it selects bookings whose
+        TRIP DEPARTS on those weekdays, matching /bookings rather than the sale
+        date this endpoint's window and series use. That is deliberate -- a
+        sale-dated weekday here would be a third reading of "Saturday" beside
+        /bookings' departure and /revenue's payment date. `share_percentage` is a
+        share of the filtered set, so under a weekday filter it is each channel's
+        share of weekend departures rather than of everything.
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/day_of_week"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+      responses:
+        "200":
+          description: Channel data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ChannelItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/occupancy:
+    get:
+      operationId: getOccupancy
+      summary: Occupancy and capacity statistics
+      tags: [Occupancy]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - name: product_option_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Occupancy data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OccupancyData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/OccupancySeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/extras:
+    get:
+      operationId: getExtras
+      summary: Extra/add-on sales statistics
+      tags: [Extras]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+        - $ref: "#/components/parameters/sort_by"
+        - $ref: "#/components/parameters/sort_direction"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Extra data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ExtraItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/discounts:
+    get:
+      operationId: getDiscounts
+      summary: Discount code usage statistics
+      tags: [Discounts]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/channel_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/resource_id"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+      responses:
+        "200":
+          description: Discount data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DiscountItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/gift-certificates:
+    get:
+      operationId: getGiftCertificates
+      summary: Gift certificate statistics
+      tags: [Gift Certificates]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+      responses:
+        "200":
+          description: Gift certificate data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/GiftCertificateData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/GiftCertificateSeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/summary:
+    get:
+      operationId: getSummary
+      summary: Dashboard summary (aggregates key metrics)
+      tags: [Summary]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/location_id"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+      responses:
+        "200":
+          description: Summary data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/SummaryData"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/browsing:
+    get:
+      operationId: getBrowsing
+      summary: Browsing funnel and visitor behaviour
+      description: >-
+        Pre-booking behaviour, read from the first-party customer-event spine
+        rather than from bookings. It is the only endpoint here that can see a
+        visitor who never booked -- which is the whole population a "where do we
+        lose people" question is about -- and the only one whose `data` has a
+        second, degraded shape.
+
+
+        **A `200` carrying `unavailable: true` is not data.** It is returned when
+        behavioural analytics are off for the account, and when the requested
+        range covers more events than this report will scan. In that variant
+        `funnel` and `by_type` are empty, `series` is `[]`, and the counts are
+        absent entirely -- so a client that charts it reports a funnel of zeroes,
+        which reads as "nobody visits us" rather than "tracking is off". Read
+        `reason`: the scan refusal names a shorter range that would work, so the
+        correct response is to narrow `from`/`to` and retry, or to tell the
+        operator that tracking is not enabled.
+
+
+        `product_id`, `location_id`, `channel_id`, `resource_id`, `date_basis`,
+        `time_of_day_from` and `time_of_day_to` are all refused with a `400`, not
+        ignored: `customer_events` is not joined to bookings, so a row carries no
+        product, channel, location, resource or departure to filter on. The
+        server-written conversion that closes the funnel records only a booking
+        id, so a product-scoped funnel could only ever have an unscoped last step.
+
+
+        `day_of_week` IS applied, and it is the weekday the VISIT happened, read
+        in the account's timezone. It narrows every figure here -- the counts, the
+        funnel, `by_type` and `series` -- so a weekday-scoped funnel is a funnel
+        over those days' events only, not a full funnel with those days
+        highlighted.
+      tags: [Browsing]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/day_of_week"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+      responses:
+        "200":
+          description: >-
+            Browsing data, or the `unavailable` variant. Both are a 200 -- see the
+            operation description before treating `data` as a funnel.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/BrowsingData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/BrowsingSeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Sanctum API token
+
+  parameters:
+    from:
+      name: from
+      in: query
+      description: >-
+        First day of the period, in the account's timezone (inclusive).
+        Defaults to 30 days before the account's today.
+      schema:
+        type: string
+        format: date
+        example: "2026-02-15"
+    to:
+      name: to
+      in: query
+      description: >-
+        Last day of the period, in the account's timezone (inclusive, so the
+        whole of that local day counts). Defaults to the account's today.
+      schema:
+        type: string
+        format: date
+        example: "2026-03-17"
+    granularity:
+      name: granularity
+      in: query
+      description: Time series bucket size
+      schema:
+        type: string
+        enum: [day, week, month, quarter, year]
+        default: day
+    business_unit_id:
+      name: business_unit_id
+      in: query
+      description: Filter by business unit (defaults to user's current unit)
+      schema:
+        type: integer
+    product_id:
+      name: product_id
+      in: query
+      description: Filter by product
+      schema:
+        type: integer
+    channel_id:
+      name: channel_id
+      in: query
+      description: >-
+        Filter to one sales channel, by a `channel_id` /channels reports. It takes
+        all three kinds of value that endpoint publishes, so any row of the
+        breakdown can be fed straight back in — which of the three is decided by
+        the value's FORMAT, not by a second parameter:
+
+
+        * a UUID — that one OTA, e.g.
+        `6f593c68-f82e-4b92-bfdd-2df1ae9c91a5`;
+
+        * a non-negative integer — that one reseller;
+
+        * a bucket name — `ota` or `reseller` for every channel of that kind, or
+        `direct_online`, `direct_offline`, `indirect_offline`, `other` for one of
+        the four synthetic rows. Accepted in either letter case, since `channel_type`
+        on the same row is the upper-case spelling of the same token.
+
+
+        Anything else is a `400` naming the three shapes, rather than a `200` over
+        a channel that does not exist: the bucket names are a closed vocabulary and
+        a near-miss (`diret_online`) would otherwise read as an OTA id and answer
+        with every figure zero while `meta.filters` reported the scope as applied.
+
+
+        The selected bookings are exactly the ones the matching /channels row
+        counted — the bucket rule is an ordered chain, so a reseller sale billed to
+        a partner is `indirect_offline` and is not on that reseller's row or in
+        this filter's results.
+
+
+        There is no existence check: `channels` lives on the central connection,
+        and an id nothing was sold through answers with zeroes rather than a
+        refusal. Not accepted by /occupancy (which counts departure slots, not
+        bookings), /gift-certificates, /summary or /browsing.
+
+
+        Declared `string` although `ChannelItem.channel_id` is `oneOf: [string,
+        integer]`, and the two do agree: a query value is a string on the wire, so
+        a reseller's integer id is sent as its decimal digits
+        (`?channel_id=7`) and no conversion is lost. The JSON surfaces — the MCP
+        `statistics_query` tool and the operator assistant — declare a
+        `["string", "integer"]` union instead, because there a reseller id really
+        does arrive as a JSON number and a string-only schema would refuse the
+        value /channels just published.
+      schema:
+        type: string
+        example: "6f593c68-f82e-4b92-bfdd-2df1ae9c91a5"
+    location_id:
+      name: location_id
+      in: query
+      description: >-
+        Filter by the product's location. Read the id back from /locations, which
+        is the breakdown this filter drills into. Not accepted by
+        /gift-certificates or /browsing.
+      schema:
+        type: integer
+    resource_id:
+      name: resource_id
+      in: query
+      description: >-
+        Filter to the bookings ONE resource worked — a guide or captain, a boat,
+        or a piece of equipment. The id is the `resource_id` field of
+        /resources, which is the only place it is published; `resource_category`
+        on the same row distinguishes a person from an asset.
+
+
+        Any category is accepted, not only `GUIDE`: /resources ranks all four, so
+        refusing the others would make its own output unusable here.
+
+
+        On /resources it narrows the ranking to that resource's own row rather
+        than returning every resource that shared its bookings — `booking_resource`
+        holds a booking's guide and its equipment alike, so the alternative ranks
+        equipment as a peer of captains and repeats one captain's revenue on each
+        crew-mate's row.
+
+
+        A soft-deleted resource and a resource belonging to another business unit
+        are both accepted, matching `product_id`: a captain who has left still
+        worked the bookings inside a historical window, and a cross-unit id is
+        narrowed to nothing by the business-unit scope rather than disclosing
+        anything. Not accepted by /occupancy (which counts departure slots, and an
+        empty slot has nobody working it), /gift-certificates, /summary or
+        /browsing.
+      schema:
+        type: integer
+    date_basis:
+      name: date_basis
+      in: query
+      description: >-
+        Which date `from` and `to` are compared against.
+
+
+        * `booking` (the default) — when the booking was SOLD, which is what
+        every metric did before this parameter existed;
+
+        * `trip` — when the departure happens, read from `availabilities.from`.
+
+
+        Both readings of "October" are natural and the numbers differ, often by
+        months for a seasonal operator, so a client reporting one should say which
+        it used.
+
+
+        `meta.filters.date_basis` is ALWAYS present on the five endpoints that
+        accept the parameter, carrying `booking` when you omitted it — it is a
+        mode rather than a narrowing filter, so an absent key never meant "not
+        applied", it meant "applied as booking". It used to be dropped when
+        unset, which published a sale-dated answer to a departure-shaped question
+        with nothing saying so. `meta.dated_by` states the same fact on EVERY
+        endpoint, including those that refuse this parameter.
+
+
+        Only `booking` and `trip` are accepted; anything else is a 400 naming
+        both, never read as the default.
+
+
+        Accepted by /bookings, /products, /resources, /customers and /locations;
+        refused by every other endpoint rather than ignored. `meta.dated_by.selectable`
+        states that per response and `meta.dated_by.event` names the clock each endpoint
+        actually used -- those are the copies that cannot drift.
+
+
+        Under `trip` the window is read as PRODUCT-local wall clock, because
+        `availabilities.from` stores a wall clock rather than an instant — the same
+        rule /occupancy has always followed. So a tenant selling in two timezones
+        can date a boundary departure differently from its revenue.
+      schema:
+        type: string
+        enum: [booking, trip]
+        default: booking
+    day_of_week:
+      name: day_of_week
+      in: query
+      description: >-
+        Comma-separated days to include (mon,tue,wed,thu,fri,sat,sun), read in
+        the account's timezone.
+
+
+        IT IS THE WEEKDAY OF WHATEVER THE ENDPOINT COUNTS, AND THE FOUR THAT
+        ACCEPT IT DO NOT ALL MEAN THE SAME DAY. /bookings and /channels count
+        bookings and read the weekday the TRIP DEPARTS; /revenue counts payments
+        and reads the weekday the PAYMENT ARRIVED; /browsing counts visits and
+        reads the weekday the VISIT HAPPENED. Comparing "Saturday revenue" with
+        "Saturday bookings" is comparing two different Saturdays, so say which one
+        was asked for. Every other endpoint refuses it with a `400`.
+      schema:
+        type: string
+        example: "mon,wed,fri"
+    time_of_day_from:
+      name: time_of_day_from
+      in: query
+      description: >-
+        Filter availabilities starting from this time, read against the departure's own
+        PRODUCT-local wall clock rather than the account's timezone.
+      schema:
+        type: string
+        format: time
+        example: "09:00"
+    time_of_day_to:
+      name: time_of_day_to
+      in: query
+      description: >-
+        Filter availabilities ending before this time, read against the departure's own
+        PRODUCT-local wall clock rather than the account's timezone.
+      schema:
+        type: string
+        format: time
+        example: "17:00"
+    compare_from:
+      name: compare_from
+      in: query
+      description: First day of the comparison period, in the account's timezone
+      schema:
+        type: string
+        format: date
+    compare_to:
+      name: compare_to
+      in: query
+      description: >-
+        Last day of the comparison period, in the account's timezone
+        (inclusive). Required with compare_from.
+      schema:
+        type: string
+        format: date
+    sort_by:
+      name: sort_by
+      in: query
+      description: Sort field (valid values depend on endpoint)
+      schema:
+        type: string
+    sort_direction:
+      name: sort_direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    limit:
+      name: limit
+      in: query
+      description: Max items to return (1-50)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid Sanctum token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Unauthenticated.
+    Forbidden:
+      description: User lacks `view_reports` permission or plan does not include statistics
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+    ValidationError:
+      description: >-
+        A parameter was rejected. Also returned when a filter is sent to a metric
+        that does not apply it (for example `product_id` to `/browsing`): those
+        combinations are refused rather than silently ignored, and the message
+        names the endpoints that do apply the filter.
+
+
+        Note the status is **400**, not 422 — these routes sit under `api/*`,
+        where the application renders every validation failure as 400 — and the
+        per-field messages are under `details`, not `errors`.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: The given data was invalid.
+              details:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+  schemas:
+    StatisticsEnvelope:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            period:
+              type: object
+              properties:
+                from:
+                  type: string
+                  format: date
+                to:
+                  type: string
+                  format: date
+            granularity:
+              type: string
+              enum: [day, week, month, quarter, year]
+            currency:
+              type: string
+              description: ISO 4217 currency code of the tenant
+              example: EUR
+            money:
+              $ref: "#/components/schemas/MoneyVisibility"
+            filters:
+              type: object
+              description: >-
+                Active filters echoed back. Every key present is a filter that
+                genuinely narrowed the query, so an absent one did nothing — with
+                one deliberate exception: `date_basis` is a MODE and is always
+                present on the five endpoints that accept it, carrying `booking`
+                when the caller omitted it.
+            dated_by:
+              $ref: "#/components/schemas/DatedBy"
+            generated_at:
+              type: string
+              format: date-time
+        comparison:
+          # `nullable` beside a `$ref` is not a JSON Schema keyword, so in 3.1 it
+          # is ignored; a union is the only form a 3.1 validator or generator reads.
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/Comparison"
+
+    DatedBy:
+      type: object
+      description: >-
+        WHICH DATE the period was compared against. Present on every response as
+        `meta.dated_by`, on every endpoint — including those that refuse the
+        `date_basis` parameter, whose clock is otherwise stated nowhere in the
+        RESPONSE, so a client cannot read it per answer.
+
+
+        It exists because a figure dated by the wrong clock looks exactly like one
+        dated by the right one. A January window on `/resources` with no
+        `date_basis` answers with bookings SOLD in January, so a guide whose
+        January departures were all booked in December is absent from the answer
+        entirely — and the response is not empty, it is populated and plausible,
+        which is the shape that gets believed.
+
+
+        `meta.filters.date_basis` is the round-trippable half of this: replay it
+        in your next request to drill down. `dated_by.event` is NOT a
+        `date_basis` value and must not be sent back as one.
+      required: [event, selectable, note]
+      properties:
+        event:
+          description: Which event's date `from` and `to` were compared against.
+          type: string
+          enum:
+            - booking_sold
+            - trip_departure
+            - payment_received
+            - certificate_purchased
+            - visit
+            - mixed
+        selectable:
+          type: boolean
+          description: >-
+            Whether `date_basis` can change it. False on /revenue, /occupancy,
+            /channels, /extras, /discounts, /gift-certificates, /browsing and
+            /summary — ask a different endpoint rather than passing the
+            parameter, which those refuse with a 400.
+        note:
+          type: string
+          description: >-
+            One or two sentences naming the clock, written for an LLM reading the
+            response rather than for a generated client. A selectable endpoint on the
+            default basis spends a second sentence telling the caller how to re-ask.
+          example: >-
+            The reporting period is dated by when each booking was SOLD
+            (date_basis=booking, the default), so a trip that ran inside this
+            period but was booked before it is NOT counted here.
+
+    MoneyVisibility:
+      type: object
+      description: >-
+        What the amounts in ONE period cover. Present on every response as
+        `meta.money`, so an absent or partial figure is never ambiguous, and
+        attached to `comparison` when there is something to say about that period
+        separately.
+
+
+        Four states: visible and complete; visible but NARROWED to exclude
+        sales-channel bookings (`reason: see_money_of_ota_booking`, with
+        `excluded_bookings` saying how many are missing); withheld because the
+        caller may not see amounts at all; and withheld because every booking in
+        the period was a channel's, so a narrowed figure would be `0.00` and that
+        reads as "earned nothing".
+
+
+        It describes its OWN period and nothing else. `meta.money` says nothing
+        about the comparison period, which is judged on its own exclusion counts
+        and carries its own copy of this object.
+      properties:
+        amounts_visible:
+          type: boolean
+          description: >-
+            When false, every amount in the period this object describes is `null`
+            rather than `0` -- `data` and `series` for `meta.money`, the
+            comparison's own `data` and `series` for its copy. Monetary entries in
+            `comparison.deltas` are `null` when EITHER period is withheld.
+        reason:
+          type: [string, "null"]
+          enum: [see_money_of_booking, see_money_of_ota_booking, all_excluded, null]
+          description: >-
+            Null when the amounts are complete. `see_money_of_booking` means
+            withheld entirely; `see_money_of_ota_booking` means present but
+            narrowed; `all_excluded` means narrowed to nothing and therefore
+            withheld.
+        excludes_channel_sales:
+          type: boolean
+          description: >-
+            True when the amounts leave out bookings that came from a sales
+            channel.
+        excluded_bookings:
+          type: [integer, "null"]
+          description: >-
+            How many bookings in the period the amounts leave out. Null when
+            nothing is excluded. **A total with a non-zero value here is partial**
+            and must not be read as the period's revenue.
+          example: 3
+
+    Comparison:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+        data:
+          type: object
+          description: Same shape as the main `data` for the comparison period
+        series:
+          type: array
+          description: Same shape as the main `series` for the comparison period
+        money:
+          $ref: "#/components/schemas/MoneyVisibility"
+          description: >
+            Present only when there is something to say about this period's
+            amounts, so a caller who sees everything gets no such key. The
+            comparison period is judged on its OWN exclusion counts: a primary
+            period whose amounts are withheld does not withhold this one, and a
+            primary period that is fine does not vouch for it. Read it rather than
+            `meta.money` before reporting any figure inside this block.
+        deltas:
+          type: object
+          description: >
+            Key-value map of numeric field deltas. A monetary delta is `null`
+            whenever EITHER period's amounts are withheld -- `absolute` is the
+            difference between the two periods, so publishing it beside the
+            surviving period would reconstruct the withheld one.
+          additionalProperties:
+            type: [object, "null"]
+            properties:
+              absolute:
+                type: number
+              percentage:
+                type: [number, "null"]
+
+    # ── Revenue ──────────────────────────
+    RevenueData:
+      type: object
+      properties:
+        gross_revenue:
+          type: [number, "null"]
+          description: Total revenue before deductions
+        net_revenue:
+          type: [number, "null"]
+          description: Gross minus commissions and refunds
+        commissions:
+          type: [number, "null"]
+        tips:
+          type: [number, "null"]
+        refunds:
+          type: [number, "null"]
+        transaction_count:
+          type: integer
+        average_transaction_value:
+          type: [number, "null"]
+
+    RevenueSeriesItem:
+      type: object
+      properties:
+        date:
+          type: string
+        gross_revenue:
+          type: [number, "null"]
+        net_revenue:
+          type: [number, "null"]
+        refunds:
+          type: [number, "null"]
+        transaction_count:
+          type: integer
+
+    # ── Bookings ─────────────────────────
+    BookingData:
+      type: object
+      properties:
+        total_bookings:
+          type: integer
+        confirmed:
+          type: integer
+        cancelled:
+          type: integer
+        pending:
+          type: integer
+        expired:
+          type: integer
+          description: >-
+            Unpaid checkout holds whose clock has run out. Counted inside
+            `total_bookings` and `total_guests`. Undocumented before 1.4.0; the
+            field itself has always been returned.
+        cancellation_rate:
+          type: number
+          description: Percentage (0-100)
+        average_guests_per_booking:
+          type: number
+          description: >-
+            Mean party size over the whole population, cancelled and expired
+            bookings included — `confirmed_guests / confirmed` is the mean over
+            the trips that ran.
+        average_lead_time_days:
+          type: number
+          description: Average days between booking and activity
+        total_guests:
+          type: integer
+          description: >-
+            Party sizes summed over this metric's WHOLE population — the same
+            bookings `total_bookings` counts, cancellations and expired unpaid
+            holds included. Never present it as people carried: measured on a dev
+            tenant it was 107% over the number who travelled. Use
+            `confirmed_guests` for that.
+        confirmed_guests:
+          type: integer
+          description: >-
+            Party sizes summed over the bookings that are confirmed, not
+            cancelled, and not an expired hold — the people a trip actually ran
+            for. Added in 1.4.0; `total_guests` is unchanged.
+
+    BookingSeriesItem:
+      type: object
+      properties:
+        date:
+          type: string
+        total_bookings:
+          type: integer
+        confirmed:
+          type: integer
+        cancelled:
+          type: integer
+        pending:
+          type: integer
+        expired:
+          type: integer
+        total_guests:
+          type: integer
+          description: >-
+            Party sizes summed over this bucket's WHOLE population — the same
+            bookings `total_bookings` counts, cancellations and expired unpaid
+            holds included. Use `confirmed_guests` for people carried.
+        confirmed_guests:
+          type: integer
+          description: >-
+            Party sizes summed over the bookings that are confirmed, not
+            cancelled, and not an expired hold — the people a trip actually ran
+            for. Added in 1.4.0; `total_guests` is unchanged.
+
+    # ── Products ─────────────────────────
+    ProductItem:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        product_title:
+          type: string
+        total_bookings:
+          type: integer
+        total_guests:
+          type: integer
+          description: >-
+            Party sizes summed over this row's WHOLE population — the same
+            bookings `total_bookings` counts, cancellations included. Use
+            `confirmed_guests` for people carried.
+
+
+            Both guest figures on this metric are ROUNDED: a booking covering
+            several departures contributes its guests in proportion to how many
+            of them fall in the window, so the underlying value is fractional and
+            the integer is the nearest whole person.
+        confirmed_guests:
+          type: integer
+          description: >-
+            Party sizes over the bookings that are confirmed, not cancelled and
+            not an expired hold. Added in 1.4.0.
+
+
+            Both guest figures on this metric are ROUNDED: a booking covering
+            several departures contributes its guests in proportion to how many
+            of them fall in the window, so the underlying value is fractional and
+            the integer is the nearest whole person.
+        gross_revenue:
+          type: [number, "null"]
+        cancellation_rate:
+          type: number
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              total_bookings:
+                type: integer
+              total_guests:
+                type: integer
+                description: >-
+                  Rounded, like the row figure above — this bucket holds each
+                  booking's share of the departures that fall inside it.
+              confirmed_guests:
+                type: integer
+                description: >-
+                  Confirmed, uncancelled, unexpired guests. Added in 1.4.0.
+                  Rounded, on the same share as `total_guests` beside it.
+              gross_revenue:
+                type: [number, "null"]
+
+    # ── Resources ────────────────────────
+    ResourceItem:
+      type: object
+      properties:
+        resource_id:
+          type: integer
+        resource_name:
+          type: string
+        resource_category:
+          type: string
+          enum: [GUIDE, ASSET, EQUIPMENT, AUXILIARY]
+        total_bookings:
+          type: integer
+        total_guests:
+          type: integer
+          description: >-
+            Party sizes summed over this row's WHOLE population — the same
+            bookings `total_bookings` counts, cancellations included. Use
+            `confirmed_guests` for people carried. Exact: see below.
+        confirmed_guests:
+          type: integer
+          description: >-
+            Party sizes over the bookings that are confirmed, not cancelled and
+            not an expired hold. Added in 1.4.0. Exact, unlike `/products` and
+            `/locations`: this metric joins no availabilities and so divides each
+            booking by nothing.
+        associated_revenue:
+          type: [number, "null"]
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              total_bookings:
+                type: integer
+              total_guests:
+                type: integer
+              confirmed_guests:
+                type: integer
+                description: Confirmed, uncancelled, unexpired guests. Added in 1.4.0.
+              associated_revenue:
+                type: [number, "null"]
+
+    # ── Locations ────────────────────────
+    LocationData:
+      type: object
+      properties:
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocationItem"
+        unlocated_bookings:
+          type: [integer, "null"]
+          description: >-
+            Bookings in the window carrying at least one product with no `PRIMARY`
+            and no `START` location, and therefore absent from `locations[]`. The
+            totals above are short by these, so report it whenever it is not zero
+            rather than presenting a partial breakdown as the whole business.
+
+
+            **`null` when `location_id` is set.** The field answers "what is
+            missing from this breakdown", and under a location filter that is
+            answered by the filter itself — every other place is absent by
+            request. A `0` there would assert that nothing was left out of a
+            deliberately single-row ranking, and a count would read as a shortfall
+            in the one row that is shown.
+
+    LocationItem:
+      type: object
+      properties:
+        location_id:
+          type: integer
+          description: Feed back into `location_id` to scope another metric to this place.
+        location_name:
+          type: [string, "null"]
+          description: >-
+            The location's own name, falling back to its city and then its country
+            code. `locations.name` is nullable and was added years after the table,
+            so rows written by the address form or generated from a `PRIMARY` carry
+            an address and no name; null means none of the three was set.
+        city:
+          type: [string, "null"]
+        country_code:
+          type: [string, "null"]
+        location_type:
+          type: [string, "null"]
+          # Unquoted, unlike the `type` union above: in a type union OpenAPI 3.1
+          # names the null type as the string "null", but an enum has to contain
+          # the real null or the union admits a value the enum then refuses.
+          enum: [PRIMARY, START, null]
+          description: >-
+            Which of the product's rows was used. `START` appears only for products
+            with no `PRIMARY`.
+        total_bookings:
+          type: integer
+        total_products:
+          type: integer
+          description: How many distinct products departed from here in the window.
+        total_guests:
+          type: integer
+          description: >-
+            Party sizes summed over this row's WHOLE population — the same
+            bookings `total_bookings` counts, cancellations included. Use
+            `confirmed_guests` for people carried.
+
+
+            Both guest figures on this metric are ROUNDED: a booking covering
+            several departures contributes its guests in proportion to how many
+            of them fall in the window, so the underlying value is fractional and
+            the integer is the nearest whole person.
+        confirmed_guests:
+          type: integer
+          description: >-
+            Party sizes over the bookings that are confirmed, not cancelled and
+            not an expired hold. Added in 1.4.0.
+
+
+            Both guest figures on this metric are ROUNDED: a booking covering
+            several departures contributes its guests in proportion to how many
+            of them fall in the window, so the underlying value is fractional and
+            the integer is the nearest whole person.
+        gross_revenue:
+          type: [number, "null"]
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              total_bookings:
+                type: integer
+              total_guests:
+                type: integer
+                description: >-
+                  Rounded, like the row figure above — this bucket holds each
+                  booking's share of the departures that fall inside it.
+              confirmed_guests:
+                type: integer
+                description: >-
+                  Confirmed, uncancelled, unexpired guests. Added in 1.4.0.
+                  Rounded, on the same share as `total_guests` beside it.
+              gross_revenue:
+                type: [number, "null"]
+
+    # ── Customers ────────────────────────
+    CustomerData:
+      type: object
+      properties:
+        total_customers:
+          type: integer
+        new_customers:
+          type: integer
+        returning_customers:
+          type: integer
+          description: >-
+            Customers active in the window who had booked BEFORE it opened. The
+            probe behind it is business-wide by design and is not narrowed by
+            `product_id`, `channel_id`, `location_id` or `resource_id` — so under
+            a resource filter this still means "had booked the company before",
+            never "had sailed with this captain before". For that, read the two
+            `repeat_customers_*` counts below.
+        repeat_customers_lifetime:
+          type: integer
+          description: >-
+            Customers active in the window with more than one booking matching the
+            filters in force, counted over their whole history rather than over the
+            window. With `resource_id` set that is "has sailed with this captain
+            more than once"; with no narrowing filter it is "has booked the company
+            more than once". `repeat_customer_basis` says which.
+        repeat_customers_in_period:
+          type: integer
+          description: >-
+            The same count restricted to bookings inside `from`..`to`. Reported
+            beside the lifetime figure rather than instead of it because both are
+            legitimate readings of "repeat customer" and they differ by a lot on a
+            short window.
+        repeat_customer_basis:
+          type: string
+          enum: [resource, business]
+          description: >-
+            What the two counts above are counting repeat bookings OF —
+            `resource` when `resource_id` is set, `business` otherwise. A partial
+            figure looks exactly like a complete one, and nothing else in the
+            payload distinguishes "this captain's repeat customers" from "the
+            company's".
+        retention_rate:
+          type: number
+          description: Percentage (0-100)
+        average_lifetime_value:
+          type: [number, "null"]
+        top_customers:
+          type: array
+          items:
+            type: object
+            properties:
+              customer_id:
+                type: integer
+              customer_name:
+                type: string
+              total_bookings:
+                type: integer
+              total_spent:
+                type: [number, "null"]
+              last_booking_date:
+                type: [string, "null"]
+                format: date
+              country:
+                type: [string, "null"]
+
+    CustomerSeriesItem:
+      type: object
+      properties:
+        date:
+          type: string
+        total_customers:
+          type: integer
+
+    # ── Channels ─────────────────────────
+    ChannelItem:
+      type: object
+      properties:
+        channel_id:
+          oneOf:
+            - type: string
+            - type: integer
+          description: >-
+            Three different kinds of value, and `channel_type` says which: a UUID
+            string when it is `OTA`, the bucket name itself (`direct_online`,
+            `direct_offline`, `indirect_offline`, `other`) when it is one of the
+            four bucket names, and an integer reseller id for anything else.
+
+
+            All three forms are accepted by the `channel_id` query parameter, so
+            any row here can be fed back to scope another metric. See that
+            parameter's description.
+        channel_name:
+          type: string
+        channel_type:
+          type: string
+          description: >-
+            Deliberately NOT an enum: a reseller row carries that reseller's own
+            `providers.type`, which is an unconstrained `varchar`, so the set is
+            open. The fixed values are `OTA` and the four bucket names
+            (`DIRECT_ONLINE`, `DIRECT_OFFLINE`, `INDIRECT_OFFLINE`, `OTHER`),
+            plus `RESELLER` for a reseller whose own type is null.
+
+
+            It is still the discriminator for `channel_id`: `OTA` means a UUID
+            string, one of the four bucket names means `channel_id` is that same
+            bucket name, and anything else means an integer reseller id.
+        total_bookings:
+          type: integer
+        gross_revenue:
+          type: [number, "null"]
+        commission_paid:
+          type: [number, "null"]
+        cancellation_rate:
+          type: number
+        share_percentage:
+          type: number
+          description: Percentage of total bookings
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              total_bookings:
+                type: integer
+              gross_revenue:
+                type: [number, "null"]
+
+    # ── Occupancy ────────────────────────
+    OccupancyData:
+      type: object
+      properties:
+        total_slots:
+          type: integer
+        booked_slots:
+          type: integer
+        fully_booked_slots:
+          type: integer
+        average_occupancy_rate:
+          type: number
+          description: Percentage (0-100)
+        peak_day_of_week:
+          type: [string, "null"]
+          enum: [mon, tue, wed, thu, fri, sat, sun, null]
+        peak_time_of_day:
+          type: [string, "null"]
+          example: "10:00"
+        by_day_of_week:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: string
+              slots:
+                type: integer
+              booked:
+                type: integer
+              occupancy_rate:
+                type: number
+        by_time_of_day:
+          type: array
+          items:
+            type: object
+            properties:
+              hour:
+                type: string
+                example: "10:00"
+              slots:
+                type: integer
+              booked:
+                type: integer
+              occupancy_rate:
+                type: number
+
+    OccupancySeriesItem:
+      type: object
+      properties:
+        date:
+          type: string
+        total_slots:
+          type: integer
+        booked_slots:
+          type: integer
+        occupancy_rate:
+          type: number
+
+    # ── Extras ───────────────────────────
+    ExtraItem:
+      type: object
+      properties:
+        extra_id:
+          type: integer
+        extra_title:
+          type: string
+        product_title:
+          type: [string, "null"]
+        times_sold:
+          type: integer
+        revenue:
+          type: [number, "null"]
+        attachment_rate:
+          type: number
+          description: Percentage of bookings that included this extra
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              times_sold:
+                type: integer
+              revenue:
+                type: [number, "null"]
+
+    # ── Discounts ────────────────────────
+    DiscountItem:
+      type: object
+      properties:
+        discount_id:
+          type: integer
+        discount_code:
+          type: string
+        times_used:
+          type: integer
+        total_discount_amount:
+          type: [number, "null"]
+        average_discount_per_booking:
+          type: [number, "null"]
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              times_used:
+                type: integer
+              total_discount_amount:
+                type: [number, "null"]
+
+    # ── Gift Certificates ────────────────
+    GiftCertificateData:
+      type: object
+      properties:
+        issued:
+          type: integer
+        redeemed:
+          type: integer
+          description: Certificates with at least one transaction
+        expired:
+          type: integer
+        total_issued_value:
+          type: [number, "null"]
+        total_redeemed_value:
+          type: [number, "null"]
+        outstanding_value:
+          type: [number, "null"]
+        redemption_rate:
+          type: number
+          description: Percentage (0-100)
+
+    GiftCertificateSeriesItem:
+      type: object
+      properties:
+        date:
+          type: string
+        issued:
+          type: integer
+        redeemed:
+          type: integer
+        issued_value:
+          type: [number, "null"]
+        redeemed_value:
+          type: [number, "null"]
+
+    # ── Summary ──────────────────────────
+    SummaryData:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+        revenue:
+          type: object
+          properties:
+            gross:
+              type: [number, "null"]
+            net:
+              type: [number, "null"]
+            refunds:
+              type: [number, "null"]
+        bookings:
+          type: object
+          properties:
+            total:
+              type: integer
+            confirmed:
+              type: integer
+            cancelled:
+              type: integer
+            cancellation_rate:
+              type: number
+        customers:
+          type: object
+          properties:
+            total:
+              type: integer
+            new:
+              type: integer
+            returning:
+              type: integer
+            retention_rate:
+              type: number
+        occupancy_rate:
+          type: number
+        average_guests_per_booking:
+          type: number
+        top_product:
+          type: [object, "null"]
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            bookings:
+              type: integer
+        top_channel:
+          type: [object, "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            bookings:
+              type: integer
+        peak_day_of_week:
+          type: [string, "null"]
+        peak_time_of_day:
+          type: [string, "null"]
+
+    # ── Browsing ─────────────────────────
+    BrowsingData:
+      description: >-
+        Two shapes under one key, told apart by `unavailable`. There is no
+        OpenAPI `discriminator` because the discriminating field is a boolean
+        rather than a string, so a generated client has to branch on it by hand.
+
+
+        Branch on `unavailable` FIRST. The degraded variant carries no counts at
+        all -- not zeroed counts -- precisely so that reading it as a funnel
+        fails loudly rather than producing a chart of zeroes.
+
+
+        Both variants declare `required`, which nothing else in this document
+        does -- and here it is load-bearing rather than tidiness. This is the one
+        schema whose branch is chosen by a property's VALUE: without `required`,
+        an object omitting `unavailable` matches BOTH branches, so `oneOf` fails
+        on it, and a generated client types the discriminator itself as optional.
+        The other `oneOf`s here pick a branch by TYPE and need none of this.
+      oneOf:
+        - $ref: "#/components/schemas/BrowsingTotals"
+        - $ref: "#/components/schemas/BrowsingUnavailable"
+
+    BrowsingTotals:
+      type: object
+      description: The funnel and its totals, for a range this report was able to scan.
+      required: [unavailable, total_events, total_visitors, funnel, by_type, retention_days]
+      properties:
+        unavailable:
+          type: boolean
+          enum: [false]
+          description: Always false on this variant. Present so the two shapes are distinguishable without inspecting other keys.
+        total_events:
+          type: integer
+          description: Events in the period, all types, not just the funnel steps.
+        total_visitors:
+          type: integer
+          description: >-
+            Distinct browsers (`visitor_id`), not people. One person on a phone
+            and a laptop is two; one shared device is one. A visitor who later
+            identifies is still counted as the browser they were.
+        funnel:
+          type: array
+          description: >-
+            The five intent steps, in ascending order of commitment, always all
+            five and always in this order -- a step nobody reached is present with
+            zeroes rather than omitted.
+          items:
+            $ref: "#/components/schemas/BrowsingFunnelStep"
+          minItems: 5
+          maxItems: 5
+        by_type:
+          type: object
+          description: >-
+            Every event type seen in the period, keyed by its raw type string
+            (`page_view`, `add_to_cart`, `email_opened`, ...). A superset of
+            `funnel`: it includes email, SMS and WhatsApp delivery beats, which
+            are not browsing steps. A type with no events in the period is absent,
+            not zero.
+          additionalProperties:
+            $ref: "#/components/schemas/BrowsingTypeTotals"
+        retention_days:
+          type: integer
+          description: >-
+            How long raw events are kept for this account before pruning. A range
+            reaching further back than this is answered honestly and
+            under-reports, because the events are gone -- the rollups that outlive
+            them are per-customer and are not what this metric reads.
+          example: 90
+
+    BrowsingUnavailable:
+      type: object
+      description: >-
+        Returned with a **200**, not an error status: nothing about the request
+        was wrong. Either the account does not collect behavioural events, or the
+        range is too wide to scan.
+      required: [unavailable, reason, funnel, by_type]
+      properties:
+        unavailable:
+          type: boolean
+          enum: [true]
+        reason:
+          type: string
+          description: >-
+            Operator-readable prose, and the only place the two causes are told
+            apart. The scan refusal states the event count and names a day count
+            that would fit, so it can be acted on in one retry.
+          example: That range covers 4,812,009 events, more than this report can scan. Try 12 day(s) or fewer.
+        funnel:
+          type: array
+          description: >-
+            Always empty on this variant. Typed the same as the available
+            variant's so a generated client gets one type for the key, and bounded
+            to zero items so a validator says what the prose says.
+          items:
+            $ref: "#/components/schemas/BrowsingFunnelStep"
+          maxItems: 0
+        by_type:
+          type: object
+          description: Always empty on this variant.
+          additionalProperties:
+            $ref: "#/components/schemas/BrowsingTypeTotals"
+          maxProperties: 0
+
+    BrowsingFunnelStep:
+      type: object
+      # `conversion_from_previous` is required AND nullable, which is not a
+      # contradiction: the key is always present, and `null` on the first step is
+      # a value the union admits. Dropping it from `required` would let a client
+      # treat an absent key and a null one as the same thing, and they are not --
+      # absent would mean the step was not computed.
+      required: [step, label, visitors, events, conversion_from_previous]
+      properties:
+        step:
+          type: string
+          enum: [view_item, add_to_cart, begin_checkout, add_payment_info, booking_confirmed]
+          description: >-
+            The event type this step counts. `booking_confirmed` closes the
+            funnel and is written server-side from the real booking, so it cannot
+            be inflated by anyone holding a widget token.
+        label:
+          type: string
+          description: The step's name in the caller's locale. Display this; never the raw `step`.
+          example: Added to cart
+        visitors:
+          type: integer
+          description: Distinct browsers that reached this step.
+        events:
+          type: integer
+          description: >-
+            Raw events at this step, so it can exceed `visitors` -- one person
+            adding three products to the cart is three events and one visitor.
+        conversion_from_previous:
+          type: [number, "null"]
+          description: >-
+            Percentage (0-100) of the PREVIOUS step's visitors that reached this
+            one -- not of the top of the funnel. "Where do we lose people" is a
+            question about adjacent steps; a percentage of the first step reads
+            alarmingly low at the bottom of any funnel. Null on the first step,
+            which has no previous one, and `0` where the previous step had no
+            visitors.
+
+    BrowsingTypeTotals:
+      type: object
+      required: [events, visitors]
+      properties:
+        events:
+          type: integer
+        visitors:
+          type: integer
+
+    BrowsingSeriesItem:
+      type: object
+      description: >-
+        Event volume per bucket, so the caller can see shape rather than one
+        number. Bucketed by `granularity` and gap-filled, like every other
+        metric's series -- a bucket with no events is present with `events: 0`
+        rather than omitted, so a chart draws a floor instead of a straight line
+        across the silence. Empty for the `unavailable` variant.
+      required: [date, events]
+      properties:
+        date:
+          type: string
+        events:
+          type: integer

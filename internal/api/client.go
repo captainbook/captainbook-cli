@@ -23,6 +23,12 @@ const (
 
 // Client is an HTTP client for the CaptainBook Statistics API.
 type Client struct {
+	// sleep waits out a retry backoff. Nil means the real clock; it exists so
+	// tests can assert the backoff SCHEDULE instead of spending it, which they
+	// previously did at a cost of ~16s of wall time per run. Unexported on
+	// purpose: no production caller needs it, so it is not part of the API.
+	sleep func(ctx context.Context, d time.Duration) error
+
 	BaseURL    string
 	Token      string
 	HTTPClient *http.Client
@@ -46,14 +52,19 @@ func NewClient(baseURL, token string) *Client {
 
 // QueryParams holds the query parameters for a statistics request.
 type QueryParams struct {
-	From           string
-	To             string
-	Granularity    string
-	BusinessUnitID int
-	ProductID      int
-	CompareFrom    string
-	CompareTo      string
-	Extra          map[string]string
+	From        string
+	To          string
+	Granularity string
+	CompareFrom string
+	CompareTo   string
+
+	// Extra carries every per-metric filter and extra flag, keyed by the spec's
+	// own parameter name. business_unit_id and product_id used to have dedicated
+	// fields here; they travel through Extra like every other filter now, because
+	// which filters a metric accepts is a per-metric question and the gating for
+	// it lives in cmd/stats.go. Keeping two fields meant two code paths to the
+	// same two query keys, only one of them gated.
+	Extra map[string]string
 }
 
 // Do makes a GET request to the given endpoint path with the given query parameters.
@@ -71,10 +82,8 @@ func (c *Client) Do(ctx context.Context, endpoint *Endpoint, params *QueryParams
 			if c.Verbose && c.VerboseW != nil {
 				fmt.Fprintf(c.VerboseW, "→ Retry %d/%d in %s\n", attempt, maxRetries, backoff)
 			}
-			select {
-			case <-ctx.Done():
-				return nil, &TimeoutError{Duration: defaultTimeout.String()}
-			case <-time.After(backoff):
+			if err := c.waitBackoff(ctx, backoff); err != nil {
+				return nil, err
 			}
 		}
 
@@ -142,12 +151,31 @@ func (c *Client) doRequest(ctx context.Context, reqURL string) ([]byte, error) {
 			return nil, &ForbiddenError{Message: errResp.Message}
 		}
 		return nil, &ForbiddenError{}
-	case http.StatusUnprocessableEntity:
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		// 400 is the one that actually fires. The statistics routes sit under
+		// `api/*`, where every validation failure renders as 400, and the
+		// vendored spec declares no 422 at all — so handling only 422 sent every
+		// refusal to the `default` arm below, where it surfaced as exit 18
+		// "Unexpected API response" with a 200-char-truncated body instead of
+		// exit 12 with the field names. 422 stays accepted because it costs
+		// nothing and the inventory lane does use it.
 		var valResp ValidationErrorResponse
-		if json.Unmarshal(body, &valResp) == nil {
-			return nil, &ValidationError{Message: valResp.Message, Errors: valResp.Errors}
+		// Informative() is load-bearing: unmarshalling into a struct succeeds for
+		// ANY JSON object, so without it a 400 whose shape we do not model became
+		// ValidationError{"", nil} and printed the bare string "Validation error",
+		// throwing away the server's sentence. A plan-gate refusal
+		// (`{"error":"Statistics are not included in your subscription plan."}`)
+		// is exactly that shape, and it is the most actionable 400 this API sends.
+		if json.Unmarshal(body, &valResp) == nil && valResp.Informative() {
+			return nil, &ValidationError{Message: valResp.Reason(), Errors: valResp.FieldErrors()}
 		}
-		return nil, &ValidationError{Message: "validation failed"}
+		// Nothing we model decoded. The status still says validation failure, so
+		// the TYPE stays ValidationError — that is what maps to exit 12, and a
+		// proxy returning an HTML 422 is still a validation failure. What must not
+		// happen is losing the body: carry it as the message instead of the
+		// contentless "validation failed", which printed as the bare string
+		// "Validation error" and threw the server's response away.
+		return nil, &ValidationError{Message: truncate(string(body), 200)}
 	case http.StatusTooManyRequests:
 		retryAfter := resp.Header.Get("Retry-After")
 		return nil, &RateLimitError{RetryAfter: retryAfter}
@@ -175,12 +203,6 @@ func (c *Client) buildURL(endpoint *Endpoint, params *QueryParams) (string, erro
 	}
 	if params.Granularity != "" {
 		q.Set("granularity", params.Granularity)
-	}
-	if params.BusinessUnitID > 0 && !endpoint.HasExcludedFlag("business_unit_id") {
-		q.Set("business_unit_id", strconv.Itoa(params.BusinessUnitID))
-	}
-	if params.ProductID > 0 && !endpoint.HasExcludedFlag("product_id") {
-		q.Set("product_id", strconv.Itoa(params.ProductID))
 	}
 	if params.CompareFrom != "" {
 		q.Set("compare_from", params.CompareFrom)
@@ -213,6 +235,20 @@ func isRetriable(err error) bool {
 }
 
 const maxRetryAfter = 60 // seconds
+
+// waitBackoff blocks for d, or returns a TimeoutError if the context ends
+// first. It is the only place the retry loop touches the clock.
+func (c *Client) waitBackoff(ctx context.Context, d time.Duration) error {
+	if c.sleep != nil {
+		return c.sleep(ctx, d)
+	}
+	select {
+	case <-ctx.Done():
+		return &TimeoutError{Duration: defaultTimeout.String()}
+	case <-time.After(d):
+		return nil
+	}
+}
 
 func retryBackoff(lastErr error, attempt int) time.Duration {
 	if rl, ok := lastErr.(*RateLimitError); ok && rl.RetryAfter != "" {
