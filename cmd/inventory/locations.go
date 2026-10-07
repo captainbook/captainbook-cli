@@ -25,7 +25,7 @@ func locationsDefs() []CommandDef {
 			Use: "locations list", Short: "List locations (start, end, meeting points)",
 			Kind: KindRead, Verb: "GET", Path: "/locations", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "type", Type: "string", Description: "PRIMARY|START|END|VISITED|SECONDARY"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},

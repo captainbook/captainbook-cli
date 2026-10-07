@@ -31,10 +31,10 @@ func pricingTiersDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListPricingTiersParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
-				{Name: "product-id", Type: "string", Description: "Filter by parent product (via the pricing_category relation). Mutually exclusive with --availability-id."},
-				{Name: "availability-id", Type: "string", Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto the tier's amount and adds default_amount/is_override. Mutually exclusive with --product-id (combining the two returns 422)."},
+				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by parent product (via the pricing_category relation). Mutually exclusive with --availability-id."},
+				{Name: "availability-id", Type: "int", Min: 1, Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto the tier's amount and adds default_amount/is_override. Mutually exclusive with --product-id (combining the two returns 422)."},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -42,7 +42,15 @@ func pricingTiersDefs() []CommandDef {
 				// `availability_id` describe overlapping scopes and the
 				// server rejects them together. Catching it here saves a
 				// round-trip and surfaces a friendlier message.
-				if args.FlagString("product-id") != "" && args.FlagString("availability-id") != "" {
+				// Read through FlagSet, not FlagString: both flags are typed
+				// `int`, and RunArgs.FlagString type-asserts to string, so it
+				// returns "" for an int-valued flag however it was set. Asking
+				// FlagString here made this gate permanently false — the two
+				// params went to the wire together and the server answered the
+				// 422 this exists to pre-empt. Nothing caught it: the suite
+				// passed, both drift directions passed, and the gate still read
+				// correctly.
+				if args.FlagSet("product-id") && args.FlagSet("availability-id") {
 					return nil, fmt.Errorf("--product-id and --availability-id are mutually exclusive")
 				}
 				p := &gen.ListPricingTiersParams{}
@@ -52,10 +60,12 @@ func pricingTiersDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-id"); v != "" {
+				if args.FlagSet("product-id") {
+					v := args.FlagInt("product-id")
 					p.ProductId = &v
 				}
-				if v := args.FlagString("availability-id"); v != "" {
+				if args.FlagSet("availability-id") {
+					v := args.FlagInt("availability-id")
 					p.AvailabilityId = &v
 				}
 				if args.FlagBool("include-trashed") {
@@ -74,7 +84,8 @@ func pricingTiersDefs() []CommandDef {
 			Verb: "GET", Path: "/pricing-tiers/{id}", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "availability-id", Type: "string", Description: "Overlay the per-slot override for this availability onto the tier's amount and surface default_amount/is_override. Returns 404 if the tier isn't reachable from the availability's product."},
+				{Name: "availability-id", Type: "int", Min: 1, Description: "Overlay the per-slot override for this availability onto the tier's amount and surface default_amount/is_override. Returns 404 if the tier isn't reachable from the availability's product."},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
@@ -82,7 +93,12 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				p := &gen.ShowPricingTierParams{}
-				if v := args.FlagString("availability-id"); v != "" {
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
+				}
+				if args.FlagSet("availability-id") {
+					v := args.FlagInt("availability-id")
 					p.AvailabilityId = &v
 				}
 				resp, err := r.Client.ShowPricingTierWithResponse(ctx, id, p)
@@ -117,7 +133,9 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreatePricingTierWithBodyWithResponse(ctx, &gen.CreatePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", "")
 				if res != nil {
 					res.WireBody = body
@@ -154,7 +172,9 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdatePricingTierWithBodyWithResponse(ctx, id, &gen.UpdatePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
 				if res != nil {
 					res.WireBody = body
@@ -198,7 +218,9 @@ func pricingTiersDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestorePricingTierWithBodyWithResponse(ctx, id, &gen.RestorePricingTierParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "PricingTier", id)
 				if res != nil {
 					res.WireBody = body

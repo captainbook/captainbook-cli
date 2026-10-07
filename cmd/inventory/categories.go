@@ -29,7 +29,7 @@ func categoriesDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListCategoriesParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListCategoriesParams{}

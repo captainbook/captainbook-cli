@@ -21,7 +21,7 @@ func customersDefs() []CommandDef {
 			Use: "customers list", Short: "List customers", Kind: KindRead,
 			Verb: "GET", Path: "/customers", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"},
+				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "email", Type: "string", Description: "Filter by exact email"},

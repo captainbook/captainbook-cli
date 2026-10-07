@@ -8,7 +8,7 @@ This index is the global tour. Each per-resource cookbook (linked at the bottom)
 
 `ceebee` ships two namespaces:
 
-- **`ceebee stats …`** — read-only analytics over revenue, bookings, customers, channels, etc. The v1 statistics surface is unchanged from the legacy `skills.md` — see your existing instructions for those commands.
+- **`ceebee stats …`** — read-only analytics over revenue, bookings, customers, channels, locations, browsing and more. Thirteen metrics; see [statistics.md](statistics.md) for the filter vocabulary and the date-basis rules, which decide what each number actually counts.
 - **`ceebee inventory …`** — read+write inventory, bookings, transactions, gift certificates, customer notifications. This is the new v1 namespace and the focus of these cookbooks.
 
 Both namespaces share authentication, configuration, idempotency, dry-run, audit, exit-code, and error-code conventions, all documented below.
@@ -133,12 +133,13 @@ Passing a bool bare still means true (`--dry-run`, `--include-trashed`), which i
 
 ### Idempotency keys
 
-Every mutation accepts `Idempotency-Key: <UUIDv7>` (header). The CLI auto-mints one per invocation, prints it to stderr, and reuses it on retry within the same invocation:
+Every mutation sends `Idempotency-Key: <UUIDv7>` (header). The CLI auto-mints one per invocation and reuses it on every retry within that invocation, which is what makes retrying a mutation safe — the server dedupes by key.
 
-```text
-$ ceebee inventory bookings refund bk_88 --amount 5000 --reason "duplicate charge"
-[ceebee] idempotency-key=018f5e2c-6c4a-7c5a-9d2c-83a1b1f6e4cd
-{"data":{"transaction":{...}}}
+The key is **not printed to stdout or stderr.** To recover it, read the audit log, which records the key the request actually carried:
+
+```bash
+ceebee inventory bookings refund bk_88 --amount 5000 --reason "duplicate charge"
+ceebee audit list --limit 1 --format json | jq -r '.[0].idempotency_key'
 ```
 
 To replay deliberately (e.g. resume a script that crashed mid-flight):
@@ -296,6 +297,17 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory media upload <product-id>` | POST /products/{id}/media | `cli:write` | none (multipart) |
 | `inventory media delete <id>` | DELETE /media/{id} | `cli:write` | none |
 | `inventory notifications resend <booking-id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
+| `inventory partners list` | GET /partners | `cli:read` | n/a |
+| `inventory partners get <id>` | GET /partners/{id} | `cli:read` | n/a |
+| `inventory segments list` | GET /segments | `cli:read` | n/a |
+| `inventory segments get <id>` | GET /segments/{id} | `cli:read` | n/a |
+| `inventory segments members <id>` | GET /segments/{id}/members | `cli:read` | n/a |
+| `inventory segments fields` | GET /segment-fields | `cli:read` | n/a |
+| `inventory segments create` | POST /segments | `cli:write` | body |
+| `inventory resource-calendar list` | GET /resource-calendar | `cli:read` | n/a |
+| `inventory workflows nodes` | GET /workflow-nodes | `cli:read` | n/a |
+| `inventory availabilities create` | POST /availabilities | `cli:write` | body |
+| `inventory products duplicate <id>` | POST /products/{id}/duplicate | `cli:write` | body |
 
 When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally with `"dry-run not supported for this command"` and exit code 1 — no HTTP call is made.
 
@@ -303,6 +315,7 @@ When the dry-run column says **none**, sending `--dry-run` from the CLI errors l
 
 ## Resource directory
 
+- [statistics.md](statistics.md) — The whole `ceebee stats` namespace: 13 metrics, the per-metric filter vocabulary the server enforces, and the timezone/date-basis rules that decide what a number means.
 - [auth.md](auth.md) — `whoami`, token / ability probing.
 - [products.md](products.md) — Products CRUD + restore. Private vs shared, rich text, cancellation policy.
 - [product-options.md](product-options.md) — Product Options CRUD + restore. Auto-generated option codes.
@@ -323,12 +336,15 @@ When the dry-run column says **none**, sending `--dry-run` from the CLI errors l
 - [categories.md](categories.md) — Read-only product category catalog (platform-managed).
 - [media.md](media.md) — Product images + documents.
 - [notifications.md](notifications.md) — Booking confirmation resend.
+- [partners.md](partners.md) — Read-only selling partners and channel partners. Where `bookings list --partner-id` gets its id.
+- [segments.md](segments.md) — Customer segments: list, members, the per-tenant filterable-field vocabulary, and smart-segment creation.
+- [resource-calendar.md](resource-calendar.md) — When one resource is occupied, across bookings and explicit unavailability.
 
 ## Tips for agents
 
 1. **Run `ceebee inventory whoami` first.** It costs nothing, validates auth, and reports your tenant + abilities. Bail early if you're missing `cli:cs` for an op that needs it.
 2. **Always `--dry-run` before destructive writes** — especially anything in the capability table flagged `cli:cs` or marked as cascade-deleting.
 3. **Reads default to `table`, mutations default to `json`.** If you're piping to `jq`, force `--format json` on reads.
-4. **Errors go to stderr, data to stdout.** Pipe stdout into your parser; tee stderr if you want the idempotency-key trail.
+4. **Errors go to stderr, data to stdout.** Pipe stdout into your parser. For the idempotency-key trail read `~/.ceebee/audit.jsonl` (via `ceebee audit list`), not stderr — the key is not printed.
 5. **For async bulk-update**, grep stderr for `BULK_UPDATE_ACCEPTED bulk_update_id=` to capture the audit-row id.
 6. **Exit code 0 + stderr signal = async accepted, not synchronously done.** Treat it as "queued".

@@ -17,8 +17,8 @@ func extrasDefs() []CommandDef {
 			Use: "extras list", Short: "List extras", Kind: KindRead,
 			Verb: "GET", Path: "/extras", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "product-id", Type: "string", Description: "Filter by product"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by product"},
 				{Name: "include-trashed", Type: "bool"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
@@ -30,7 +30,8 @@ func extrasDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-id"); v != "" {
+				if args.FlagSet("product-id") {
+					v := args.FlagInt("product-id")
 					p.ProductId = &v
 				}
 				if args.FlagBool("include-trashed") {
@@ -92,7 +93,9 @@ func extrasDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateExtraWithBodyWithResponse(ctx, &gen.CreateExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", "")
 				if res != nil {
 					res.WireBody = body
@@ -126,7 +129,9 @@ func extrasDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateExtraWithBodyWithResponse(ctx, id, &gen.UpdateExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
 				if res != nil {
 					res.WireBody = body
@@ -164,7 +169,9 @@ func extrasDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreExtraWithBodyWithResponse(ctx, id, &gen.RestoreExtraParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Extra", id)
 				if res != nil {
 					res.WireBody = body

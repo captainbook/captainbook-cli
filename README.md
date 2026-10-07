@@ -120,10 +120,12 @@ ceebee stats summary --business-unit-id 42
 | `stats extras` | Extra/add-on sales performance |
 | `stats discounts` | Discount code usage statistics |
 | `stats gift-certs` | Gift certificate issuance and redemption |
+| `stats locations` | Location ranking statistics |
+| `stats browsing` | Browsing funnel and visitor behaviour |
 
 ### `ceebee inventory` — read + write
 
-The inventory namespace covers 110+ endpoints across 21 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
+The inventory namespace covers 125+ endpoints across 24 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
 
 ```bash
 # Read

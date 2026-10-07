@@ -267,9 +267,11 @@ func availabilitiesDefs() []CommandDef {
 			Use: "list", Short: "List availabilities", Kind: KindRead,
 			Verb: "GET", Path: "/availabilities", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"},
+				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
-				{Name: "product-option-id", Type: "string"},
+				{Name: "product-option-id", Type: "int", Min: 1},
+				{Name: "product-id", Type: "string", Description: "Filter to availabilities of this product (accepts the id in either spelling the API takes)"},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},
 				{Name: "from", Type: "string", Description: availFromDesc},
 				{Name: "to", Type: "string", Description: availToDesc},
 				{Name: "has-capacity", Type: "bool", Description: "Only slots with remaining capacity"},
@@ -284,7 +286,15 @@ func availabilitiesDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
 				}
-				if v := args.FlagString("product-option-id"); v != "" {
+				if v := args.FlagString("product-id"); v != "" {
+					p.ProductId = &v
+				}
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
+				}
+				if args.FlagSet("product-option-id") {
+					v := args.FlagInt("product-option-id")
 					p.ProductOptionId = &v
 				}
 				if v := args.FlagString("from"); v != "" {
@@ -383,8 +393,11 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "status", Type: "string", Description: "available|blocked"},
 				{Name: "is-bookable", Type: "bool", Description: "Bulk-close state, tracked independently of --status. Reads false after a bulk-update booking-status close"},
 				{Name: "fares", Type: "string", Description: "JSON array of per-slot pricing overrides: [{pricing_tier_id, amount}, ...]. amount null deletes the override"},
+				{Name: "day-count", Type: "int", Description: "Multi-day events: number of days this departure spans"},
+				{Name: "start-time", Type: "string", Description: "HH:MM, product-local wall clock (datetime products only)"},
+				{Name: "end-time", Type: "string", Description: "HH:MM, product-local wall clock (datetime products only)"},
 			},
-			ForensicFields: []string{"capacity", "status", "is-bookable", "fares"},
+			ForensicFields: []string{"capacity", "status", "is-bookable", "fares", "day-count", "start-time", "end-time"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
@@ -394,6 +407,9 @@ func availabilitiesDefs() []CommandDef {
 					"capacity":    "capacity",
 					"status":      "status",
 					"is-bookable": "is_bookable",
+					"day-count":   "day_count",
+					"start-time":  "start_time",
+					"end-time":    "end_time",
 				})
 				if err != nil {
 					return nil, err
@@ -413,12 +429,55 @@ func availabilitiesDefs() []CommandDef {
 					}
 				}
 				resp, err := r.Client.UpdateAvailabilityWithBodyWithResponse(ctx, id, &gen.UpdateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", id)
 				if res != nil {
 					res.WireBody = body
 				}
 				return res, err
+			},
+		},
+		{
+			Use: "create", Short: "Create one availability (departure)", Kind: KindMutation,
+			Verb: "POST", Path: "/availabilities", Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Long: "Creates a single departure. Use `create-rule` instead to generate a " +
+				"recurring series; this is the one-off.",
+			Flags: []FlagDef{
+				{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option ID"},
+				{Name: "date", Type: "string", Required: true, Description: "Departure date (YYYY-MM-DD)"},
+				{Name: "start-time", Type: "string", Required: true, Description: "HH:MM, product-local wall clock"},
+				{Name: "end-time", Type: "string", Required: true, Description: "HH:MM, product-local wall clock"},
+				{Name: "capacity", Type: "int", Required: true, Description: "Slot capacity"},
+				{Name: "day-count", Type: "int", Description: "Multi-day events: number of days this departure spans"},
+				{Name: "end-date", Type: "string", Description: "Multi-day events: explicit end date (YYYY-MM-DD)"},
+				{Name: "is-bookable", Type: "bool", Description: "Whether the departure is open for booking"},
+			},
+			ForensicFields: []string{"product-option-id", "date", "start-time", "end-time", "capacity", "day-count", "end-date", "is-bookable"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
+					"product-option-id": "product_option_id",
+					"date":              "date",
+					"start-time":        "start_time",
+					"end-time":          "end_time",
+					"capacity":          "capacity",
+					"day-count":         "day_count",
+					"end-date":          "end_date",
+					"is-bookable":       "is_bookable",
+				})
+				if err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.CreateAvailabilityWithBodyWithResponse(ctx, &gen.CreateAvailabilityParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
+				res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, perr
 			},
 		},
 		{
@@ -442,8 +501,20 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "start-time", Type: "string", Description: "HH:MM (datetime products only)"},
 				{Name: "end-time", Type: "string", Description: "HH:MM (datetime products only)"},
 				{Name: "add-days-count", Type: "int", Description: "Multi-day events: extra days added to the end timestamp"},
+				{Name: "capacity", Type: "int", Description: "Capacity for every departure the rule creates"},
+				{Name: "times", Type: "json", Description: "Departure times as JSON, or @file.json: [{start_time, end_time, add_days_count?}, ...]"},
 			},
-			ForensicFields: []string{"product-option-id", "start-date", "end-date", "weekdays", "start-time", "end-time"},
+			// D20: `times` and `capacity` decide how many departures the rule creates
+			// and how large each one is. The audit keeps only body_sha256, so a
+			// value absent from this list cannot be reconstructed afterwards.
+			// add-days-count belongs here by this list's own stated criterion:
+			// it decides how LARGE each generated departure is (a multi-day
+			// event spanning N extra days). It is wired into the body and was
+			// missing from the audit, so an incident responder could see which
+			// option and which dates were touched but not that each departure
+			// spanned four days — the one value that explains the resulting
+			// overlapping inventory.
+			ForensicFields: []string{"product-option-id", "start-date", "end-date", "weekdays", "start-time", "end-time", "capacity", "times", "add-days-count"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				// Client-side range gate. The server rejects out-of-range
 				// weekdays with 422, but EU operators (Monday-first muscle
@@ -464,6 +535,8 @@ func availabilitiesDefs() []CommandDef {
 					"start-time":        "start_time",
 					"end-time":          "end_time",
 					"add-days-count":    "add_days_count",
+					"capacity":          "capacity",
+					"times":             "times",
 				})
 				if err != nil {
 					return nil, err
@@ -658,11 +731,18 @@ func timeValueNewValue(args RunArgs) (any, error) {
 // <setting>` subcommand. settingName is the kebab-case CLI form; the
 // underlying spec setting is the same with `-` → `_`.
 func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, newValueFn func(RunArgs) (any, error)) CommandDef {
-	// Common to every bulk-update setting: the temporal/scoping fields.
+	// Common to every bulk-update setting: the scoping fields.
+	//
+	// As of cli-v1 1.20.0 the spec offers TWO scopes and requires exactly one:
+	// either `availability_ids`, or `product_option_id` + `from` + `to`. So none
+	// of these can be Required at the cobra level any more — the choice is
+	// enforced below instead, because cobra cannot express "exactly one of these
+	// two groups".
 	commonFlags := []FlagDef{
-		{Name: "from", Type: "string", Required: true, Description: availFromDesc},
-		{Name: "to", Type: "string", Required: true, Description: availToDesc},
-		{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option ID"},
+		{Name: "from", Type: "string", Description: availFromDesc},
+		{Name: "to", Type: "string", Description: availToDesc},
+		{Name: "product-option-id", Type: "string", Description: "Target product option ID (with --from/--to)"},
+		{Name: "availability-ids", Type: "intSlice", Description: "The exact departures to change, comma-separated (max 1000). Mutually exclusive with --product-option-id/--from/--to. Use this whenever the request has an exception in it: \"close everything that day except the one that is booked\" cannot be written as a date range"},
 	}
 	flags := append([]FlagDef{}, commonFlags...)
 	flags = append(flags, perSettingFlags...)
@@ -670,7 +750,12 @@ func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, n
 	// Forensic fields per D37 + plan §"async bulk-update": capture
 	// setting, from, to, product_option_id, plus the per-setting
 	// new_value fields.
-	forensic := []string{"from", "to", "product-option-id"}
+	//
+	// D20: `availability-ids` decides exactly how many departures one call
+	// changes, which is the largest blast radius in this command tree. The audit
+	// keeps only body_sha256, so omitting it would leave an incident responder
+	// unable to tell which departures were touched.
+	forensic := []string{"from", "to", "product-option-id", "availability-ids"}
 	for _, f := range perSettingFlags {
 		forensic = append(forensic, f.Name)
 	}
@@ -688,14 +773,29 @@ func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, n
 		// forensic ensures audit_summary records which one ran.
 		StaticForensic: map[string]any{"setting": specSetting},
 		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-			from, err := parseDate(args.FlagString("from"))
-			if err != nil {
-				return nil, fmt.Errorf("--from: %w", err)
+			// Exactly one scope, per the spec: "Either `availability_ids`, or
+			// `product_option_id` + `from` + `to`. Sending both is a 422;
+			// sending neither is a 422." These gates mirror those refusals
+			// rather than spending a round trip to discover them.
+			idsSet := args.FlagSet("availability-ids")
+			rangeFlags := []string{"product-option-id", "from", "to"}
+			var rangeGiven []string
+			for _, f := range rangeFlags {
+				if args.FlagSet(f) {
+					rangeGiven = append(rangeGiven, "--"+f)
+				}
 			}
-			to, err := parseDate(args.FlagString("to"))
-			if err != nil {
-				return nil, fmt.Errorf("--to: %w", err)
+			switch {
+			case idsSet && len(rangeGiven) > 0:
+				return nil, fmt.Errorf("--availability-ids is mutually exclusive with %s: pass one scope or the other, not both",
+					strings.Join(rangeGiven, ", "))
+			case !idsSet && len(rangeGiven) == 0:
+				return nil, fmt.Errorf("one scope is required: either --availability-ids, or all of --product-option-id, --from and --to")
+			case !idsSet && len(rangeGiven) < len(rangeFlags):
+				return nil, fmt.Errorf("the date-range scope needs all of --product-option-id, --from and --to (got %s)",
+					strings.Join(rangeGiven, ", "))
 			}
+
 			newValue, err := newValueFn(args)
 			if err != nil {
 				return nil, err
@@ -712,9 +812,44 @@ func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, n
 				}
 			}
 			body["setting"] = specSetting
-			body["from"] = from.Format("2006-01-02")
-			body["to"] = to.Format("2006-01-02")
-			body["product_option_id"] = args.FlagString("product-option-id")
+			if idsSet {
+				ids, _ := args.Flags["availability-ids"].([]int)
+				// The cap matches the job's chunk size; the server answers 422
+				// above it. An id that does not resolve is also a 422 naming it
+				// rather than a silently narrowed list, so there is nothing to
+				// filter here.
+				if len(ids) == 0 {
+					return nil, fmt.Errorf("--availability-ids: at least one id is required")
+				}
+				if len(ids) > 1000 {
+					return nil, fmt.Errorf("--availability-ids: %d ids exceeds the 1000 cap; a longer list is a date range wearing the wrong shape", len(ids))
+				}
+				for _, id := range ids {
+					if id < 1 {
+						return nil, fmt.Errorf("--availability-ids: %d is not a valid availability id (must be >= 1)", id)
+					}
+				}
+				body["availability_ids"] = ids
+			} else {
+				from, err := parseDate(args.FlagString("from"))
+				if err != nil {
+					return nil, fmt.Errorf("--from: %w", err)
+				}
+				to, err := parseDate(args.FlagString("to"))
+				if err != nil {
+					return nil, fmt.Errorf("--to: %w", err)
+				}
+				// `to` is EXCLUSIVE and must be strictly after `from`. Equal
+				// dates matched nothing and used to answer a cheerful 200 with
+				// total_matched: 0, which reads as a successful change; the
+				// server made it a 422 in 1.18.0 and so does this.
+				if !to.Time.After(from.Time) {
+					return nil, fmt.Errorf("--to must be strictly after --from (the range is half-open, so one day means --to = the NEXT day)")
+				}
+				body["from"] = from.Format("2006-01-02")
+				body["to"] = to.Format("2006-01-02")
+				body["product_option_id"] = args.FlagString("product-option-id")
+			}
 			body["new_value"] = newValue
 			if args.DryRun {
 				body["dry_run"] = true

@@ -2,6 +2,9 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/google/uuid"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -27,8 +30,10 @@ func guestsDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListGuestsParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
 				{Name: "booking-id", Type: "string", Description: "Filter by booking"},
+				{Name: "customer-id", Type: "string", Description: "Guests on bookings whose booker is this customer (UUID)"},
+				{Name: "q", Type: "string", Description: "Free-text search over guest name and email"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListGuestsParams{}
@@ -40,6 +45,16 @@ func guestsDefs() []CommandDef {
 				}
 				if v := args.FlagString("booking-id"); v != "" {
 					p.BookingId = &v
+				}
+				if v := args.FlagString("customer-id"); v != "" {
+					id, err := uuid.Parse(v)
+					if err != nil {
+						return nil, fmt.Errorf("--customer-id: invalid UUID: %w", err)
+					}
+					p.CustomerId = &id
+				}
+				if v := args.FlagString("q"); v != "" {
+					p.Q = &v
 				}
 				resp, err := r.Client.ListGuestsWithResponse(ctx, p)
 				if err != nil {
@@ -99,7 +114,9 @@ func guestsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateGuestWithBodyWithResponse(ctx, id, &gen.UpdateGuestParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Guest", id)
 				if res != nil {
 					res.WireBody = body

@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
@@ -18,10 +20,11 @@ func productOptionsDefs() []CommandDef {
 			Use: "product-options list", Short: "List product options", Kind: KindRead,
 			Verb: "GET", Path: "/product-options", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
-				{Name: "product-id", Type: "string", Description: "Filter by parent product"},
+				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by parent product"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
+				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				params := &gen.ListProductOptionsParams{}
@@ -31,7 +34,15 @@ func productOptionsDefs() []CommandDef {
 				if v := args.FlagString("cursor"); v != "" {
 					params.Cursor = &v
 				}
-				if v := args.FlagString("product-id"); v != "" {
+				if v := args.FlagString("since"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return nil, fmt.Errorf("--since: invalid RFC3339 timestamp: %w", err)
+					}
+					params.Since = &t
+				}
+				if args.FlagSet("product-id") {
+					v := args.FlagInt("product-id")
 					params.ProductId = &v
 				}
 				if args.FlagBool("include-trashed") {
@@ -90,7 +101,9 @@ func productOptionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.CreateProductOptionWithBodyWithResponse(ctx, &gen.CreateProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", "")
 				if res != nil {
 					res.WireBody = body
@@ -127,7 +140,9 @@ func productOptionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.UpdateProductOptionWithBodyWithResponse(ctx, id, &gen.UpdateProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", id)
 				if res != nil {
 					res.WireBody = body
@@ -169,7 +184,9 @@ func productOptionsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreProductOptionWithBodyWithResponse(ctx, id, &gen.RestoreProductOptionParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "ProductOption", id)
 				if res != nil {
 					res.WireBody = body

@@ -55,11 +55,11 @@ func answersDefs() []CommandDef {
 				"  # Include answers to questions the operator has since retired\n" +
 				"  ceebee inventory answers list --booking-id bk_9 --include-trashed",
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
 				{Name: "booking-id", Type: "string", Description: "Answers on one booking"},
 				{Name: "question-id", Type: "int", Description: "Answers to one question, across bookings. Numeric here (the spec types it integer on this endpoint), unlike the prefixed ids other commands take"},
 				{Name: "granularity", Type: "string", Description: "booking|guest|extra"},
-				{Name: "product-option-id", Type: "int", Description: "Answers on bookings for one product option. Numeric here, unlike the prefixed form other commands accept"},
+				{Name: "product-option-id", Type: "int", Min: 1, Description: "Answers on bookings for one product option. Numeric here, unlike the prefixed form other commands accept"},
 				{Name: "from", Type: "string", Description: "Trip departure >= ISO 8601 (inclusive). Bounds the DEPARTURE, not when the answer was written"},
 				{Name: "to", Type: "string", Description: "Trip departure < ISO 8601 (exclusive). See --from"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at (a genuine UTC bound, unlike --from/--to)"},

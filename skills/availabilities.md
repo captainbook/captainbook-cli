@@ -8,6 +8,7 @@ An `Availability` is the per-date instance of a `ProductOption`: capacity for a 
 |---------|---------------|---------|---------|
 | `inventory availabilities list` | GET /availabilities | `cli:read` | n/a |
 | `inventory availabilities get <id>` | GET /availabilities/{id} | `cli:read` | n/a |
+| `inventory availabilities create` | POST /availabilities | `cli:write` | body |
 | `inventory availabilities update <id>` | PATCH /availabilities/{id} | `cli:write` | body |
 | `inventory availabilities delete <id>` | DELETE /availabilities/{id} | `cli:write` | body |
 | `inventory availabilities create-rule` | POST /availability-rules | `cli:write` | body |

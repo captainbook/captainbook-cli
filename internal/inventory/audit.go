@@ -33,6 +33,7 @@ package inventory
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -464,25 +465,38 @@ func readJSONL(path string) ([]AuditEntry, error) {
 	defer f.Close()
 
 	var out []AuditEntry
-	scanner := bufio.NewScanner(f)
-	// Allow long lines (forensic_summary can be substantial).
-	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+	// bufio.Scanner is wrong for this file. It fails the WHOLE read on a single
+	// line longer than its cap (bufio.ErrTooLong), and Reader.List turns that
+	// into a total failure — so one oversized entry made every OTHER entry
+	// unreadable too, including unrelated earlier cancels, voids and refunds.
+	// That is the opposite of what an append-only forensic log is for, and it
+	// became reachable the moment a ForensicFields flag could be sourced from a
+	// file (`--conditions @big.json`): before that, forensic_summary was bounded
+	// by ARG_MAX.
+	//
+	// bufio.Reader grows to fit instead. A single pathological line costs memory
+	// proportional to itself and nothing else; it no longer costs the reader the
+	// rest of the file.
+	br := bufio.NewReaderSize(f, 64*1024)
+	for {
+		line, err := br.ReadBytes('\n')
+		if len(line) > 0 {
+			line = bytes.TrimRight(line, "\r\n")
+			if len(line) > 0 {
+				var e AuditEntry
+				// Corrupt line — skip. The reader is permissive by design.
+				if json.Unmarshal(line, &e) == nil {
+					out = append(out, e)
+				}
+			}
 		}
-		var e AuditEntry
-		if err := json.Unmarshal(line, &e); err != nil {
-			// Corrupt line — skip. The reader is permissive by design.
-			continue
+		if err != nil {
+			if err == io.EOF {
+				return out, nil
+			}
+			return out, err
 		}
-		out = append(out, e)
 	}
-	if err := scanner.Err(); err != nil {
-		return out, err
-	}
-	return out, nil
 }
 
 // DefaultAuditPath returns the canonical audit log path under the user's

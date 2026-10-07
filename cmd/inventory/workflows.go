@@ -41,10 +41,52 @@ func workflowsCmd(runner *Runner) *cobra.Command {
 func workflowsDefs() []CommandDef {
 	return []CommandDef{
 		{
+			Use: "nodes", Short: "The trigger + action catalogue for composing a workflow",
+			Kind: KindRead, Verb: "GET", Path: "/workflow-nodes", Ability: invpkg.Read,
+			Long: "Lists the trigger and action vocabulary: which action_type values exist " +
+				"and what each one's config must contain. Read this before writing " +
+				"create --trigger or create --steps.\n\n" +
+				"This route sits behind the workflows subscription gate, so a tenant whose " +
+				"plan does not include workflows gets a 404 carrying that reason — it is " +
+				"not a missing resource.\n\n" +
+				"Every TRIGGER node comes back with config: [] (an empty JSON array) " +
+				"where the spec declares an object, because Laravel serializes an empty " +
+				"config as [] rather than {}. The CLI reads this response as raw bytes " +
+				"for that reason, so the catalogue is fully usable; the spec mismatch is " +
+				"tracked in TODOS.md as an upstream fix.",
+			Flags: []FlagDef{
+				{Name: "kind", Type: "string", Description: "action|logic|trigger"},
+			},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				p := &gen.ListWorkflowNodesParams{}
+				if v := args.FlagString("kind"); v != "" {
+					k := gen.ListWorkflowNodesParamsKind(v)
+					p.Kind = &k
+				}
+				// Untyped read, exactly as workflows list/get do, and for the
+				// identical reason: the spec types config as `object` but Laravel
+				// serializes an empty one as `[]`, and the strict-typed decode
+				// fails with "cannot unmarshal array into ... config of type
+				// map[string]string". Every trigger node has an empty config, so
+				// the TYPED path made the default invocation — the one the Long
+				// text tells you to run first — fail outright, while --kind action
+				// and --kind logic happened to work.
+				//
+				// This was logged as an upstream-only problem. It is not: the
+				// remedy was already established in this file for the same cause,
+				// five call sites away. The renderers consume raw bytes either way.
+				resp, err := r.Client.ListWorkflowNodes(ctx, p)
+				if err != nil {
+					return nil, err
+				}
+				return readRawResponse(resp, "WorkflowNode", "")
+			},
+		},
+		{
 			Use: "list", Short: "List workflows", Kind: KindRead,
 			Verb: "GET", Path: "/workflows", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"},
+				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
 				{Name: "include-trashed", Type: "bool"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
@@ -120,8 +162,13 @@ func workflowsDefs() []CommandDef {
 				{Name: "business-unit-id", Type: "int", Description: "Defaults to the caller's current business unit"},
 				{Name: "max-credits-per-run", Type: "int", Description: "Per-execution credit ceiling (default 50)"},
 				{Name: "notify-on-fail", Type: "bool"},
+				{Name: "trigger", Type: "json", Description: "Trigger as JSON, or @file.json: {action_type, config?}. Run workflows nodes for the vocabulary"},
+				{Name: "steps", Type: "json", Description: "Steps as JSON, or @file.json: [{step_type, action_type?, parent_ref?, ...}, ...], written alongside the workflow"},
 			},
-			ForensicFields: []string{"name", "business-unit-id", "max-credits-per-run", "notify-on-fail"},
+			// D20: `steps` and `trigger` ARE the automation this workflow will
+			// run. The audit keeps only body_sha256, so leaving them out would
+			// make a created workflow unreconstructable after the fact.
+			ForensicFields: []string{"name", "business-unit-id", "max-credits-per-run", "notify-on-fail", "trigger", "steps"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
 					"name":                "name",
@@ -129,6 +176,8 @@ func workflowsDefs() []CommandDef {
 					"business-unit-id":    "business_unit_id",
 					"max-credits-per-run": "max_credits_per_run",
 					"notify-on-fail":      "notify_on_fail",
+					"trigger":             "trigger",
+					"steps":               "steps",
 				})
 				if err != nil {
 					return nil, err
@@ -504,7 +553,7 @@ func workflowExecutionsDefs() []CommandDef {
 			Long: "Default ordering: latest first (created_at DESC, id DESC) — the most " +
 				"common support query is \"what failed in the last hour\".",
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"},
+				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
 				{Name: "workflow-id", Type: "string", Description: "Filter to one workflow (UUID)"},
 				{Name: "status", Type: "string", Description: "pending|running|waiting|completed|failed"},
@@ -575,9 +624,9 @@ func workflowExecutionsDefs() []CommandDef {
 			Kind: KindRead, Verb: "GET", Path: "/workflow-executions/{id}/logs", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"},
+				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
-				{Name: "step-id", Type: "int", Description: "Filter to one step's history"},
+				{Name: "step-id", Type: "int", Min: 1, Description: "Filter to one step's history"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := executionIDArg(args)

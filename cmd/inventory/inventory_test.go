@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -23,6 +24,8 @@ import (
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 	"github.com/spf13/cobra"
+
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 )
 
 // fakeServer returns an httptest.Server that returns canned responses
@@ -38,10 +41,23 @@ func fakeServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *Runn
 		t.Fatalf("parse server URL: %v", err)
 	}
 
-	// Build a transport-less gen client (the test handler is the source
-	// of truth, and we don't want the round-tripper chain's host
-	// allow-list to reject httptest's loopback addresses).
-	client, err := gen.NewClientWithResponses(srv.URL)
+	// Build a gen client WITHOUT most of the round-tripper chain: the test handler
+	// is the source of truth, and the chain's host allow-list rejects httptest's
+	// loopback addresses.
+	//
+	// The flat-error normalizer IS installed, because it is a response-shape
+	// adapter rather than an auth/host/retry concern, and leaving it out made the
+	// tests structurally unable to see a whole class of bug: generated decoding
+	// rejects a flat `{"error":"text"}` body and returns (nil, err) before any of
+	// this package's error handling runs. Without this layer every test would pass
+	// while the user got `json: cannot unmarshal string into Go struct field
+	// ErrorEnvelope.error`.
+	//
+	// The rest of the chain is still absent here — idempotency minting, URL
+	// validation and retry are exercised by internal/inventory/transport_test.go
+	// against their own stubs. That split is recorded in TODOS.md.
+	httpClient := &http.Client{Transport: invpkg.NewFlatErrorNormalizer(nil)}
+	client, err := gen.NewClientWithResponses(srv.URL, gen.WithHTTPClient(httpClient))
 	if err != nil {
 		t.Fatalf("build gen client: %v", err)
 	}
@@ -783,7 +799,7 @@ func TestBookingsCancel_IsCSGated(t *testing.T) {
 	// stops matching the spec. The enum IS the argument for a static gate,
 	// so pin the whole set.
 	wantEnum := []string{"none", "full", "partial"}
-	if !sameSet(f.Enum, wantEnum) {
+	if !docscan.SameValues(f.Enum, wantEnum) {
 		t.Errorf("spec refund_policy enum is now %v, was %v. The static cli:cs gate on "+
 			"bookings cancel rests on EVERY member being a CS-only policy override. "+
 			"A member that applies the product's own policy instead is operator-reachable "+
@@ -1521,25 +1537,24 @@ func TestBookingsList_ResourceFilterParams(t *testing.T) {
 // The spec pins resource_id to minimum 1, and the usual `!= 0` unset-guard
 // would drop a 0 and return EVERY booking unfiltered — which an agent reads as
 // "this resource is assigned to all of them". Fail before the network instead.
+//
+// This drives the REAL command tree rather than calling def.Run directly, and
+// that is load-bearing. The bound is declared as FlagDef.Min and enforced once in
+// makeRunE, which is the only path a user can take — but it is also a path a
+// hand-built RunArgs skips entirely. An earlier version of this test passed
+// `RunArgs{Flags: {"resource-id": 0}}` straight to the closure, so after the
+// guard moved it asserted on a code path production does not use. Driving Cmd()
+// keeps the assertion pointed at what actually runs.
 func TestBookingsList_RejectsZeroResourceID(t *testing.T) {
-	def := bookingsDefFor(t, "bookings list")
-
-	var called bool
-	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"data":[],"meta":{}}`))
-	})
-
-	_, err := def.Run(context.Background(), runner, RunArgs{Flags: map[string]any{"resource-id": 0}})
+	q, _, hit, err := capture(t, "bookings", "list", "--resource-id", "0")
 	if err == nil {
 		t.Fatal("expected an error for --resource-id 0, got nil")
 	}
 	if !strings.Contains(err.Error(), "resource-id") {
 		t.Errorf("error should name the offending flag; got %v", err)
 	}
-	if called {
-		t.Error("must reject before hitting the network — an unfiltered list is worse than an error")
+	if hit {
+		t.Errorf("must reject before hitting the network — an unfiltered list is worse than an error (query: %v)", q)
 	}
 }
 
@@ -2065,21 +2080,21 @@ func TestProductsList_StatusGateRejectsArchived(t *testing.T) {
 		t.Fatalf("extractEnumTokens(%q) returned nil — the client-side enum gate "+
 			"in makeRunE is disabled for --status, so any value reaches the server", desc)
 	}
-	if !sameSet(tokens, []string{"draft", "published"}) {
+	if !docscan.SameValues(tokens, []string{"draft", "published"}) {
 		t.Errorf("--status allow-list is %v, want [draft published]. status filters the "+
 			"two-state is_active column and the server validates it with in:published,draft",
 			tokens)
 	}
 
 	for _, v := range []string{"draft", "published"} {
-		if !inSlice(v, tokens) {
+		if !slices.Contains(tokens, v) {
 			t.Errorf("--status %q rejected locally but the server accepts it", v)
 		}
 	}
 	// `archived` specifically: it was the spec's phantom third state, and a
 	// re-sync that reinstates it must fail here as well as in the drift test.
 	for _, v := range []string{"archived", "publshed", ""} {
-		if v != "" && inSlice(v, tokens) {
+		if v != "" && slices.Contains(tokens, v) {
 			t.Errorf("--status %q passes the client-side gate; the server 422s on it, "+
 				"so the operator pays a round trip to learn it is invalid", v)
 		}

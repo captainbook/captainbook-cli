@@ -17,6 +17,35 @@ A `Booking` is a customer reservation against a `ProductOption` on a specific da
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
 
+## Filters on `bookings list`
+
+cli-v1 1.29.0 widened this list considerably. The ones worth knowing:
+
+| Flag | Notes |
+|---|---|
+| `--date-field` | Which date `--from`/`--to` bound: `starts_at` (default, the trip), `confirmed_at`, or `created_at`. This is the single most common source of "why is this booking missing" — a trip in March confirmed in January is outside a January `starts_at` window. |
+| `--status` | Case-insensitive alias of `--booking-status`. Both exist; pick one. |
+| `--origin-type` | `ota`, `direct_online`, `direct_offline`, `indirect_offline`, `reseller`, `other`. The surface that sold the booking. |
+| `--partner-id` | Matches **either** side of the partner relationship. Ids come from `inventory partners list`. |
+| `--customer-id` | The booker, as a UUID. From `customers list`. A malformed value fails locally rather than as a 404. |
+| `--include-trashed` | Soft-deleted bookings. Distinct from `--include-cancelled`, which lifts the cancelling scope. |
+| `--since` | ISO 8601 lower bound on `updated_at`, for incremental sync. |
+| `--include resources` | Enriches each row with assigned resources plus a `resource_state_token` suitable for stale-state guarded writes. Any other value is a 422 — a misspelling used to return 200 with no resources and nothing saying why. |
+
+```bash
+# Bookings CONFIRMED in January, whatever month they depart
+ceebee inventory bookings list --from 2026-01-01 --to 2026-01-31 --date-field confirmed_at
+
+# One partner's OTA bookings
+ceebee inventory bookings list --partner-id 7 --origin-type ota --format table
+
+# Everything that changed since the last sync, including soft-deleted rows
+ceebee inventory bookings list --since 2026-10-01T00:00:00Z --include-trashed
+
+# Rows with their assigned resources and a write token
+ceebee inventory bookings list --include resources --format json
+```
+
 ## Worked examples
 
 ### 1. List confirmed bookings starting in May

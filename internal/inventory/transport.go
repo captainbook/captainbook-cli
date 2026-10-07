@@ -105,7 +105,104 @@ func New(cfg Config, base http.RoundTripper) http.RoundTripper {
 	rt = &idempotencyKeyRT{next: rt, mint: mintUUIDv7}
 	rt = &bearerAuthRT{next: rt, token: cfg.Token, verbose: cfg.Verbose, verboseW: verboseW}
 	rt = &requestURLValidatorRT{next: rt, expectedHost: cfg.ExpectedHost}
+	rt = &flatErrorNormalizerRT{next: rt}
 	return rt
+}
+
+// flatErrorNormalizerRT rewrites a FLAT error body into the enveloped shape the
+// generated client expects, for error statuses only.
+//
+// The spec declares every refusal as `{"error": {code, message, ...}}`, but some
+// admission gates answer with `{"error": "<sentence>"}` — the plan gate on
+// `GET /workflow-nodes` returns exactly that, with 404, for a tenant whose plan
+// excludes workflows.
+//
+// Handling it in ParseError alone was not enough, and the reason is worth stating:
+// oapi-codegen unmarshals a 404 into `gen.NotFound` (= ErrorEnvelope) and the
+// generated method returns `(nil, err)` when that fails. The flat body fails it
+// with `cannot unmarshal string into Go struct field ErrorEnvelope.error of type
+// gen.Error`, so every closure's `if err != nil { return nil, err }` fires BEFORE
+// ParseGenResponse is reached and the flat-shape handling downstream never runs.
+// The user saw a raw JSON type error instead of "Workflows are not included in
+// your subscription plan."
+//
+// Normalizing here fixes it for every operation at once, and costs nothing on the
+// happy path: 2xx bodies are passed through untouched without being read.
+type flatErrorNormalizerRT struct {
+	next http.RoundTripper
+}
+
+// NewFlatErrorNormalizer wraps base with the flat-error rewrite ALONE.
+//
+// Exported for the test harness, which deliberately builds its gen client without
+// the rest of the chain (the host allow-list rejects httptest's loopback
+// addresses). This layer has nothing to do with hosts, auth or retries — it only
+// reshapes an error body — so installing it on its own keeps the tests faithful
+// for response handling without re-introducing the reason the chain was skipped.
+func NewFlatErrorNormalizer(base http.RoundTripper) http.RoundTripper {
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return &flatErrorNormalizerRT{next: base}
+}
+
+func (r *flatErrorNormalizerRT) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := r.next.RoundTrip(req)
+	if err != nil || resp == nil || resp.StatusCode < 400 {
+		return resp, err
+	}
+	if !strings.Contains(resp.Header.Get("Content-Type"), "json") {
+		return resp, nil
+	}
+
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	resp.Body.Close()
+	if readErr != nil {
+		// Hand back what the body said it was; the caller's own error handling
+		// reports the read failure.
+		resp.Body = io.NopCloser(bytes.NewReader(body))
+		return resp, nil
+	}
+
+	if rewritten, ok := normalizeFlatError(body); ok {
+		body = rewritten
+		resp.Header.Del("Content-Length")
+		resp.ContentLength = int64(len(body))
+	}
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+	return resp, nil
+}
+
+// normalizeFlatError turns `{"error":"text"}` into `{"error":{"message":"text"}}`,
+// preserving every other top-level key. Reports false when the body is not that
+// shape, in which case it must be passed through byte-for-byte.
+func normalizeFlatError(body []byte) ([]byte, bool) {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(body, &top) != nil {
+		return nil, false
+	}
+	raw, ok := top["error"]
+	if !ok {
+		return nil, false
+	}
+	var flat string
+	if json.Unmarshal(raw, &flat) != nil {
+		// Already an object (or something else) — leave it alone.
+		return nil, false
+	}
+	if strings.TrimSpace(flat) == "" {
+		return nil, false
+	}
+	wrapped, err := json.Marshal(map[string]string{"message": flat})
+	if err != nil {
+		return nil, false
+	}
+	top["error"] = wrapped
+	out, err := json.Marshal(top)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
 
 // requestURLValidatorRT rejects requests whose URL is malformed and enforces
@@ -216,9 +313,9 @@ type retryRT struct {
 
 func (r *retryRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	var (
-		resp                       *http.Response
-		lastErr                    error
-		idempotencyInProgressUsed  bool
+		resp                      *http.Response
+		lastErr                   error
+		idempotencyInProgressUsed bool
 	)
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {

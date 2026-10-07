@@ -18,21 +18,21 @@ func transactionsDefs() []CommandDef {
 		{
 			Use: "transactions list", Short: "List transactions", Kind: KindRead,
 			Verb: "GET", Path: "/transactions", Ability: invpkg.Read,
-			// NOTE: --status is intentionally NOT exposed. The spec's
-			// listTransactions query parameter accepts
-			// [pending,succeeded,failed,partial], but the Transaction
-			// schema's status enum is [succeeded] with the description
-			// "Always `succeeded` — failed payments don't produce a row at
-			// all." Filtering by anything other than `succeeded` is
-			// guaranteed zero results, and `succeeded` filters everything,
-			// so the flag is a no-op trap. Filed as a server-team issue;
-			// re-add the flag when the schema gains real status semantics.
+			// NOTE: there is no --status, and as of cli-v1 1.29.0 there is
+			// nothing to expose: the spec REMOVED the `status` query
+			// parameter from listTransactions. It previously accepted
+			// [pending,succeeded,failed,partial] while the Transaction
+			// schema's own status enum was [succeeded] ("Always `succeeded`
+			// — failed payments don't produce a row at all"), so the filter
+			// was a no-op trap and the server team dropped it. `comp` left
+			// the --type enum in the same release.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int"}, {Name: "cursor", Type: "string"},
-				{Name: "type", Type: "string", Description: "charge|refund|comp"},
+				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "type", Type: "string", Description: "charge|refund"},
 				{Name: "from", Type: "string", Description: "Transaction created_at >= ISO 8601"},
 				{Name: "to", Type: "string", Description: "Transaction created_at <= ISO 8601"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				p := &gen.ListTransactionsParams{}
@@ -41,6 +41,10 @@ func transactionsDefs() []CommandDef {
 				}
 				if v := args.FlagString("cursor"); v != "" {
 					p.Cursor = &v
+				}
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
 				}
 				if v := args.FlagString("type"); v != "" {
 					t := gen.ListTransactionsParamsType(v)

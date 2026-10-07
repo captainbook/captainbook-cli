@@ -40,6 +40,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
+
+	"github.com/captainbook/captainbook-cli/internal/docscan"
 )
 
 // -----------------------------------------------------------------------------
@@ -483,22 +485,6 @@ func (s *specDoc) bodyField(op *opDef, jsonKey string) *specField {
 // because makeRunE uses it for client-side flag validation.
 // -----------------------------------------------------------------------------
 
-func sameSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	as := append([]string(nil), a...)
-	bs := append([]string(nil), b...)
-	sort.Strings(as)
-	sort.Strings(bs)
-	for i := range as {
-		if as[i] != bs[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func kebabToSnake(s string) string { return strings.ReplaceAll(s, "-", "_") }
 
 // -----------------------------------------------------------------------------
@@ -827,7 +813,7 @@ func TestSpecDrift_FlagDescriptionEnumsMatchSpec(t *testing.T) {
 				// but the server doesn't enforce. Skip.
 				continue
 			}
-			if !sameSet(tokens, specEnum) {
+			if !docscan.SameValues(tokens, specEnum) {
 				t.Errorf("[%s] %q (%s %s): flag --%s description tokens %v don't match spec enum %v",
 					c.File, c.Use, c.Verb, c.Path, f.Name, tokens, specEnum)
 			}
@@ -1303,4 +1289,139 @@ components:
 	if _, err := parseCurrencyRequirements([]byte("components: {schemas: {Foo: {properties: {name: {type: string}}}}}")); err == nil {
 		t.Fatal("expected an error when no schema declares currency, got nil — a spec reshape would silently disable the flag rule")
 	}
+}
+
+// -----------------------------------------------------------------------------
+// Flag TYPE vs spec type.
+//
+// Closes the hole TODOS.md recorded for a long time: every other drift check
+// compares flag NAMES, JSON keys, enums and abilities, and none of them compares
+// a flag's Go type against the type the spec gives that parameter. So the CLI
+// declared `string` flags against `type: integer` query params for several
+// releases and nothing noticed — until upstream tightened the generated types
+// and the compiler noticed for us, in twelve places at once.
+//
+// A compiler catching it is luck, not a guard: it only worked because codegen
+// happened to produce a mismatched Go type. A `string` flag against a `type:
+// integer` param that oapi-codegen still models as *string would sail through.
+//
+// This reads the LIVE cobra tree, not the AST. That is deliberate and it is the
+// single most important design decision in this test: an AST walker reads a
+// non-literal field value as EMPTY and skips the entity in SILENCE, so a
+// loop-built Flags list would simply not be checked and the count-based
+// fail-closed guard below could not tell. `bindCommands` annotates verb/path
+// onto the live command precisely so tests can work from the real object.
+// -----------------------------------------------------------------------------
+
+// globalFlagNames are added to every command by bindCommands, not declared by a
+// CommandDef, so they have no spec parameter to compare against.
+var globalFlagNames = map[string]bool{
+	"data": true, "dry-run": true, "format": true, "idempotency-key": true,
+	"profile": true, "verbose": true, "help": true,
+}
+
+// flagTypeExceptions are flags whose declared type deliberately differs from the
+// spec's scalar type. Key: "VERB /path --flag". Value: why.
+var flagTypeExceptions = map[string]string{}
+
+// expectedFlagType maps a spec scalar type to the CommandDef flag type that
+// carries it. Returns "" when the spec type is not an unambiguous scalar, in
+// which case this test asserts nothing rather than guessing.
+func expectedFlagType(specType string) string {
+	switch specType {
+	case "integer":
+		return "int"
+	case "boolean":
+		return "bool"
+	case "string":
+		return "string"
+	default:
+		// "array", "object", a union, or absent. A union is the interesting one:
+		// `include` is "one value or a list of them" and `PositiveIntegerId` is
+		// "an integer or a digit string", and in both cases more than one flag
+		// type is legitimate. Asserting here would manufacture false failures.
+		return ""
+	}
+}
+
+func TestSpecDrift_FlagTypesMatchSpecTypes(t *testing.T) {
+	doc := loadSpecDoc(t)
+
+	// The comparison reads cobra's own type name straight off the live flag
+	// (pflag.Flag.Value.Type()) and compares it with what expectedFlagType
+	// derives from the spec. There is deliberately no CommandDef-type-to-cobra-name
+	// lookup table here: a table would be a third statement of the mapping that
+	// could drift from the two real ones.
+	//
+	// "json" flags are registered as cobra strings and validated on collection;
+	// the spec types those fields as object/array, which expectedFlagType
+	// declines to assert on.
+
+	checked := 0
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		verb, path := c.Annotations["verb"], c.Annotations["path"]
+		if verb != "" && path != "" {
+			op := doc.ops[verb+" "+path]
+			if op != nil {
+				c.Flags().VisitAll(func(f *pflag.Flag) {
+					if globalFlagNames[f.Name] {
+						return
+					}
+					param := strings.ReplaceAll(f.Name, "-", "_")
+
+					// Query parameter first, then the request body.
+					var field *specField
+					if qp, ok := op.QueryParams[param]; ok {
+						field = qp
+					} else if op.BodyRef != "" {
+						if flat, ok := doc.schemas[op.BodyRef]; ok {
+							field = flat[param]
+						}
+					} else if op.BodyInline != nil {
+						field = op.BodyInline[param]
+					}
+					if field == nil {
+						// No spec field by this name. Whether that is a problem
+						// is the other tests' question (field maps, coverage);
+						// this one only compares types it can resolve.
+						return
+					}
+					want := expectedFlagType(field.Type)
+					if want == "" {
+						return
+					}
+					// Count the COMPARISON, not the match. Counting only
+					// matches meant a run in which every flag type disagreed
+					// reported "the walker is broken, not the CLI" — pointing
+					// the reader away from the real failure.
+					checked++
+					got := f.Value.Type()
+					if got == want {
+						return
+					}
+					key := verb + " " + path + " --" + f.Name
+					if reason, ok := flagTypeExceptions[key]; ok {
+						t.Logf("allowed flag-type exception: %s (%s)", key, reason)
+						return
+					}
+					t.Errorf("[%s] --%s is declared %q but the spec types %s as %q (want a %q flag).\n"+
+						"      A flag whose type disagrees with the spec either fails to compile against the "+
+						"generated client or silently sends the wrong JSON type.",
+						c.CommandPath(), f.Name, got, param, field.Type, want)
+				})
+			}
+		}
+		for _, child := range c.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+
+	// Guard the guard. A walker that resolves nothing passes vacuously, which is
+	// exactly the silent-skip failure this test is built to avoid.
+	if checked == 0 {
+		t.Fatal("resolved 0 flag/spec type pairs — the walker or the spec parser is broken, not the CLI")
+	}
+	t.Logf("compared %d flag types against spec parameter types", checked)
 }

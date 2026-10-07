@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -798,5 +799,166 @@ func TestRetry_IdempotencyConflict_NotAutoRetried(t *testing.T) {
 	got, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(got), "IDEMPOTENCY_CONFLICT") {
 		t.Errorf("body must be preserved on surfaced 409: %q", string(got))
+	}
+}
+
+// TestFlatErrorNormalizerRT covers the transport rewrite that makes a FLAT error
+// body readable by the generated client.
+//
+// Why a transport layer and not just ParseError: oapi-codegen unmarshals a 404
+// into gen.NotFound (= ErrorEnvelope, whose `error` is an OBJECT) and the generated
+// method returns (nil, err) when that fails. A flat `{"error":"<sentence>"}` fails
+// it with "cannot unmarshal string into Go struct field ErrorEnvelope.error", so
+// every closure's `if err != nil { return nil, err }` fires BEFORE ParseGenResponse
+// runs — and the flat-shape handling added downstream never executes. The user got
+// a raw JSON type error instead of the plan-gate explanation.
+//
+// `GET /workflow-nodes` returns exactly that shape, with 404, for a tenant whose
+// plan excludes workflows.
+//
+// Value: protects=a flat {"error":"text"} refusal is reshaped so generated decoding succeeds and the sentence survives; fails_when=the normalizer is removed from the chain, or starts rewriting 2xx bodies or already-enveloped errors; why_new=ParseError-level tests pass a body directly and cannot see that generated decoding rejects it first; seam=http.RoundTripper
+func TestFlatErrorNormalizerRT(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     int
+		ctype      string
+		body       string
+		wantChange bool
+		wantSub    string
+	}{
+		{
+			name: "flat 404 is enveloped", status: 404, ctype: "application/json",
+			body:       `{"error":"Workflows are not included in your subscription plan."}`,
+			wantChange: true,
+			wantSub:    `"error":{"message":"Workflows are not included in your subscription plan."}`,
+		},
+		{
+			name: "already enveloped is untouched", status: 404, ctype: "application/json",
+			body:       `{"error":{"code":"NOT_FOUND","message":"nope"}}`,
+			wantChange: false,
+		},
+		{
+			name: "success body is never touched", status: 200, ctype: "application/json",
+			body:       `{"error":"this is data, not an error"}`,
+			wantChange: false,
+		},
+		{
+			name: "non-json error is untouched", status: 500, ctype: "text/html",
+			body:       `<html>502</html>`,
+			wantChange: false,
+		},
+		{
+			name: "null error value is untouched", status: 400, ctype: "application/json",
+			body:       `{"error":null}`,
+			wantChange: false,
+		},
+		{
+			name: "empty string error is untouched", status: 400, ctype: "application/json",
+			body:       `{"error":"   "}`,
+			wantChange: false,
+		},
+		{
+			name: "sibling keys survive the rewrite", status: 403, ctype: "application/json",
+			body:       `{"error":"denied","meta":{"request_id":"r1"}}`,
+			wantChange: true,
+			wantSub:    `"request_id":"r1"`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rt := &flatErrorNormalizerRT{next: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				h := http.Header{}
+				h.Set("Content-Type", tc.ctype)
+				return &http.Response{
+					StatusCode: tc.status,
+					Header:     h,
+					Body:       io.NopCloser(strings.NewReader(tc.body)),
+				}, nil
+			})}
+
+			req, _ := http.NewRequest(http.MethodGet, "https://example.test/x", nil)
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatalf("RoundTrip: %v", err)
+			}
+			got, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("read body: %v", err)
+			}
+
+			if !tc.wantChange {
+				if string(got) != tc.body {
+					t.Errorf("body was rewritten but must be passed through byte-for-byte:\n got %s\nwant %s", got, tc.body)
+				}
+				return
+			}
+			if string(got) == tc.body {
+				t.Fatalf("body was NOT rewritten: %s", got)
+			}
+			if !strings.Contains(string(got), tc.wantSub) {
+				t.Errorf("rewritten body = %s, want it to contain %s", got, tc.wantSub)
+			}
+			// The rewritten body must satisfy the shape generated decoding needs:
+			// `error` must be an OBJECT.
+			var probe struct {
+				Error map[string]any `json:"error"`
+			}
+			if err := json.Unmarshal(got, &probe); err != nil {
+				t.Errorf("rewritten body still fails object decoding: %v", err)
+			}
+		})
+	}
+}
+
+// roundTripFunc adapts a function to http.RoundTripper.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+// TestNew_InstallsFlatErrorNormalizer asserts the production chain actually
+// CONTAINS the normalizer.
+//
+// The end-to-end test in cmd/inventory proves the layer works, but the test
+// harness installs its own copy, so deleting the layer from New() left that test
+// green — it verified the behaviour without verifying the wiring. Confirmed by
+// seeding: removing `rt = &flatErrorNormalizerRT{next: rt}` from New() failed
+// nothing. This closes that.
+//
+// Value: protects=New() installs the flat-error normalizer, so the layer is reachable in production; fails_when=the layer is dropped from the chain while its own unit tests and the cmd-level end-to-end test (which installs its own copy) stay green; why_new=no test asserted chain MEMBERSHIP, only the layer's behaviour; seam=http.RoundTripper
+func TestNew_InstallsFlatErrorNormalizer(t *testing.T) {
+	const reason = "Workflows are not included in your subscription plan."
+
+	base := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		h := http.Header{}
+		h.Set("Content-Type", "application/json")
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Header:     h,
+			Body:       io.NopCloser(strings.NewReader(`{"error":"` + reason + `"}`)),
+		}, nil
+	})
+
+	rt := New(Config{Token: "tok", ExpectedHost: "example.test"}, base)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.test/workflow-nodes", nil)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+
+	// `error` must have become an OBJECT, which is what generated decoding needs.
+	var probe struct {
+		Error map[string]any `json:"error"`
+	}
+	if err := json.Unmarshal(body, &probe); err != nil {
+		t.Fatalf("the production chain did not normalize the flat error body (%s): %v", body, err)
+	}
+	if probe.Error["message"] != reason {
+		t.Errorf("error.message = %v, want %q — the normalizer is missing from New()'s chain", probe.Error["message"], reason)
 	}
 }
