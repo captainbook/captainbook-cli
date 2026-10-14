@@ -23,6 +23,28 @@ The `--type` enum classifies the audience semantically (used by the booking widg
 
 Default: `TRAVELLER` (use when no specific audience type applies).
 
+## "Must travel with" (`--companions`)
+
+A category can be gated on another one: *"a Child seat may only be booked when at least one Adult is in the same booking."* That rule lives on the dependent category as a list of **companion links**, each `{category_id, min_quantity}`.
+
+```bash
+# Children can only be booked alongside at least 1 Adult
+ceebee inventory pricing-categories update $CHILD_ID \
+  --companions "[{\"category_id\": $ADULT_ID, \"min_quantity\": 1}]"
+```
+
+Three rules decide what the list means:
+
+- **ANY one link satisfies it.** Links are never added together. `[{A,1},{B,1}]` means "at least one A **or** at least one B", not both.
+- **The write REPLACES the whole set.** `[]` clears every link; omitting `--companions` leaves them untouched. There is no add-one call.
+- **No links means no rule** — the category is freely bookable.
+
+Pass `@file.json` instead of an inline string for anything past a link or two:
+
+```bash
+ceebee inventory pricing-categories update 31 --companions @companions.json --dry-run
+```
+
 ## Worked examples
 
 ### 1. Adult / Child split for a private sailing product
@@ -69,11 +91,27 @@ ceebee inventory pricing-categories restore 22
 # Restores the bucket, but child tiers stay deleted — restore them individually if needed
 ```
 
+### 5. Gate a child category on adults, then remove the gate
+
+```bash
+# Require 2 adults per child booking
+ceebee inventory pricing-categories update 31 \
+  --companions '[{"category_id": 30, "min_quantity": 2}]'
+
+# Later: drop the requirement entirely
+ceebee inventory pricing-categories update 31 --companions '[]'
+```
+
 ## Pitfalls
 
 - ⚠️ **No `--since`, and sending `since=` is a 422.** The `pricing_categories` table carries no `created_at` / `updated_at` columns, so there is nothing for the filter to bound and `created_at` / `updated_at` are always null on the response. The 422 is deliberate — a silently-unfiltered page is what a polling client would misread as a delta. No incremental sync here: list in full and diff client-side.
 - ⚠️ **Reparenting is forbidden via PATCH.** Updating `product_id` is rejected by `UpdatePricingCategoryRequest::rules()` per spec. Create a new category if you need to move tiers across products.
-- ⚠️ **Delete cascades to PricingTiers.** Deleting a category soft-deletes every tier underneath it. Restore restores the category only — tiers stay soft-deleted and need explicit `pricing-tiers restore <id>` calls.
+- ⚠️ **Delete cascades to PricingTiers, and silently drops every companion link.** Deleting a category soft-deletes every tier underneath it **and removes every "Must travel with" link from or to it** — so a category that required this one becomes freely bookable. Restore brings back neither: tiers need explicit `pricing-tiers restore <id>` calls, and the links are gone for good. Re-send `--companions` on every category that pointed at the deleted one.
+- ⚠️ **`--data '{"companions": …}'` is validated exactly like the flag.** Both inputs assemble the same wire field, so the self-link, duplicate, unknown-key, 20-link and `min_quantity` 1–999 checks run whichever one you use, and the refusal names `--data` when that was the source. Your bytes are also carried through verbatim on that path, so a `category_id` past 2^53 is not rounded. (The wider `--data` number-rounding issue on other fields is still open — see TODOS.md.)
+- ⚠️ **`--companions` REPLACES; it never merges.** Adding one link means re-sending the ones you are keeping. Send a single new link against a category that already has two and the other two are deleted — and nothing in the response says so, it just comes back with one link, which reads like it worked. Read the current set with `get <id>` first.
+- ⚠️ **A companion with no pricing tiers is accepted, returned on read, and ignored.** Customers cannot book an unpriced category, so a link to one gates nothing until that category has tiers. A category whose every link is unpriced effectively has no rule — and the payload gives no hint of it.
+- ⚠️ **`--is-internal` is refused while another category names this one.** Setting it true is a 422 for as long as some other category's `companions` points here; clear that link first. Internal categories cannot be companions either.
+- ⚠️ **Loops are refused on update, including indirect ones.** Linking A→B when B already has to travel with A — directly or through a chain — is a 422, because neither would be bookable.
 - ⚠️ **`--min-age` / `--max-age` are advisory.** They're passed through to the booking widget for age-gating UX but don't enforce anything server-side. If a customer lies about age, you find out at the door.
 - ⚠️ **No tiers created automatically.** Creating a category does NOT create a default tier. You have to follow up with `pricing-tiers create` — without a tier, the bucket has no fare and the product can't be priced.
 - ⚠️ **No server-side dry-run on delete or restore.** CLI rejects `--dry-run` on those routes.

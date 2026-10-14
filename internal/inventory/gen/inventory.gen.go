@@ -2364,6 +2364,15 @@ type AvailabilityPage struct {
 	Pagination *Pagination    `json:"pagination,omitempty"`
 }
 
+// AvailabilityRuleNotes The OPPOSITE of `skip_reasons`: facts about occurrences that WILL be created anyway. Omitted entirely when there is nothing to say — never sent as an empty object. The two keys are disjoint by construction.
+type AvailabilityRuleNotes struct {
+	// DstShiftedTwinExists Occurrences the option already has at a DIFFERENT hour, left by the pre-1.17.0 enumeration's DST arithmetic. They do not match the `(from, to)` skip — that is what the fix changed — so approving creates both. Which hour is right is a question about the operator's calendar, so it is reported, not resolved.
+	DstShiftedTwinExists *int `json:"dst_shifted_twin_exists,omitempty"`
+
+	// OtherDeparturesExist Occurrences that would land on a day the option already sells at another time, for any reason other than the one above. The general case of the same fact: a season reloaded thirty minutes off an existing one shares no `(from, to)` with it, so nothing is skipped and every day ends up selling twice. `rule.other_departures_sample` names the days and times.
+	OtherDeparturesExist *int `json:"other_departures_exist,omitempty"`
+}
+
 // AvailabilityRulePreview Echo of the recurrence rule the server expanded plus a small sample
 // of the resulting (from, to) windows for human inspection.
 type AvailabilityRulePreview struct {
@@ -2379,7 +2388,20 @@ type AvailabilityRulePreview struct {
 	EndDate        *openapi_types.Date                    `json:"end_date,omitempty"`
 
 	// EndTime The FIRST departure time's end.
-	EndTime         *string `json:"end_time,omitempty"`
+	EndTime *string `json:"end_time,omitempty"`
+
+	// OtherDeparturesSample What is ALREADY on the days this rule would collide with — up to three of them, each with the times that day already sells. Empty whenever `notes.other_departures_exist` is absent, and the two always agree: the note is the count, this is what the count is about.
+	// The half an operator can act on. "2027-06-07 already has 07:00" is recognisable as the schedule they meant to replace in a way that a bare 154 is not, and replacing is what they almost always mean — this endpoint cannot do it, so the old departures need a `POST /availabilities/bulk-delete` of their own, issued BEFORE the rule rather than after it (see the endpoint description).
+	// Times are relabelled with the product's timezone through the same helper `sample_dates` and `GET /availabilities` use, so a departure reads identically on all three. `date` is the departure date as stored, which is product-local wall clock.
+	OtherDeparturesSample *[]struct {
+		Date *openapi_types.Date `json:"date,omitempty"`
+
+		// Existing Up to three of that day's existing departures.
+		Existing *[]struct {
+			From *time.Time `json:"from,omitempty"`
+			To   *time.Time `json:"to,omitempty"`
+		} `json:"existing,omitempty"`
+	} `json:"other_departures_sample,omitempty"`
 	ProductOptionId *string `json:"product_option_id,omitempty"`
 
 	// SampleDates Up to three of the windows that would be CREATED — not the first three the rule matched — so it is empty whenever `would_create` is 0. The digits are the product's local wall clock, relabelled with the product's `timezone` through the same helper `GET /availabilities` uses — so a departure reads identically on both surfaces, including when that zone is unusable.
@@ -2488,6 +2510,77 @@ type AvailableGiftCertificate struct {
 	UpdatedAt              *time.Time `json:"updated_at,omitempty"`
 }
 
+// BookedExtra One extra the customer bought on a booking — a `booking_extra` pivot
+// row. Mirrors `BookedExtraResource::toArray()`.
+//
+// DISTINCT from `Extra`, which is the catalogue entry `GET /extras`
+// returns. `Extra.amount` is what the add-on is offered at today;
+// `BookedExtra.unit_amount` is what this customer was charged, and the
+// two diverge the moment an operator reprices it.
+//
+// No `id`: `booking_extra` has no surrogate key — and no PRIMARY KEY and
+// no unique index either, only a non-unique index per foreign key. So
+// `extra_id` identifies the CATALOGUE row, never the pivot row: do not
+// de-duplicate or upsert on it. Nothing in the schema prevents two rows
+// for the same `(booking_id, extra_id)`, and `total_amount` on the booking
+// would count both. No `currency` either — the `extras` table has no such
+// column and the booking's own `currency` governs the whole payload.
+type BookedExtra struct {
+	// DeletedAt The CATALOGUE row's soft-delete, not the purchase's. Set when the
+	// operator has retired this extra since the booking was made; the row
+	// is still returned, because retiring an add-on does not unsell it.
+	// Independent of `include_trashed`.
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+
+	// ExtraId The catalogue `Extra.id`. Resolvable through `GET /extras/{id}` —
+	// with `?include_trashed=true` when `deleted_at` is set here.
+	ExtraId *string `json:"extra_id,omitempty"`
+
+	// Name The catalogue extra's `title`, English translation. Mirrors
+	// `Extra.name`, so the catalogue and the purchase name an add-on
+	// identically — except that an extra with no English translation
+	// reports `null` here rather than the empty string the catalogue
+	// returns, because a blank name is indistinguishable from an add-on
+	// genuinely called nothing.
+	Name *string `json:"name,omitempty"`
+
+	// Quantity Units bought. Not redacted by any permission — see `Booking.extras`.
+	// The underlying column is nullable and reports as `0` when unset.
+	Quantity *int `json:"quantity,omitempty"`
+
+	// TotalAmount `unit_amount * quantity`. Stated rather than left to the client to
+	// multiply, because a consumer recomputing it from a redacted
+	// `unit_amount` would get null. Null for a caller without
+	// `see_money_of_booking`.
+	TotalAmount *Money `json:"total_amount,omitempty"`
+
+	// UnitAmount Price per unit AS CHARGED (`booking_extra.fare`). NOT the catalogue
+	// price.
+	//
+	// **This field carries NO currency of its own, and which currency it
+	// is in depends on who wrote the row.** `booking_extra` has no
+	// currency column, and the writers disagree:
+	//
+	// - A CHANNEL booking stores the channel's own figure. On the live
+	//   GetYourGuide path the pivot `fare` is the OTA's `retailPrice` and
+	//   the booking's transaction currency is the same channel currency,
+	//   so here the extra IS in `Booking.currency`.
+	// - A DIRECT booking (widget, back office) stores the catalogue
+	//   `extras.fare`, which is in the account currency, unconverted.
+	//
+	// So neither "the account currency" nor "`Booking.currency`" is true
+	// for every row. Treat the figure as unlabelled: it is comparable with
+	// the other amounts on the SAME booking, and must not be converted,
+	// summed across bookings, or compared against a currency resolved from
+	// anywhere else. If you need a labelled amount, read the booking's
+	// transactions.
+	// The column is nullable and
+	// reports as `0` when unset, so `null` here means exactly one thing:
+	// withheld from a caller without `see_money_of_booking`. A free
+	// add-on and one with no fare recorded both read as `0`.
+	UnitAmount *Money `json:"unit_amount,omitempty"`
+}
+
 // Booking defines model for Booking.
 type Booking struct {
 	// Answers The customer's answers to the operator's custom booking questions.
@@ -2579,9 +2672,31 @@ type Booking struct {
 
 	// ExpiresAt Set on held bookings; null on confirmed bookings. Past `expires_at` + null `confirmed_at` = expired.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	Guests    *[]Guest   `json:"guests,omitempty"`
-	HeldUntil *time.Time `json:"held_until,omitempty"`
-	Id        *string    `json:"id,omitempty"`
+
+	// Extras The add-ons the customer BOUGHT — `booking_extra` pivot rows, not
+	// the `/extras` catalogue, which only says what is on offer for a
+	// product and can be repriced after the sale.
+	//
+	// Present on `GET /bookings/{id}` only, deliberately absent from
+	// `GET /bookings`, and absent from the `before` / `after` snapshots on
+	// a mutation receipt (`cancel`, `comp`). The reason is PAYLOAD SIZE and
+	// that no list consumer asked for the breakdown, NOT query cost: the
+	// list already eager-loads the pivot to compute `total_amount`, so
+	// publishing the rows there would cost no extra query.
+	// `total_amount` includes the extras on every one of those surfaces,
+	// so no caller is left reconciling from nothing.
+	//
+	// Survives a money redaction, unlike `transactions`. A caller without
+	// `see_money_of_booking` still gets the rows with `extra_id`, `name`
+	// and `quantity`, and `unit_amount` / `total_amount` nulled — what
+	// the customer bought and how many is an operational fact a guide
+	// preparing a departure needs, and it is not an amount. `[]` means
+	// this booking bought no extras; there is no permission under which
+	// the key is withheld.
+	Extras    *[]BookedExtra `json:"extras,omitempty"`
+	Guests    *[]Guest       `json:"guests,omitempty"`
+	HeldUntil *time.Time     `json:"held_until,omitempty"`
+	Id        *string        `json:"id,omitempty"`
 
 	// PaidAmount Sum of charge `BookingTransaction.amount` (rows with
 	// `refund_for IS NULL`). Computed at serialization time from
@@ -2616,8 +2731,29 @@ type Booking struct {
 	// (`confirmed_at`, `cancelled_at`, `created_at`, …) are real UTC.
 	StartsAt *time.Time `json:"starts_at,omitempty"`
 
-	// TotalAmount Sourced from `bookings.gross_price` (booking-level total).
+	// TotalAmount The booking's whole total: `bookings.gross_price` PLUS the sum of
+	// `booking_extra.fare * booking_extra.quantity` over the rows in
+	// `extras`.
+	//
+	// `gross_price` on its own is pricing tiers only —
+	// `Booking::computeGrossPrice()` never reads `booking_extra` — so
+	// until `1.34.0` this field was BELOW `paid_amount` on any booking
+	// carrying add-ons. It now INCLUDES the extras, as every per-booking
+	// reader in the product does.
+	//
+	// Two limits on that agreement, both deliberate. The base column here
+	// is `gross_price`; the other readers base on `retail_price`, which
+	// for a tenant without `marketplace_fee_included` is
+	// `gross_price + application_fee * gross_price`, so the figures still
+	// differ for a marketplace booking. And the aggregate statistics
+	// surface sums `bookings.gross_price` with no extras at all, so a
+	// revenue figure read there will not reconcile against the sum of
+	// these totals.
+	//
 	// Null for a caller without the `see_money_of_booking` permission.
+	// `bookings.gross_price` is NOT NULL, so a persisted booking always
+	// has a base figure: a comped or free booking carrying a paid add-on
+	// reports `0 + extras`, not null.
 	TotalAmount *Money `json:"total_amount,omitempty"`
 
 	// Transactions Empty for a caller without the `see_money_of_booking` permission —
@@ -2644,13 +2780,22 @@ type BookingPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
-// BulkDeleteAvailabilityRequest Filter shape mirrors `BulkUpdateAvailabilityRequest` so a CLI flow
-// that previewed a date-range change can reuse the same payload to
-// delete instead. Range is half-open: rows where `from >= from AND
-// from < to` are matched.
+// BulkDeleteAvailabilityRequest Filter shape mirrors `BulkUpdateAvailabilityRequest` field for field,
+// so a CLI flow that previewed a change can reuse the same payload to
+// delete instead.
+//
+// TWO scopes, mutually exclusive. `availability_ids` names the exact
+// rows; `product_option_id` + `from` + `to` takes a half-open range
+// (rows where `from >= from AND from < to`). Exactly one is required
+// and sending both is a 422 — a payload carrying both is a caller who
+// does not know which is in force, and on a delete the two readings are
+// "these three departures" and "this season".
 type BulkDeleteAvailabilityRequest struct {
-	DryRun *bool              `json:"dry_run,omitempty"`
-	From   openapi_types.Date `json:"from"`
+	// AvailabilityIds The exact departures to delete. They may belong to several product options — nothing about a delete needs them to share one, and a cleanup after a season reload is naturally spread across the options that were reloaded.
+	// Every id must resolve to a ProductOption-backed availability. One that does not is a 422 naming it; ids are never silently dropped.
+	AvailabilityIds *[]PositiveIntegerId `json:"availability_ids,omitempty"`
+	DryRun          *bool                `json:"dry_run,omitempty"`
+	From            *openapi_types.Date  `json:"from,omitempty"`
 
 	// ProductOptionId A positive integer id, in either spelling this API accepts.
 	//
@@ -2667,9 +2812,16 @@ type BulkDeleteAvailabilityRequest struct {
 	// is narrower than the validator on exactly those two spellings, which
 	// is the safe direction — both still work if sent, and nothing a client
 	// generates from this document can fail to be accepted.
-	ProductOptionId PositiveIntegerId  `json:"product_option_id"`
-	To              openapi_types.Date `json:"to"`
+	ProductOptionId *PositiveIntegerId  `json:"product_option_id,omitempty"`
+	To              *openapi_types.Date `json:"to,omitempty"`
+	union           json.RawMessage
 }
+
+// BulkDeleteAvailabilityRequest0 defines model for .
+type BulkDeleteAvailabilityRequest0 = interface{}
+
+// BulkDeleteAvailabilityRequest1 defines model for .
+type BulkDeleteAvailabilityRequest1 = interface{}
 
 // BulkUpdateAvailabilityRequest Single setting per request — the underlying `BulkAvailabilityUpdateJob`
 // only handles one setting at a time. To change multiple settings (e.g.
@@ -3158,11 +3310,16 @@ type CreateLocationRequestType string
 // CreatePricingCategoryRequest Mirrors `CreatePricingCategoryRequest::rules()`. `name` is
 // translatable — accepts a bare string, persisted as `{"en": "..."}`.
 type CreatePricingCategoryRequest struct {
-	DryRun     *bool  `json:"dry_run,omitempty"`
-	IsInternal *bool  `json:"is_internal,omitempty"`
-	MaxAge     *int   `json:"max_age,omitempty"`
-	MinAge     *int   `json:"min_age,omitempty"`
-	Name       string `json:"name"`
+	// Companions Replaces every "Must travel with" link of the category; `[]` clears
+	// them, omitting the key leaves them unchanged. Refused with 422 per row
+	// for the category itself, another product's category, an internal or
+	// deleted category, a duplicate, or a `min_quantity` outside 1-999.
+	Companions *[]PricingCategoryCompanionInput `json:"companions,omitempty"`
+	DryRun     *bool                            `json:"dry_run,omitempty"`
+	IsInternal *bool                            `json:"is_internal,omitempty"`
+	MaxAge     *int                             `json:"max_age,omitempty"`
+	MinAge     *int                             `json:"min_age,omitempty"`
+	Name       string                           `json:"name"`
 
 	// ProductId A positive integer id, in either spelling this API accepts.
 	//
@@ -4140,6 +4297,13 @@ type PositiveIntegerId1 = string
 // `created_at` / `updated_at` are always null and
 // `GET /pricing-categories?since=` is refused with 422.
 type PricingCategory struct {
+	// Companions "Must travel with": the category may only be booked when at least
+	// ONE of these links is met (never added together). `[]` means no
+	// rule. The same rows the create and update payloads accept back.
+	// A link to a category with no pricing tiers is listed here but
+	// ignored until that category is priced.
+	Companions *[]PricingCategoryCompanion `json:"companions,omitempty"`
+
 	// CreatedAt Always null — no such column on `pricing_categories`.
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
@@ -4161,6 +4325,38 @@ type PricingCategory struct {
 
 // PricingCategoryType defines model for PricingCategory.Type.
 type PricingCategoryType string
+
+// PricingCategoryCompanion One "Must travel with" link, as returned on read.
+type PricingCategoryCompanion struct {
+	// CategoryId Another pricing category of the same product.
+	CategoryId string `json:"category_id"`
+
+	// MinQuantity Guests of `category_id` needed in the booking for this link to be met.
+	MinQuantity int `json:"min_quantity"`
+}
+
+// PricingCategoryCompanionInput One "Must travel with" link on a write. `category_id` must be another
+// category of the SAME product that customers can book (not internal,
+// not deleted), and may appear once per list.
+type PricingCategoryCompanionInput struct {
+	// CategoryId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	CategoryId  PositiveIntegerId `json:"category_id"`
+	MinQuantity int               `json:"min_quantity"`
+}
 
 // PricingCategoryPage defines model for PricingCategoryPage.
 type PricingCategoryPage struct {
@@ -4948,7 +5144,15 @@ type UpdateLocationRequestType string
 // `product_id`) is not supported via PATCH; create a new category if you
 // need to move tiers across products.
 type UpdatePricingCategoryRequest struct {
-	DryRun     *bool                             `json:"dry_run,omitempty"`
+	// Companions Replaces every "Must travel with" link of the category; `[]` clears
+	// them, omitting the key leaves them unchanged. Refused with 422 per row
+	// for the category itself, another product's category, an internal or
+	// deleted category, a duplicate, a `min_quantity` outside 1-999, or a
+	// category that already has to travel with this one (a loop).
+	Companions *[]PricingCategoryCompanionInput `json:"companions,omitempty"`
+	DryRun     *bool                            `json:"dry_run,omitempty"`
+
+	// IsInternal `true` is refused with 422 while another category's `companions` names this one.
 	IsInternal *bool                             `json:"is_internal,omitempty"`
 	MaxAge     *int                              `json:"max_age,omitempty"`
 	MinAge     *int                              `json:"min_age,omitempty"`
@@ -6055,6 +6259,16 @@ type DeleteExtraParams struct {
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
 	// same key is sent on two real calls, normal idempotency rules apply.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ShowExtraParams defines parameters for ShowExtra.
+type ShowExtraParams struct {
+	// IncludeTrashed Include soft-deleted rows in the response (default false).
+	// Only applies to resources that use Laravel's `SoftDeletes` trait
+	// (products, product options, pricing tiers, extras, questions).
+	// Accepts `true false 1 0 yes no on off`, or a JSON boolean over MCP;
+	// anything else is a 422 rather than being read as false.
+	IncludeTrashed *IncludeTrashed `form:"include_trashed,omitempty" json:"include_trashed,omitempty"`
 }
 
 // UpdateExtraParams defines parameters for UpdateExtra.
@@ -7824,6 +8038,158 @@ func (t *Answer_AnswerRaw) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsBulkDeleteAvailabilityRequest0 returns the union data inside the BulkDeleteAvailabilityRequest as a BulkDeleteAvailabilityRequest0
+func (t BulkDeleteAvailabilityRequest) AsBulkDeleteAvailabilityRequest0() (BulkDeleteAvailabilityRequest0, error) {
+	var body BulkDeleteAvailabilityRequest0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBulkDeleteAvailabilityRequest0 overwrites any union data inside the BulkDeleteAvailabilityRequest as the provided BulkDeleteAvailabilityRequest0
+func (t *BulkDeleteAvailabilityRequest) FromBulkDeleteAvailabilityRequest0(v BulkDeleteAvailabilityRequest0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeBulkDeleteAvailabilityRequest0 performs a merge with any union data inside the BulkDeleteAvailabilityRequest, using the provided BulkDeleteAvailabilityRequest0
+func (t *BulkDeleteAvailabilityRequest) MergeBulkDeleteAvailabilityRequest0(v BulkDeleteAvailabilityRequest0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsBulkDeleteAvailabilityRequest1 returns the union data inside the BulkDeleteAvailabilityRequest as a BulkDeleteAvailabilityRequest1
+func (t BulkDeleteAvailabilityRequest) AsBulkDeleteAvailabilityRequest1() (BulkDeleteAvailabilityRequest1, error) {
+	var body BulkDeleteAvailabilityRequest1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBulkDeleteAvailabilityRequest1 overwrites any union data inside the BulkDeleteAvailabilityRequest as the provided BulkDeleteAvailabilityRequest1
+func (t *BulkDeleteAvailabilityRequest) FromBulkDeleteAvailabilityRequest1(v BulkDeleteAvailabilityRequest1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeBulkDeleteAvailabilityRequest1 performs a merge with any union data inside the BulkDeleteAvailabilityRequest, using the provided BulkDeleteAvailabilityRequest1
+func (t *BulkDeleteAvailabilityRequest) MergeBulkDeleteAvailabilityRequest1(v BulkDeleteAvailabilityRequest1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t BulkDeleteAvailabilityRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.AvailabilityIds != nil {
+		object["availability_ids"], err = json.Marshal(t.AvailabilityIds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'availability_ids': %w", err)
+		}
+	}
+
+	if t.DryRun != nil {
+		object["dry_run"], err = json.Marshal(t.DryRun)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'dry_run': %w", err)
+		}
+	}
+
+	if t.From != nil {
+		object["from"], err = json.Marshal(t.From)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'from': %w", err)
+		}
+	}
+
+	if t.ProductOptionId != nil {
+		object["product_option_id"], err = json.Marshal(t.ProductOptionId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'product_option_id': %w", err)
+		}
+	}
+
+	if t.To != nil {
+		object["to"], err = json.Marshal(t.To)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'to': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *BulkDeleteAvailabilityRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["availability_ids"]; found {
+		err = json.Unmarshal(raw, &t.AvailabilityIds)
+		if err != nil {
+			return fmt.Errorf("error reading 'availability_ids': %w", err)
+		}
+	}
+
+	if raw, found := object["dry_run"]; found {
+		err = json.Unmarshal(raw, &t.DryRun)
+		if err != nil {
+			return fmt.Errorf("error reading 'dry_run': %w", err)
+		}
+	}
+
+	if raw, found := object["from"]; found {
+		err = json.Unmarshal(raw, &t.From)
+		if err != nil {
+			return fmt.Errorf("error reading 'from': %w", err)
+		}
+	}
+
+	if raw, found := object["product_option_id"]; found {
+		err = json.Unmarshal(raw, &t.ProductOptionId)
+		if err != nil {
+			return fmt.Errorf("error reading 'product_option_id': %w", err)
+		}
+	}
+
+	if raw, found := object["to"]; found {
+		err = json.Unmarshal(raw, &t.To)
+		if err != nil {
+			return fmt.Errorf("error reading 'to': %w", err)
+		}
+	}
+
+	return err
+}
+
 // AsBulkUpdateAvailabilityRequestNewValue0 returns the union data inside the BulkUpdateAvailabilityRequest_NewValue as a BulkUpdateAvailabilityRequestNewValue0
 func (t BulkUpdateAvailabilityRequest_NewValue) AsBulkUpdateAvailabilityRequestNewValue0() (BulkUpdateAvailabilityRequestNewValue0, error) {
 	var body BulkUpdateAvailabilityRequestNewValue0
@@ -8328,7 +8694,7 @@ type ClientInterface interface {
 	DeleteExtra(ctx context.Context, id IdPath, params *DeleteExtraParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ShowExtra request
-	ShowExtra(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ShowExtra(ctx context.Context, id IdPath, params *ShowExtraParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateExtraWithBody request with any body
 	UpdateExtraWithBody(ctx context.Context, id IdPath, params *UpdateExtraParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9260,8 +9626,8 @@ func (c *Client) DeleteExtra(ctx context.Context, id IdPath, params *DeleteExtra
 	return c.Client.Do(req)
 }
 
-func (c *Client) ShowExtra(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewShowExtraRequest(c.Server, id)
+func (c *Client) ShowExtra(ctx context.Context, id IdPath, params *ShowExtraParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShowExtraRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -13463,7 +13829,7 @@ func NewDeleteExtraRequest(server string, id IdPath, params *DeleteExtraParams) 
 }
 
 // NewShowExtraRequest generates requests for ShowExtra
-func NewShowExtraRequest(server string, id IdPath) (*http.Request, error) {
+func NewShowExtraRequest(server string, id IdPath, params *ShowExtraParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -13486,6 +13852,28 @@ func NewShowExtraRequest(server string, id IdPath) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeTrashed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_trashed", *params.IncludeTrashed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -19611,7 +19999,7 @@ type ClientWithResponsesInterface interface {
 	DeleteExtraWithResponse(ctx context.Context, id IdPath, params *DeleteExtraParams, reqEditors ...RequestEditorFn) (*DeleteExtraResponse, error)
 
 	// ShowExtraWithResponse request
-	ShowExtraWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowExtraResponse, error)
+	ShowExtraWithResponse(ctx context.Context, id IdPath, params *ShowExtraParams, reqEditors ...RequestEditorFn) (*ShowExtraResponse, error)
 
 	// UpdateExtraWithBodyWithResponse request with any body
 	UpdateExtraWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateExtraParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateExtraResponse, error)
@@ -20432,6 +20820,9 @@ type CreateAvailabilityRuleResponse struct {
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
 
+			// Notes The OPPOSITE of `skip_reasons`: facts about occurrences that WILL be created anyway. Omitted entirely when there is nothing to say — never sent as an empty object. The two keys are disjoint by construction.
+			Notes *AvailabilityRuleNotes `json:"notes,omitempty"`
+
 			// Rule Echo of the recurrence rule the server expanded plus a small sample
 			// of the resulting (from, to) windows for human inspection.
 			Rule *AvailabilityRulePreview `json:"rule,omitempty"`
@@ -20468,6 +20859,9 @@ type CreateAvailabilityRuleResponse struct {
 				After  *map[string]interface{} `json:"after,omitempty"`
 				Before *map[string]interface{} `json:"before,omitempty"`
 			} `json:"diff,omitempty"`
+
+			// Notes The OPPOSITE of `skip_reasons`: facts about occurrences that WILL be created anyway. Omitted entirely when there is nothing to say — never sent as an empty object. The two keys are disjoint by construction.
+			Notes *AvailabilityRuleNotes `json:"notes,omitempty"`
 
 			// Rule Echo of the recurrence rule the server expanded plus a small sample
 			// of the resulting (from, to) windows for human inspection.
@@ -24834,8 +25228,8 @@ func (c *ClientWithResponses) DeleteExtraWithResponse(ctx context.Context, id Id
 }
 
 // ShowExtraWithResponse request returning *ShowExtraResponse
-func (c *ClientWithResponses) ShowExtraWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowExtraResponse, error) {
-	rsp, err := c.ShowExtra(ctx, id, reqEditors...)
+func (c *ClientWithResponses) ShowExtraWithResponse(ctx context.Context, id IdPath, params *ShowExtraParams, reqEditors ...RequestEditorFn) (*ShowExtraResponse, error) {
+	rsp, err := c.ShowExtra(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -26636,6 +27030,9 @@ func ParseCreateAvailabilityRuleResponse(rsp *http.Response) (*CreateAvailabilit
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
 
+				// Notes The OPPOSITE of `skip_reasons`: facts about occurrences that WILL be created anyway. Omitted entirely when there is nothing to say — never sent as an empty object. The two keys are disjoint by construction.
+				Notes *AvailabilityRuleNotes `json:"notes,omitempty"`
+
 				// Rule Echo of the recurrence rule the server expanded plus a small sample
 				// of the resulting (from, to) windows for human inspection.
 				Rule *AvailabilityRulePreview `json:"rule,omitempty"`
@@ -26678,6 +27075,9 @@ func ParseCreateAvailabilityRuleResponse(rsp *http.Response) (*CreateAvailabilit
 					After  *map[string]interface{} `json:"after,omitempty"`
 					Before *map[string]interface{} `json:"before,omitempty"`
 				} `json:"diff,omitempty"`
+
+				// Notes The OPPOSITE of `skip_reasons`: facts about occurrences that WILL be created anyway. Omitted entirely when there is nothing to say — never sent as an empty object. The two keys are disjoint by construction.
+				Notes *AvailabilityRuleNotes `json:"notes,omitempty"`
 
 				// Rule Echo of the recurrence rule the server expanded plus a small sample
 				// of the resulting (from, to) windows for human inspection.

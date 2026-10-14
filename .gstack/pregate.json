@@ -1,0 +1,43 @@
+{
+  "$schema": "https://github.com/garrytan/gstack/docs/pregate.md#pregate-v1",
+  "runner": "sh -c 'for f in {files}; do [ -f \"$f\" ] || { echo \"pregate: declared test file is missing: $f\" >&2; exit 1; }; done; go test -race -count=1 $(printf \"%s\\n\" {files} | xargs dirname | sort -u | sed \"s|^|./|\")'",
+  "strays": {
+    "allow": [
+      ".gstack/"
+    ]
+  },
+  "dependencies": {
+    "api/inventory/cli-v1.yaml": [
+      "cmd/inventory/spec_drift_test.go",
+      "cmd/inventory/spec_coverage_test.go",
+      "cmd/inventory/inventory_test.go",
+      "tools/speccompat/main_test.go",
+      "tools/speccompat/hoist_test.go",
+      "tools/speccompat/typearray_test.go"
+    ],
+    "api/statistics/statistics-openapi.yml": [
+      "internal/api/statistics_drift_test.go"
+    ],
+    "internal/inventory/gen/*.go": [
+      "cmd/inventory/wire_capture_test.go",
+      "cmd/inventory/wire_capture_134_test.go",
+      "cmd/inventory/inventory_test.go"
+    ],
+    "skills/*.md": [
+      "cmd/inventory/skills_drift_test.go",
+      "cmd/docs_drift_test.go"
+    ],
+    "README.md": [
+      "cmd/inventory/skills_drift_test.go",
+      "cmd/docs_drift_test.go"
+    ],
+    "TODOS.md": [],
+    "CLAUDE.md": [],
+    "skills.md": [],
+    ".gitignore": [],
+    ".github/workflows/*.yml": [],
+    ".gstack/pregate.json": [
+      "cmd/pregate_config_test.go"
+    ]
+  }
+}

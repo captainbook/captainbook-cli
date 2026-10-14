@@ -197,7 +197,7 @@ Run `ceebee inventory <resource> --help` for full flag listings. See [skills/ind
 
 ### `ceebee audit` — local mutation log
 
-Every successful mutation appends to `~/.ceebee/audit.jsonl` with the idempotency key, body sha256, ability used, dry-run flag, status code, duration, and a forensic summary of the relevant fields.
+Every successful mutation appends to `~/.ceebee/audit.jsonl` with the idempotency key, body sha256, ability used, dry-run flag, status code, duration, and a forensic summary of the relevant fields. Those forensic values are size-bounded (everywhere except `media upload`, which still builds its row by hand): anything over 16 KiB, or not JSON-encodable, is replaced by a `__ceebee_forensic_cap` marker carrying its size and digest, so one oversized `@file.json` argument cannot rotate real history off the end of the log. See [skills/index.md](skills/index.md#audit-log) for the marker's shape.
 
 ```bash
 ceebee audit list --limit 20         # newest-first
@@ -271,7 +271,7 @@ make clean           # Remove binaries
 
 The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. CI-enforced drift tests keep spec, code, and docs in sync:
 
-- `cmd/inventory/spec_drift_test.go` — three checks against the spec: flag/JSON-key drift, enum-token drift, and idempotency-key threading regressions.
+- `cmd/inventory/spec_drift_test.go` — six checks against the spec (flag/JSON-key drift, enum-token drift in flag descriptions, flag TYPE drift, idempotency-key threading regressions, the `cli:cs` ability set both per-operation and by cardinality, and `--currency` tracking the endpoints where the spec makes it required), plus one `CommandDef` integrity check that every `ForensicFields` entry names a flag that exists. Several of them read the LIVE cobra tree rather than the `CommandDef` AST, because an AST walker reads a non-literal field as empty and skips the entity in silence. See CLAUDE.md for the three things these deliberately do NOT prove.
 - `cmd/inventory/since_flag_test.go` — a `--since` flag must exist exactly where the spec declares the `since` query param. Both directions are silent failures: a flag the spec dropped is parsed and thrown away, handing the caller a full unfiltered page they read as an incremental sync.
 - `cmd/inventory/skills_drift_test.go` — every `ceebee inventory …` invocation in `skills/*.md` and this README must resolve against the live cobra tree, and the endpoint tables in the cookbooks must match each command's bound verb, path, ability, and dry-run mode. It also forbids the space form of a bool flag in docs: write `--flag=false`, never `--flag false`.
 

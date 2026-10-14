@@ -232,6 +232,13 @@ bug: they carry `json.RawMessage` and are validated rather than decoded, so the
 operator's bytes reach the wire verbatim — the same approach `parseFaresFlag`
 already used. See `parseJSONFlag` in `cmd/inventory/inventory.go`.
 
+**Narrower again after the cli-v1 1.34.0 sync.** `companions` is the first field
+read back OUT of `--data` as raw bytes rather than off the re-marshalled body
+(`companionsRawFromArgs`), so a `category_id` past 2^53 now survives that path
+verbatim. It is one field, not a fix: every other `--data` key still round-trips.
+The pattern generalises, though — read the key from `args.RawData` and overlay
+the RawMessage — so it is the shape a full fix would take.
+
 That leaves `--data` itself as the one remaining path that still round-trips
 numbers through `float64`, which is what the rest of this entry describes. Fixing
 it means changing `JSONBodyFromArgs` to merge into `json.RawMessage` (or decode
@@ -606,8 +613,17 @@ PREVIEWED mutation as a committed one — the audit log asserting the opposite o
 what happened. The same asymmetry is already handled for the body hash, which
 reflects the real wire body via `res.WireBody`.
 
-**Fix:** derive `DryRun` from the assembled wire body rather than the flag, or
-refuse a `dry_run` key inside `--data` and require the flag.
+**Precedent set by the cli-v1 1.34.0 sync, not yet applied here.**
+`bulkDeleteNoOpWarnings` had the identical problem for its stderr signal — a
+`--data`-set `dry_run` made it warn on a preview — and it was fixed by reading
+`body["dry_run"]` from the assembled body rather than `args.DryRun`. The audit
+field is the same one-line change against the same map; it was left out of that
+sync because `auditEntry` is shared by every command and the change deserves its
+own test per mutation shape rather than riding along with one endpoint's warning.
+
+**Fix:** derive `DryRun` from the assembled wire body rather than the flag, the
+way `bulkDeleteNoOpWarnings` now does, or refuse a `dry_run` key inside `--data`
+and require the flag.
 **Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
 
 ## `workflows create` can write a third-party secret to the audit log
@@ -870,6 +886,14 @@ or a sentinel) and skip `Append` when `res == nil && WireBody == nil`.
 
 ## `--data` bypasses the bulk-update scope gate and is absent from the audit
 
+**UPDATE (cli-v1 1.34.0 sync, 2026-10-14): the scope half of this is CLOSED.**
+Both bulk endpoints now evict the opposing scope's keys from `--data` before
+sending, and `resolveAvailabilityScope` refuses a `--data`-only scope with "one
+scope is required". Pinned at both call sites by `TestWire_BulkDeleteScopes` and
+`TestWire_BulkUpdateScopeEvictsTheOtherScopeFromData`. Only the forensic half
+below is still open; see also the companions-via---data entry, which is the same
+remaining cause for one field.
+
 `availabilities bulk-update` decides scope from FLAGS only (`args.FlagSet(...)`),
 while `JSONBodyFromArgs` seeds the body from `--data` first. So
 `--data '{"availability_ids":[9999],"from":"2020-01-01"}'` passes a gate that
@@ -965,3 +989,355 @@ divergence, which was the part that mattered.
 semantics, and have both suites pass in the root command they resolve against.
 **Raised by:** Optibot on #27 (non-blocking).
 **Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## A channel booking with an add-on over-reports its total, upstream
+
+As of the cli-v1 1.34.0 sync, `Booking.total_amount` includes the booking's
+purchased extras, which is what every other per-booking reader in the product
+already did. On two import paths the extras are then counted TWICE.
+
+`ChannelManager\GetYourGuide\ManageBookingsEndpoint` writes the add-on total
+INTO `gross_price`, `retail_price`, `direct_price`, `net_price` and `voucher`,
+and attaches the same add-ons to the `booking_extra` pivot with the identical
+`fare` × `quantity`. `XolaBookingImport` does the same from CSV.
+`BokunBookingImport` attaches no extras and is unaffected.
+
+**Deliberately NOT worked around here.** This is a pre-existing, product-wide
+defect, not something the CLI introduced: `retail_price` carries the same
+doubled figure and roughly 40 call sites across 26 files add the extras on top
+of it — the mobile payload, the automation webhooks, the OCTO channel resource,
+the accounting and booking exports, the money-visibility badge, the payroll
+payout jobs, the document/invoice variable resolver. The CLI is the latest
+surface to agree with them. The root cause is one place (those columns should
+not include an amount the pivot already carries) and fixing it there corrects
+every surface at once; special-casing it per endpoint would leave the cause in
+place and make this surface the only one computing on a different basis.
+
+Tracked upstream as captainbook/captainbook#8616. Documented for operators in
+`skills/bookings.md`. If a figure from a GYG or Xola booking looks high by
+exactly its add-on total, that is this — escalate rather than patching the CLI.
+
+**Fix:** nothing in this repo — re-vendor the spec once captainbook#8616 lands.
+**Why:** a plausible-looking local "fix" here would fork the money basis from
+the rest of the product, which is worse than the known over-report.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream.
+
+
+## ~~skills/availabilities.md uses the `po_` id spelling where the flag is an integer~~ — DONE
+
+**Completed:** during the cli-v1 1.34.0 sync (2026-10-14).
+
+All nine `--product-option-id po_88` examples now pass the bare number, and the
+explanatory note was rewritten.
+
+This entry was closed ONCE on false reasoning and had to be reopened, which is
+the part worth remembering. The first version argued that `po_88` was correct on
+bulk-update / bulk-delete because their flag is Go-typed `string` while
+`availabilities list`'s is `int` — so only the two `list` examples were defects.
+That confuses where the refusal comes from with what is valid. The wire contract
+is `PositiveIntegerId` on all five endpoints (`{type: integer, minimum: 1}` or
+`{type: string, pattern: "^[1-9][0-9]*$"}`, cli-v1.yaml ~6832), and the 1.22.0
+changelog entry adds that a non-numeric `product_option_id` became a 422
+VALIDATION_FAILED rather than a 404 on exactly those endpoints. `po_88` matches
+neither branch, so every one of the nine examples was a documented 422; the
+string-typed flag only means cobra does not catch it first.
+
+Still open as the general lesson: `TestSkillsDocDrift` validates that a
+documented flag EXISTS on the resolved command, never that the documented VALUE
+would parse or be accepted. A value-level check — resolve each documented flag
+to its spec field and reject a value the schema cannot accept — would have
+caught this twice over.
+
+## A path-id-only mutation writes an audit row that names no target
+
+**One of three symptoms of a single cause.** `forensicSummary` can only see
+`args.Flags` and `StaticForensic`, so nothing a closure DERIVES and nothing a
+positional arg carries can reach `forensic_summary`. The other two are "A
+companions value sent through --data is not recorded" and "The BULK_DELETE_NO_OP
+outcome reaches stderr but not the audit row". A `RunResult.ForensicExtra` sink
+closes all three; the `CommandDef.ForensicPathArgs` sketch below is an
+ALTERNATIVE to that sink, not an addition. Do not build both.
+
+`pricing-categories delete <id>` produces an audit entry from which the deleted
+category cannot be identified: the CommandDef declares no `ForensicFields`, a
+DELETE sends no body so `body_sha256` is empty, and the spec's 204 carries no
+body so `tryParseDataID` leaves `response_id` empty. `forensicSummary()`
+(`cmd/inventory/inventory.go`) reads only `args.Flags`, and `RunResult.ResourceID`
+— which DOES hold the path id — is used for diff rendering and never copied into
+`AuditEntry`.
+
+Raised by the security specialist during the cli-v1 1.34.0 sync review and
+deliberately deferred there: it is pre-existing, it affects EVERY mutation whose
+only input is a path id (`delete`, `restore`, and the several `{id}/action`
+routes) rather than just this one, and the fix is a schema or CommandDef change
+that wants its own tests.
+
+What made it worth recording now: spec 1.30.0 widened the blast radius of this
+particular delete. It already cascaded to child PricingTiers; it now also
+removes every "Must travel with" link FROM or TO the category, and a restore
+brings none of them back. So the one operation whose audit row cannot say what
+it hit is also the one that got harder to undo.
+
+**Fix:** either add a `CommandDef.ForensicPathArgs` (or a StaticForensic-style
+hook) so `forensicSummary` can record positional ids, or copy
+`RunResult.ResourceID` into `AuditEntry` and bump the audit schema version.
+Prefer whichever keeps `forensic_summary` the single place an incident responder
+reads. Then cover it for one path-id-only mutation per shape.
+
+**Why:** the audit log is the only record of a destructive call — it keeps
+`body_sha256` and not the body — so a row that identifies no target cannot
+answer the one question asked after an incident.
+**Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
+
+## The enum-description drift test cannot see a nested spec field
+
+`TestSpecDrift_FlagDescriptionEnumsMatchSpec` resolves a flag to its spec field
+through `specDoc.bodyField`, which is a FLAT top-level lookup over
+`op.BodyInline` / `op.BodyRef`. Any flag whose spec field lives inside a nested
+object is therefore never compared, silently.
+
+The live instance is `availabilities bulk-update capacity --operator`. Its
+description is the pipe-token run `set_to|increase_by|decrease_by`, and the spec
+pins exactly that enum — but at `BulkUpdateAvailabilityRequest.new_value.operator`
+(`api/inventory/cli-v1.yaml` around line 8533), one level down inside the
+discriminated `new_value` object. Verified by mutation: adding a bogus
+`multiply_by` token to that description leaves the whole suite green.
+
+Found during the cli-v1 1.34.0 sync review. A reviewer initially attributed it
+to the test iterating AST flags rather than live ones; that was a real and
+separate hole and it is now fixed (the loop is live-driven, and comparisons went
+38 -> 39), but it is NOT the cause here. The cause is the flat resolver, and the
+mutation stays green after that fix.
+
+**Fix:** teach `bodyField` to descend one level into inline object properties
+(and to follow a `$ref` on a nested property), or give the few discriminated
+payloads an explicit flag-to-path map. Prefer the former — a map is a third
+statement of the mapping that can drift from the other two.
+
+**Why:** the enum run in a flag description is a promise cobra prints to the
+operator, and for the one bulk-update field that takes a closed set of
+operators nothing checks it against the server's.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## A companions value sent through --data is not recorded in forensic_summary
+
+`forensicSummary` reads only `args.Flags`, so `pricing-categories update <id>
+--data '{"companions":[...]}'` writes an audit row with no `companions` entry,
+while the same call written with `--companions` records the full value. The row
+keeps only `body_sha256`, which is not reversible.
+
+That matters more than the usual forensic gap because the field REPLACES the
+whole "Must travel with" set: a call that wiped every link on a category is
+indistinguishable, in the audit, from one that touched nothing about companions.
+The cli-v1 1.34.0 sync promoted `--data` to a first-class, fully validated input
+for this field (it is now gated exactly like the flag), which is what makes the
+asymmetry worth closing.
+
+**Fix:** after a successful `overlayValidatedCompanions`, write the validated
+rows back into `args.Flags["companions"]` so both paths audit identically — or
+add a per-run forensic sink on `RunResult` for values a closure derives rather
+than reads from a flag. The second is the more general fix; several closures
+assemble body fields that no `ForensicFields` entry can name.
+
+**Why:** the audit log is the only durable record of a destructive call, and
+this one is a silent-wipe shape.
+**Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
+
+## overlayJSONField round-trips sibling fields through float64
+
+`overlayJSONField` unmarshals the whole assembled body into `map[string]any`,
+sets one key and re-marshals. Every sibling field therefore survives a
+decode/encode cycle, and Go decodes JSON numbers into float64 — so an integer
+past 2^53 in a sibling is altered.
+
+Reachable but not currently harmful: the fields that share a body with an
+overlaid one are `min_age` / `max_age` (spec `integer, minimum: 0`, no maximum)
+on pricing-categories, and the `availabilities update` fares overlay's
+neighbours. No realistic age or capacity is near 2^53, so this is recorded as a
+property rather than a live defect. It is the same root cause as the open
+`--data` rounding entry, in a different code path.
+
+**Fix:** splice the key into the already-marshalled object, or assemble the body
+once as `map[string]json.RawMessage` so only the overlaid key is rewritten.
+**Why:** the repo already fixed this class once for `--fares` and records it as
+open for `--data`; this is the third site and the same one-line discipline.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## A 1000-id bulk-delete runs close to the client's fixed 60s timeout
+
+A reviewer measured a 1000-id `availabilities bulk-delete` against a test tenant
+at ~31-32s, with the inventory client's budget a fixed 60s and `retryRT` sitting
+INSIDE that budget — so a network-error retry after 32s has under 28s left. Two
+of three identical 1000-id attempts also returned `500 INTERNAL_ERROR` at
+~31-32s while smaller batches returned the expected 422, which is consistent
+with a server or gateway limit near 30s rather than with the id count.
+
+Treat the numbers as indicative, not established: they came from a single
+unplanned run against one tenant, not a controlled measurement.
+
+**Fix:** decide a recommended batch size well under the 1000 cap (200-300 ids
+still collapses 250 calls into one) and say so in `skills/availabilities.md`;
+or make the 60s budget configurable for the two bulk endpoints. Either way add
+the pitfall that a timed-out bulk-delete is NOT evidence nothing was deleted —
+re-read with `availabilities list --include-trashed` before retrying, because a
+blind retry on a partially-committed transaction is the harmful move.
+**Why:** the one endpoint where a client timeout is ambiguous is the destructive
+one, and the docs currently steer operators straight at the cap.
+**Effort:** human S / CC S. **Priority:** P2. **Depends on:** upstream
+confirmation of the ~30s server limit.
+
+
+## The BULK_DELETE_NO_OP outcome reaches stderr but not the audit row
+
+`availabilities bulk-delete` now warns on stderr when a committed delete removed
+nothing. That outcome is computed from the response, after `runMutation` has
+already assembled the `AuditEntry` from the CommandDef's static fields and
+`args.Flags` — so it reaches the operator's terminal and never
+`~/.ceebee/audit.jsonl`. A committed delete that removed 0 rows and one that
+removed 4,000 produce byte-identical audit rows: same status, same empty
+error_code, same forensic scope fields.
+
+Raised by the red team during the cli-v1 1.34.0 sync, after the stderr half had
+been implemented. The audit half needs a channel that does not exist yet: a
+closure cannot contribute to `forensic_summary`, because the only inputs are
+`StaticForensic` and flag values.
+
+**Fix:** add a per-run forensic sink on `RunResult` (e.g. `ForensicExtra
+map[string]any`) that `runMutation` merges into the entry, then have bulk-delete
+record `total_deleted` and `status`. The same sink closes the companions-via---data
+gap recorded above, so do them together.
+
+**Why:** the audit log is the record of what a destructive call DID, and
+"deleted nothing" is the single most useful thing it could say about a
+bulk-delete that an operator is now querying after the fact.
+**Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
+
+## The forensic size cap does not cover the hand-built media audit entry
+
+`capForensicValue` bounds one forensic value at 16 KB, but it runs inside
+`forensicSummary`, and `products media upload` is the one mutation that
+assembles its `AuditEntry` and forensic map by hand instead. So `--alt-text`
+(an unbounded operator string, limited only by ARG_MAX — around 1 MB on macOS)
+still lands verbatim in `audit.jsonl`.
+
+Smaller than the 60 MB `@file.json` the cap was written for, but it sits on the
+same rotation budget (50 MB, 3 files) the cap exists to protect. The real reason
+it persists: the cap is applied at the CALLER rather than at the sink, so every
+hand-built `AuditEntry` — present and future — opts out by default.
+
+**Fix:** move the cap down to where every entry passes, rather than up where
+each caller must remember it — capping inside `invpkg.FileLogger.Append` would
+cover every present and future hand-built entry by construction. Short of that,
+route media.go's map through `capForensicValue` on insert.
+**Why:** a cap with one documented exception is a cap nobody can rely on.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+
+## The range scope of a destructive bulk-delete has no blast-radius bound
+
+`parseAvailabilityRange` bounds ORDERING (`to` strictly after `from`) but not
+SPAN, so `--from 0001-01-01 --to 9999-12-31` passes the only local gate and one
+synchronous call soft-deletes every departure of a product option across all
+time. The sibling id scope on the same command is capped at 1000
+(`availabilityIDsMaxItems`) and refuses anything larger, so the two scopes of one
+destructive endpoint disagree about whether a blast radius needs a limit.
+
+Raised by the security specialist in the third review pass of the cli-v1 1.34.0
+sync, and deliberately NOT fixed there: adding a span limit is a new
+client-side refusal, and the spec documents no maximum range, so it risks
+exactly the CLI-only refusal the shared scope helper exists to avoid. That is a
+judgement call for the repo owner rather than a review fix.
+
+**Fix:** decide a maximum span (400 days covers the longest season anyone
+schedules in one call) and refuse past it unless an explicit opt-out flag is
+given, naming the computed day count in the refusal so a year typo is visible.
+A year outside roughly 2000-2100 is worth refusing on its own. Confirm upstream
+first that no legitimate caller needs an unbounded range.
+**Why:** a one-character year typo is the cheapest way to delete a tenant's
+whole calendar, and the confirmed-booking precheck is the only thing standing in
+front of it.
+**Effort:** human S / CC S. **Priority:** P2. **Depends on:** upstream
+confirmation that a span cap is acceptable.
+
+## `--format table` drops a dry run's non-diff fields
+
+`tryParseDiffEnvelope` keeps an envelope whenever `would_apply` is true, and
+`renderResult` RETURNS after the diff renderer in table mode — so for a dry run
+whose payload carries sibling keys outside `diff`, those keys are never printed.
+On `availabilities create-rule --dry-run --format table` that silently discards
+`notes.other_departures_exist`, `rule.other_departures_sample`, `would_create`,
+`total_matched` and `skip_reasons`: the collision warning that spec 1.31.0 added
+and that `skills/availabilities.md` now tells operators to read before
+approving. `bulk-delete --dry-run --format table` loses `status` and
+`total_matched` the same way.
+
+Mitigated, not harmless: mutations default to `--format=json`, so the fields do
+print unless an operator explicitly asks for table. Pre-existing — TODOS already
+records it for `segments create` — but this sync is what made it matter, by
+documenting fields the table path drops.
+
+**Fix:** render the diff and then fall through to `output.Format(res.Body)` so
+sibling keys still print, rather than treating `would_apply: true` alone as
+proof the payload is a pure diff envelope. Add a table-format assertion for
+`notes` / `other_departures_sample` beside the existing every-format
+BULK_DELETE_NO_OP test.
+**Why:** the one surface that warns an operator they are about to create 1,137
+duplicate departures is also the one a format flag can silence.
+**Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
+
+## companions `min_quantity` is stricter than the contract
+
+`parseCompanionsValue` decodes `min_quantity` with `json.Unmarshal` into a Go
+`int`, which refuses three spellings the server accepts: the digit string `"2"`,
+and the integer-valued numbers `2.0` and `2e0`. Under OpenAPI 3.1 / JSON Schema
+2020-12 the latter two satisfy `type: integer`, and Laravel's `integer` rule
+stringifies before validating — which is the whole basis of the sibling
+`PositiveIntegerId` note in the spec ("the operator assistant sends one
+(`(string) $option->id`)"). So an assistant-generated payload that stringifies
+both fields by the same mechanism is refused locally for a body the server would
+take, which is the CLI-only-refusal class this repo treats as a real defect.
+
+`category_id` already handles the loose spellings; only `min_quantity` does not.
+
+**Fix:** decode `min_quantity` the way `category_id` is decoded — try a digit
+string, then `json.Number` — accepting an integer-valued float and keeping the
+1..999 bound. Pin `"2"` as accepted so the asymmetry cannot return.
+**Why:** every other companions gate matches the spec exactly; this is the one
+place the CLI is narrower than the server.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## The pre-gate counts a tag-triggered release lane as a pre-merge obligation
+
+`gstack-pregate` derives its lanes from `.github/workflows/*.yml` and treats
+every job that runs tests as a `requires-remote` obligation on a non-Linux
+machine. That produces two obligations here, and only one of them can ever be
+satisfied before merge:
+
+- `ci.yml/test` — triggers on `pull_request`, so opening the PR runs it. Cleared
+  with `gstack-pregate clear --remote ci.yml/test --run-url <url>`.
+- `release.yml/test` — triggers ONLY on `push: tags: v[0-9]*`. This repo cuts
+  releases by pushing a tag AFTER merge (there is no VERSION file; the Makefile
+  derives the version from `git describe`), so the lane cannot run on a branch
+  or a PR by construction.
+
+Net effect: `gstack-ship-receipt write` always fails with
+`PREGATE_REMOTE_UNCLEARED` on the release lane, so no ship receipt can be
+written for this repo pre-merge. Neither `.gstack/pregate.json` nor
+`gstack-pregate clear` has a way to declare a lane release-time-only — `warn`
+explicitly cannot downgrade the lanes check's requires-remote verdict.
+
+This is a tooling-fit gap rather than a defect in either tool: the pre-gate's
+model is "every tests-bearing workflow job must have run", which is right for a
+repo whose workflows all trigger on PR, and wrong for one with a separate
+tag-triggered release pipeline.
+
+**Fix:** upstream, a way to mark a workflow lane as release-time (e.g. a
+`release_lanes` key in pregate-v1, or deriving it from the job's own triggers —
+a job reachable only from `push: tags:` cannot be a pre-merge obligation).
+Locally, nothing: do not clear it with a false run URL, and do not delete the
+`test` job from `release.yml`, which exists so a tagged release cannot ship
+untested.
+**Why:** the receipt is the artifact a later agent reads to know the gate ran;
+one that can never be written is worse than one that is absent, because its
+absence looks like an oversight.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream gstack.

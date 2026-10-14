@@ -68,7 +68,7 @@ Two consequences worth designing around:
 | Missing permission | What goes null/empty on `Booking` |
 |--------------------|-----------------------------------|
 | `view_booker_of_booking` | `customer.name` / `.email` / `.phone`, and inline `guests[]`. `customer.id` survives so the payload stays joinable. |
-| `see_money_of_booking` | `total_amount`, `paid_amount`, `refunded_amount` (null); `transactions[]` (empty). |
+| `see_money_of_booking` | `total_amount`, `paid_amount`, `refunded_amount` (null); `transactions[]` (empty); `unit_amount` / `total_amount` on each `extras[]` row (null). The `extras[]` array itself **survives**, keeping `extra_id`, `name` and `quantity` — what the customer bought and how many is an operational fact, not an amount. See [bookings.md](bookings.md). |
 | `view_answers_of_booking` | `answers` (null — distinct from `[]`, which means "none exist"). |
 
 The dedicated child endpoints agree with those gates rather than letting a caller walk around them: `transactions list` also requires `see_money_of_booking`, `guests list` also requires `view_booker_of_booking`, and `answers list` requires `view_answers_of_booking`. A guest or answer outside the caller's business unit or assigned trips reads as **404**, not 403, so the id space is not enumerable.
@@ -202,6 +202,8 @@ bulk_id=$(
 ### Audit log
 
 Every successful mutation logs to `~/.ceebee/audit.jsonl` — one JSON object per call: timestamp, profile, tenant, command, endpoint, idempotency key, request body hash (SHA-256, never the body itself — PII-safe), ability used, dry-run flag, response status, response ID, duration, error code (if any), and a `forensic_summary` field for sensitive (`cli:cs`) operations like refund / cancel / comp.
+
+**Every value in that row is size-bounded, and the marker that says so is worth recognising.** A `json`-typed flag accepts `@file.json` with no size limit, and the row is appended even when the CLI refused the input locally, so without a cap one 60 MB value could rotate the log out from under three real refunds. A `forensic_summary` value over **16 KiB** is therefore replaced by a `__ceebee_forensic_cap` object carrying `omitted`, `bytes`, `cap_bytes` and `canonical_json_sha256`; a value that is not JSON-encodable at all (pflag accepts `--rating NaN`) gets the same marker with `go_type`, rather than costing the entry its whole row. Two things follow for anyone reading the log: the digest is taken over the **canonical JSON** encoding, so `sha256sum yourfile.json` will not match it, and only that exact double-underscored key is a cap event — it is namespaced so an operator-supplied object cannot forge one. The server-supplied response ID and error code are truncated at 1 KiB with `…(truncated, sha256=…)` appended. One gap: `media upload` assembles its row by hand and is not covered.
 
 ```bash
 ceebee audit list                                   # most recent first; --limit N

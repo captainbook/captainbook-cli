@@ -162,6 +162,7 @@ period only** — a comparison carries its own copy, and monetary entries in
 - **Money is in the tenant's display units** — `150.00` for EUR, `15000` for JPY. Check `meta.currency`.
 - **Read `meta.filters`.** The server echoes back which filters it applied. If something is missing from that echo, it was not applied.
 - **Statistics needs a subscription.** A plan without it answers `403`, as does a token whose user lacks `view_reports`.
+- **`revenue` and a booking's own `total_amount` are different bases — never cross-foot them.** This surface sums `bookings.gross_price`, which is pricing tiers ONLY and carries no purchased add-ons; add-on money is reported separately by `stats extras`. Since Inventory CLI spec 1.34.0, a booking's `total_amount` from `ceebee inventory bookings get` **includes** its extras (see [bookings.md](bookings.md)). So the sum of per-booking totals over a period will exceed `stats revenue` for that period by roughly the extras total, and that gap is a basis difference, not a discrepancy to chase. A marketplace booking adds a second, independent gap: most per-booking readers base on `retail_price`, which adds the application fee.
 
 ## Exit codes
 

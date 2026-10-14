@@ -1,2 +1,7 @@
 ceebee
 ceebee-*
+
+# gstack local state: pregate.json IS committed (the pre-gate only honours the
+# copy on origin/<base>), but probe evidence and scratch files are per-run.
+/.gstack/tmp/
+/.gstack/qa-reports/
