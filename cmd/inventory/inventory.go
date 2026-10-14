@@ -56,6 +56,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
 	"github.com/captainbook/captainbook-cli/internal/config"
@@ -832,7 +833,15 @@ func capAuditString(s string) string {
 	if len(s) <= auditStringMaxBytes {
 		return s
 	}
-	return s[:auditStringMaxBytes] + "…(truncated, sha256=" + sha256Hex([]byte(s)) + ")"
+	// Back up to a rune boundary. Slicing by bytes can split a multi-byte
+	// UTF-8 sequence and write invalid UTF-8 into audit.jsonl, which is a
+	// JSONL file other tools parse. Server ids and error codes are ASCII in
+	// practice, so this is the cheap correctness of not depending on that.
+	cut := auditStringMaxBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…(truncated, sha256=" + sha256Hex([]byte(s)) + ")"
 }
 
 // sha256Hex returns the hex-encoded sha256 of body, or "" for nil/empty.
@@ -1461,6 +1470,22 @@ func JSONBodyFromArgs(args RunArgs, dryRun bool, fieldMap map[string]string) ([]
 	if len(args.RawData) > 0 {
 		if err := json.Unmarshal(args.RawData, &body); err != nil {
 			return nil, fmt.Errorf("--data: invalid JSON: %w", err)
+		}
+		// A non-object --data is refused rather than carried. `--data null`
+		// decodes successfully and leaves `body` a NIL map, which marshals to
+		// `null` — and every overlay helper then unmarshals that back into a
+		// nil map and PANICS on its first assignment, crashing the CLI before
+		// it can audit the call or report a validation error. Reached by
+		// `pricing-categories update <id> --data null --companions '[]'` and
+		// by the older `availabilities update <id> --data null --fares '[...]'`.
+		//
+		// Refusing at the source rather than re-initialising per call site:
+		// every request body in the spec is an object, so a scalar or array
+		// here is a mistake on any endpoint, and the json flag type already
+		// refuses the same shapes for the same reason (see parseJSONFlag).
+		if body == nil {
+			return nil, fmt.Errorf("--data: expected a JSON object, got null. " +
+				"Every request body is an object; pass {} for an empty one")
 		}
 	}
 	// Per-field flag overrides: fieldMap is flag-name → JSON-key.

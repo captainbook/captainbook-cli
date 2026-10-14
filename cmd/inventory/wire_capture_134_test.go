@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // TestWire_BulkDeleteScopes covers both selectors bulk-delete offers as of
@@ -1158,5 +1159,141 @@ func TestForensicCapBoundary(t *testing.T) {
 				t.Errorf("an uncapped value must be recorded byte-for-byte")
 			}
 		})
+	}
+}
+
+// TestWire_NonObjectDataIsRefusedNotCrashed covers the panic Optibot found on
+// PR #28.
+//
+// `--data null` decodes successfully and leaves JSONBodyFromArgs' body a NIL
+// map, which marshals to `null`. Every overlay helper then unmarshals that
+// back into a nil map and panics on its first assignment, so
+// `pricing-categories update 31 --data null --companions '[]'` crashed the CLI
+// with "assignment to entry in nil map" — before the call could be audited or
+// a validation error reported. The older `availabilities update --data null
+// --fares '[...]'` path had the same crash.
+//
+// Value: protects=a non-object --data is refused with a message instead of
+// crashing the process, on every command that overlays a field;
+// fails_when=JSONBodyFromArgs stops rejecting a nil body, or an overlay helper
+// drops its nil-map guard; why_new=no test passed a non-object --data to any
+// command; seam=none; no_claim=the server's own handling of a null body
+// (nothing is sent)
+func TestWire_NonObjectDataIsRefusedNotCrashed(t *testing.T) {
+	// Both overlay call sites in the tree, so the fix is pinned where it is
+	// shared rather than only where it was found.
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "companions overlay",
+			args: []string{"pricing-categories", "update", "31", "--data", "null", "--companions", `[]`},
+		},
+		{
+			name: "fares overlay",
+			args: []string{"availabilities", "update", "av_1", "--data", "null",
+				"--fares", `[{"pricing_tier_id":"pt_7","amount":100}]`},
+		},
+		{
+			name: "no overlay flag at all",
+			args: []string{"pricing-categories", "update", "31", "--data", "null", "--name", "Kids"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("the CLI panicked instead of refusing: %v", r)
+				}
+			}()
+			_, body, hit, err := capture(t, tc.args...)
+			if err == nil {
+				t.Fatalf("expected a refusal; command succeeded with body %v", body)
+			}
+			if hit {
+				t.Errorf("the refusal still reached the server with body %v", body)
+			}
+			if !strings.Contains(err.Error(), "expected a JSON object") {
+				t.Errorf("error = %v, want it to name the non-object --data", err)
+			}
+		})
+	}
+
+	// An object --data still works, so the guard refuses only what it should.
+	t.Run("an object --data is unaffected", func(t *testing.T) {
+		_, body, hit, err := capture(t, "pricing-categories", "update", "31",
+			"--data", `{"name":"Kids"}`, "--companions", `[]`)
+		if !hit {
+			t.Fatalf("a valid object --data was refused: %v", err)
+		}
+		if body["name"] != "Kids" {
+			t.Errorf("--data's name did not survive: %v", body)
+		}
+		if _, ok := body["companions"].([]any); !ok {
+			t.Errorf("companions = %#v, want the overlaid array", body["companions"])
+		}
+	})
+}
+
+// TestIsDryRunBody covers the truthiness the strict comparison missed.
+//
+// Value: protects=a preview requested through --data suppresses the
+// destructive no-op warning whatever JSON type carried the flag;
+// fails_when=the check goes back to `body["dry_run"] == true`, which matches
+// only a Go bool and so fires the warning on a float64 or string preview;
+// why_new=only the bool spelling was covered; seam=none; no_claim=that the
+// server accepts these spellings (the spec types dry_run as boolean; this only
+// keeps the CLI quiet when one is sent)
+func TestIsDryRunBody(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		val  any
+		want bool
+	}{
+		{"absent", nil, false},
+		{"bool true", true, true},
+		{"bool false", false, false},
+		{"json number 1", float64(1), true},
+		{"json number 0", float64(0), false},
+		{"string 1", "1", true},
+		{"string true", "true", true},
+		{"string TRUE", "TRUE", true},
+		{"string 0", "0", false},
+		{"unrelated type", []any{1}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := map[string]any{}
+			if tc.val != nil {
+				body["dry_run"] = tc.val
+			}
+			if got := isDryRunBody(body); got != tc.want {
+				t.Errorf("isDryRunBody(%#v) = %v, want %v", tc.val, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCapAuditString_DoesNotSplitARune keeps audit.jsonl valid UTF-8.
+//
+// Value: protects=truncating an over-long server string cuts at a rune
+// boundary, so the JSONL line stays valid UTF-8 for whatever parses it;
+// fails_when=the truncation goes back to slicing by byte index;
+// why_new=nothing exercised capAuditString at all; seam=none;
+// no_claim=none beyond protects
+func TestCapAuditString_DoesNotSplitARune(t *testing.T) {
+	// Multi-byte runes arranged so a byte-index cut lands mid-sequence.
+	long := strings.Repeat("é", auditStringMaxBytes)
+	got := capAuditString(long)
+	if !utf8.ValidString(got) {
+		t.Errorf("capAuditString produced invalid UTF-8")
+	}
+	if len(got) <= len("…(truncated, sha256=)") {
+		t.Errorf("capAuditString returned %q, which kept no content", got)
+	}
+
+	short := "req_01HXY12345ABCDEFGHJKMNPQRS"
+	if capAuditString(short) != short {
+		t.Errorf("a short string must be recorded verbatim")
 	}
 }

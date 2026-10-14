@@ -145,7 +145,15 @@ func resolveAvailabilityScope(args RunArgs) (ids []int, useIDs bool, err error) 
 	if !idsSet {
 		return nil, false, nil
 	}
-	ids, _ = args.Flags["availability-ids"].([]int)
+	ids, ok := args.Flags["availability-ids"].([]int)
+	if !ok {
+		// The flag is declared intSlice, so this cannot happen today. Without
+		// the check a future type change would leave ids nil and surface as
+		// "at least one id is required", sending the reader at the operator's
+		// input instead of the declaration that changed.
+		return nil, false, fmt.Errorf("--availability-ids: internal type error: "+
+			"expected []int from the intSlice flag, got %T", args.Flags["availability-ids"])
+	}
 	// The cap matches the job's chunk size; the server answers 422 above it.
 	// An id that does not resolve is also a 422 naming it rather than a
 	// silently narrowed list, so there is nothing to filter here.
@@ -276,10 +284,33 @@ func bulkDeleteDef() CommandDef {
 				// contract, so the line goes to stderr.
 				// dry-run comes off the assembled body, not args.DryRun —
 				// see bulkDeleteNoOpWarnings for why.
-				res.Warnings = append(res.Warnings, bulkDeleteNoOpWarnings(resp.Body, body["dry_run"] == true)...)
+				res.Warnings = append(res.Warnings, bulkDeleteNoOpWarnings(resp.Body, isDryRunBody(body))...)
 			}
 			return res, perr
 		},
+	}
+}
+
+// isDryRunBody reports whether an assembled request body asks for a preview.
+//
+// `body["dry_run"] == true` would only match a Go bool. The value can come
+// from --data, where json.Unmarshal produces float64 for `1` and string for
+// `"1"` — both of which the server's boolean validator accepts — so the strict
+// comparison read a preview as a commit and fired the destructive no-op
+// warning on it, the one thing the suppression exists to prevent. Out of
+// contract (the spec types dry_run as boolean), which is why it is tolerated
+// here rather than refused: this function's job is to stay quiet on a
+// preview, not to validate the payload.
+func isDryRunBody(body map[string]any) bool {
+	switch v := body["dry_run"].(type) {
+	case bool:
+		return v
+	case float64:
+		return v != 0
+	case string:
+		return v == "1" || strings.EqualFold(v, "true")
+	default:
+		return false
 	}
 }
 
@@ -457,6 +488,15 @@ func overlayJSONField(body []byte, key string, value any) ([]byte, error) {
 	m := map[string]any{}
 	if err := json.Unmarshal(body, &m); err != nil {
 		return nil, err
+	}
+	// `null` unmarshals into a NIL map without error, and assigning to one
+	// panics. JSONBodyFromArgs now refuses a non-object --data so this cannot
+	// be reached from a flag, but the guard stays: a panic here crashes the
+	// CLI before the call can be audited or reported, which is a far worse
+	// failure than the error, and every caller passes bytes from somewhere
+	// else.
+	if m == nil {
+		return nil, fmt.Errorf("cannot set %q on a non-object body (%s)", key, body)
 	}
 	m[key] = value
 	return json.Marshal(m)
