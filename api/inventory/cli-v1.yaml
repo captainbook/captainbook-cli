@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Inventory CLI API
-  version: 1.29.0
+  version: 1.34.0
   description: |
     Internal HTTP JSON API serving the CaptainBook inventory CLI client
     (which lives in a separate repository). Primary consumer is Claude Code
@@ -32,7 +32,9 @@ info:
           `guests` array are withheld from a caller without
           `view_booker_of_booking` (`customer.id` survives, so the payload
           stays joinable); `total_amount` / `paid_amount` / `refunded_amount` /
-          `transactions` are null/empty without `see_money_of_booking`; and
+          `transactions` are null/empty without `see_money_of_booking`, as are
+          `unit_amount` and `total_amount` on each `extras` row (the array
+          itself survives, carrying `extra_id`, `name` and `quantity`); and
           `answers` is null without `view_answers_of_booking`. The keys are
           always present; only the values are withheld.
         - The dedicated child endpoints agree with those field gates rather
@@ -154,12 +156,183 @@ info:
     ## Changes
 
     `info.version` moves when the contract does, so a client vendoring this file
-    byte-for-byte can tell which copy it holds by reading it. **It is a serial
+    byte-for-byte can tell which copy it holds by reading it. **Gaps in the
+    sequence are normal**: a number is claimed by whichever branch bumps it, and
+    a branch that is still open or was abandoned leaves its number unused. A
+    missing entry is not a lost one. **It is a serial
     number, not a semver range** — do NOT treat a minor bump as "compatible" or
     write a `^1.0`-style constraint against it. This is an internal API with one
     known consumer; breaking changes ship here without a major bump and are
     marked **Breaking** below. The URL major (`/api/v1/cli`) is a separate axis
     and does not move.
+
+    - **1.34.0** — **Breaking for anyone reconciling a figure.**
+      `Booking.total_amount` now includes the booking's purchased extras, and
+      `GET /bookings/{id}` gains an `extras` array naming them.
+
+      `total_amount` was `bookings.gross_price` verbatim, and that column is
+      PRICING TIERS ONLY — `Booking::computeGrossPrice()` sums the
+      `booking_pricing_tier` pivots and never reads `booking_extra`. Every
+      other surface in the product adds the extras on top (the mobile and
+      automation booking payloads, the OCTO channel resource, the accounting
+      and booking exports, the calendar and availability transformers, the
+      money-visibility badge). So a booking with add-ons published a
+      `total_amount` BELOW its own `paid_amount` — which reads as an
+      overpayment to anyone reconciling, and as a discount to an agent asked
+      what the trip cost. The figure moves UP by the extras total on affected
+      bookings and is unchanged on bookings without any.
+
+      The `extras` array is **detail-only**, like `answers` — the list already
+      eager-loads the pivot for `total_amount`, so the reason is payload size
+      and the absence of a list consumer for the breakdown, not query cost, and
+      `total_amount` carries the figure on both surfaces. Each
+      row is a `booking_extra` pivot: `extra_id`, `name`, `quantity`,
+      `unit_amount`, `total_amount`, `deleted_at`. There is no row id to report,
+      and no key to synthesise either: the table has no PRIMARY KEY and no
+      unique index, so `extra_id` names the CATALOGUE row and must not be used
+      to de-duplicate or upsert pivot rows. See the `BookedExtra` schema.
+
+      Three things about it are deliberate:
+
+      - **`unit_amount` is the price AS CHARGED** (`booking_extra.fare`), not
+        the catalogue `Extra.amount` that `GET /extras` reports. The two
+        disagree the moment an operator reprices an add-on, and a booking must
+        not restate its history at today's prices.
+      - **A retired extra still appears.** `extras` soft-deletes, and the
+        relation is a plain many-to-many, so a catalogue row trashed after the
+        sale used to vanish from the booking — silently taking its money out of
+        the total. The row is returned with its `deleted_at` set instead. This
+        is NOT behind `include_trashed`: a booking's total must not depend on a
+        query parameter.
+      - **The array survives a money redaction.** `unit_amount` and
+        `total_amount` are nulled without `see_money_of_booking` (composed with
+        `see_money_of_ota_booking`, as everywhere else), but `extra_id`, `name`
+        and `quantity` remain. What the customer bought and how many is an
+        operational fact a guide preparing a departure needs; it is not an
+        amount.
+
+      **Known and NOT fixed here: a GetYourGuide booking with an add-on
+      over-reports.** On the live GetYourGuide path
+      (`ChannelManager\GetYourGuide\ManageBookingsEndpoint`) the add-on total is
+      written INTO `gross_price`, `retail_price`, `direct_price`, `net_price` and
+      `voucher`, and the same add-ons are also attached to `booking_extra` with
+      the identical `fare` x `quantity`. So this endpoint counts them twice. The
+      `XolaBookingImport` CSV path does the same. (`BokunBookingImport` attaches
+      no extras and is unaffected.)
+
+      This is a PRE-EXISTING, product-wide defect rather than something this
+      change introduces: `retail_price` carries the same doubled figure, and
+      **40 lines across 26 files** add the extras on top of it — the mobile
+      payload, the automation webhooks, the OCTO channel resource, the
+      accounting and booking exports, the money-visibility badge, the payroll
+      payout jobs and the document/invoice variable resolver have all always
+      over-reported these bookings. This change makes the CLI the latest surface
+      to agree with them. The root cause is one place — those columns should not
+      include an amount the pivot already carries — and fixing it there corrects
+      every surface at once. Do not special-case it per endpoint, which would
+      leave the cause in place and make this surface the only one with a
+      different basis. Tracked as captainbook#8616.
+    - **1.32.0** — `POST /availabilities/bulk-delete` takes
+      **`availability_ids`**. Additive: `product_option_id` + `from` + `to`
+      keeps working unchanged, and is now `required_without` the id list
+      rather than flatly required.
+
+      The scope the endpoint was missing, and the one that makes a CLEANUP
+      expressible. The range scope deletes everything it matches, so "remove
+      the departures that rule just created, keep the ones that were already
+      there" had no shape here: old and new sit on the same option inside the
+      same dates. The sibling `bulk-update` has had `availability_ids` since
+      1.19.0 for the same reason — a range cannot say EXCEPT — so the two
+      endpoints taking "a set of departures" disagreed about what a set is,
+      and the destructive one was the narrower.
+
+      Measured cost of the gap: an operator with 1,137 duplicate departures
+      across six product options had no call that could express the cleanup.
+      The precise alternative was `DELETE /availabilities/{id}` 1,137 times
+      (captainbook#8609).
+
+      Up to 1000 ids, and they may span several product options. An id that
+      resolves to nothing — deleted, mistyped, or a non-ProductOption
+      bookable — is a 422 naming it rather than a silent drop, so
+      `total_matched` is the length of the list rather than a prediction.
+      Sending both scopes is a 422.
+
+      The channel retraction is now one announcement per option, derived from
+      the deleted rows instead of from `product_option_id`, which an
+      id-scoped payload does not carry.
+
+      The chunked write is also wrapped in one transaction, so the endpoint's
+      all-or-nothing contract now holds past 1000 rows as well as up to it.
+      It still does not lock the matched rows against a booking being
+      confirmed between the precheck and the write: that window is identical
+      on the pre-1.32.0 range scope and in both web delete paths, and the
+      lock that would actually close it is on the booking side
+      (captainbook#8617) rather than here.
+
+    - **1.31.0** — `POST /availability-rules` reports departures that already
+      exist at a DIFFERENT time on the days it would write to. Additive: one
+      new `notes` key and one new `rule` key, both on the dry run.
+
+      **`notes.other_departures_exist`** counts the departures this rule would
+      create that land on a day the option already sells at another time.
+      **`rule.other_departures_sample`** names up to three of those days and
+      the times already on them, relabelled with the product's zone like
+      `sample_dates`.
+
+      The gap it closes: `skip_reasons.already_exists` matches the exact
+      `(from, to)` pair, which is the right identity for a skip and the wrong
+      one for a warning. A rule aimed at a season that already runs thirty
+      minutes away matches no pair, so every occurrence is new and
+      `would_create` reads exactly as it does for an empty calendar. An
+      operator reloading a season at corrected times means REPLACE; this
+      endpoint only ever ADDS, and nothing said so. It put 1,137 duplicate
+      departures on the 2027 season of four fishing trips across seven
+      approvals, each promising 172 departures and each correct
+      (captainbook#8610).
+
+      Disjoint from `notes.dst_shifted_twin_exists`, which is the subset of
+      the same fact that our own pre-1.17.0 enumeration caused. A row counted
+      there is not counted here: two numbers for one row would leave the
+      caller working out whether they are the same departures, and the
+      operator's next move differs — one is a repair of our arithmetic, the
+      other a decision about which of two schedules they want.
+
+      Nothing is refused, for the same reason the DST note refuses nothing.
+      Replacing a schedule is still two calls, and the order is now stated on
+      the endpoint: bulk-delete the old departures FIRST, then create the
+      rule. A range-scoped delete issued AFTER an asynchronous create takes
+      the corrected departures too if the worker has already run, so the
+      documented order is the only one that cannot end with an empty season.
+
+    - **1.30.0** — Pricing categories carry `companions` ("Must travel with")
+      on read, create and update. Additive on read: every `PricingCategory`
+      gains a `companions` list, `[]` when the category has no rule.
+
+      A link says the category may only be booked when at least
+      `min_quantity` guests of `category_id` are in the same booking. A
+      category with several links is satisfied when ANY one of them is met;
+      links are never added together. No links means no rule.
+
+      On create and update `companions` REPLACES the whole set, and `[]`
+      clears it. Omit the key to leave the links as they are. A 422
+      (`VALIDATION_FAILED`, per row under `companions.{n}.category_id` or
+      `companions.{n}.min_quantity`) refuses a companion that is the category
+      itself, belongs to another product, is internal or deleted, or is listed
+      twice, and a `min_quantity` outside 1-999. An update also refuses a
+      companion that already has to travel with this category, directly or
+      through other categories: a loop would leave neither bookable. The dry
+      run runs the same checks, so a preview is refused exactly when the
+      commit would be.
+
+      A companion with no pricing tiers is accepted and returned on read, but
+      customers cannot book it, so that link is ignored until the category is
+      priced. A category whose every link is ignored has no rule.
+
+      Two more refusals and one side effect follow from the same rule:
+      `is_internal: true` is a 422 on a category another one must travel
+      with (remove it from that category's `companions` first), and
+      `DELETE /pricing-categories/{id}` removes every link from or to the
+      category. A restore does not bring them back.
 
     - **1.29.0** — New read endpoint: `GET /resource-calendar`. Additive; no
       existing endpoint changes shape.
@@ -2163,6 +2336,25 @@ paths:
         `skip_reasons.already_exists`, so re-running the same rule creates
         nothing.
 
+        **This endpoint adds; it never replaces.** The skip above needs the
+        exact `(from, to)`, so a rule aimed at a season that already runs at
+        another time skips nothing: every day ends up with both departures.
+        `notes.other_departures_exist` counts those days and
+        `rule.other_departures_sample` names three of them with the times
+        already on them. Nothing is refused — which schedule the operator
+        wants is not ours to pick.
+
+        **Replacing a schedule is two calls, and the ORDER matters.**
+        `POST /availabilities/bulk-delete` the old departures FIRST, then
+        create the rule. Not the other way round: this endpoint is
+        asynchronous (202, then `CreateBatchAvailabilityJob` writes the rows)
+        while bulk-delete is synchronous and its range scope takes EVERY
+        departure of the option in `[from, to)`. A delete issued after the
+        create therefore removes the corrected schedule as well as the old
+        one if the worker has already run, and only the old one if it has
+        not — a coin toss on queue latency, with an empty season as one of
+        the outcomes.
+
         **No-op:** if nothing would be created — the date range × weekdays
         matched no dates, or every match already exists — the endpoint
         returns 200 with `status=no_op` and skips the dispatch. Otherwise
@@ -2200,6 +2392,8 @@ paths:
                               would_create: { type: integer, description: "Of those, how many will be materialized. Always > 0 here." }
                               skip_reasons:
                                 $ref: "#/components/schemas/AvailabilityRuleSkipReasons"
+                              notes:
+                                $ref: "#/components/schemas/AvailabilityRuleNotes"
                               rule:
                                 $ref: "#/components/schemas/AvailabilityRulePreview"
         "200":
@@ -2223,6 +2417,8 @@ paths:
                               would_create: { type: integer, description: "Of those, how many would be materialized. Zero on a no-op." }
                               skip_reasons:
                                 $ref: "#/components/schemas/AvailabilityRuleSkipReasons"
+                              notes:
+                                $ref: "#/components/schemas/AvailabilityRuleNotes"
                               rule:
                                 $ref: "#/components/schemas/AvailabilityRulePreview"
         "401": { $ref: "#/components/responses/Unauthenticated" }
@@ -2401,20 +2597,65 @@ paths:
   /availabilities/bulk-delete:
     post:
       operationId: bulkDeleteAvailabilities
-      summary: Bulk soft-delete availabilities across a date range (synchronous)
+      summary: Bulk soft-delete availabilities, by id or across a date range (synchronous)
       description: |
-        Soft-deletes every availability of one ProductOption inside
-        `[from, to)` in a single UPDATE on `deleted_at`. Synchronous — the
-        response carries the actual `total_deleted` count, no polling
-        required.
+        Soft-deletes departures in chunked UPDATEs on `deleted_at`.
+        Synchronous — the response carries the actual `total_deleted` count,
+        no polling required.
+
+        **Two scopes, exactly one of them.** `availability_ids` names the
+        exact rows (up to 1000, and they may belong to several product
+        options); `product_option_id` with `from` and `to` takes every
+        departure of that option in a half-open range. Sending both is a
+        422.
+
+        Reach for the id scope whenever the request contains an exception —
+        which includes every "delete the old departures and keep the new
+        ones" cleanup. Old and new sit on the same option inside the same
+        dates, so no range separates them and the range scope takes both.
+        That was this endpoint's only shape until 1.32.0, and the gap had a
+        cost: an operator with 1,137 duplicate departures across six options
+        had no API that could express the cleanup, and the per-row
+        `DELETE /availabilities/{id}` alternative was 1,137 calls
+        (captainbook#8609).
+
+        An id that resolves to nothing — deleted, mistyped, or belonging to
+        a non-ProductOption bookable — is a 422 naming it, never a silent
+        drop. So `total_matched` under the id scope is exactly the length of
+        the list rather than a prediction, which is the property the scope
+        exists for: a partial delete reported as `total_deleted: 167` over a
+        list of 170 would leave the operator unable to tell which three
+        survived.
+
+        **All-or-nothing**, in both senses. The chunked soft-delete runs in
+        one transaction, so a failure part-way through a 1,500-row delete
+        leaves the range untouched rather than half gone — the 1000-id
+        chunking is an implementation detail and never a partial result.
 
         **All-or-nothing on confirmed bookings.** Before any rows are
-        touched, the server scans the matched range for availabilities with
+        touched, the server scans the matched set for availabilities with
         a confirmed Booking attached. If any are found the entire request
         is rejected with 409 `AVAILABILITY_HAS_CONFIRMED_BOOKING` and
         `error.details` carries `total_blocked` plus a sample of up to 20
-        availability ids. Operator must cancel/move those bookings or
-        narrow the range and retry.
+        availability ids. Operator must cancel/move those bookings, narrow
+        the range, or — under the id scope — send the list again without
+        those ids, which is what the refusal's own `hint` says.
+
+        **Replacing a schedule? Delete BEFORE you create, never after.**
+        `POST /availability-rules` is asynchronous: it answers 202 and a
+        worker writes the departures. This endpoint is synchronous and takes
+        every departure of the option in `[from, to)`. So a delete issued
+        after the rule removes the corrected schedule as well as the old one
+        if the worker has already run, and only the old one if it has not —
+        decided by queue latency, with an empty season as one of the two
+        outcomes. The same caveat is on the rule endpoint; it is repeated
+        here because an operator planning the replacement from this side
+        would otherwise never read it.
+
+        The `availability_ids` scope above is immune to it: ids name the rows
+        that exist now, so they cannot reach a departure the worker has not
+        written yet. Browse the old departures, send their ids, and the order
+        stops mattering.
 
         **Cascade caveat.** Soft-delete is a single bulk UPDATE that
         bypasses model events, so the `Availability → pricingTiers`
@@ -2425,6 +2666,9 @@ paths:
         **Channel retraction.** Because the bulk UPDATE fires no model events,
         the removal is announced explicitly: if the ProductOption is mapped to
         GetYourGuide, a `vacancies: 0` push is queued for the deleted slots.
+        One announcement per option, derived from the deleted rows rather than
+        from the payload, so an id-scoped call spanning three options retracts
+        from all three.
         GYG has no delete endpoint, so a zero-vacancy push is the only
         retraction mechanism. Best-effort and asynchronous: the 200 does not
         mean GYG has been told. Only future slots inside the 90-day horizon are
@@ -2617,6 +2861,9 @@ paths:
       description: |
         Soft-deletes the category and cascades to its pricing tiers
         (`PricingCategory::$cascadeDeletes = ['pricingTiers']`).
+        Also removes every "Must travel with" link from or to the category,
+        so a category that required it can now be booked without it. A
+        restore does not bring the links back.
       tags: [PricingCategories]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -3720,7 +3967,7 @@ paths:
     get:
       operationId: showBooking
       summary: Show a booking
-      description: Inlines guests and most-recent transactions.
+      description: Inlines guests, most-recent transactions, purchased extras and answers.
       tags: [Bookings]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -4425,6 +4672,7 @@ paths:
       tags: [Extras]
       parameters:
         - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IncludeTrashed"
       responses:
         "200":
           description: Extra
@@ -6967,6 +7215,65 @@ components:
             properties:
               from: { type: string, format: date-time }
               to: { type: string, format: date-time }
+        other_departures_sample:
+          type: array
+          maxItems: 3
+          description: >
+            What is ALREADY on the days this rule would collide with — up to
+            three of them, each with the times that day already sells. Empty
+            whenever `notes.other_departures_exist` is absent, and the two
+            always agree: the note is the count, this is what the count is
+            about.
+
+            The half an operator can act on. "2027-06-07 already has 07:00" is
+            recognisable as the schedule they meant to replace in a way that
+            a bare 154 is not, and replacing is what they almost always mean —
+            this endpoint cannot do it, so the old departures need a
+            `POST /availabilities/bulk-delete` of their own, issued BEFORE the
+            rule rather than after it (see the endpoint description).
+
+            Times are relabelled with the product's timezone through the same
+            helper `sample_dates` and `GET /availabilities` use, so a
+            departure reads identically on all three. `date` is the departure
+            date as stored, which is product-local wall clock.
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date, example: "2027-06-07" }
+              existing:
+                type: array
+                maxItems: 3
+                description: "Up to three of that day's existing departures."
+                items:
+                  type: object
+                  properties:
+                    from: { type: string, format: date-time }
+                    to: { type: string, format: date-time }
+
+    AvailabilityRuleNotes:
+      type: object
+      description: >
+        The OPPOSITE of `skip_reasons`: facts about occurrences that WILL be
+        created anyway. Omitted entirely when there is nothing to say — never
+        sent as an empty object. The two keys are disjoint by construction.
+      properties:
+        dst_shifted_twin_exists:
+          type: integer
+          description: >
+            Occurrences the option already has at a DIFFERENT hour, left by
+            the pre-1.17.0 enumeration's DST arithmetic. They do not match the
+            `(from, to)` skip — that is what the fix changed — so approving
+            creates both. Which hour is right is a question about the
+            operator's calendar, so it is reported, not resolved.
+        other_departures_exist:
+          type: integer
+          description: >
+            Occurrences that would land on a day the option already sells at
+            another time, for any reason other than the one above. The
+            general case of the same fact: a season reloaded thirty minutes
+            off an existing one shares no `(from, to)` with it, so nothing is
+            skipped and every day ends up selling twice.
+            `rule.other_departures_sample` names the days and times.
 
     AvailabilityRuleSkipReasons:
       type: object
@@ -7059,9 +7366,38 @@ components:
         min_age: { type: [integer, "null"] }
         max_age: { type: [integer, "null"] }
         is_internal: { type: [boolean, "null"], description: "Internal categories are excluded from public-facing checkout flows." }
+        companions:
+          type: array
+          description: |
+            "Must travel with": the category may only be booked when at least
+            ONE of these links is met (never added together). `[]` means no
+            rule. The same rows the create and update payloads accept back.
+            A link to a category with no pricing tiers is listed here but
+            ignored until that category is priced.
+          items: { $ref: "#/components/schemas/PricingCategoryCompanion" }
         deleted_at: { type: [string, "null"], format: date-time }
         created_at: { type: [string, "null"], format: date-time, description: "Always null — no such column on `pricing_categories`." }
         updated_at: { type: [string, "null"], format: date-time, description: "Always null — no such column on `pricing_categories`." }
+
+    PricingCategoryCompanion:
+      type: object
+      required: [category_id, min_quantity]
+      description: One "Must travel with" link, as returned on read.
+      properties:
+        category_id: { type: string, description: "Another pricing category of the same product." }
+        min_quantity: { type: integer, minimum: 1, maximum: 999, description: "Guests of `category_id` needed in the booking for this link to be met." }
+
+    PricingCategoryCompanionInput:
+      type: object
+      additionalProperties: false
+      required: [category_id, min_quantity]
+      description: |
+        One "Must travel with" link on a write. `category_id` must be another
+        category of the SAME product that customers can book (not internal,
+        not deleted), and may appear once per list.
+      properties:
+        category_id: { $ref: "#/components/schemas/PositiveIntegerId" }
+        min_quantity: { type: integer, minimum: 1, maximum: 999 }
 
     PricingTier:
       type: object
@@ -7358,13 +7694,58 @@ components:
             - `null` — you may NOT see answers. The server does not even read
               them from the database in this case.
           items: { $ref: "#/components/schemas/Answer" }
+        extras:
+          type: array
+          description: |
+            The add-ons the customer BOUGHT — `booking_extra` pivot rows, not
+            the `/extras` catalogue, which only says what is on offer for a
+            product and can be repriced after the sale.
+
+            Present on `GET /bookings/{id}` only, deliberately absent from
+            `GET /bookings`, and absent from the `before` / `after` snapshots on
+            a mutation receipt (`cancel`, `comp`). The reason is PAYLOAD SIZE and
+            that no list consumer asked for the breakdown, NOT query cost: the
+            list already eager-loads the pivot to compute `total_amount`, so
+            publishing the rows there would cost no extra query.
+            `total_amount` includes the extras on every one of those surfaces,
+            so no caller is left reconciling from nothing.
+
+            Survives a money redaction, unlike `transactions`. A caller without
+            `see_money_of_booking` still gets the rows with `extra_id`, `name`
+            and `quantity`, and `unit_amount` / `total_amount` nulled — what
+            the customer bought and how many is an operational fact a guide
+            preparing a departure needs, and it is not an amount. `[]` means
+            this booking bought no extras; there is no permission under which
+            the key is withheld.
+          items: { $ref: "#/components/schemas/BookedExtra" }
         total_amount:
           oneOf:
             - $ref: "#/components/schemas/Money"
             - type: "null"
           description: |
-            Sourced from `bookings.gross_price` (booking-level total).
+            The booking's whole total: `bookings.gross_price` PLUS the sum of
+            `booking_extra.fare * booking_extra.quantity` over the rows in
+            `extras`.
+
+            `gross_price` on its own is pricing tiers only —
+            `Booking::computeGrossPrice()` never reads `booking_extra` — so
+            until `1.34.0` this field was BELOW `paid_amount` on any booking
+            carrying add-ons. It now INCLUDES the extras, as every per-booking
+            reader in the product does.
+
+            Two limits on that agreement, both deliberate. The base column here
+            is `gross_price`; the other readers base on `retail_price`, which
+            for a tenant without `marketplace_fee_included` is
+            `gross_price + application_fee * gross_price`, so the figures still
+            differ for a marketplace booking. And the aggregate statistics
+            surface sums `bookings.gross_price` with no extras at all, so a
+            revenue figure read there will not reconcile against the sum of
+            these totals.
+
             Null for a caller without the `see_money_of_booking` permission.
+            `bookings.gross_price` is NOT NULL, so a persisted booking always
+            has a base figure: a comped or free booking carrying a paid add-on
+            reports `0 + extras`, not null.
         paid_amount:
           oneOf:
             - $ref: "#/components/schemas/Money"
@@ -7542,6 +7923,91 @@ components:
           additionalProperties: true
         created_at: { type: [string, "null"], format: date-time, description: "Always null — no such column on `guests`." }
         updated_at: { type: [string, "null"], format: date-time, description: "Always null — no such column on `guests`." }
+
+    BookedExtra:
+      type: object
+      description: |
+        One extra the customer bought on a booking — a `booking_extra` pivot
+        row. Mirrors `BookedExtraResource::toArray()`.
+
+        DISTINCT from `Extra`, which is the catalogue entry `GET /extras`
+        returns. `Extra.amount` is what the add-on is offered at today;
+        `BookedExtra.unit_amount` is what this customer was charged, and the
+        two diverge the moment an operator reprices it.
+
+        No `id`: `booking_extra` has no surrogate key — and no PRIMARY KEY and
+        no unique index either, only a non-unique index per foreign key. So
+        `extra_id` identifies the CATALOGUE row, never the pivot row: do not
+        de-duplicate or upsert on it. Nothing in the schema prevents two rows
+        for the same `(booking_id, extra_id)`, and `total_amount` on the booking
+        would count both. No `currency` either — the `extras` table has no such
+        column and the booking's own `currency` governs the whole payload.
+      properties:
+        extra_id:
+          type: string
+          description: |
+            The catalogue `Extra.id`. Resolvable through `GET /extras/{id}` —
+            with `?include_trashed=true` when `deleted_at` is set here.
+        name:
+          type: [string, "null"]
+          description: |
+            The catalogue extra's `title`, English translation. Mirrors
+            `Extra.name`, so the catalogue and the purchase name an add-on
+            identically — except that an extra with no English translation
+            reports `null` here rather than the empty string the catalogue
+            returns, because a blank name is indistinguishable from an add-on
+            genuinely called nothing.
+        quantity:
+          type: integer
+          description: |
+            Units bought. Not redacted by any permission — see `Booking.extras`.
+            The underlying column is nullable and reports as `0` when unset.
+        unit_amount:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+          description: |
+            Price per unit AS CHARGED (`booking_extra.fare`). NOT the catalogue
+            price.
+
+            **This field carries NO currency of its own, and which currency it
+            is in depends on who wrote the row.** `booking_extra` has no
+            currency column, and the writers disagree:
+
+            - A CHANNEL booking stores the channel's own figure. On the live
+              GetYourGuide path the pivot `fare` is the OTA's `retailPrice` and
+              the booking's transaction currency is the same channel currency,
+              so here the extra IS in `Booking.currency`.
+            - A DIRECT booking (widget, back office) stores the catalogue
+              `extras.fare`, which is in the account currency, unconverted.
+
+            So neither "the account currency" nor "`Booking.currency`" is true
+            for every row. Treat the figure as unlabelled: it is comparable with
+            the other amounts on the SAME booking, and must not be converted,
+            summed across bookings, or compared against a currency resolved from
+            anywhere else. If you need a labelled amount, read the booking's
+            transactions.
+            The column is nullable and
+            reports as `0` when unset, so `null` here means exactly one thing:
+            withheld from a caller without `see_money_of_booking`. A free
+            add-on and one with no fare recorded both read as `0`.
+        total_amount:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+          description: |
+            `unit_amount * quantity`. Stated rather than left to the client to
+            multiply, because a consumer recomputing it from a redacted
+            `unit_amount` would get null. Null for a caller without
+            `see_money_of_booking`.
+        deleted_at:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            The CATALOGUE row's soft-delete, not the purchase's. Set when the
+            operator has retired this extra since the booking was made; the row
+            is still returned, because retiring an add-on does not unsell it.
+            Independent of `include_trashed`.
 
     Extra:
       type: object
@@ -7858,13 +8324,34 @@ components:
 
     BulkDeleteAvailabilityRequest:
       type: object
-      required: [product_option_id, from, to]
       description: |
-        Filter shape mirrors `BulkUpdateAvailabilityRequest` so a CLI flow
-        that previewed a date-range change can reuse the same payload to
-        delete instead. Range is half-open: rows where `from >= from AND
-        from < to` are matched.
+        Filter shape mirrors `BulkUpdateAvailabilityRequest` field for field,
+        so a CLI flow that previewed a change can reuse the same payload to
+        delete instead.
+
+        TWO scopes, mutually exclusive. `availability_ids` names the exact
+        rows; `product_option_id` + `from` + `to` takes a half-open range
+        (rows where `from >= from AND from < to`). Exactly one is required
+        and sending both is a 422 — a payload carrying both is a caller who
+        does not know which is in force, and on a delete the two readings are
+        "these three departures" and "this season".
+      oneOf:
+        - required: [availability_ids]
+        - required: [product_option_id, from, to]
       properties:
+        availability_ids:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          description: >
+            The exact departures to delete. They may belong to several
+            product options — nothing about a delete needs them to share one,
+            and a cleanup after a season reload is naturally spread across
+            the options that were reloaded.
+
+            Every id must resolve to a ProductOption-backed availability. One
+            that does not is a 422 naming it; ids are never silently dropped.
+          items: { $ref: "#/components/schemas/PositiveIntegerId" }
         product_option_id: { $ref: "#/components/schemas/PositiveIntegerId" }
         from: { type: string, format: date }
         to: { type: string, format: date }
@@ -8863,6 +9350,15 @@ components:
         min_age: { type: [integer, "null"], minimum: 0 }
         max_age: { type: [integer, "null"], minimum: 0 }
         is_internal: { type: boolean, default: false }
+        companions:
+          type: array
+          maxItems: 20
+          description: |
+            Replaces every "Must travel with" link of the category; `[]` clears
+            them, omitting the key leaves them unchanged. Refused with 422 per row
+            for the category itself, another product's category, an internal or
+            deleted category, a duplicate, or a `min_quantity` outside 1-999.
+          items: { $ref: "#/components/schemas/PricingCategoryCompanionInput" }
         dry_run: { type: boolean, default: false }
 
     UpdatePricingCategoryRequest:
@@ -8878,7 +9374,17 @@ components:
           enum: [ADULT, CHILD, INFANT, YOUTH, STUDENT, SENIOR, TRAVELLER, EU_CITIZEN, MILITARY, EU_CITIZEN_STUDENT]
         min_age: { type: [integer, "null"], minimum: 0 }
         max_age: { type: [integer, "null"], minimum: 0 }
-        is_internal: { type: boolean }
+        is_internal: { type: boolean, description: "`true` is refused with 422 while another category's `companions` names this one." }
+        companions:
+          type: array
+          maxItems: 20
+          description: |
+            Replaces every "Must travel with" link of the category; `[]` clears
+            them, omitting the key leaves them unchanged. Refused with 422 per row
+            for the category itself, another product's category, an internal or
+            deleted category, a duplicate, a `min_quantity` outside 1-999, or a
+            category that already has to travel with this one (a loop).
+          items: { $ref: "#/components/schemas/PricingCategoryCompanionInput" }
         dry_run: { type: boolean, default: false }
 
     CreatePricingTierRequest:
