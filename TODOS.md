@@ -1305,3 +1305,39 @@ string, then `json.Number` — accepting an integer-valued float and keeping the
 **Why:** every other companions gate matches the spec exactly; this is the one
 place the CLI is narrower than the server.
 **Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## The pre-gate counts a tag-triggered release lane as a pre-merge obligation
+
+`gstack-pregate` derives its lanes from `.github/workflows/*.yml` and treats
+every job that runs tests as a `requires-remote` obligation on a non-Linux
+machine. That produces two obligations here, and only one of them can ever be
+satisfied before merge:
+
+- `ci.yml/test` — triggers on `pull_request`, so opening the PR runs it. Cleared
+  with `gstack-pregate clear --remote ci.yml/test --run-url <url>`.
+- `release.yml/test` — triggers ONLY on `push: tags: v[0-9]*`. This repo cuts
+  releases by pushing a tag AFTER merge (there is no VERSION file; the Makefile
+  derives the version from `git describe`), so the lane cannot run on a branch
+  or a PR by construction.
+
+Net effect: `gstack-ship-receipt write` always fails with
+`PREGATE_REMOTE_UNCLEARED` on the release lane, so no ship receipt can be
+written for this repo pre-merge. Neither `.gstack/pregate.json` nor
+`gstack-pregate clear` has a way to declare a lane release-time-only — `warn`
+explicitly cannot downgrade the lanes check's requires-remote verdict.
+
+This is a tooling-fit gap rather than a defect in either tool: the pre-gate's
+model is "every tests-bearing workflow job must have run", which is right for a
+repo whose workflows all trigger on PR, and wrong for one with a separate
+tag-triggered release pipeline.
+
+**Fix:** upstream, a way to mark a workflow lane as release-time (e.g. a
+`release_lanes` key in pregate-v1, or deriving it from the job's own triggers —
+a job reachable only from `push: tags:` cannot be a pre-merge obligation).
+Locally, nothing: do not clear it with a false run URL, and do not delete the
+`test` job from `release.yml`, which exists so a tagged release cannot ship
+untested.
+**Why:** the receipt is the artifact a later agent reads to know the gate ran;
+one that can never be written is worse than one that is absent, because its
+absence looks like an oversight.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream gstack.
