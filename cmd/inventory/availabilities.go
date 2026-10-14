@@ -12,6 +12,7 @@ import (
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,144 @@ const (
 	availFromDesc = "Date range start, inclusive (YYYY-MM-DD). Range is half-open [from, to)."
 	availToDesc   = "Date range end, exclusive (YYYY-MM-DD). Range is half-open [from, to)."
 )
+
+// availabilityIDsDesc is the `--availability-ids` flag description shared by
+// bulk-update and bulk-delete. Both endpoints mean the same thing by it, and
+// the sentence operators actually need — reach for ids whenever the request
+// contains an exception — is the one the spec repeats on both.
+// availabilityIDsMaxItems mirrors the spec's `maxItems` on the
+// `availability_ids` array of both bulk endpoints. Named for the same reason
+// companionsMaxItems is: the cap appears in the gate, in the refusal message
+// and in the flag description, and a spec bump must not be able to move one
+// without the others — so every one of those three reads it from here.
+const availabilityIDsMaxItems = 1000
+
+// availabilityIDsDesc is the `--availability-ids` flag description shared by
+// bulk-update and bulk-delete. Both endpoints mean the same thing by it, and
+// the sentence operators actually need — reach for ids whenever the request
+// contains an exception — is the one the spec repeats on both.
+var availabilityIDsDesc = fmt.Sprintf("The exact departures to act on, comma-separated (max %d; may span product options, ",
+	availabilityIDsMaxItems) +
+	"except on bulk-update pricing, which refuses a list spanning more than one option). " +
+	"Mutually exclusive with --product-option-id/--from/--to. Use this whenever the request has an " +
+	"exception in it: \"delete the duplicates that rule just created, keep the ones that were already " +
+	"there\" cannot be written as a date range, because old and new sit on the same option inside the " +
+	"same dates"
+
+// productOptionScopeDesc is the `--product-option-id` description for the two
+// bulk endpoints, where the flag is one third of the range scope rather than a
+// standalone filter.
+const productOptionScopeDesc = "Target product option ID (with --from/--to)"
+
+// availabilityScopeFlags are the scoping flags shared by
+// /availabilities/bulk-update and /availabilities/bulk-delete. Neither
+// endpoint can mark any of them Required at the cobra level: the spec
+// requires exactly ONE of the two scopes, which cobra cannot express.
+// resolveAvailabilityScope enforces it instead.
+//
+// Takes no parameters on purpose. An earlier spelling passed the
+// product-option description in, and both call sites filled it with the same
+// literal — which is the duplicated string the extraction existed to remove,
+// reintroduced one level up, where the next edit to one endpoint's help text
+// would silently diverge the two.
+func availabilityScopeFlags() []FlagDef {
+	return []FlagDef{
+		{Name: "from", Type: "string", Description: availFromDesc},
+		{Name: "to", Type: "string", Description: availToDesc},
+		{Name: "product-option-id", Type: "string", Description: productOptionScopeDesc},
+		{Name: "availability-ids", Type: "intSlice", Description: availabilityIDsDesc},
+	}
+}
+
+// parseAvailabilityRange parses and validates the date-range scope shared by
+// /availabilities/bulk-update and /availabilities/bulk-delete.
+//
+// `to` is EXCLUSIVE and must be strictly after `from` on BOTH endpoints. The
+// schemas say so only for bulk-update, which is how an earlier version of this
+// file came to apply the gate on one endpoint and argue, in a comment, that
+// the other deliberately had no such rule. The spec's changelog is explicit
+// that it does — cli-v1.yaml, the 1.22.0 entry:
+//
+//	POST /availabilities/bulk-delete also refuses `from` equal to `to` with a
+//	422, matching /availabilities/bulk-update. `to` is EXCLUSIVE on both, so
+//	that range matched nothing and the delete answered 200 with
+//	total_deleted: 0 — success, having removed nothing.
+//
+// So the equal-dates call was never "a request the server accepts": it is a
+// 422, and the reason it is refused there is the reason it must be refused
+// here — on a destructive endpoint, a typo that answers 200 having deleted
+// nothing is the worst available outcome. One shared parser means the two
+// endpoints cannot drift on it again.
+func parseAvailabilityRange(args RunArgs) (from, to openapi_types.Date, err error) {
+	from, err = parseDate(args.FlagString("from"))
+	if err != nil {
+		return from, to, fmt.Errorf("--from: %w", err)
+	}
+	to, err = parseDate(args.FlagString("to"))
+	if err != nil {
+		return from, to, fmt.Errorf("--to: %w", err)
+	}
+	if !to.Time.After(from.Time) {
+		return from, to, fmt.Errorf("--to must be strictly after --from (the range is half-open, so one day means --to = the NEXT day)")
+	}
+	return from, to, nil
+}
+
+// resolveAvailabilityScope enforces the "exactly one scope" rule that
+// /availabilities/bulk-update (since spec 1.19.0) and
+// /availabilities/bulk-delete (since 1.32.0) share: either
+// `availability_ids`, or `product_option_id` + `from` + `to`. Sending both
+// is a 422 server-side and sending neither is a 422; these gates mirror
+// those refusals rather than spending a round trip to discover them.
+//
+// It returns the validated id list and whether the id scope is in force; the
+// range branch is parsed by parseAvailabilityRange, which both endpoints share
+// because both document the same half-open rule.
+//
+// Extracted rather than copied because the copy is where this kind of gate
+// goes wrong: the --product-id/--availability-id exclusion in
+// pricing_tiers.go read two int flags with FlagString and could never fire,
+// with the compiler, both drift directions and the whole suite green.
+func resolveAvailabilityScope(args RunArgs) (ids []int, useIDs bool, err error) {
+	idsSet := args.FlagSet("availability-ids")
+	rangeFlags := []string{"product-option-id", "from", "to"}
+	var rangeGiven []string
+	for _, f := range rangeFlags {
+		if args.FlagSet(f) {
+			rangeGiven = append(rangeGiven, "--"+f)
+		}
+	}
+	switch {
+	case idsSet && len(rangeGiven) > 0:
+		return nil, false, fmt.Errorf("--availability-ids is mutually exclusive with %s: pass one scope or the other, not both",
+			strings.Join(rangeGiven, ", "))
+	case !idsSet && len(rangeGiven) == 0:
+		return nil, false, fmt.Errorf("one scope is required: either --availability-ids, or all of --product-option-id, --from and --to")
+	case !idsSet && len(rangeGiven) < len(rangeFlags):
+		return nil, false, fmt.Errorf("the date-range scope needs all of --product-option-id, --from and --to (got %s)",
+			strings.Join(rangeGiven, ", "))
+	}
+	if !idsSet {
+		return nil, false, nil
+	}
+	ids, _ = args.Flags["availability-ids"].([]int)
+	// The cap matches the job's chunk size; the server answers 422 above it.
+	// An id that does not resolve is also a 422 naming it rather than a
+	// silently narrowed list, so there is nothing to filter here.
+	if len(ids) == 0 {
+		return nil, false, fmt.Errorf("--availability-ids: at least one id is required")
+	}
+	if len(ids) > availabilityIDsMaxItems {
+		return nil, false, fmt.Errorf("--availability-ids: %d ids exceeds the %d cap; a longer list is a date range wearing the wrong shape",
+			len(ids), availabilityIDsMaxItems)
+	}
+	for _, id := range ids {
+		if id < 1 {
+			return nil, false, fmt.Errorf("--availability-ids: %d is not a valid availability id (must be >= 1)", id)
+		}
+	}
+	return ids, true, nil
+}
 
 // availabilitiesCmd builds the `inventory availabilities` subtree. Most
 // resources are bound via bindCommands(); availabilities is special
@@ -43,37 +182,44 @@ func availabilitiesCmd(runner *Runner) *cobra.Command {
 }
 
 // bulkDeleteDef is the synchronous `availabilities bulk-delete` command.
-// Mirrors the bulk-update filter shape (product_option_id + half-open
-// [from, to)) but the response carries `total_deleted` directly — there's
-// no async job, no stderr signal, no polling. 409
+// Mirrors the bulk-update filter shape — as of spec 1.32.0 that includes
+// BOTH of its scopes, `availability_ids` as well as product_option_id +
+// half-open [from, to) — but the response carries `total_deleted` directly:
+// there's no async job, no stderr signal, no polling. 409
 // AVAILABILITY_HAS_CONFIRMED_BOOKING aborts the entire request before any
 // row is touched.
 func bulkDeleteDef() CommandDef {
 	return CommandDef{
-		Use: "bulk-delete", Short: "Bulk soft-delete availabilities across a date range (synchronous)",
+		Use: "bulk-delete", Short: "Bulk soft-delete availabilities, by id or across a date range (synchronous)",
 		Kind: KindMutation, Verb: "POST", Path: "/availabilities/bulk-delete",
 		Ability: invpkg.Write, DryRunMode: DryRunBody,
-		Long: "Soft-deletes every availability of one product option in [from, to). " +
+		Long: "Soft-deletes departures, either the exact rows named by --availability-ids " +
+			fmt.Sprintf("(up to %d, which may span product options) or every availability of one ", availabilityIDsMaxItems) +
+			"product option in [from, to). Exactly one scope; sending both is a 422. " +
 			"Synchronous — response carries `total_deleted`. 409 " +
 			"AVAILABILITY_HAS_CONFIRMED_BOOKING is returned if any matched row has " +
 			"a confirmed Booking attached (entire request rejected, no rows touched); " +
 			"`error.details.total_blocked` + `sample_availability_ids` (up to 20) " +
 			"identify the blockers. The confirmed-booking precheck runs even on " +
-			"--dry-run.",
-		Flags: []FlagDef{
-			{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option ID"},
-			{Name: "from", Type: "string", Required: true, Description: availFromDesc},
-			{Name: "to", Type: "string", Required: true, Description: availToDesc},
-		},
-		ForensicFields: []string{"product-option-id", "from", "to"},
+			"--dry-run.\n\n" +
+			"Replacing a schedule? Delete BEFORE you create, never after. " +
+			"`availabilities create-rule` is asynchronous (202, then a worker writes the " +
+			"rows) while this is synchronous, so a range-scoped delete issued after the " +
+			"rule takes the corrected departures too if the worker has already run — a " +
+			"coin toss on queue latency with an empty season as one outcome. The id scope " +
+			"is immune: ids name rows that exist now, so they cannot reach a departure the " +
+			"worker has not written yet.",
+		Flags: availabilityScopeFlags(),
+		// D20: the scope decides exactly how many departures one call
+		// destroys, which is the largest blast radius in this command tree.
+		// The audit keeps only body_sha256, so omitting --availability-ids
+		// would leave an incident responder unable to tell which departures
+		// were deleted.
+		ForensicFields: []string{"product-option-id", "from", "to", "availability-ids"},
 		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-			from, err := parseDate(args.FlagString("from"))
+			ids, useIDs, err := resolveAvailabilityScope(args)
 			if err != nil {
-				return nil, fmt.Errorf("--from: %w", err)
-			}
-			to, err := parseDate(args.FlagString("to"))
-			if err != nil {
-				return nil, fmt.Errorf("--to: %w", err)
+				return nil, err
 			}
 			// Mirror bulk-update: start with --data (if any) as the base,
 			// then overlay typed fields. Typed flags always WIN so the
@@ -85,9 +231,24 @@ func bulkDeleteDef() CommandDef {
 					return nil, fmt.Errorf("--data: invalid JSON: %w", err)
 				}
 			}
-			body["product_option_id"] = args.FlagString("product-option-id")
-			body["from"] = from.Format("2006-01-02")
-			body["to"] = to.Format("2006-01-02")
+			if useIDs {
+				body["availability_ids"] = ids
+				// The scopes are mutually exclusive on the wire, so a --data
+				// blob carrying the other one would turn an id-scoped call
+				// into a 422. Typed flags win: drop it.
+				delete(body, "product_option_id")
+				delete(body, "from")
+				delete(body, "to")
+			} else {
+				from, to, rerr := parseAvailabilityRange(args)
+				if rerr != nil {
+					return nil, rerr
+				}
+				body["product_option_id"] = args.FlagString("product-option-id")
+				body["from"] = from.Format("2006-01-02")
+				body["to"] = to.Format("2006-01-02")
+				delete(body, "availability_ids")
+			}
 			if args.DryRun {
 				body["dry_run"] = true
 			}
@@ -102,10 +263,74 @@ func bulkDeleteDef() CommandDef {
 			res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "Availability", "")
 			if res != nil {
 				res.WireBody = raw
+				// A delete that matched nothing answers 200, and on a
+				// destructive command "success" and "did nothing" must not
+				// look the same.
+				//
+				// This covers a WELL-FORMED scope that found nothing left to
+				// delete — rows already removed, or a correct range that is
+				// not the one the operator meant. The empty-range typo cannot
+				// reach here: parseAvailabilityRange refuses `from >= to`
+				// before the request, because the server 422s it too (see that
+				// function for the spec citation). stdout stays the data
+				// contract, so the line goes to stderr.
+				// dry-run comes off the assembled body, not args.DryRun —
+				// see bulkDeleteNoOpWarnings for why.
+				res.Warnings = append(res.Warnings, bulkDeleteNoOpWarnings(resp.Body, body["dry_run"] == true)...)
 			}
 			return res, perr
 		},
 	}
+}
+
+// bulkDeleteNoOpWarnings returns one stderr line when a bulk-delete reports
+// that it removed nothing, naming the likeliest cause the payload can show.
+//
+// Fires when: a non-dry-run response reports `status: no_op`, or
+// `total_deleted: 0`.
+//
+// Stays quiet when: the request body set `dry_run`, the response labels itself
+// `preview`, the body does not parse (an error envelope included), or neither
+// counter is present. A delete that removed rows says nothing extra.
+func bulkDeleteNoOpWarnings(body []byte, dryRun bool) []string {
+	// dryRun comes from the REQUEST body rather than the response because the
+	// response cannot be trusted to distinguish them: `status` is not required
+	// on the 200, and the spec's no-op paragraph carries no dry-run exception,
+	// so a preview that matched nothing may well answer `status: "no_op"`. A
+	// warning that fires on a preview — which deletes nothing by design — is a
+	// warning operators learn to ignore. The body rather than the --dry-run
+	// flag because `--data` can set `dry_run` on its own.
+	if dryRun {
+		return nil
+	}
+	var env struct {
+		Data struct {
+			Status       string `json:"status"`
+			TotalDeleted *int   `json:"total_deleted"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil
+	}
+	// Redundant with the dry-run check above, for a server that DOES label its
+	// previews — not the primary test, which is why the request body decides.
+	if env.Data.Status == "preview" {
+		return nil
+	}
+	noOp := env.Data.Status == "no_op" ||
+		(env.Data.TotalDeleted != nil && *env.Data.TotalDeleted == 0)
+	if !noOp {
+		return nil
+	}
+	// The hint names a cause that can actually produce this 200. It used to
+	// blame the half-open range, but the server refuses `from == to` with a
+	// 422 (cli-v1.yaml, 1.22.0) and parseAvailabilityRange now refuses it
+	// locally, so that typo never reaches here. What does reach here is a
+	// well-formed range, or a set of ids, that genuinely had nothing left to
+	// delete — which is worth saying out loud on a destructive command.
+	return []string{"BULK_DELETE_NO_OP deleted=0 hint=the scope matched no live departure; " +
+		"it may already have been deleted, or the range may not be the one you meant — " +
+		"confirm with `availabilities list --include-trashed` before re-running"}
 }
 
 // parseFaresFlag decodes and validates the `--fares` JSON array shared by
@@ -269,7 +494,12 @@ func availabilitiesDefs() []CommandDef {
 			Flags: []FlagDef{
 				{Name: "limit", Type: "int", Min: 1},
 				{Name: "cursor", Type: "string"},
-				{Name: "product-option-id", Type: "int", Min: 1},
+				// An integer here, unlike the string-typed flag of the same
+				// name on the two bulk endpoints. Both carry the spec's
+				// PositiveIntegerId on the wire; the difference is only which
+				// layer refuses a non-numeric id, so the description says the
+				// part an operator can act on.
+				{Name: "product-option-id", Type: "int", Min: 1, Description: "Filter by product option (numeric id)"},
 				{Name: "product-id", Type: "string", Description: "Filter to availabilities of this product (accepts the id in either spelling the API takes)"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},
 				{Name: "from", Type: "string", Description: availFromDesc},
@@ -490,9 +720,22 @@ func availabilitiesDefs() []CommandDef {
 				"materialized rows via `availabilities list`. " +
 				"--weekdays uses PHP's format('w'): Sunday=0, Saturday=6. " +
 				"For datetime products --start-time and --end-time are required; for date " +
-				"products both are ignored. --dry-run returns total_matched + first 3 [from,to] " +
-				"pairs so an agent can preview the slot count before committing. If the date " +
-				"range × weekdays matches zero days, returns 200 status=no_op (no dispatch).",
+				"products both are ignored. If the date " +
+				"range × weekdays matches zero days, returns 200 status=no_op (no dispatch).\n\n" +
+				"Reading a dry run: would_create is the number that will be materialized — " +
+				"NOT total_matched, which counts occurrences the rule generated before skips. " +
+				"skip_reasons.already_exists matches the exact (from, to) pair, so this " +
+				"endpoint only ever ADDS: a rule aimed at a season that already runs at " +
+				"another time skips nothing and every day ends up selling twice. Spec 1.31.0 " +
+				"reports that collision on the dry run as notes.other_departures_exist (a " +
+				"count) and rule.other_departures_sample (up to three of the days, with the " +
+				"times already on them). Read both before approving. Nothing is refused — " +
+				"which schedule you want is not the server's call. With more than one " +
+				"departure time, also read rule.times[]: would_create and total_matched are " +
+				"SUMS across times, so a time that would create nothing is invisible in them. " +
+				"A dry run carries no `status` field at all (would_apply marks a preview; the " +
+				"only 200 status is no_op), so do not gate on status==preview. Replacing a " +
+				"season is two calls and bulk-delete must come FIRST; see that command.",
 			Flags: []FlagDef{
 				{Name: "product-option-id", Type: "string", Required: true, Description: "Target product option"},
 				{Name: "start-date", Type: "string", Required: true, Description: "Recurrence window start (YYYY-MM-DD)"},
@@ -604,11 +847,18 @@ func availabilitiesDefs() []CommandDef {
 			},
 		},
 		// NOTE: no restore command. The spec exposes DELETE (soft-delete via
-		// `deleted_at`) and `bulk-delete`, but the Availability schema does
-		// NOT surface `deleted_at`, the list endpoint has no
-		// `?include_trashed=` parameter, and there is no
-		// /availabilities/{id}/restore operation. There's currently no
-		// supported way to undo a soft-delete from the CLI.
+		// `deleted_at`) and `bulk-delete`, but there is no
+		// /availabilities/{id}/restore operation, so a soft-delete cannot be
+		// undone from the CLI.
+		//
+		// It CAN be enumerated, though, and an earlier version of this note
+		// denied it: `Availability.deleted_at` is a real response field (see
+		// the generated Availability struct) and GET /availabilities takes
+		// `include_trashed`, which `availabilities list` exposes. That
+		// distinction is the whole of incident response after a bad
+		// bulk-delete — list the deleted rows to learn exactly what went,
+		// then re-create them — so the inaccurate version pointed operators
+		// at ops for a question they could answer themselves.
 	}
 }
 
@@ -731,20 +981,9 @@ func timeValueNewValue(args RunArgs) (any, error) {
 // <setting>` subcommand. settingName is the kebab-case CLI form; the
 // underlying spec setting is the same with `-` → `_`.
 func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, newValueFn func(RunArgs) (any, error)) CommandDef {
-	// Common to every bulk-update setting: the scoping fields.
-	//
-	// As of cli-v1 1.20.0 the spec offers TWO scopes and requires exactly one:
-	// either `availability_ids`, or `product_option_id` + `from` + `to`. So none
-	// of these can be Required at the cobra level any more — the choice is
-	// enforced below instead, because cobra cannot express "exactly one of these
-	// two groups".
-	commonFlags := []FlagDef{
-		{Name: "from", Type: "string", Description: availFromDesc},
-		{Name: "to", Type: "string", Description: availToDesc},
-		{Name: "product-option-id", Type: "string", Description: "Target product option ID (with --from/--to)"},
-		{Name: "availability-ids", Type: "intSlice", Description: "The exact departures to change, comma-separated (max 1000). Mutually exclusive with --product-option-id/--from/--to. Use this whenever the request has an exception in it: \"close everything that day except the one that is booked\" cannot be written as a date range"},
-	}
-	flags := append([]FlagDef{}, commonFlags...)
+	// Common to every bulk-update setting: the scoping fields. Shared with
+	// bulk-delete, which takes the same two scopes as of spec 1.32.0.
+	flags := availabilityScopeFlags()
 	flags = append(flags, perSettingFlags...)
 
 	// Forensic fields per D37 + plan §"async bulk-update": capture
@@ -773,27 +1012,9 @@ func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, n
 		// forensic ensures audit_summary records which one ran.
 		StaticForensic: map[string]any{"setting": specSetting},
 		Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
-			// Exactly one scope, per the spec: "Either `availability_ids`, or
-			// `product_option_id` + `from` + `to`. Sending both is a 422;
-			// sending neither is a 422." These gates mirror those refusals
-			// rather than spending a round trip to discover them.
-			idsSet := args.FlagSet("availability-ids")
-			rangeFlags := []string{"product-option-id", "from", "to"}
-			var rangeGiven []string
-			for _, f := range rangeFlags {
-				if args.FlagSet(f) {
-					rangeGiven = append(rangeGiven, "--"+f)
-				}
-			}
-			switch {
-			case idsSet && len(rangeGiven) > 0:
-				return nil, fmt.Errorf("--availability-ids is mutually exclusive with %s: pass one scope or the other, not both",
-					strings.Join(rangeGiven, ", "))
-			case !idsSet && len(rangeGiven) == 0:
-				return nil, fmt.Errorf("one scope is required: either --availability-ids, or all of --product-option-id, --from and --to")
-			case !idsSet && len(rangeGiven) < len(rangeFlags):
-				return nil, fmt.Errorf("the date-range scope needs all of --product-option-id, --from and --to (got %s)",
-					strings.Join(rangeGiven, ", "))
+			ids, idsSet, err := resolveAvailabilityScope(args)
+			if err != nil {
+				return nil, err
 			}
 
 			newValue, err := newValueFn(args)
@@ -813,42 +1034,25 @@ func bulkUpdateDef(settingName, short, long string, perSettingFlags []FlagDef, n
 			}
 			body["setting"] = specSetting
 			if idsSet {
-				ids, _ := args.Flags["availability-ids"].([]int)
-				// The cap matches the job's chunk size; the server answers 422
-				// above it. An id that does not resolve is also a 422 naming it
-				// rather than a silently narrowed list, so there is nothing to
-				// filter here.
-				if len(ids) == 0 {
-					return nil, fmt.Errorf("--availability-ids: at least one id is required")
-				}
-				if len(ids) > 1000 {
-					return nil, fmt.Errorf("--availability-ids: %d ids exceeds the 1000 cap; a longer list is a date range wearing the wrong shape", len(ids))
-				}
-				for _, id := range ids {
-					if id < 1 {
-						return nil, fmt.Errorf("--availability-ids: %d is not a valid availability id (must be >= 1)", id)
-					}
-				}
 				body["availability_ids"] = ids
+				// Same eviction bulk-delete does, and for the same reason: the
+				// scopes are mutually exclusive ON THE WIRE, so a --data blob
+				// carrying the other one turns a valid call into a 422. Typed
+				// flags win by DELETING the other scope, not merely by
+				// overwriting their own keys — overwriting leaves the orphan
+				// keys in place and the server reads "both scopes present".
+				delete(body, "product_option_id")
+				delete(body, "from")
+				delete(body, "to")
 			} else {
-				from, err := parseDate(args.FlagString("from"))
-				if err != nil {
-					return nil, fmt.Errorf("--from: %w", err)
-				}
-				to, err := parseDate(args.FlagString("to"))
-				if err != nil {
-					return nil, fmt.Errorf("--to: %w", err)
-				}
-				// `to` is EXCLUSIVE and must be strictly after `from`. Equal
-				// dates matched nothing and used to answer a cheerful 200 with
-				// total_matched: 0, which reads as a successful change; the
-				// server made it a 422 in 1.18.0 and so does this.
-				if !to.Time.After(from.Time) {
-					return nil, fmt.Errorf("--to must be strictly after --from (the range is half-open, so one day means --to = the NEXT day)")
+				from, to, rerr := parseAvailabilityRange(args)
+				if rerr != nil {
+					return nil, rerr
 				}
 				body["from"] = from.Format("2006-01-02")
 				body["to"] = to.Format("2006-01-02")
 				body["product_option_id"] = args.FlagString("product-option-id")
+				delete(body, "availability_ids")
 			}
 			body["new_value"] = newValue
 			if args.DryRun {
