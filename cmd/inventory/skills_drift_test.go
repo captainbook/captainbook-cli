@@ -336,17 +336,50 @@ func TestSpecQueryParamsAreExposedAsFlags(t *testing.T) {
 // "Price (minor units, persisted as `fare`)" rendered as `--amount fare`,
 // and "extra days added to the `to` timestamp" rendered as
 // `--add-days-count to` — both hiding that the flags take an int.
+//
+// It reads the LIVE cobra tree, not the AST, for the reason
+// TestSpecDrift_FlagTypesMatchSpecTypes does: an AST walker only sees a
+// description written as a string literal inside the CommandDef, so hoisting
+// one into a named const or returning the flag list from a helper takes it out
+// of view and the check passes on a flag it never inspected — silently, which
+// is worse than failing.
+//
+// That is not hypothetical. The cli-v1 1.34.0 sync moved two descriptions into
+// consts (companionsDesc, availabilityIDsDesc) and bulk-delete's flag list into
+// availabilityScopeFlags(), and the AST version of this test went green on a
+// description containing a literal backquote while the built binary rendered
+// `--companions fare`. Reading f.Usage off pflag is immune to where the string
+// was written.
 func TestFlagDescriptionsHaveNoBackquotes(t *testing.T) {
-	for _, cl := range walkInventoryCmdLits(t) {
-		for _, f := range cl.Flags {
-			if strings.Contains(f.Description, "`") {
+	checked := 0
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			if globalFlagNames[f.Name] {
+				return
+			}
+			checked++
+			if strings.Contains(f.Usage, "`") {
 				t.Errorf("%s: --%s description contains a backquote: %q\n"+
 					"    cobra renders the backquoted word as the flag's value placeholder "+
 					"(e.g. `--amount fare` instead of `--amount int`). Use plain text.",
-					cl.Use, f.Name, f.Description)
+					c.CommandPath(), f.Name, f.Usage)
 			}
+		})
+		for _, child := range c.Commands() {
+			walk(child)
 		}
 	}
+	walk(Cmd())
+
+	// Fail closed on a broken walker. Without this, a change that stopped the
+	// traversal from reaching any flag would report success for the same
+	// reason the AST version did: zero inspections look exactly like zero
+	// problems.
+	if checked == 0 {
+		t.Fatal("inspected 0 flag descriptions — the walker is broken, not the commands")
+	}
+	t.Logf("inspected %d flag descriptions across the live command tree", checked)
 }
 
 // -----------------------------------------------------------------------------

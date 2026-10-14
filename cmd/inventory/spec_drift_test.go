@@ -785,40 +785,139 @@ func genParamsName(e ast.Expr) (string, bool) {
 // gift-cert-status / transaction-type drift class.
 func TestSpecDrift_FlagDescriptionEnumsMatchSpec(t *testing.T) {
 	spec := loadSpecDoc(t)
-	cmds := walkInventoryCmdLits(t)
-	for _, c := range cmds {
-		op := spec.findOp(c.Verb, c.Path)
+	// Driven by the LIVE cobra tree, with the AST consulted only for the
+	// JSONBodyFromArgs field map, which exists nowhere else.
+	//
+	// Two rewrites got here. The first read descriptions from the AST, so
+	// hoisting one into a const took it out of view. The second read them live
+	// but still ITERATED the AST's flag list — and `parseFlagsLit` returns nil
+	// unless `Flags:` is a composite literal, which neither `bulk-delete`
+	// (`Flags: availabilityScopeFlags()`) nor the bulk-update CommandDef
+	// (`Flags: flags`) is. So every flag on the five bulk-update subcommands,
+	// `--operator` among them, was still unchecked: a bogus token added to its
+	// enum description left the whole suite green. Iterating the live index
+	// means a flag is checked because it EXISTS on the command, not because of
+	// how its declaration happens to be written.
+	live := liveFlagUsages(t)
+	fieldMaps := astFieldMaps(t)
+	compared := 0
+	for key, usages := range live {
+		op := spec.findOp(key.Verb, key.Path)
 		if op == nil {
 			continue // already reported by the FieldMap test
 		}
-		for _, f := range c.Flags {
-			tokens := extractEnumTokens(f.Description)
+		jsonKey := fieldMaps[key.Verb+" "+key.Path][key.Flag]
+		if jsonKey == "" {
+			jsonKey = kebabToSnake(key.Flag)
+		}
+		var specEnum []string
+		if sf := spec.bodyField(op, jsonKey); sf != nil && sf.Enum != nil {
+			specEnum = sf.Enum
+		} else if qp, ok := op.QueryParams[jsonKey]; ok && qp.Enum != nil {
+			specEnum = qp.Enum
+		}
+		if specEnum == nil {
+			// The spec does not constrain this field with an enum — the
+			// description's pipes document valid client values the server does
+			// not enforce. Skip.
+			continue
+		}
+		// Several commands can share one operation (the five bulk-update
+		// subcommands do), so every distinct description for the key is
+		// checked rather than one standing in for the rest.
+		for _, usage := range usages {
+			tokens := extractEnumTokens(usage)
 			if tokens == nil {
 				continue
 			}
-			// Resolve the flag to a spec field.
-			jsonKey := c.FieldMap[f.Name]
-			if jsonKey == "" {
-				jsonKey = kebabToSnake(f.Name)
-			}
-			var specEnum []string
-			if sf := spec.bodyField(op, jsonKey); sf != nil && sf.Enum != nil {
-				specEnum = sf.Enum
-			} else if qp, ok := op.QueryParams[jsonKey]; ok && qp.Enum != nil {
-				specEnum = qp.Enum
-			}
-			if specEnum == nil {
-				// Spec doesn't constrain this field with an enum — the
-				// description's pipes are documenting valid client values
-				// but the server doesn't enforce. Skip.
-				continue
-			}
+			compared++
 			if !docscan.SameValues(tokens, specEnum) {
-				t.Errorf("[%s] %q (%s %s): flag --%s description tokens %v don't match spec enum %v",
-					c.File, c.Use, c.Verb, c.Path, f.Name, tokens, specEnum)
+				t.Errorf("%s %s: flag --%s description tokens %v don't match spec enum %v",
+					key.Verb, key.Path, key.Flag, tokens, specEnum)
 			}
 		}
 	}
+
+	// Fail closed, with a floor rather than just non-zero: a traversal that
+	// quietly stopped resolving most flags would still clear a `> 0` check.
+	// 38 was the count when this floor was written; raise it, never lower it.
+	const floor = 38
+	if compared < floor {
+		t.Fatalf("compared only %d flag description enum runs, want at least %d — "+
+			"the walker lost coverage rather than the descriptions getting cleaner", compared, floor)
+	}
+	t.Logf("compared %d flag description enum runs against the spec", compared)
+}
+
+// astFieldMaps indexes each operation's JSONBodyFromArgs flag-to-JSON-key map,
+// the one thing the live cobra tree does not carry.
+//
+// Keyed "VERB /path". Where several CommandDefs share an operation their maps
+// are merged; a flag appearing in more than one with DIFFERENT keys is reported
+// rather than silently resolved to whichever was walked last.
+func astFieldMaps(t *testing.T) map[string]map[string]string {
+	t.Helper()
+	out := map[string]map[string]string{}
+	for _, c := range walkInventoryCmdLits(t) {
+		if c.Verb == "" || c.Path == "" || len(c.FieldMap) == 0 {
+			continue
+		}
+		k := c.Verb + " " + c.Path
+		if out[k] == nil {
+			out[k] = map[string]string{}
+		}
+		for flag, jsonKey := range c.FieldMap {
+			if prev, ok := out[k][flag]; ok && prev != jsonKey {
+				t.Errorf("%s: --%s maps to %q in one CommandDef and %q in another; "+
+					"the enum check cannot pick between them", k, flag, prev, jsonKey)
+				continue
+			}
+			out[k][flag] = jsonKey
+		}
+	}
+	return out
+}
+
+// liveFlagKey identifies one flag on one spec operation.
+type liveFlagKey struct {
+	Verb string
+	Path string
+	Flag string
+}
+
+// liveFlagUsages indexes every registered flag's REAL description — what cobra
+// will print — by the operation its command is annotated with. Several commands
+// may share one operation, so the value is the set of distinct descriptions
+// found, deduplicated but never collapsed to one.
+func liveFlagUsages(t *testing.T) map[liveFlagKey][]string {
+	t.Helper()
+	out := map[liveFlagKey][]string{}
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		verb, path := c.Annotations["verb"], c.Annotations["path"]
+		if verb != "" && path != "" {
+			c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+				if globalFlagNames[f.Name] {
+					return
+				}
+				k := liveFlagKey{verb, path, f.Name}
+				for _, seen := range out[k] {
+					if seen == f.Usage {
+						return
+					}
+				}
+				out[k] = append(out[k], f.Usage)
+			})
+		}
+		for _, child := range c.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+	if len(out) == 0 {
+		t.Fatal("indexed 0 live flags — the walker is broken")
+	}
+	return out
 }
 
 // abilityConstValue maps the `Ability:` field's AST expression to the
