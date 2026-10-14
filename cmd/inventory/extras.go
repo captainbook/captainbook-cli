@@ -56,12 +56,20 @@ func extrasDefs() []CommandDef {
 			Use: "extras get <id>", Short: "Show one extra", Kind: KindRead,
 			Verb: "GET", Path: "/extras/{id}", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
+			Flags: []FlagDef{
+				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows — needed to resolve an extra a booking still carries after the catalogue row was retired"},
+			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
-				resp, err := r.Client.ShowExtraWithResponse(ctx, id)
+				p := &gen.ShowExtraParams{}
+				if args.FlagBool("include-trashed") {
+					t := true
+					p.IncludeTrashed = &t
+				}
+				resp, err := r.Client.ShowExtraWithResponse(ctx, id, p)
 				if err != nil {
 					return nil, err
 				}
