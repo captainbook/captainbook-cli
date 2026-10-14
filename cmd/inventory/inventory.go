@@ -656,12 +656,16 @@ func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) e
 		Version:         invpkg.AuditSchemaVersion,
 		DurationMs:      duration.Milliseconds(),
 	}
+	// Both of these are SERVER-supplied and the generated client reads a 2xx
+	// body with io.ReadAll and no limit, so they are bounded here for the same
+	// reason capForensicValue bounds the operator's side: one oversized audit
+	// line can rotate audit.jsonl (50 MB, 3 files) and evict real history.
 	if res != nil {
 		auditEntry.Status = res.Status
-		auditEntry.ResponseID = res.ResponseID
+		auditEntry.ResponseID = capAuditString(res.ResponseID)
 	}
 	if runErr != nil {
-		auditEntry.ErrorCode = errorCode(runErr)
+		auditEntry.ErrorCode = capAuditString(errorCode(runErr))
 	}
 
 	if r.AuditLogger != nil {
@@ -737,13 +741,98 @@ func forensicSummary(def CommandDef, args RunArgs) map[string]any {
 	}
 	for _, name := range def.ForensicFields {
 		if v, ok := args.Flags[name]; ok {
-			out[name] = v
+			out[name] = capForensicValue(v)
 		}
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
+}
+
+// forensicValueMaxBytes caps one forensic value. Generous enough that every
+// realistic payload is recorded verbatim — a 1000-id availability list is ~8 KB
+// — and small enough that no single entry can threaten the log.
+const forensicValueMaxBytes = 16 << 10
+
+// capForensicValue replaces an oversized forensic value with its length and
+// digest, keeping the audit row bounded.
+//
+// A `json`-typed flag accepts @file.json and reads it with no size limit, and
+// runMutation appends an audit entry even when the closure refused the input
+// before issuing any request. So
+// `--companions @60mb.json`, refused locally for exceeding the 20-link cap,
+// still appended a ~60 MB line. audit.jsonl rotates at 50 MB keeping 3 files,
+// so three such refused invocations could evict every real cancel, refund and
+// void entry that preceded them: a validation error the operator never sent
+// anywhere would destroy the record of the calls they did.
+//
+// The digest is kept rather than dropping the field, because "something
+// oversized was passed here" plus a stable hash is still forensically useful;
+// silently omitting the key would read as the flag not being used. It is taken
+// over the CANONICAL JSON encoding, not the operator's file: json.Marshal
+// compacts, so `sha256sum companions.json` will NOT match it. The key says so,
+// to stop a responder burning an incident on that comparison.
+//
+// It does not cover `products media upload`, which builds its AuditEntry and
+// forensic map by hand rather than through forensicSummary. See TODOS.md.
+func capForensicValue(v any) any {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		// Fail CLOSED. Returning v here was the original spelling and it was
+		// the one path where the size is unknown skipping the cap — but worse
+		// than unbounded: an unencodable value makes json.Marshal of the whole
+		// AuditEntry fail, and FileLogger.Append then drops the ENTIRE row with
+		// only a stderr warning. Reachable today, because pflag's Float64
+		// accepts NaN and Inf and both `--rating` and `--discount-pct` are
+		// ForensicFields, so `--rating NaN` cost the audit its whole entry for
+		// a call that was refused locally. One field is the right price.
+		return map[string]any{forensicCapKey: map[string]any{
+			"omitted": "value is not JSON-encodable",
+			"go_type": fmt.Sprintf("%T", v),
+		}}
+	}
+	if len(raw) <= forensicValueMaxBytes {
+		return v
+	}
+	return map[string]any{forensicCapKey: map[string]any{
+		"omitted":               "value exceeds the forensic size cap",
+		"bytes":                 len(raw),
+		"canonical_json_sha256": sha256Hex(raw),
+		"cap_bytes":             forensicValueMaxBytes,
+	}}
+}
+
+// forensicCapKey namespaces the cap marker so an operator value cannot forge
+// one.
+//
+// Every `json`-typed forensic flag accepts an arbitrary object, so a flat
+// marker was reproducible verbatim as a flag value: an operator could pass
+// `{"omitted":"value exceeds the forensic size cap","bytes":62914560,...}` and
+// have a real value recorded as an omission, with a chosen byte count and
+// digest for a responder to chase. The leading underscores cannot appear as a
+// top-level key the CLI itself writes, and anything reading audit.jsonl should
+// treat only this shape as a cap event.
+const forensicCapKey = "__ceebee_forensic_cap"
+
+// auditStringMaxBytes bounds a SERVER-supplied string before it reaches the
+// audit row.
+//
+// capForensicValue bounds what the operator passed, but `response_id` (from
+// `data.id`) and `error_code` (from an error envelope's `error.code`) are
+// copied from the response verbatim, and the generated client reads a 2xx body
+// with io.ReadAll and no limit. So the rotation-eviction vector the forensic
+// cap closes was still open from the other side. A real id or error code is
+// well under 128 bytes.
+const auditStringMaxBytes = 1 << 10
+
+// capAuditString truncates an over-long audit string, keeping a digest so the
+// original is still identifiable.
+func capAuditString(s string) string {
+	if len(s) <= auditStringMaxBytes {
+		return s
+	}
+	return s[:auditStringMaxBytes] + "…(truncated, sha256=" + sha256Hex([]byte(s)) + ")"
 }
 
 // sha256Hex returns the hex-encoded sha256 of body, or "" for nil/empty.
