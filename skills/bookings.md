@@ -83,12 +83,33 @@ Field-level redaction on `Booking` is silent: **the keys are always present, onl
 | Missing permission | What goes null/empty |
 |--------------------|----------------------|
 | `view_booker_of_booking` | `customer.name` / `.email` / `.phone` and the inline `guests[]`. `customer.id` survives, so the payload stays joinable. |
-| `see_money_of_booking` | `total_amount`, `paid_amount`, `refunded_amount` (null) and `transactions[]` (empty). |
+| `see_money_of_booking` | `total_amount`, `paid_amount`, `refunded_amount` (null) and `transactions[]` (empty). Also `unit_amount` / `total_amount` on each `extras[]` row — but the array itself **survives**, carrying `extra_id`, `name` and `quantity`. What the customer bought and how many is an operational fact a guide preparing a departure needs; it is not an amount. |
 | `view_answers_of_booking` | `answers` (null — see the table above). |
 
 The dedicated child endpoints agree with those gates rather than letting you walk around them: `transactions list` also requires `see_money_of_booking`, and `guests list` / `answers list` also require `view_booker_of_booking` / `view_answers_of_booking`. A guest or answer outside your business unit or assigned trips reads as **404**, not 403, so the id space is not enumerable.
 
 Ability and permission are two different gates. `cli:read` decides which *endpoints* you can reach; the permissions of the user the token was issued to decide which *data* comes back. A caller holding `view_own_booking` (declared `exclusive_of` `view_any_booking`) sees only the bookings their linked resource is assigned to — list endpoints return a smaller page rather than a 403, so a short page is not evidence of a small calendar.
+
+### 2c. What the booking cost: `total_amount` and `extras[]`
+
+`total_amount` is the booking's **whole** total: the pricing tiers plus the sum of the purchased add-ons. Until spec 1.34.0 it was the tier total alone, which published a figure **below** the booking's own `paid_amount` on any booking carrying add-ons — reading as an overpayment to anyone reconciling, and as a discount to an agent asked what the trip cost. If you have a cached figure from an older run, it is low by exactly the extras total.
+
+`get <id>` inlines the breakdown as `extras[]`, one row per add-on actually bought: `{extra_id, name, quantity, unit_amount, total_amount, deleted_at}`.
+
+```bash
+ceebee inventory bookings get bk_42 --format json \
+| jq '{total: .data.total_amount, paid: .data.paid_amount,
+       extras: [.data.extras[] | {name, quantity, unit_amount, total_amount}]}'
+```
+
+Four things to know before you reconcile anything against it:
+
+- **`extras[]` is detail-only.** It is on `get <id>` and deliberately absent from `bookings list` and from the `before` / `after` snapshots on a `cancel` / `comp` receipt. `total_amount` carries the money on all of those surfaces, so nothing is left unreconcilable — but a list-driven script cannot see the breakdown.
+- **`unit_amount` is the price AS CHARGED, not the catalogue price.** It is the `booking_extra` fare, which diverges from `extras get <id>`'s `amount` the moment an operator reprices the add-on. A booking must not restate its history at today's prices.
+- **It carries no currency of its own, and the writer decides which one it is in.** A channel booking stores the channel's figure (in `Booking.currency`); a direct booking stores the catalogue fare in the *account* currency, unconverted. Treat the number as unlabelled: comparable with the other amounts on the **same** booking, never converted, summed across bookings, or compared against a currency resolved elsewhere. Read `transactions` if you need a labelled amount.
+- **A retired extra still appears**, with `deleted_at` set — retiring an add-on does not unsell it, and dropping the row would quietly take its money out of the total. This is **not** behind `--include-trashed`: a booking's total must not depend on a query parameter. To resolve the catalogue row, `extras get <id> --include-trashed`.
+
+Two agreements it does **not** make, both deliberate. The base column here is `gross_price`, while most other per-booking readers base on `retail_price` (which adds the application fee for a tenant without `marketplace_fee_included`), so the figures still differ for a marketplace booking. And the aggregate statistics surface sums `gross_price` with **no extras at all** — a revenue figure read from `ceebee stats` will not reconcile against the sum of these totals. That is a basis difference, not a bug to chase.
 
 ### 3. Find every trip a given resource is on
 
@@ -241,6 +262,7 @@ A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` 
 - ⚠️ **The state token isn't optional and isn't reusable.** `--expected-resource-state-token` is required, and it's invalidated by any resource change on that booking — including your own successful write. Re-read before each subsequent `set-resources` on the same booking; the response's `data.resource_state_token` is the new one.
 - ⚠️ **Don't retry through a `BOOKING_RESOURCE_STATE_STALE`.** It means the world moved, not that the request was malformed. Retrying the identical body is how you clobber someone else's change the moment the guard happens to line up. Re-read and re-decide.
 - ⚠️ **`--resource-id` on list matches active resources only.** A soft-deleted resource yields an empty page, not a 404 — don't read that as "this resource was never used".
+- ⚠️ **A GetYourGuide or Xola booking with an add-on over-reports its total.** Those import paths write the add-on total INTO `gross_price` *and* attach the same add-ons to the pivot, so the extras are counted twice. This is a known product-wide defect (`retail_price` carries the same doubled figure, and ~40 call sites across the product add the extras on top of it), tracked as captainbook#8616 — the CLI agrees with every other surface rather than special-casing it. Do not "fix" such a figure locally; escalate. Bokun imports attach no extras and are unaffected.
 - ⚠️ **Redaction is silent, and `null` does not mean "empty".** `customer.name`, `total_amount`, `answers` and friends come back as `null` (keys present) when the token's *user* lacks the matching permission — see example 2b. `answers: []` means "none exist"; `answers: null` means "you may not see them". Treating the two the same ships a manifest that is quietly missing every dietary requirement.
 - ⚠️ **`starts_at` / `ends_at` on a booking are in the PRODUCT's timezone, not UTC.** They are read from the linked availability, whose `from` / `to` columns store product-local wall clock: `2026-08-04T10:00:00+01:00` is a 10:00 local departure for a `Europe/London` product. The booking's own timestamps (`confirmed_at`, `cancelled_at`, `created_at`, …) are real UTC. Don't normalise the whole object to UTC with one rule.
 - ⚠️ **`--include resources` is opt-in on list but implicit on get.** `bookings get` always carries `resources[]` + `resource_state_token`; `bookings list` only does with `--include resources`. Scripts that grab the token from a list call will silently read `null` without it.
