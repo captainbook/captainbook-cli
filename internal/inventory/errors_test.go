@@ -1334,13 +1334,20 @@ func TestParseError_PlanLimitReachedPartialDetails(t *testing.T) {
 //
 // UserMessage was restructured to branch on which details arrived; Error() kept
 // a flat three-slot Sprintf, so an absent or partial `details` printed
-// "PLAN_LIMIT_REACHED: item= limit= current=". That string is what `%v`, the
-// audit log and every `errors.As` consumer that falls back to Error() record,
-// and three empty slots do not read as "the server did not say" — they read as
-// "the allowance is empty", which is a different and wrong fact about the
-// account.
+// "PLAN_LIMIT_REACHED: item= limit= current=" — and three empty slots do not
+// read as "the server did not say", they read as "the allowance is empty",
+// which is a different and wrong fact about the account.
 //
-// Value: protects=Error() names only the detail slots the payload carried, on every partial shape; fails_when=Error() goes back to a flat three-slot format string; why_new=the partial-details test next door asserts on UserMessage only, and Error() is the path logs use; seam=none
+// What this does NOT protect, corrected after /qa checked it instead of
+// assuming it: no CLI path prints this string. An earlier version of this
+// comment claimed the audit log recorded it. It does not — the row carries
+// `error_code` and no message — and cmd/root.go reaches UserMessage first for
+// any type implementing UserMessenger, `--verbose` included. The test is worth
+// keeping because Error() is part of the type's contract and arm 1 of that
+// handler (`*api.ExitError`) prints `exitErr.Err`, so a future wrap would
+// expose it; it is not evidence of an operator-visible bug repaired.
+//
+// Value: protects=Error() names only the detail slots the payload carried, on every partial shape; fails_when=Error() goes back to a flat three-slot format string; why_new=the partial-details test next door asserts on UserMessage only, and nothing covered Error(); seam=none; no_claim=any operator-visible surface (no CLI path prints Error() today; the audit row carries error_code, not the message)
 func TestPlanLimitReachedError_ErrorStringHasNoBlankSlots(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

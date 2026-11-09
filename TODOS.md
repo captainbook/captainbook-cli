@@ -1487,6 +1487,27 @@ make the bound's presence separable from its value (`MinSet bool`, or `*int`) an
 the `makeRunE` condition; it touches every `CommandDef` that declares an int flag, which
 is why it is not folded into a review-response commit.
 
+**Three benign `pii.phone.e164` pregate warns need an allowlist entry on `main`.**
+`gstack-pregate` reports MEDIUM `pii.phone.e164` for `9000000000`
+(`cmd/inventory/bookings.go`, in the `integralNumber` comment) and `2147483647` /
+`3000000000` (`cmd/inventory/wire_capture_156_test.go`, the wide-id subtest). All three
+are integer bounds, not phone numbers — `2147483647` is literally `math.MaxInt32`, the
+value that subtest is about. The verdict is `warn`, not `fail`, so nothing is blocked,
+and the numbers are deliberately not renamed: spelling the bound differently to satisfy
+a phone-number regex would make the test less legible than the warn is costly.
+Allowlists only count from `origin/main` and `--policy-from head` may only ADD test
+lanes, so the entry (by id + path) has to land in the policy on `main`.
+
+**`PlanLimitReachedError.UserMessage` prints a double period on its no-details arm.**
+The fallback arm is `"PLAN_LIMIT_REACHED: %s. This is an account ENTITLEMENT…"`, and the
+server's `message` normally ends in a period of its own, so a 403 carrying no `details`
+renders `Plan allowance exhausted.. This is an account ENTITLEMENT…`. Observed by /qa on
+jbajou/cli-specs-update against a loopback stub (capture 006); the partial- and
+full-details arms interpolate before a parenthetical instead and read correctly
+(captures 005, 017). Pre-existing, not introduced by the Optibot-response commits.
+Cosmetic, severity Low, deferred by the Standard fix tier. The fix is to trim a trailing
+`.` from `msg` before interpolating, in that arm and any sibling with the same shape.
+
 **Why:** each is a gate or bound that is pinned in one direction only, which is the
 shape that let a real regression through during that very sync.
 **Effort:** human S / CC S each, except the `FlagDef.Min` change (human M / CC M — wide

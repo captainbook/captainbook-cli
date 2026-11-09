@@ -780,13 +780,23 @@ type PlanLimitReachedError struct {
 }
 
 // Error prints only the slots the payload actually carried, which is the same
-// presence rule UserMessage applies, on the path logs and `%v` use.
+// presence rule UserMessage applies.
 //
 // The naive three-slot format rendered "item= limit= current=" whenever
 // `details` was absent or partial — and `details` is `additionalProperties:
 // true`, so a partial payload is legal. Three empty slots do not read as "the
 // server did not say"; they read as "the allowance is empty", which is a
 // different and wrong fact about the account.
+//
+// Be precise about the reach, because the first version of this comment was
+// not: NO path in today's CLI prints this string. cmd/root.go tries
+// `*api.ExitError` first, `UserMessenger` second, `err.Error()` last, and this
+// type implements UserMessenger, so arm 2 always wins — verified end to end,
+// including under `--verbose`. The audit row does not carry it either; it
+// records `error_code` and no message. So this is the type's contract being
+// correct rather than an operator-visible bug being fixed, and it matters only
+// if something later wraps the error in an `api.ExitError` (arm 1 prints
+// `exitErr.Err`, which calls Error()) or formats it with `%v`.
 func (e *PlanLimitReachedError) Error() string {
 	var parts []string
 	if e.PlanItem != "" {
