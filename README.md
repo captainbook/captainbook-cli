@@ -80,7 +80,7 @@ The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` with a Sanc
 
 - `cli:read` — list / show / get
 - `cli:write` — create / update / delete / restore / attach / detach
-- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings resend-confirmation`, `gift-certificates void`). `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy. `gift-certificates void` needs it because voiding kills an instrument the customer paid for — every other gift-cert command is `cli:write`.
+- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings reschedule`, `bookings resend-confirmation`, `gift-certificates void`). `bookings reschedule` needs it because it moves a live booking a customer is already travelling on — `bookings create` and `bookings update` are ordinary `cli:write`. `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy. `gift-certificates void` needs it because voiding kills an instrument the customer paid for — every other gift-cert command is `cli:write`.
 
 Inspect what your token has:
 
@@ -117,6 +117,7 @@ ceebee stats summary --business-unit-id 42
 | `stats customers` | New vs returning, retention rate, top spenders |
 | `stats channels` | Booking channel distribution |
 | `stats occupancy` | Slot availability and capacity utilisation |
+| `stats attendance` | Check-ins and no-shows, read from ticket redemptions |
 | `stats extras` | Extra/add-on sales performance |
 | `stats discounts` | Discount code usage statistics |
 | `stats gift-certs` | Gift certificate issuance and redemption |
@@ -171,14 +172,14 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | Resource | Verbs available |
 |---|---|
 | `whoami` | get |
-| `products` | list, get, create, update, delete, restore |
+| `products` | list, get, create, **create-bookable**, update, duplicate, delete, restore |
 | `product-options` | list, get, create, update, delete, restore |
 | `availabilities` | list, get, update, delete, **bulk-update** (capacity / booking-status / pricing / start-time / end-time), **bulk-delete**, **create-rule** |
 | `pricing-categories` | list, get, create, update, delete, restore |
 | `pricing-tiers` | list, get, create, update, delete, restore |
 | `resources` | list, get, create, update, delete, restore, **attach**, **detach** |
 | `locations` | list, get, create, update, delete |
-| `bookings` | list, get, transactions, **available-resources**, **available-equipment-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
+| `bookings` | list, get, **create**, **update**, **reschedule**, transactions, **available-resources**, **available-equipment-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
 | `transactions` | list, get |
 | `customers` | list, get |
 | `guests` | list, get, update |
@@ -275,7 +276,7 @@ The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. 
 - `cmd/inventory/since_flag_test.go` — a `--since` flag must exist exactly where the spec declares the `since` query param. Both directions are silent failures: a flag the spec dropped is parsed and thrown away, handing the caller a full unfiltered page they read as an incremental sync.
 - `cmd/inventory/skills_drift_test.go` — every `ceebee inventory …` invocation in `skills/*.md` and this README must resolve against the live cobra tree, and the endpoint tables in the cookbooks must match each command's bound verb, path, ability, and dry-run mode. It also forbids the space form of a bool flag in docs: write `--flag=false`, never `--flag false`.
 
-**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Two spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`) and nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) and a bare `type: ["null"]` have no 3.0 spelling and are left alone, so they fail codegen loudly rather than being silently mangled. Any other 3.1-only construct upstream adopts does the same. The type-array rewrite checks schema *position*, not just the key name: every non-null member must be one of the seven JSON Schema type names, so an `example:` or `default:` block that happens to contain `type: [guest, "null"]` stays data instead of being collapsed and stamped with a fabricated `nullable: true`.
+**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Three spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`), nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`), and null-only types (`type: ["null"]`, which 1.56.0 introduced on the dry-run branch of `POST /bookings` to say a field is always null there — the `type` key is dropped and only `nullable: true` remains, so codegen renders the field as `*interface{}`). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) has no 3.0 spelling and is left alone, as is a mapping whose *only* key is `type` (that is a bare union branch, owned by the first rule), so those fail codegen loudly rather than being silently mangled. Any other 3.1-only construct upstream adopts does the same. The type-array rewrite checks schema *position*, not just the key name: every non-null member must be one of the seven JSON Schema type names, so an `example:` or `default:` block that happens to contain `type: [guest, "null"]` stays data instead of being collapsed and stamped with a fabricated `nullable: true`.
 
 ## AI agents
 
