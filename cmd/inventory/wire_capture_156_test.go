@@ -1327,6 +1327,108 @@ func TestWire_BookingsCreatePayloadLevelRefusals(t *testing.T) {
 // `--main-resource-id=0`, which the flag-keyed version caught too.
 //
 // Value: protects=the main-resource lower bound applies to a --data payload, not just the typed flag; fails_when=the check goes back to args.FlagSet, which --data bypasses; why_new=the fix's own motivating input had no test and the pre-fix code passed the one test there was; seam=testNewRunner
+// TestWire_ExpiryNullIsNotAWindow is the regression test for a gate that read
+// the key and not the value, and for the trap in fixing it.
+//
+// `--data '{"expiry": null}'` on a reservation carried the key and no window,
+// so the "a reservation requires --expiry" gate saw a present key and stayed
+// silent while the payload left. The spec types expiry `integer` with
+// `minimum: 0` — not nullable — and calls it "Required when `booking_type:
+// reservation`", validated `required|numeric`, so the server refuses it.
+//
+// The second half is the part worth pinning. The two arms ask OPPOSITE
+// questions of the same key: the reservation arm asks "is there a usable
+// window?", where null is no, and the booking arm asks "was the field sent at
+// all?", where null is yes, because the spec refuses `expiry` on a booking as a
+// field ("Sending it with `booking_type: booking` is a `422`, not a silent
+// drop"). The first version of this fix used one shared boolean and silently
+// stopped refusing `{"expiry": null}` on a booking — fixing one arm by
+// breaking the other.
+//
+// Value: protects=a null expiry does not satisfy a reservation's window requirement AND still counts as sent on a booking; fails_when=the two arms share one presence boolean again, or either arm goes back to reading only the key; why_new=nothing covered the null spelling, and the two arms disagree about what null means; seam=none; no_claim=says nothing about the server's own validation, only which payloads the CLI stops
+func TestWire_ExpiryNullIsNotAWindow(t *testing.T) {
+	base := []string{"bookings", "create",
+		"--availability-id", "4821",
+		"--guests", `{"3":2}`,
+		"--is-refundable=true",
+		"--customer-id", "7b9e5a2c-0000-4000-8000-000000000001",
+	}
+	withArgs := func(extra ...string) []string {
+		return append(append([]string{}, base...), extra...)
+	}
+
+	t.Run("a reservation with a null expiry is refused", func(t *testing.T) {
+		_, body, hit, err := capture(t, withArgs("--booking-type", "reservation",
+			"--data", `{"expiry": null}`)...)
+		if err == nil {
+			t.Fatalf("a reservation carrying a null expiry was accepted: %v", body)
+		}
+		if hit {
+			t.Errorf("a reservation with no window reached the server with body %v", body)
+		}
+		if !strings.Contains(err.Error(), "requires --expiry") {
+			t.Errorf("error = %v, want the reservation arm's own message", err)
+		}
+	})
+
+	// The opposite arm, and the regression the first fix attempt introduced.
+	t.Run("a booking with a null expiry is still refused", func(t *testing.T) {
+		_, body, hit, err := capture(t, withArgs("--booking-type", "booking",
+			"--data", `{"expiry": null}`)...)
+		if err == nil {
+			t.Fatalf("a booking carrying expiry was accepted because the value was null: %v", body)
+		}
+		if hit {
+			t.Errorf("expiry on a booking reached the server with body %v", body)
+		}
+		if !strings.Contains(err.Error(), "refused on --booking-type booking") {
+			t.Errorf("error = %v, want the booking arm's refusal", err)
+		}
+	})
+
+	// And a real window still works, so the guard refuses null rather than
+	// everything.
+	t.Run("a reservation with a real expiry still reaches the wire", func(t *testing.T) {
+		_, body, hit, err := capture(t, withArgs("--booking-type", "reservation",
+			"--expiry", "1800")...)
+		if !hit {
+			t.Fatalf("a reservation with a valid expiry was refused locally: %v", err)
+		}
+		if body["expiry"] != float64(1800) {
+			t.Errorf("expiry = %#v, want 1800 on the wire", body["expiry"])
+		}
+	})
+}
+
+// TestWire_MainResourceNullIsRefused is the regression test for the OTHER
+// spelling of "unassign", and the likelier one.
+//
+// The bound gate reads `decodeNumericInt`, which reports an explicit null as
+// non-numeric, so `--data '{"main_resource_id": null}'` skipped the bound and
+// left for the wire. null is not a stray value here: it is what the spec
+// accepted before 1.6.0 dropped `nullable: true`, so a caller reaching for
+// unassign from memory sends null BEFORE they try the 0 the gate was written
+// for. The spec $refs PositiveIntegerId, which is not nullable, so the server
+// refuses it on type and the local gate exists to say so first.
+//
+// Value: protects=an explicit null main_resource_id is refused locally and never reaches the wire; fails_when=the null guard is dropped, or the gate goes back to reading only decodeNumericInt; why_new=the sibling test covers 0 and a valid id, and null takes a different path through the gate; seam=none; no_claim=says nothing about what the server does with a null, only that the CLI stops sending one
+func TestWire_MainResourceNullIsRefused(t *testing.T) {
+	_, body, hit, err := capture(t, "bookings", "set-resources", "bk_42",
+		"--expected-resource-state-token", "tok", "--data", `{"main_resource_id": null}`)
+	if err == nil {
+		t.Fatalf("--data carrying a null main_resource_id was accepted: %v", body)
+	}
+	if hit {
+		t.Errorf("a null main_resource_id reached the server with body %v", body)
+	}
+	if !strings.Contains(err.Error(), "cannot be null") {
+		t.Errorf("error = %v, want it to name null specifically", err)
+	}
+	if !strings.Contains(err.Error(), "cleared, only replaced") {
+		t.Errorf("error = %v, want the sentence naming the real constraint", err)
+	}
+}
+
 func TestWire_MainResourceBoundReadsTheAssembledBody(t *testing.T) {
 	// The motivating input: 0 arrives only through --data.
 	_, body, hit, err := capture(t, "bookings", "set-resources", "bk_42",

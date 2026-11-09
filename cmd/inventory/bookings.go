@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1074,6 +1075,16 @@ func validateBookingResourcesBody(body []byte) error {
 	// becomes an opaque PositiveIntegerId 422 instead of a local message naming
 	// the real constraint.
 	if raw, ok := m["main_resource_id"]; ok {
+		// An explicit null is the OTHER spelling of the same mistake, and the
+		// likelier one: null is what the pre-1.6.0 spec accepted, so a caller
+		// reaching for "unassign" from memory sends `null` before they try `0`.
+		// decodeNumericInt reports null as non-numeric, so the bound below
+		// never sees it and the payload left for the wire to refuse on type.
+		if jsonIsNull(raw) {
+			return fmt.Errorf("--main-resource-id cannot be null; a booking's main resource cannot be " +
+				"cleared, only replaced (the spec dropped `nullable: true` in 1.6.0, so the server " +
+				"refuses null on type)")
+		}
 		if n, numeric := decodeNumericInt(raw); numeric && n < 1 {
 			return fmt.Errorf(
 				"--main-resource-id must be >= 1 (got %d); a booking's main resource cannot be cleared, only replaced", n)
@@ -1141,16 +1152,33 @@ func validateStoreBookingBody(body []byte) error {
 			return fmt.Errorf("--guests must name at least one pricing category: an empty " +
 				"mix books nobody and is refused with a 422")
 		}
-		for categoryID, rawCount := range guests {
+		// Sorted, and every offending category named at once — the same reason
+		// the reservation arm below keeps an ordered slice. Ranging a map here
+		// picked a random one of several bad counts per run, so an operator
+		// fixed the category they were told about and was refused again for
+		// the next, and any assertion on the message was flaky.
+		categoryIDs := make([]string, 0, len(guests))
+		for categoryID := range guests {
+			categoryIDs = append(categoryIDs, categoryID)
+		}
+		sort.Strings(categoryIDs)
+		var badCounts []string
+		for _, categoryID := range categoryIDs {
+			rawCount := guests[categoryID]
 			count, ok := decodeNumericInt(rawCount)
 			if !ok {
-				return fmt.Errorf("--guests[%q]: must be a whole number of guests, got %s "+
-					"(a quoted number like \"2\" is fine — the server accepts it; a JSON true "+
-					"would otherwise reach it as 1)", categoryID, rawCount)
+				badCounts = append(badCounts, fmt.Sprintf("%q: %s", categoryID, rawCount))
+				continue
 			}
 			if count < 0 {
-				return fmt.Errorf("--guests[%q]: must be 0 or more, got %d", categoryID, count)
+				badCounts = append(badCounts, fmt.Sprintf("%q: %d", categoryID, count))
 			}
+		}
+		if len(badCounts) > 0 {
+			return fmt.Errorf("--guests must give each category a whole number of guests, and each "+
+				"count must be 0 or more; these do not: %s (a quoted number like \"2\" is fine — "+
+				"the server accepts it; a JSON true would otherwise reach it as 1)",
+				strings.Join(badCounts, ", "))
 		}
 	}
 
@@ -1275,10 +1303,23 @@ func validateStoreBookingBody(body []byte) error {
 	if raw, ok := m["booking_type"]; ok {
 		_ = json.Unmarshal(raw, &bookingType)
 	}
-	_, hasExpiry := m["expiry"]
+	// Presence is not enough here: `{"expiry": null}` carries the key and no
+	// window, and the spec types expiry `integer` with `minimum: 0` — not
+	// nullable — and calls it "Required when `booking_type: reservation`",
+	// validated `required|numeric`. So a null expiry is refused by the server
+	// on type, and reading only the key let that payload leave with the one
+	// gate that exists to name the problem staying silent.
+	// The two arms ask OPPOSITE questions of the same key, so they need
+	// separate answers: the reservation arm asks "is there a usable window?",
+	// where null is no, and the booking arm asks "was the field sent at all?",
+	// where null is yes, because the spec refuses `expiry` on a booking as a
+	// field ("Sending it with `booking_type: booking` is a `422`, not a silent
+	// drop"). One shared boolean would fix one arm by breaking the other.
+	expiryRaw, expirySent := m["expiry"]
+	expiryHasValue := expirySent && !jsonIsNull(expiryRaw)
 	switch bookingType {
 	case "reservation":
-		if !hasExpiry {
+		if !expiryHasValue {
 			return fmt.Errorf("--booking-type reservation requires --expiry: a reservation is " +
 				"a hold that LAPSES, so the server refuses one with no window (the value is in " +
 				"SECONDS — 1800 is half an hour, and the configured default is 600)")
@@ -1303,7 +1344,7 @@ func validateStoreBookingBody(body []byte) error {
 				"the payment fields from the hold", strings.Join(offending, ", "))
 		}
 	case "booking":
-		if hasExpiry {
+		if expirySent {
 			return fmt.Errorf("--expiry is refused on --booking-type booking: only a " +
 				"reservation lapses. Use --booking-type reservation for a hold")
 		}

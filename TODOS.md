@@ -1467,6 +1467,33 @@ assertion. A proxy or a future server change returning one of those codes under 
 status would print a false status and assert a key-release guarantee the spec grants
 only to the 409.
 
+**`KeyReleasingConflictError` names an action the operator cannot take.** Its message says to
+retry the identical call under the **same** idempotency key, but the type is `{Code, Message}`
+only, the CLI mints a UUIDv7 per invocation, and no path prints it — it reaches
+`~/.ceebee/audit.jsonl` and nowhere else. So the single action the message names is unobtainable
+from the output, and the obvious retry (re-running the command) mints a fresh key, which is
+exactly what the message warns turns a retry into a double booking. The three sibling
+idempotency errors (`IdempotencyConflictError`, `IdempotencyInProgressError`,
+`IdempotencyUnknownError`) all carry a `Key` and name it. Two fix options: have the constructor
+read `details.key` best-effort, or have `runMutation` attach the key it already holds for the
+audit row before the error leaves. Either way the message should name `--idempotency-key`.
+Raised by the red-team reader on 2026-11-09 and skipped deliberately at review: it needs a
+design decision and changes the error type's shape, so it does not belong in a review-response
+commit. `skills/bookings.md` already teaches operators to pre-mint a key, which is why this is a
+message-actionability gap rather than a correctness bug.
+
+**No rule owns `{type: ["null"]}` spelled as a bare one-member sequence.** `rewriteNullOnlyType`
+declines it via the `len == 2` guard, and rule 1's `isNullTypeSchema` cannot match it because it
+requires `val.Kind == yaml.ScalarNode` — it owns only the scalar `{type: null}`. So that
+construct is owned by neither rule and would fail `make codegen` loudly. Failing beats silently
+erasing a union branch, so this is the safe direction and not urgent, but the guard's comment,
+the README paragraph and an earlier draft of this entry all claimed rule 1 owned it, which is
+wrong; all three now say so. The fix, if upstream ever emits that spelling, is to widen
+`isNullTypeSchema` to accept a one-member sequence, or narrow the guard to "the only key is
+`type` AND its value is a scalar". Found by the red-team reader on 2026-11-09, which proved it
+by running `normalize()` over three fixtures: `{type: ["null"], description: …}` rewrites,
+`{type: ["null"]}` alone does not, and `oneOf: [$ref, {type: ["null"]}]` survives verbatim.
+
 **`rewriteNullOnlyType` can widen a union branch rule 1 declined.** Its `len == 2` guard
 skips a bare `{type: ["null"]}` union member but not a two-key one, so where
 `rewriteNullableUnion` declines a pathological parent (both `oneOf` and `anyOf`), a
@@ -1488,15 +1515,16 @@ the `makeRunE` condition; it touches every `CommandDef` that declares an int fla
 is why it is not folded into a review-response commit.
 
 **Three benign `pii.phone.e164` pregate warns need an allowlist entry on `main`.**
-`gstack-pregate` reports MEDIUM `pii.phone.e164` for `9000000000`
-(`cmd/inventory/bookings.go`, in the `integralNumber` comment) and `2147483647` /
-`3000000000` (`cmd/inventory/wire_capture_156_test.go`, the wide-id subtest). All three
-are integer bounds, not phone numbers — `2147483647` is literally `math.MaxInt32`, the
-value that subtest is about. The verdict is `warn`, not `fail`, so nothing is blocked,
-and the numbers are deliberately not renamed: spelling the bound differently to satisfy
-a phone-number regex would make the test less legible than the warn is costly.
-Allowlists only count from `origin/main` and `--policy-from head` may only ADD test
-lanes, so the entry (by id + path) has to land in the policy on `main`.
+`gstack-pregate` reports MEDIUM `pii.phone.e164` on three ten-digit integer bounds: one
+in the `integralNumber` comment in `cmd/inventory/bookings.go`, and two in the wide-id
+subtest in `cmd/inventory/wire_capture_156_test.go` — one of which is `math.MaxInt32`
+spelled out, the value that subtest exists to probe. None is a phone number. The verdict
+is `warn`, not `fail`, so nothing is blocked, and the bounds are deliberately not
+respelled: obscuring `math.MaxInt32` to satisfy a phone-number regex would cost more
+legibility than the warn costs noise. Allowlists only count from `origin/main` and
+`--policy-from head` may only ADD test lanes, so the entry (by id + path) has to land in
+the policy on `main`. (This entry names no digits on purpose: an earlier draft quoted
+them and raised the count from three to five.)
 
 **`PlanLimitReachedError.UserMessage` prints a double period on its no-details arm.**
 The fallback arm is `"PLAN_LIMIT_REACHED: %s. This is an account ENTITLEMENT…"`, and the

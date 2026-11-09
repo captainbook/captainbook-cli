@@ -418,7 +418,14 @@ func dropNullEnumMember(m *yaml.Node) {
 //     every alias pointing at it and the emitted file stops parsing.
 func rewriteNullOnlyType(m *yaml.Node) int {
 	if len(m.Content) == 2 {
-		return 0 // bare `{type: ...}` — rule 1 owns it
+		// A mapping whose only key is `type`. Rule 1 owns the SCALAR spelling
+		// of that (`{type: null}`): isNullTypeSchema requires
+		// `val.Kind == yaml.ScalarNode`. It does NOT own the one-member
+		// SEQUENCE spelling (`{type: ["null"]}`), so that construct is owned
+		// by neither rule and would still fail codegen loudly. That is the
+		// safe direction — failing beats silently erasing a union branch — but
+		// do not read this guard as "handled elsewhere". See TODOS.md.
+		return 0
 	}
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		key, val := m.Content[i], m.Content[i+1]

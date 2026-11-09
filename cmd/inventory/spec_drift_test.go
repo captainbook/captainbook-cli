@@ -1953,3 +1953,134 @@ func TestSpecDrift_FlagMinMatchesSpecMinimum(t *testing.T) {
 	t.Logf("compared %d flag lower bounds against the spec (%d unverified, %d inexpressible)",
 		checked, len(unverified), len(inexpressible))
 }
+
+// TestSpecDrift_NestedItemBoundsMatchSpec closes the hole the two scalar-bound
+// drift tests above leave open.
+//
+// specBounds reads top-level query parameters and top-level request-body
+// properties, which is every bound a FlagDef can carry. But four bounds in this
+// package live one level deeper — inside an array's `items` schema — and so are
+// hand-copied Go constants that no test compares to the contract:
+//
+//	companionsMaxItems    <- companions.maxItems
+//	companionMaxQuantity  <- PricingCategoryCompanionInput.min_quantity.maximum
+//	bookableListMin/Max   <- options / pricing_categories min/maxItems
+//
+// Their BEHAVIOUR is pinned (the cap bites at 21, min_quantity 1000 is
+// refused), which is exactly why this direction is needed: a behavioural test
+// asserting the CLI refuses entry 21 stays green forever after upstream raises
+// maxItems to 50, and the CLI then refuses, locally, 30 lists the server takes.
+//
+// Value: protects=the four nested array-item bounds hand-copied into Go equal the spec's own numbers; fails_when=upstream moves maxItems or min_quantity's maximum and the constant is not followed, so the CLI refuses a payload the server accepts; why_new=specBounds reads only top-level properties, so no existing drift test can see an items-level bound; seam=none; no_claim=says nothing about bounds expressed as inline literals rather than named constants
+func TestSpecDrift_NestedItemBoundsMatchSpec(t *testing.T) {
+	raw, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("yaml.Unmarshal: %v", err)
+	}
+	schemas, _ := doc["components"].(map[string]any)
+	components, _ := schemas["schemas"].(map[string]any)
+	if len(components) == 0 {
+		t.Fatal("parsed no component schemas — the reader broke, not the CLI")
+	}
+
+	// dig walks a path of map keys, descending through an allOf whenever the
+	// next key is not present directly: CreateBookableProductRequest composes
+	// its two lists into an allOf branch rather than naming them at the top.
+	var dig func(node any, path []string) (any, bool)
+	dig = func(node any, path []string) (any, bool) {
+		if len(path) == 0 {
+			return node, true
+		}
+		m, ok := node.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		if next, ok := m[path[0]]; ok {
+			return dig(next, path[1:])
+		}
+		for _, sub := range toSlice(m["allOf"]) {
+			if v, ok := dig(sub, path); ok {
+				return v, true
+			}
+		}
+		return nil, false
+	}
+
+	for _, tc := range []struct {
+		name string
+		got  int
+		path []string
+	}{
+		{
+			name: "companions.maxItems",
+			got:  companionsMaxItems,
+			path: []string{"CreatePricingCategoryRequest", "properties", "companions", "maxItems"},
+		},
+		{
+			// Both halves of what the constant actually gates. One validator
+			// (parseCompanionsValue) serves create AND update, so pinning only
+			// the create schema leaves the update path free to drift: upstream
+			// raises Update's maxItems, the constant stays on Create's number,
+			// and `pricing-categories update` refuses locally a link set the
+			// server takes. Same bound, two declarations, two rows.
+			name: "companions.maxItems (update)",
+			got:  companionsMaxItems,
+			path: []string{"UpdatePricingCategoryRequest", "properties", "companions", "maxItems"},
+		},
+		{
+			name: "companion min_quantity.maximum",
+			got:  companionMaxQuantity,
+			path: []string{"PricingCategoryCompanionInput", "properties", "min_quantity", "maximum"},
+		},
+		{
+			name: "options.minItems",
+			got:  bookableListMin,
+			path: []string{"CreateBookableProductRequest", "properties", "options", "minItems"},
+		},
+		{
+			name: "options.maxItems",
+			got:  bookableListMax,
+			path: []string{"CreateBookableProductRequest", "properties", "options", "maxItems"},
+		},
+		{
+			name: "pricing_categories.minItems",
+			got:  bookableListMin,
+			path: []string{"CreateBookableProductRequest", "properties", "pricing_categories", "minItems"},
+		},
+		{
+			name: "pricing_categories.maxItems",
+			got:  bookableListMax,
+			path: []string{"CreateBookableProductRequest", "properties", "pricing_categories", "maxItems"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			node, ok := dig(any(components), tc.path)
+			if !ok {
+				// Not "the CLI is wrong": the bound vanished from the spec, or
+				// the schema was renamed. Either way the constant it feeds is
+				// now unanchored and that is the news.
+				t.Fatalf("the spec declares no %s at components.schemas.%s — the constant feeding "+
+					"it (%d) is now pinned to nothing", tc.name, strings.Join(tc.path, "."), tc.got)
+			}
+			want, ok := node.(int)
+			if !ok {
+				t.Fatalf("%s is %#v, not an integer bound", tc.name, node)
+			}
+			if tc.got != want {
+				t.Errorf("the Go constant for %s is %d, the spec says %d — a nested bound the CLI "+
+					"enforces locally has drifted from the contract, so the CLI now refuses a "+
+					"payload the server accepts (or accepts one it refuses)", tc.name, tc.got, want)
+			}
+		})
+	}
+}
+
+// toSlice normalises a YAML sequence node that may be absent.
+func toSlice(v any) []any {
+	s, _ := v.([]any)
+	return s
+}
