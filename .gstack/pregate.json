@@ -16,6 +16,10 @@
       "tools/speccompat/typearray_test.go",
       "tools/speccompat/nullonly_test.go"
     ],
+    "internal/inventory/diff.go": [
+      "internal/inventory/diff_test.go",
+      "cmd/inventory/inventory_test.go"
+    ],
     "internal/inventory/errors.go": [
       "internal/inventory/errors_test.go",
       "cmd/inventory/inventory_test.go"
