@@ -25,6 +25,8 @@ package inventory
 // operator a round trip and an audit row.
 
 import (
+	"bytes"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -1327,6 +1329,69 @@ func TestWire_BookingsCreatePayloadLevelRefusals(t *testing.T) {
 // `--main-resource-id=0`, which the flag-keyed version caught too.
 //
 // Value: protects=the main-resource lower bound applies to a --data payload, not just the typed flag; fails_when=the check goes back to args.FlagSet, which --data bypasses; why_new=the fix's own motivating input had no test and the pre-fix code passed the one test there was; seam=testNewRunner
+// TestWire_KeyReleasing409ReportsTheKeyTheServerSaw is the end-to-end half of
+// the key-releasing fix: the message must name the key the REQUEST carried, not
+// a key the error was told about separately.
+//
+// ParseGenResponse reads it off `httpResp.Request` for exactly that reason —
+// the request is what the server saw, and it is where an explicit
+// --idempotency-key and the transport's minted one converge.
+//
+// Value: protects=a key-releasing 409 surfaces the Idempotency-Key the refused request carried, through the real cobra and error path; fails_when=ParseGenResponse stops populating Key, or reads it from somewhere other than the request; why_new=the unit test builds the error by hand and cannot see the plumbing that fills Key; seam=testNewRunner; no_claim=covers only an explicitly passed --idempotency-key, because fakeServer omits the minting round-tripper (transport_test.go owns the minted path)
+func TestWire_KeyReleasing409ReportsTheKeyTheServerSaw(t *testing.T) {
+	const key = "01a1c127-6473-78d1-bae6-0de5abd05564"
+
+	var sawKey string
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		sawKey = r.Header.Get("Idempotency-Key")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"meta":{"request_id":"r1"},"error":{"code":"CAPACITY_UNAVAILABLE",` +
+			`"message":"The departure is full.","retriable":true}}`))
+	})
+
+	prevShared := sharedRunner
+	sharedRunner = &Runner{}
+	prev := testNewRunner
+	testNewRunner = func() (*Runner, error) { return runner, nil }
+	t.Cleanup(func() {
+		testNewRunner = prev
+		sharedRunner = prevShared
+	})
+
+	root := Cmd()
+	root.SetArgs([]string{"bookings", "create",
+		"--availability-id", "4821",
+		"--booking-type", "booking",
+		"--guests", `{"3":2}`,
+		"--is-refundable=true",
+		"--customer-id", "7b9e5a2c-0000-4000-8000-000000000001",
+		"--idempotency-key", key,
+	})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	err := root.Execute()
+
+	if err == nil {
+		t.Fatal("a 409 CAPACITY_UNAVAILABLE was not surfaced as an error")
+	}
+	if sawKey != key {
+		t.Fatalf("the server saw Idempotency-Key %q, want %q — the test proves nothing about "+
+			"reporting a key the request never carried", sawKey, key)
+	}
+	um, ok := err.(invpkg.UserMessenger)
+	if !ok {
+		t.Fatalf("%T does not implement UserMessenger, so cmd/root.go cannot render it", err)
+	}
+	msg := um.UserMessage()
+	if !strings.Contains(msg, key) {
+		t.Errorf("UserMessage() = %q, want it to name the key the request carried (%s)", msg, key)
+	}
+	if !strings.Contains(msg, "--idempotency-key") {
+		t.Errorf("UserMessage() = %q, want it to name the flag that reuses the key", msg)
+	}
+}
+
 // TestWire_ExpiryNullIsNotAWindow is the regression test for a gate that read
 // the key and not the value, and for the trap in fixing it.
 //

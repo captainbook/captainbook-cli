@@ -736,19 +736,49 @@ func (e *ResponseDriftError) UserMessage() string {
 type KeyReleasingConflictError struct {
 	Code    string
 	Message string
+
+	// Key is the Idempotency-Key the refused request carried, filled in by the
+	// caller from the outgoing request because this message is the only text a
+	// caller reads at failure time and it prescribes reusing that key.
+	//
+	// Without it the advice named a lever the CLI did not hand over: the key is
+	// minted per invocation and printed nowhere, reaching only
+	// ~/.ceebee/audit.jsonl, so the obvious retry — re-running the command —
+	// mints a FRESH key and takes the second booking this very message warns
+	// about. The three sibling idempotency errors all carry a Key for the same
+	// reason. Empty is tolerated: a caller that reads the key from its own
+	// --idempotency-key still gets the rest of the sentence.
+	Key string
 }
 
 func (e *KeyReleasingConflictError) Error() string {
+	if e.Key != "" {
+		return fmt.Sprintf("%s (status 409): %s (key=%s)", e.Code, e.Message, e.Key)
+	}
 	return fmt.Sprintf("%s (status 409): %s", e.Code, e.Message)
 }
 
 func (e *KeyReleasingConflictError) UserMessage() string {
+	retry := "Retry the identical call under the SAME key once the cause clears"
+	if e.Key != "" {
+		retry = fmt.Sprintf("Retry the identical call once the cause clears, passing that key back "+
+			"explicitly: --idempotency-key %s", e.Key)
+	}
 	return fmt.Sprintf(
 		"%s: %s\nThis refusal describes a passing state, so it did NOT store a response "+
-			"under your Idempotency-Key. Retry the identical call under the SAME key once the "+
-			"cause clears — minting a new key for it is how a retry becomes a double booking.",
-		e.Code, e.Message,
+			"under your Idempotency-Key%s. %s — minting a new key for it is how a retry "+
+			"becomes a double booking.",
+		e.Code, e.Message, keySuffix(e.Key), retry,
 	)
+}
+
+// keySuffix names the key inline when it is known. Separate so the sentence
+// reads the same whether or not the caller supplied one.
+func keySuffix(key string) string {
+	if key == "" {
+		return ""
+	}
+	return " (" + key + ")"
 }
 
 // -----------------------------------------------------------------------------

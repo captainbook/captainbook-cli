@@ -1147,6 +1147,57 @@ func TestParseError_FlatShapeDoesNotShadowTheEnvelope(t *testing.T) {
 	})
 }
 
+// TestKeyReleasingConflictError_NamesTheKeyItTellsYouToReuse is the regression
+// test for advice that named a lever the CLI did not hand over.
+//
+// The message says to retry "under the SAME key", and the type carried no key.
+// The CLI mints a UUIDv7 per invocation and prints it nowhere — it reaches
+// ~/.ceebee/audit.jsonl and no other surface — so the obvious retry, re-running
+// the command, mints a FRESH key and takes the second booking this very message
+// warns about. Two independent reviewers raised it before it was fixed.
+//
+// Value: protects=a key-releasing 409 names the key to reuse and the flag that reuses it, whenever the key is known; fails_when=the Key field is dropped, left unpopulated, or the message stops naming --idempotency-key; why_new=the sibling test asserts the code and the no-double-booking sentence but nothing carried or checked the key; seam=none; no_claim=does not prove the key reaches this type in the real CLI, which TestWire_KeyReleasing409ReportsTheKeyTheServerSaw covers
+func TestKeyReleasingConflictError_NamesTheKeyItTellsYouToReuse(t *testing.T) {
+	const key = "01a1c127-3a90-7071-9211-0a37b60358ae"
+
+	t.Run("with a key it names the key and the flag", func(t *testing.T) {
+		e := &KeyReleasingConflictError{Code: "CAPACITY_UNAVAILABLE", Message: "Full.", Key: key}
+		msg := e.UserMessage()
+		for _, want := range []string{key, "--idempotency-key", "double booking"} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("UserMessage() = %q, want it to contain %q", msg, want)
+			}
+		}
+		// The old wording told the caller to reuse a key it never showed. If
+		// that sentence comes back while a key IS known, the advice is
+		// unactionable again.
+		if strings.Contains(msg, "under the SAME key once the cause clears") {
+			t.Errorf("UserMessage() still gives the keyless instruction although the key is known: %q", msg)
+		}
+		if !strings.Contains(e.Error(), key) {
+			t.Errorf("Error() = %q, want the key for logs and %%v", e.Error())
+		}
+	})
+
+	// An unknown key must not invent one or print an empty slot: a caller who
+	// passed --idempotency-key themselves already has it.
+	t.Run("without a key it still reads correctly", func(t *testing.T) {
+		e := &KeyReleasingConflictError{Code: "NO_RESOURCE_AVAILABLE", Message: "None free."}
+		msg := e.UserMessage()
+		if !strings.Contains(msg, "SAME key") {
+			t.Errorf("UserMessage() = %q, want the same-key instruction when no key is known", msg)
+		}
+		for _, bad := range []string{"()", "--idempotency-key \n", "key="} {
+			if strings.Contains(msg, bad) {
+				t.Errorf("UserMessage() = %q, want no empty slot (%q)", msg, bad)
+			}
+		}
+		if strings.Contains(e.Error(), "key=") {
+			t.Errorf("Error() = %q, want no empty key slot", e.Error())
+		}
+	})
+}
+
 // TestParseError_KeyReleasingConflicts covers the three booking 409s spec
 // 1.47.0 added, and the one thing a RawAPIError fallback cannot say.
 //

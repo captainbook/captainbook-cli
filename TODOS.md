@@ -1467,20 +1467,86 @@ assertion. A proxy or a future server change returning one of those codes under 
 status would print a false status and assert a key-release guarantee the spec grants
 only to the 409.
 
-**`KeyReleasingConflictError` names an action the operator cannot take.** Its message says to
-retry the identical call under the **same** idempotency key, but the type is `{Code, Message}`
-only, the CLI mints a UUIDv7 per invocation, and no path prints it — it reaches
-`~/.ceebee/audit.jsonl` and nowhere else. So the single action the message names is unobtainable
-from the output, and the obvious retry (re-running the command) mints a fresh key, which is
-exactly what the message warns turns a retry into a double booking. The three sibling
-idempotency errors (`IdempotencyConflictError`, `IdempotencyInProgressError`,
-`IdempotencyUnknownError`) all carry a `Key` and name it. Two fix options: have the constructor
-read `details.key` best-effort, or have `runMutation` attach the key it already holds for the
-audit row before the error leaves. Either way the message should name `--idempotency-key`.
-Raised by the red-team reader on 2026-11-09 and skipped deliberately at review: it needs a
-design decision and changes the error type's shape, so it does not belong in a review-response
-commit. `skills/bookings.md` already teaches operators to pre-mint a key, which is why this is a
-message-actionability gap rather than a correctness bug.
+**`bookings create` writes customer name, email and phone verbatim to the local audit log.**
+`ForensicFields` includes `customer`, whose value is the raw
+`{"name","email","phone","zip_code",...}` object, and `forensicSummary`/`capForensicValue` apply
+only a 16 KiB size cap with no redaction — so every booking taken through the CLI persists
+plaintext PII to `~/.ceebee/audit.jsonl` (50 MB × 3 rotation). `bookings update` and
+`reschedule` add free-text `comments`, `private-notes` and `reschedule-notes` to the same sink.
+This follows existing precedent (`guests.go` already captures `passport`, `dob`, `email`,
+`phone`), so it is a convention this PR WIDENS rather than a new policy break — but it widens it
+to every create, and nothing in `FlagDef` can mark a field redact-on-audit. Raised by the
+adversarial reader on 2026-11-09 as INVESTIGATE/Low; the owner's call at review was to record it
+and decide later, with no behaviour change in this PR. Deciding it needs a redaction design
+(hash, omit, or truncate) and probably spans more than the CLI.
+
+**`specBounds` is blind to every `PositiveIntegerId` body property, and an earlier version of
+this entry named the wrong cause.** `resolve()` in `cmd/inventory/spec_drift_test.go` DOES follow
+`$ref`, up to 8 hops — the hole is that `PositiveIntegerId` is a `oneOf`, so its `minimum: 1`
+sits in `oneOf[0]` where `prop["minimum"]` never reads it. Observable: `--replaced-resource-id`
+is logged as "spec states no minimum here" and `--main-resource-id` never reaches the `missing`
+arm, though both `$ref` it. That matters for this branch specifically, because it DELETED
+`Min: 1` from `--main-resource-id`'s `FlagDef` and moved enforcement into the hand-written
+`validateBookingResourcesBody`: if that gate were dropped, no drift direction would see it. Fix
+is to flatten `oneOf`/`anyOf` in `specBounds` the way `allOf` already is. Found by the
+adversarial reader, which also caught that the previous wording here ("a `$ref` this reader does
+not follow") would have sent the next fixer to code that already works.
+
+**Two self-inflicted notes from this branch's own review, left unfixed at the frozen cap.**
+Fixing either would have destaled the only review record that bound CURRENT, and the cap left no
+round to re-bind, so they ship disclosed instead. (1) Inserting two regression tests between
+`TestWire_MainResourceBoundReadsTheAssembledBody`'s doc comment and its `func` orphaned that
+comment: its `Value:` card now heads `TestWire_ExpiryNullIsNotAWindow` and the original function
+has none. Documentation only. (2) The new null refusal reuses the phrase "cannot be cleared, only
+replaced", which was the only text assertion the `0`-path test made, so that assertion no longer
+tells which guard fired and a widened null check that swallowed `0` would stay green. Both are a
+comment move and an assertion split respectively — small, and worth doing in one focused commit.
+
+**`docFlagValues` cannot see a documented negative int value.** The extractor behind
+`TestSkillsDocIntFlagValues` treats any token starting with `-` as the next flag, so
+`--day-count -1` yields no entry: the value is neither parsed nor bound-checked and `checked`
+does not increment, which the test's own floor guard cannot notice because the omission is
+per-value. Negative is the one value class that gate cannot see, and it is exactly the class the
+`FlagDef.Min` entry above records as reaching the wire today. Fix: accept `^-?[0-9]` as a value.
+Latent rather than active — no cookbook currently documents a negative literal.
+
+**`--format table` and `csv` drop fields the operator needs and erase null-vs-zero.** Two
+findings with one shape, both reachable only by asking for a non-default format (mutations
+default to `json`, reads to `table`). (1) `bookings create` and `reschedule` route through the
+shared diff renderer, whose `DiffEnvelope` carries neither `payment_url` nor
+`departure_time_unverified`, and `runMutation` early-returns on `res.DiffEnv != nil && Format ==
+"table"` — so a reschedule's "the destination may already have departed" warning and a booking's
+hosted-checkout link are not rendered. Raised by the codex outside voice, which called it
+blocking; the owner's call at review was to ship it as a disclosed note, on the grounds that the
+default format shows both fields, nothing is lost server-side and no test fails. (2)
+`internal/output/formatter.go` renders a JSON `null` as an empty cell, so attendance's
+`no_show_guests: null` is indistinguishable from `0` — the exact conflation the statistics spec
+forbids ("zero and null mean different things here and only one of them is good news").
+`formatTable` also reads only `data`, so a metric's `series` is dropped entirely, which is
+pre-existing for every series metric.
+
+**The new body gates exit 1 while the bounds added beside them exit 12.**
+`validateStoreBookingBody`, `requireAnyBookingAmendment`, `validateBookingResourcesBody` and
+`validateBookableProductBody` all return a bare `fmt.Errorf`, so `cmd/root.go` exits 1, while the
+`FlagDef.Max` check added in the same change returns `api.ExitError{Code: api.ExitValidation}`
+and exits 12. Same class of refusal, two exit codes, so an agent branching on exit status to
+separate "my payload was wrong" from "something else broke" gets inconsistent answers. Confirms
+the existing learning `ceebee-inventory-typed-errors-all-exit-1-not-the-taxonomy`: there is no
+`invpkg`→exit-code mapper anywhere. Pre-existing for the one gate that existed before, now five.
+
+**~~`KeyReleasingConflictError` names an action the operator cannot take.~~ FIXED** on
+jbajou/cli-specs-update, 2026-11-09. Raised by the red-team reader, skipped once as "message
+actionability", then raised AGAIN by the adversarial reader at High/Blocks:yes with the argument
+that settled it: the message said to retry under the **same** idempotency key, the type carried
+none, and the CLI mints a UUIDv7 per invocation and prints it nowhere, so the obvious retry of
+re-running the command mints a fresh key and takes the second booking the message itself warns
+about. The type now carries `Key`, `ParseGenResponse` fills it from the outgoing request's
+`Idempotency-Key` header (the request is what the server saw, and where an explicit
+`--idempotency-key` and the transport's minted one converge), and the message names both the key
+and the flag. Pinned by `TestKeyReleasingConflictError_NamesTheKeyItTellsYouToReuse` and
+`TestWire_KeyReleasing409ReportsTheKeyTheServerSaw`, both proven red against the unfixed code.
+Remaining limit, disclosed: the wire test covers only an explicitly passed `--idempotency-key`,
+because `fakeServer` omits the minting round-tripper; `transport_test.go` owns the minted path.
 
 **No rule owns `{type: ["null"]}` spelled as a bare one-member sequence.** `rewriteNullOnlyType`
 declines it via the `len == 2` guard, and rule 1's `isNullTypeSchema` cannot match it because it

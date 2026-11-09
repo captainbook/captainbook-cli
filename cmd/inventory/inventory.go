@@ -1377,6 +1377,16 @@ func ParseGenResponse(body []byte, httpResp *http.Response, resourceType, resour
 	if status == http.StatusTooManyRequests {
 		parsed = invpkg.WithRetryAfter(parsed, invpkg.ParseRetryAfter(httpResp.Header.Get("Retry-After")))
 	}
+	// A key-releasing 409 tells the caller to retry under the SAME key, so it
+	// has to carry that key or the advice names a lever nothing hands over.
+	// The key is read off the REQUEST rather than threaded down from args
+	// because the request is what the server actually saw: the transport mints
+	// the header when no --idempotency-key was given, so this is the only place
+	// both spellings converge.
+	var krc *invpkg.KeyReleasingConflictError
+	if errors.As(parsed, &krc) && krc.Key == "" && httpResp.Request != nil {
+		krc.Key = httpResp.Request.Header.Get("Idempotency-Key")
+	}
 	// Partial result for the audit pipeline. Body intentionally NOT set —
 	// the caller saw a typed error; raw error-envelope bytes don't belong
 	// in res.Body which is reserved for successful response payloads.
