@@ -1328,3 +1328,85 @@ func TestParseError_PlanLimitReachedPartialDetails(t *testing.T) {
 		t.Errorf("the complete-details sentence regressed: %q", msg)
 	}
 }
+
+// TestPlanLimitReachedError_ErrorStringHasNoBlankSlots is the same assertion on
+// the OTHER renderer, which is where the fix had not reached.
+//
+// UserMessage was restructured to branch on which details arrived; Error() kept
+// a flat three-slot Sprintf, so an absent or partial `details` printed
+// "PLAN_LIMIT_REACHED: item= limit= current=". That string is what `%v`, the
+// audit log and every `errors.As` consumer that falls back to Error() record,
+// and three empty slots do not read as "the server did not say" — they read as
+// "the allowance is empty", which is a different and wrong fact about the
+// account.
+//
+// Value: protects=Error() names only the detail slots the payload carried, on every partial shape; fails_when=Error() goes back to a flat three-slot format string; why_new=the partial-details test next door asserts on UserMessage only, and Error() is the path logs use; seam=none
+func TestPlanLimitReachedError_ErrorStringHasNoBlankSlots(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     *PlanLimitReachedError
+		want    []string // substrings that must appear
+		notWant []string // substrings that must not
+	}{
+		{
+			name: "all three",
+			err:  &PlanLimitReachedError{PlanItem: "products", Limit: "41", Current: "41"},
+			want: []string{"item=products", "limit=41", "current=41"},
+			// A bare "current=" would match "current=41" here, so the
+			// trailing-slot case is left to the generic check below; these two
+			// can still be spelled as a key followed by a space.
+			notWant: []string{"item= ", "limit= "},
+		},
+		{
+			name:    "plan_item only",
+			err:     &PlanLimitReachedError{PlanItem: "products"},
+			want:    []string{"item=products"},
+			notWant: []string{"limit=", "current="},
+		},
+		{
+			name:    "numbers but no plan_item",
+			err:     &PlanLimitReachedError{Limit: "41", Current: "41"},
+			want:    []string{"limit=41", "current=41"},
+			notWant: []string{"item="},
+		},
+		{
+			// Nothing in details, but the server sent a sentence. Logging a
+			// bare code throws away the only context there was.
+			name:    "no details, message only",
+			err:     &PlanLimitReachedError{Message: "Plan allowance exhausted."},
+			want:    []string{"PLAN_LIMIT_REACHED", "Plan allowance exhausted."},
+			notWant: []string{"item=", "limit=", "current="},
+		},
+		{
+			// Nothing at all: the code alone, and no empty slots after it.
+			name:    "wholly empty",
+			err:     &PlanLimitReachedError{},
+			want:    []string{"PLAN_LIMIT_REACHED"},
+			notWant: []string{"item=", "limit=", "current=", ": "},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.err.Error()
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("Error() = %q, want it to contain %q", got, w)
+				}
+			}
+			for _, n := range tc.notWant {
+				if strings.Contains(got, n) {
+					t.Errorf("Error() = %q, want it NOT to contain %q — that is the blank-slot shape", got, n)
+				}
+			}
+			// The general form of the defect, independent of the cases above:
+			// no key may be followed by nothing.
+			for _, key := range []string{"item=", "limit=", "current="} {
+				if i := strings.Index(got, key); i >= 0 {
+					rest := got[i+len(key):]
+					if rest == "" || strings.HasPrefix(rest, " ") {
+						t.Errorf("Error() = %q leaves %q with no value", got, key)
+					}
+				}
+			}
+		})
+	}
+}

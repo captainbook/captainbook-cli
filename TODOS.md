@@ -1476,6 +1476,18 @@ outcome that package calls worse than not helping. No such construct exists in t
 spec, and `TestRewriteNullOnlyType_VendoredSpecCarriesNoneAfterNormalize` says so. The
 tightening would be "skip any mapping that is a member of a `oneOf`/`anyOf` sequence".
 
+**`FlagDef.Min` cannot express a lower bound of 0, so 41 int flags accept a negative.**
+`Min` is a plain `int` whose zero value means "unbounded", so `Min: 0` and "no Min" are
+one declaration, and `makeRunE` gates the check on `fd.Min != 0`. Every flag whose spec
+`minimum` is 0 — `--capacity`, `--amount`, `--min-age`, `--from-price`,
+`--max-credits-per-run` and 36 more — therefore passes `-5` straight to a server that
+refuses it. `TestSpecDrift_FlagMinMatchesSpecMinimum` now names all 41 in a single log
+line rather than leaving the limit invisible, which is how this was found. The fix is to
+make the bound's presence separable from its value (`MinSet bool`, or `*int`) and widen
+the `makeRunE` condition; it touches every `CommandDef` that declares an int flag, which
+is why it is not folded into a review-response commit.
+
 **Why:** each is a gate or bound that is pinned in one direction only, which is the
 shape that let a real regression through during that very sync.
-**Effort:** human S / CC S each. **Priority:** P3. **Depends on:** nothing.
+**Effort:** human S / CC S each, except the `FlagDef.Min` change (human M / CC M — wide
+but mechanical). **Priority:** P3. **Depends on:** nothing.

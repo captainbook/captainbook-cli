@@ -152,6 +152,16 @@ func TestStatsWire_UnsupportedFilterHasNoFlag(t *testing.T) {
 		{"browsing", "--product-id", "12"},     // reads the event spine, joins no bookings
 		{"summary", "--channel-id", "ch_42"},   // would make one object internally inconsistent
 		{"revenue", "--date-basis", "trip"},    // dated by when the money arrived
+
+		// attendance (new in this sync). --date-basis is the row that matters:
+		// the spec refuses it in prose — "a no-show happens at the trip, so
+		// there is no second clock to offer" — and a flag offering it would
+		// imply this metric has a booking-dated reading, which it does not.
+		{"attendance", "--date-basis", "trip"},     // no second clock: a no-show happens at the trip
+		{"attendance", "--channel-id", "ch_42"},    // counts people off redemptions, joins no channel
+		{"attendance", "--resource-id", "9"},       // likewise no resource join
+		{"attendance", "--location-id", "7"},       // likewise no location join
+		{"attendance", "--day-of-week", "sat,sun"}, // not a parameter of this metric
 	}
 	for _, tc := range cases {
 		_, err := runStats(t, "stats", tc.metric, tc.flag, tc.value)
@@ -548,38 +558,6 @@ func TestStatsWire_AttendanceHitsItsOwnPath(t *testing.T) {
 	} {
 		if gotQuery.Get(key) != want {
 			t.Errorf("%s = %q, want %q (query: %v)", key, gotQuery.Get(key), want, gotQuery)
-		}
-	}
-}
-
-// TestStatsWire_AttendanceRefusesTheFiltersItCannotApply is the per-metric
-// matrix arm for the new metric, in the shape
-// TestStatsWire_UnsupportedFilterHasNoFlag uses: the server answers 400 for a
-// filter a metric does not implement, so the flag must be ABSENT rather than
-// present and refused.
-//
-// --date-basis is the one that matters. The spec refuses it in prose — "a
-// no-show happens at the trip, so there is no second clock to offer" — and a
-// flag offering it would imply this metric has a booking-dated reading, which it
-// does not.
-//
-// Value: protects=attendance declares no filter the spec does not give it; fails_when=a copy-pasted filter grouping (filtersBookingGrain / filtersWithDateBasis) is used for this row; why_new=the metric is new and the existing matrix test enumerates other metrics; seam=none
-func TestStatsWire_AttendanceRefusesTheFiltersItCannotApply(t *testing.T) {
-	for _, tc := range []struct{ flag, value string }{
-		{"--date-basis", "trip"},     // no second clock: a no-show happens at the trip
-		{"--channel-id", "ch_42"},    // counts people off redemptions, joins no channel
-		{"--resource-id", "9"},       // likewise no resource join
-		{"--location-id", "7"},       // likewise no location join
-		{"--day-of-week", "sat,sun"}, // not a parameter of this metric
-	} {
-		_, err := runStats(t, "stats", "attendance", tc.flag, tc.value)
-		if err == nil {
-			t.Errorf("stats attendance accepted %s; the server refuses that filter with 400, so the flag should not exist", tc.flag)
-			continue
-		}
-		if !strings.Contains(err.Error(), "unknown flag") {
-			t.Errorf("stats attendance %s failed with %v, want an unknown-flag parse error — anything else means the flag EXISTS and rejected the value",
-				tc.flag, err)
 		}
 	}
 }

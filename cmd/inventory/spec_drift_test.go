@@ -1817,14 +1817,31 @@ func specBounds(t *testing.T, keyword string) map[string]int {
 // spec does not state is reported as unverified rather than failed, while a Min
 // that CONTRADICTS a stated minimum fails.
 //
-// Value: protects=no int flag declares a lower bound that contradicts the spec's minimum; fails_when=a rollout stamps Min onto a flag whose spec minimum is lower, as happened to --day-count in this very PR; why_new=nothing compared Min against the contract in either direction; seam=none
+// Both inequalities fail, and both absences are accounted for, because this
+// started out half a mirror. It failed only on `got > want`, so a bound looser
+// than the contract passed silently, and it returned early when the flag
+// declared no Min at all, so a spec floor with no local bound was never
+// compared. The Max side had already closed the second of those with its
+// `missing` arm.
+//
+// Of those two, `missing` is the one that does the work TODAY, and the
+// distinction matters for anyone reading the `got != want` line as proven: every
+// minimum the spec currently states is 0 or 1, and the only declarable Min below
+// 1 is 0 — which, because FlagDef.Min's zero value means unbounded, is
+// indistinguishable from declaring nothing and lands in `missing`. So the
+// under-minimum hole is closed by `missing`, and `got != want` is a guard that
+// becomes reachable the first time upstream states a minimum above 1. It is kept
+// because it is the correct assertion and costs nothing, not because a live flag
+// exercises it.
+//
+// Value: protects=every int flag's lower bound equals the spec's minimum, in both directions, and no stated minimum goes undeclared; fails_when=a rollout stamps Min onto a flag whose spec minimum is lower (as happened to --day-count in this very PR), a Min drifts below a stated minimum, or a flag with a spec minimum declares no Min; why_new=nothing compared Min against the contract in either direction; seam=none
 func TestSpecDrift_FlagMinMatchesSpecMinimum(t *testing.T) {
 	minima := specBounds(t, "minimum")
 	if len(minima) == 0 {
 		t.Fatal("parsed no spec minima — the reader broke, not the CLI")
 	}
 
-	var wrong, unverified []string
+	var wrong, missing, unverified, inexpressible []string
 	checked := 0
 
 	var walk func(c *cobra.Command)
@@ -1846,21 +1863,57 @@ func TestSpecDrift_FlagMinMatchesSpecMinimum(t *testing.T) {
 					return
 				}
 				got, present := declared[f.Name]
-				if !present {
-					return
-				}
 				want, stated := minima[verb+" "+path+"."+kebabToSnake(f.Name)]
-				if !stated {
-					unverified = append(unverified, fmt.Sprintf("%s --%s (Min %d; spec states no minimum here, "+
-						"often a PositiveIntegerId $ref)", c.CommandPath(), f.Name, got))
-					return
-				}
-				checked++
-				if got > want {
-					wrong = append(wrong, fmt.Sprintf(
-						"%s --%s declares Min %d, but the spec's minimum is %d — the values between "+
-							"are refused locally and accepted by the server",
-						c.CommandPath(), f.Name, got, want))
+				switch {
+				case !stated:
+					// A Min the spec does not state. `minimum: 0` is the JSON
+					// Schema default for an unsigned id and several ids are
+					// typed `PositiveIntegerId` through a $ref this reader does
+					// not follow, so this is reported rather than failed.
+					if present {
+						unverified = append(unverified, fmt.Sprintf("%s --%s (Min %d; spec states no minimum here, "+
+							"often a PositiveIntegerId $ref)", c.CommandPath(), f.Name, got))
+					}
+				case !present:
+					// The spec→flag direction, and the half this test shipped
+					// without: a spec that states a floor and a flag that
+					// declares none accepts every value below it locally and
+					// hands the server a request it refuses. This is the
+					// `missing` arm the Max mirror already had.
+					//
+					// `minimum: 0` is exempt because FlagDef cannot express it.
+					// `Min` is an int whose zero value MEANS unbounded, so
+					// `Min: 0` and "no Min" are one declaration and no edit
+					// could satisfy this arm. Logged so the limit is visible
+					// rather than silent.
+					if want == 0 {
+						inexpressible = append(inexpressible, fmt.Sprintf(
+							"%s --%s (spec minimum 0; FlagDef.Min's zero value means unbounded)",
+							c.CommandPath(), f.Name))
+						return
+					}
+					missing = append(missing, fmt.Sprintf("%s --%s (spec minimum %d)",
+						c.CommandPath(), f.Name, want))
+				default:
+					// Both sides stated: the bound must be the contract's
+					// number, not merely no stricter than it. `got > want`
+					// alone let a looser bound pass; `got != want` closes both
+					// ways, as the Max side does. The looser half is not
+					// reachable with today's spec minima (see the doc comment)
+					// — the `missing` arm above is what catches that in
+					// practice.
+					checked++
+					if got != want {
+						relation := "stricter than"
+						consequence := "the values between are refused locally and accepted by the server"
+						if got < want {
+							relation = "looser than"
+							consequence = "the values between are accepted locally and refused by the server"
+						}
+						wrong = append(wrong, fmt.Sprintf(
+							"%s --%s declares Min %d, %s the spec's minimum of %d — %s",
+							c.CommandPath(), f.Name, got, relation, want, consequence))
+					}
 				}
 			})
 		}
@@ -1872,16 +1925,31 @@ func TestSpecDrift_FlagMinMatchesSpecMinimum(t *testing.T) {
 
 	sort.Strings(wrong)
 	if len(wrong) > 0 {
-		t.Errorf("%d flag(s) declare a lower bound stricter than the spec:\n  %s",
+		t.Errorf("%d flag lower bound(s) disagree with the spec:\n  %s",
 			len(wrong), strings.Join(wrong, "\n  "))
+	}
+	sort.Strings(missing)
+	if len(missing) > 0 {
+		t.Errorf("%d flag(s) declare no Min where the spec states a minimum, so under-minimum "+
+			"values reach the wire:\n  %s", len(missing), strings.Join(missing, "\n  "))
 	}
 	sort.Strings(unverified)
 	for _, u := range unverified {
 		t.Logf("Min not verified against a stated minimum: %s", u)
 	}
+	// One line, not 41. These are a known structural gap rather than per-flag
+	// news, and printed individually they bury the `unverified` lines, which
+	// are the ones worth reading.
+	sort.Strings(inexpressible)
+	if len(inexpressible) > 0 {
+		t.Logf("%d flag(s) carry a spec minimum of 0 that FlagDef.Min cannot express "+
+			"(its zero value means unbounded), so a negative value reaches the wire; see TODOS.md:\n  %s",
+			len(inexpressible), strings.Join(inexpressible, "\n  "))
+	}
 	if checked == 0 {
 		t.Fatalf("compared no flag Min against a stated spec minimum — the reader or the walker " +
 			"lost coverage, and this is the direction that let --day-count's Min: 1 ship")
 	}
-	t.Logf("compared %d flag lower bounds against the spec (%d unverified)", checked, len(unverified))
+	t.Logf("compared %d flag lower bounds against the spec (%d unverified, %d inexpressible)",
+		checked, len(unverified), len(inexpressible))
 }

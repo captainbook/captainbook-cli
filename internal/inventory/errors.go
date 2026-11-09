@@ -779,8 +779,34 @@ type PlanLimitReachedError struct {
 	Message  string
 }
 
+// Error prints only the slots the payload actually carried, which is the same
+// presence rule UserMessage applies, on the path logs and `%v` use.
+//
+// The naive three-slot format rendered "item= limit= current=" whenever
+// `details` was absent or partial — and `details` is `additionalProperties:
+// true`, so a partial payload is legal. Three empty slots do not read as "the
+// server did not say"; they read as "the allowance is empty", which is a
+// different and wrong fact about the account.
 func (e *PlanLimitReachedError) Error() string {
-	return fmt.Sprintf("PLAN_LIMIT_REACHED: item=%s limit=%s current=%s", e.PlanItem, e.Limit, e.Current)
+	var parts []string
+	if e.PlanItem != "" {
+		parts = append(parts, "item="+e.PlanItem)
+	}
+	if e.Limit != "" {
+		parts = append(parts, "limit="+e.Limit)
+	}
+	if e.Current != "" {
+		parts = append(parts, "current="+e.Current)
+	}
+	if len(parts) > 0 {
+		return "PLAN_LIMIT_REACHED: " + strings.Join(parts, " ")
+	}
+	// Nothing in `details` at all. Fall back to the server's own sentence if it
+	// sent one, rather than logging a bare code with no context.
+	if e.Message != "" {
+		return "PLAN_LIMIT_REACHED: " + e.Message
+	}
+	return "PLAN_LIMIT_REACHED"
 }
 
 func (e *PlanLimitReachedError) UserMessage() string {

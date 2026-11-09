@@ -399,9 +399,11 @@ func dropNullEnumMember(m *yaml.Node) {
 // rule 1 exists to prevent, reached by a different road.
 //
 // 3.0 has no null type to map onto, so the type is dropped and only
-// `nullable: true` remains. Codegen renders a typeless schema as
-// `interface{}`, i.e. the field becomes `*interface{}` — which holds the one
-// value the schema permits, and no other value the server can legally send.
+// `nullable: true` remains. Codegen renders a typeless schema as `interface{}`
+// and adds no pointer, because `interface{}` is already nilable — so the field
+// becomes a plain `interface{}` (verified: `PaymentUrl interface{}` in
+// internal/inventory/gen), which holds the one value the schema permits, and no
+// other value the server can legally send.
 // Widening the Go type is safe in a way narrowing would not be: every
 // conforming payload still round-trips.
 //
