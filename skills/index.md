@@ -30,7 +30,7 @@ The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` over a Sanc
 export CEEBEE_API_URL=https://demo.captainbook.io/api/v1/cli
 export CEEBEE_API_TOKEN=sk-xxxxxxxxxxxx
 
-# Profile path (persists in ~/.ceebee/config.toml)
+# Profile path (persists in ~/.ceebee/config.yaml)
 ceebee config add demo --url https://demo.captainbook.io/api/v1/cli --token sk-xxxxxxxxxxxx
 ceebee --profile demo inventory products list
 ```
@@ -47,7 +47,7 @@ Tokens carry one or more abilities. The server enforces them at the route layer;
 |-------------|--------------|
 | `cli:read`  | All read endpoints. Implicit alongside `cli:write` / `cli:cs`. |
 | `cli:write` | Inventory mutations: products, options, availabilities (incl. bulk), pricing tiers, discounts (incl. apply), gift certs (issue/resend), guests, extras, questions, media. NOT categories — those are platform-managed and read-only. |
-| `cli:cs`    | CS-only sensitive operations: `bookings cancel`, `bookings refund`, `bookings comp`, `bookings reschedule`, `notifications resend` (aliased as `bookings resend-confirmation`), and `gift-certificates void`. `bookings reschedule` is in it because it moves a live booking a customer is already travelling on — `bookings create` and `bookings update` are ordinary `cli:write`. `bookings cancel` is in this set for **every** `--refund-policy` value — the whole V1 enum (`none|full|partial`) overrides the product's cancellation policy, and the server 403s operator tokens on overrides. `gift-certificates void` is in it because voiding kills an instrument the customer paid for. |
+| `cli:cs`    | CS-only sensitive operations: `bookings cancel`, `bookings refund`, `bookings comp`, `bookings reschedule`, `bookings resend-confirmation` (also reachable as `notifications resend`), and `gift-certificates void`. `bookings reschedule` is in it because it moves a live booking a customer is already travelling on — `bookings create` and `bookings update` are ordinary `cli:write`. `bookings cancel` is in this set for **every** `--refund-policy` value — the whole V1 enum (`none|full|partial`) overrides the product's cancellation policy, and the server 403s operator tokens on overrides. `gift-certificates void` is in it because voiding kills an instrument the customer paid for. |
 
 Recommended issuance: a `cli:read` token for reporting bots, a `cli:read + cli:write` token for inventory editors, and a `cli:read + cli:write + cli:cs` token for Customer Success engineers.
 
@@ -156,7 +156,9 @@ On replay of the same operation with the same body, you get the original respons
 
 **Refusals release the key.** A request rejected at the gate — `401`, `403`, `422 VALIDATION_FAILED`, `429`, and the `404` from the workflows plan gate — records no outcome, because nothing ran. The key is free to reuse, including with a different body. So "fix the token and retry with the same key" and "fix the invalid field and retry with the same key" are both safe. A `404` from a handler (the row genuinely does not exist) is a real outcome and does replay.
 
-**Three `409`s release it too, and they are the exception to the rule above.** Every other `409` describes something that will answer the same way forever — a cancelled booking stays cancelled, a departed slot stays departed — so replaying its stored response is correct. On the booking writes, `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and `NO_RESOURCE_AVAILABLE` each describe a **passing** state (a full departure, a slot that filled or closed, a guide already assigned), so nothing is stored under the key. **Retry the identical call under the SAME key** once the cause clears; minting a new one for it is how a retry becomes a double booking. Persisting one used to make a card approved during a busy minute un-approvable even after a cancellation freed the seat. The CLI surfaces all three with that instruction in the error message.
+**Three `409`s release it too, and they are the exception to the rule above.** Most other `409`s describe something that will answer the same way forever — a cancelled booking stays cancelled, a departed slot stays departed — so replaying the stored response is correct. On the booking writes, `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and `NO_RESOURCE_AVAILABLE` each describe a **passing** state (a full departure, a slot that filled or closed, a guide already assigned), so nothing is stored under the key. **Retry the identical call under the SAME key** once the cause clears; minting a new one for it is how a retry becomes a double booking. Persisting one used to make a card approved during a busy minute un-approvable even after a cancellation freed the seat. The CLI surfaces all three with that instruction in the error message.
+
+Two more `409`s are not final either, so read `error.retriable` and the code rather than assuming a `409` is settled. `IDEMPOTENCY_IN_PROGRESS` is transient, and the transport already auto-retries it once at 250 ms before surfacing it. `PRODUCT_BEING_DUPLICATED` — on the product and product-option writes, while a copy job reads the source for a couple of minutes — is transient *and* releases its key (`error.retriable` is `true`), so the identical request under the same key once the copy finishes is the intended recovery.
 
 `BOOKING_RESOURCE_REQUEST_INVALID` (`422`, on `set-resources`) releases its key for the ordinary reason: nothing was applied.
 
@@ -250,9 +252,9 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | `BOOKING_RESOURCE_CONFLICT` | `bookings set-resources`: the selection itself is illegal. `details.rejections[]` names every refused id with a `<FIELD>_RESOURCE_<PROBLEM>` code. Re-run the `bookings available-*` lists. |
 | `TICKET_REISSUE_NOT_CONFIRMED` | `products update`: changing `--delivery-method` would reissue existing bookings' tickets, invalidating the QR codes customers already hold (un-notified). Preview with `--dry-run`, then resend with `--confirm-ticket-reissue`. |
 | `PLAN_LIMIT_REACHED` | 403 on `products create` / `duplicate` / `restore` and `resources create` / `restore`: the ACCOUNT has run out, not the token. `details` carry `plan_item`, `limit`, `current`. No change to the request helps — the operator upgrades the plan or removes a row. Checked BEFORE the permission, so it binds an account owner too, and it is rolled out per account: an account over its limit may still be answered `201`. |
-| `CAPACITY_UNAVAILABLE` | 409 on `bookings create`: the departure filled. **Releases its idempotency key** — retry the identical call under the SAME key. |
+| `CAPACITY_UNAVAILABLE` | 409 on `bookings create` and `bookings reschedule`: the departure filled, or the destination cannot hold the party. **Releases its idempotency key** — retry the identical call under the SAME key. |
 | `DEPARTURE_NOT_BOOKABLE` | 409 on `bookings create`: the slot is closed, past its cut-off window, or no pricing tier covers the party size. **Releases its key.** The last two are the only causes the dry run cannot predict. |
-| `NO_RESOURCE_AVAILABLE` | 409 on `bookings create`: no guide or asset free for the departure. **Releases its key.** |
+| `NO_RESOURCE_AVAILABLE` | 409 on `bookings create` and `bookings reschedule`: no guide or asset free for the departure. **Releases its key.** |
 | `DEPOSIT_EXCEEDS_TOTAL` | 422 on `bookings create`: the deposit is above the booking's computed total, which the server can only check after composing fares against the locked availability. |
 | `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED` | 422 on `bookings reschedule`: the destination departure belongs to another product option. That move cancels and replaces on the dashboard; it is not an in-place reschedule. |
 | `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE` | 422 on `bookings update`: the custom attribute is backed by a code pool, which changes only through the atomic claim/release action — writing it directly would leave the same code drawable for a second customer. |

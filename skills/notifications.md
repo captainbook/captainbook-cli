@@ -8,7 +8,7 @@ V1 ships a single notification command: **resend the booking confirmation** (ema
 |---------|---------------|---------|---------|
 | `inventory notifications resend <booking-id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
 
-`ceebee inventory bookings resend-confirmation <id>` is an alias for the same endpoint — the spec defines only one operation, and both commands share a flag list and closure. Use whichever reads better in context.
+`ceebee inventory notifications resend <id>` is the top-level **alias**; the canonical spelling is `ceebee inventory bookings resend-confirmation <id>`. The spec defines only one operation, and both commands share a flag list and closure, so either spelling runs the same call and writes the same audit row (`command` there is the verb and path, not the CLI words you typed). Use whichever reads better in context; prefer the booking form when you are naming the operation in writing, since that is the one the endpoint belongs to.
 
 ## Worked examples
 
