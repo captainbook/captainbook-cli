@@ -1341,3 +1341,141 @@ untested.
 one that can never be written is worse than one that is absent, because its
 absence looks like an oversight.
 **Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream gstack.
+
+## Upstream: the statistics spec added a whole endpoint without moving its version
+
+`api/statistics/statistics-openapi.yml` reads `version: 1.4.0` both before and
+after the Attendance endpoint landed. Upstream commit `836e7ea965`
+("feat(statistics): report no-shows, and say when nobody was counting") added
+`GET /api/v1/statistics/attendance`, the `Attendance` tag, `AttendanceData` and
+`AttendanceSeriesItem` — 115 lines — and left `info.version` alone.
+
+The inventory spec is the contrast and shows this is a discipline gap rather
+than a convention: `cli-v1.yaml` moved 1.34.0 → 1.56.0 over the same period and
+carries a per-release changelog in `info.description` precise enough to drive a
+CLI sync on its own. The statistics spec has neither a changelog nor a moving
+version, so **the version string cannot be used to detect that this spec
+changed**, and a sync that diffs on versions alone would have skipped it
+entirely.
+
+Nothing broke here: `TestStatisticsDrift_EveryEndpointIsBound` reads the paths
+rather than the version and reported the unbound metric immediately, which is
+exactly the absence that direction of the pin exists to see. That is the
+mitigation already in place, and it is why this is P3 rather than a defect —
+but it means the statistics lane's only change signal is the drift tests, and a
+response-shape change (which nothing pins on this side) would still be
+invisible.
+
+**Fix:** upstream — bump `info.version` on a statistics spec change, and
+ideally give it the `info.description` changelog the inventory spec has. File on
+`captainbook/captainbook`; do not patch the vendored copy, which must stay
+byte-identical.
+**Why:** a version that does not move is worse than no version, because a reader
+reasonably concludes nothing changed.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream.
+
+## Two new nullable fields can be set but not cleared from a typed flag
+
+The 1.56.0 sync added two fields the spec types as nullable, where `null` is a
+meaningful value the flag cannot express:
+
+- `bookings update --comments` / `--private-notes` — the spec says "Send null to
+  clear", and a string flag cannot. `--comments=""` stores an empty string,
+  which is a different value the server keeps.
+- `pricing-categories update --max-per-resource` — "null removes the limit", and
+  an int flag has no null. `0` is out of the spec's 1-99 range and is refused.
+
+Both are reachable with `--data '{"comments": null}'` and both `--help` strings
+say so, so this is a documented ergonomic gap rather than a capability one. It
+is the same shape as the `intSlice` entry above: the CLI can set these fields
+but never clear them without dropping to the raw body.
+
+A general fix would be a nullable flag type (a `--clear-<field>` companion, or a
+sentinel the parser maps to JSON null) rather than three per-field workarounds —
+which is why this is recorded once instead of being patched twice.
+
+**Why:** "set but never unset" is a silent half-surface; an agent reading
+`--help` sees the field and not the asymmetry unless it reads to the end of the
+description.
+**Effort:** human M / CC M. **Priority:** P3. **Depends on:** nothing.
+
+## Six error codes added in 1.47.0-1.49.0 fall back to RawAPIError
+
+The sync typed two of the new codes — the three key-releasing booking 409s
+(`KeyReleasingConflictError`) and `PLAN_LIMIT_REACHED`
+(`PlanLimitReachedError`) — because each says something the server's own message
+does not: what to do about the idempotency key, and that no change to the
+request will help.
+
+The rest reach the user through `RawAPIError`, which preserves the code and the
+message verbatim: `DEPOSIT_EXCEEDS_TOTAL`, `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED`,
+`DESTINATION_ALREADY_STARTED`, `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE`,
+`BOOKING_HAS_NO_DEPARTURE` and `BOOKING_RESOURCE_REQUEST_INVALID`. That is a
+deliberate choice, not an oversight — the registry has always been selective,
+and a dozen older codes sit in the same fallback — but it is worth naming the
+criterion so the next sync applies the same one: **a code earns a type when the
+CLI can add a REMEDY the message cannot carry.** By that test,
+`BOOKING_RESOURCE_REQUEST_INVALID` is the strongest remaining candidate, because
+it releases its idempotency key for the same counter-intuitive reason the three
+409s do and nothing in its message says so.
+
+Note there is still no test pinning the registry against the spec's `Error.code`
+catalogue in either direction, so a code the server starts emitting is invisible
+here until someone hits it.
+
+**Why:** the fallback is honest, so nothing is lost today; the gap is that
+"which codes deserve a type" is decided per sync with no written rule.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## Review notes from the 1.56.0 sync that were not fixed in that PR
+
+Six findings from the pre-landing review of the 1.56.0 spec sync landed below the
+blocking floor and ship as notes rather than fixes. Recorded together because four
+of them are one defect class — a bound or a gate that is only half-pinned.
+
+**`--day-count -1` reaches the wire against a spec `minimum: 0`.** Pre-existing: `main`
+declared no lower bound on the three `--day-count` flags either. The 1.56.0 sync briefly
+added `Min: 1` there as a side effect of the `Max` rollout, which was worse — the spec
+documents `0` as "an ordinary same-day session" — so it was removed rather than
+corrected downward. The real obstacle is structural: `FlagDef.Min` treats `0` as
+"unset", so a spec minimum of 0 cannot be expressed as a bound and no drift direction
+can cover it. Fixing it means either a `MinSet bool` beside `Min`, or a pointer.
+
+**`TestSpecDrift_FlagMinMatchesSpecMinimum` is one-directional.** It fails where the spec
+STATES a minimum and merely logs where a flag declares a `Min` the spec does not state.
+Its sibling `TestSpecDrift_FlagMaxMatchesSpecMaximum` gained that second direction in the
+same commit, which is what catches an invented bound; the `Min` side still has the hole.
+Restoring `Min: 1` on `timeValueFlags` is reported as "unverified" and passes.
+
+**That same test guards coverage with `checked == 0` only.** The `Max` test gained
+per-construction-pattern probes (a `$ref`'d parameter, an inline parameter, a body
+property, a composed-schema body property) precisely because a single count is satisfied
+by the query-parameter branch alone. The `Min` test still relies on the count, so if
+`specBounds`' request-body walk stopped resolving, every body-field `Min` would become a
+log line while the query-parameter minima kept `checked > 0`.
+
+**`extras: null` and `customer_id: null` slip past `validateStoreBookingBody`.** An
+explicit `null` on `extras` skips the closed-shape check, and a `null` `customer_id`
+satisfies the "exactly one customer" rule and then 422s on the wire. The sibling
+companions gate refuses `null` explicitly and documents why ("null is not in the
+contract and must not be guessed at"); these two take the opposite position silently.
+Reachable only through `--data`.
+
+**`KeyReleasingConflictError.Error()` hardcodes "status 409"** while its constructor
+discards the real status, and `ParseError` dispatches on the code with no status
+assertion. A proxy or a future server change returning one of those codes under another
+status would print a false status and assert a key-release guarantee the spec grants
+only to the 409.
+
+**`rewriteNullOnlyType` can widen a union branch rule 1 declined.** Its `len == 2` guard
+skips a bare `{type: ["null"]}` union member but not a two-key one, so where
+`rewriteNullableUnion` declines a pathological parent (both `oneOf` and `anyOf`), a
+branch spelled `{type: ["null"], description: …}` is still stripped to an untyped
+`nullable: true` — widening the union instead of failing loudly, which is the one
+outcome that package calls worse than not helping. No such construct exists in today's
+spec, and `TestRewriteNullOnlyType_VendoredSpecCarriesNoneAfterNormalize` says so. The
+tightening would be "skip any mapping that is a member of a `oneOf`/`anyOf` sequence".
+
+**Why:** each is a gate or bound that is pinned in one direction only, which is the
+shape that let a real regression through during that very sync.
+**Effort:** human S / CC S each. **Priority:** P3. **Depends on:** nothing.
