@@ -38,10 +38,11 @@ direction proves every flag the CLI has exists in the spec, the other proves
 every operation and field the spec has is reachable from the CLI. Neither alone
 can see absence.
 
-Three things those tests deliberately do NOT prove, each with its own guard:
+Four things those tests deliberately do NOT prove, each with its own guard:
 
 - **That a value reaches the wire.** A flag can be declared and never wired, and
-  both drift directions stay green. `cmd/inventory/wire_capture_test.go` and
+  both drift directions stay green. `cmd/inventory/wire_capture_test.go` (plus
+  the per-sync `wire_capture_134_test.go` and `wire_capture_156_test.go`) and
   `cmd/stats_wire_test.go` assert on the request the server actually receives.
 - **That a flag's TYPE matches the spec.** See
   `TestSpecDrift_FlagTypesMatchSpecTypes`; it reads the LIVE cobra tree, not the
@@ -50,6 +51,17 @@ Three things those tests deliberately do NOT prove, each with its own guard:
 - **That abilities are right for operations the spec does not annotate.**
   `TestSpecDrift_AbilitiesMatchSpec` scrapes prose and is silent on operations
   lacking it. Verify those against `routes/api_cli_v1.php` in the server repo.
+- **That every numeric bound in the spec is enforced.**
+  `TestSpecDrift_FlagMaxMatchesSpecMaximum` and
+  `TestSpecDrift_FlagMinMatchesSpecMinimum` assert both directions, and
+  `TestSpecDrift_NestedItemBoundsMatchSpec` covers the array-`items` bounds that
+  live in hand-copied Go constants. Two bounds are still structurally out of
+  reach and are logged, not failed: a spec `minimum: 0` (`FlagDef.Min`'s zero
+  value *means* unbounded, so "no floor" and "a floor of zero" are one
+  declaration — 41 flags sit here, so a negative value reaches the wire), and a
+  maximum on a float flag (`FlagDef.Max` is an int). Read each field's OWN spec
+  bound before rolling a bound out across sibling flags; `--day-count`'s
+  minimum is 0 where its `--limit` siblings' is 1.
 
 ### Regenerating the inventory client
 

@@ -263,7 +263,7 @@ func bookingsDefs() []CommandDef {
 				{Name: "payment-method", Type: "string", Description: "cash|paypal|bank_transfer — how the customer is paying. Records intent and takes no payment; card is refused on every account. Refused entirely on a reservation"},
 				{Name: "payment-notes", Type: "string", Description: "Free-text note on the payment (≤2000 chars). Needs a deposit to attach to; refused on a reservation"},
 				{Name: "deposit", Type: "int", Description: "Money ALREADY RECEIVED, in the account currency's MINOR units (2000 = 20.00 EUR; 2000 = 2000 JPY). Not a charge. A non-zero value requires --currency. Refused above the booking's computed total (DEPOSIT_EXCEEDS_TOTAL), and refused entirely on a reservation"},
-				{Name: "currency", Type: "string", Description: "Required alongside a NON-ZERO --deposit and must equal the account currency reported by auth whoami — it is validated, never converted, so the amount is recorded exactly as sent"},
+				{Name: "currency", Type: "string", Description: "Required alongside a NON-ZERO --deposit and must equal the account currency reported by inventory whoami — it is validated, never converted, so the amount is recorded exactly as sent"},
 				{Name: "private-notes", Type: "string", Description: "Internal notes, never shown to the customer (≤5000 chars)"},
 				{Name: "comments", Type: "string", Description: "Public notes on the booking (≤5000 chars)"},
 				{Name: "expiry", Type: "int", Description: "SECONDS until a reservation lapses — 1800 is half an hour, and the configured default is 600. REQUIRED with --booking-type reservation and refused with --booking-type booking"},

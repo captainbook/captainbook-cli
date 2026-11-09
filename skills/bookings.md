@@ -1,8 +1,8 @@
 # Bookings
 
-A `Booking` is a customer reservation against a `ProductOption` on a specific date. The CLI exposes reads, the booking lifecycle (`create`, `update`, `reschedule`), resource assignment, and the money-moving actions `cancel`, `refund`, and `comp`.
+A `Booking` is a customer reservation against a `ProductOption` on a specific date. The CLI exposes reads, the booking lifecycle (`create`, `update`, `reschedule`), resource assignment, the money-moving actions `cancel`, `refund`, and `comp`, and a confirmation resend.
 
-Four of these need `cli:cs` rather than `cli:write`: `cancel`, `refund`, `comp` and `reschedule`. `cancel` is CS for every `--refund-policy` value, because the whole V1 enum (`none|full|partial`) is policy overrides and the server 403s operator tokens on overrides; `reschedule` is CS because it moves a live booking a customer is already travelling on, which is a judgement about a person's trip rather than a catalogue edit.
+Five of these need `cli:cs` rather than `cli:write`: `cancel`, `refund`, `comp`, `reschedule` and `resend-confirmation`. `cancel` is CS for every `--refund-policy` value, because the whole V1 enum (`none|full|partial`) is policy overrides and the server 403s operator tokens on overrides; `reschedule` is CS because it moves a live booking a customer is already travelling on, which is a judgement about a person's trip rather than a catalogue edit.
 
 **Taking a booking arrived in spec 1.47.0.** Before it, an agent could read every booking on the account, reassign its guide, cancel it, comp it and refund it — but could not create one, so "book Mrs Papadopoulou onto Friday's 10:00" ended in a hand-off to a screen. Three operations close that, and they split deliberately: `create` takes the booking and **charges nothing**, `update` amends only notes and operator metadata, and `reschedule` moves a booking **in place**, keeping its id.
 
@@ -23,6 +23,9 @@ Four of these need `cli:cs` rather than `cli:write`: `cancel`, `refund`, `comp` 
 | `inventory bookings cancel <id>` | POST /bookings/{id}/cancel | `cli:cs` | body |
 | `inventory bookings refund <id>` | POST /bookings/{id}/refund | `cli:cs` | body |
 | `inventory bookings comp <id>` | POST /bookings/{id}/comp | `cli:cs` | body |
+| `inventory bookings resend-confirmation <id>` | POST /bookings/{id}/notifications/resend-confirmation | `cli:cs` | body |
+
+`resend-confirmation` is the same operation as `inventory notifications resend` — one route, two spellings. See [notifications.md](notifications.md).
 
 ## Filters on `bookings list`
 

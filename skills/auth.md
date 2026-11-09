@@ -28,7 +28,7 @@ Intent: detect whether the operator can run booking refunds before queueing them
 ceebee inventory whoami --format json | jq -r '.data.abilities | index("cli:cs") // empty'
 ```
 
-Empty output → no `cli:cs`; the script should skip refund operations and emit a warning. Anything else (the index) → ability is present. The `cli:cs` set is `bookings cancel` / `refund` / `comp`, `notifications resend`, and `gift-certificates void` — the last one is easy to miss, since every other gift-cert command is `cli:write`.
+Empty output → no `cli:cs`; the script should skip refund operations and emit a warning. Anything else (the index) → ability is present. The `cli:cs` set is `bookings cancel` / `refund` / `comp` / `reschedule`, `notifications resend` (aliased as `bookings resend-confirmation`), and `gift-certificates void` — the last one is easy to miss, since every other gift-cert command is `cli:write`. `bookings reschedule` is in the set while `bookings create` and `bookings update` are ordinary `cli:write`, so a token that can take a booking cannot necessarily move one.
 
 ### 3. Print human-readable status
 
