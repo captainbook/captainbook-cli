@@ -1162,23 +1162,32 @@ func validateStoreBookingBody(body []byte) error {
 			categoryIDs = append(categoryIDs, categoryID)
 		}
 		sort.Strings(categoryIDs)
-		var badCounts []string
+		// Two failure modes, reported separately. Merging them into one
+		// sentence carrying both phrases made the message deterministic but
+		// cost the existing assertions their meaning: every refusal then
+		// matched both "whole number of guests" and "must be 0 or more", so a
+		// test could no longer tell which branch had fired. Keep the phrases
+		// attached to the modes they name.
+		var notWhole, negative []string
 		for _, categoryID := range categoryIDs {
 			rawCount := guests[categoryID]
 			count, ok := decodeNumericInt(rawCount)
 			if !ok {
-				badCounts = append(badCounts, fmt.Sprintf("%q: %s", categoryID, rawCount))
+				notWhole = append(notWhole, fmt.Sprintf("%q: %s", categoryID, rawCount))
 				continue
 			}
 			if count < 0 {
-				badCounts = append(badCounts, fmt.Sprintf("%q: %d", categoryID, count))
+				negative = append(negative, fmt.Sprintf("%q: %d", categoryID, count))
 			}
 		}
-		if len(badCounts) > 0 {
-			return fmt.Errorf("--guests must give each category a whole number of guests, and each "+
-				"count must be 0 or more; these do not: %s (a quoted number like \"2\" is fine — "+
-				"the server accepts it; a JSON true would otherwise reach it as 1)",
-				strings.Join(badCounts, ", "))
+		if len(notWhole) > 0 {
+			return fmt.Errorf("--guests must give each category a whole number of guests; these do "+
+				"not: %s (a quoted number like \"2\" is fine — the server accepts it; a JSON true "+
+				"would otherwise reach it as 1)", strings.Join(notWhole, ", "))
+		}
+		if len(negative) > 0 {
+			return fmt.Errorf("--guests: a category's count must be 0 or more; these are negative: %s",
+				strings.Join(negative, ", "))
 		}
 	}
 

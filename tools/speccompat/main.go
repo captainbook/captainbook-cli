@@ -410,10 +410,13 @@ func dropNullEnumMember(m *yaml.Node) {
 // Two guards, both for the same reason the rest of this package has them —
 // silently mangling a schema is worse than not helping:
 //
-//   - A mapping whose ONLY key is `type` is left alone. That is a bare union
-//     branch, rule 1's business, and if rule 1 declined it (a pathological
-//     schema carrying both `oneOf` and `anyOf`, say) then codegen SHOULD still
-//     reject it rather than have this rule quietly erase the branch.
+//   - A mapping whose ONLY key is `type` is left alone. Rule 1 owns the SCALAR
+//     spelling of that (`{type: null}`), because isNullTypeSchema requires a
+//     scalar value; it does NOT own the one-member SEQUENCE spelling
+//     (`{type: ["null"]}`), which no rule claims. Either way codegen SHOULD
+//     reject what neither rule handled rather than have this rule quietly
+//     erase the branch — failing loudly is the safe direction, but it is not
+//     the same as being handled. See TODOS.md.
 //   - An anchored sequence is left alone, because splicing it out orphans
 //     every alias pointing at it and the emitted file stops parsing.
 func rewriteNullOnlyType(m *yaml.Node) int {
