@@ -24,7 +24,7 @@ func questionsDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListQuestionsParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "product-option-id", Type: "int", Min: 1, Description: "Filter by option"},
 				{Name: "required", Type: "bool", Description: "Filter required-only"},
 				{Name: "include-trashed", Type: "bool"},

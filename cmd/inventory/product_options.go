@@ -20,7 +20,7 @@ func productOptionsDefs() []CommandDef {
 			Use: "product-options list", Short: "List product options", Kind: KindRead,
 			Verb: "GET", Path: "/product-options", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by parent product"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},

@@ -17,8 +17,8 @@ func endpointByName(name string) *Endpoint {
 // cannot tell whether the table matches the server. That is what the statistics
 // drift tests in statistics_drift_test.go do, by reading the vendored spec.
 func TestEndpointsCount(t *testing.T) {
-	if got := len(Endpoints); got != 13 {
-		t.Errorf("len(Endpoints) = %d, want 13", got)
+	if got := len(Endpoints); got != 14 {
+		t.Errorf("len(Endpoints) = %d, want 14", got)
 	}
 }
 
@@ -34,6 +34,7 @@ func TestAllEndpointsExist(t *testing.T) {
 		{"customers", "/customers"},
 		{"channels", "/channels"},
 		{"occupancy", "/occupancy"},
+		{"attendance", "/attendance"},
 		{"extras", "/extras"},
 		{"discounts", "/discounts"},
 		{"locations", "/locations"},

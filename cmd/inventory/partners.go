@@ -21,7 +21,7 @@ func partnersDefs() []CommandDef {
 			Use: "partners list", Short: "List partners (selling partners and channel partners)",
 			Kind: KindRead, Verb: "GET", Path: "/partners", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted rows"},

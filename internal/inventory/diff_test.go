@@ -470,3 +470,54 @@ func readAll(r interface{ Read(p []byte) (int, error) }) (string, error) {
 		}
 	}
 }
+
+// TestRenderDiff_SurfacesGuestMixWarnings pins the one response field on
+// POST /bookings that the operator must act on and that a diff-only render
+// dropped.
+//
+// `guest_mix_warnings` is a SIBLING of `diff`, so a renderer that walked only
+// the diff showed nothing — and what it carries is a companion-rule violation
+// the booking was allowed ANYWAY (a child with no adult). The dashboard warns
+// on screen; the spec's own words for this surface before 1.47.0 are that "the
+// rule was waived for every AI caller silently". TicketReissue is parsed into
+// the same struct for the identical reason.
+//
+// Value: protects=a waived companion rule is visible in table output, not only in raw JSON; fails_when=GuestMixWarnings is dropped from DiffEnvelope or stops being rendered, which silently hides a child booked with no adult; why_new=the field is new in this sync and the renderer walked only `diff` and `side_effects`; seam=none
+func TestRenderDiff_SurfacesGuestMixWarnings(t *testing.T) {
+	env := DiffEnvelope{
+		WouldApply: true,
+		GuestMixWarnings: []GuestMixWarning{
+			{Title: "Child without adult", Message: "A Child must travel with at least 1 Adult."},
+		},
+	}
+	var buf bytes.Buffer
+	if err := RenderDiff(&buf, "Booking", env); err != nil {
+		t.Fatalf("RenderDiff: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Child without adult", "must travel with at least 1 Adult", "allowed anyway"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table output is missing %q — the waived rule is invisible:\n%s", want, out)
+		}
+	}
+
+	// Absent and empty both mean "nothing to warn about" and must print no
+	// heading: an empty array is the documented "the mix satisfies every rule".
+	for _, tc := range []struct {
+		name string
+		env  DiffEnvelope
+	}{
+		{"absent", DiffEnvelope{WouldApply: true}},
+		{"empty", DiffEnvelope{WouldApply: true, GuestMixWarnings: []GuestMixWarning{}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var b bytes.Buffer
+			if err := RenderDiff(&b, "Booking", tc.env); err != nil {
+				t.Fatalf("RenderDiff: %v", err)
+			}
+			if strings.Contains(b.String(), "Guest-mix warnings") {
+				t.Errorf("printed a warnings heading with no warnings:\n%s", b.String())
+			}
+		})
+	}
+}

@@ -1,6 +1,10 @@
 # Bookings
 
-A `Booking` is a customer reservation against a `ProductOption` on a specific date. The CLI exposes reads, resource assignment (`cli:write`), and the money-moving actions `cancel`, `refund`, and `comp`. All three money-moving actions require `cli:cs` — `cancel` included, for every `--refund-policy` value, because the whole V1 enum (`none|full|partial`) is policy overrides and the server 403s operator tokens on overrides. There is no `create` in V1 — bookings are created via the public booking flow.
+A `Booking` is a customer reservation against a `ProductOption` on a specific date. The CLI exposes reads, the booking lifecycle (`create`, `update`, `reschedule`), resource assignment, and the money-moving actions `cancel`, `refund`, and `comp`.
+
+Four of these need `cli:cs` rather than `cli:write`: `cancel`, `refund`, `comp` and `reschedule`. `cancel` is CS for every `--refund-policy` value, because the whole V1 enum (`none|full|partial`) is policy overrides and the server 403s operator tokens on overrides; `reschedule` is CS because it moves a live booking a customer is already travelling on, which is a judgement about a person's trip rather than a catalogue edit.
+
+**Taking a booking arrived in spec 1.47.0.** Before it, an agent could read every booking on the account, reassign its guide, cancel it, comp it and refund it — but could not create one, so "book Mrs Papadopoulou onto Friday's 10:00" ended in a hand-off to a screen. Three operations close that, and they split deliberately: `create` takes the booking and **charges nothing**, `update` amends only notes and operator metadata, and `reschedule` moves a booking **in place**, keeping its id.
 
 ## Endpoints
 
@@ -8,6 +12,9 @@ A `Booking` is a customer reservation against a `ProductOption` on a specific da
 |---------|---------------|---------|---------|
 | `inventory bookings list` | GET /bookings | `cli:read` | n/a |
 | `inventory bookings get <id>` | GET /bookings/{id} | `cli:read` | n/a |
+| `inventory bookings create` | POST /bookings | `cli:write` | body |
+| `inventory bookings update <id>` | PATCH /bookings/{id} | `cli:write` | body |
+| `inventory bookings reschedule <id>` | POST /bookings/{id}/reschedule | `cli:cs` | body |
 | `inventory bookings transactions <id>` | GET /bookings/{id}/transactions | `cli:read` | n/a |
 | `inventory bookings available-resources <id>` | GET /bookings/{id}/resources/available | `cli:read` | n/a |
 | `inventory bookings available-equipment-resources <id>` | GET /bookings/{id}/resources/equipment/available | `cli:read` | n/a |
@@ -48,13 +55,101 @@ ceebee inventory bookings list --include resources --format json
 
 ## Worked examples
 
+### 0a. Take a booking (`create`)
+
+Intent: "book Mrs Papadopoulou and her two children onto Friday's 10:00 sailing, she paid €200 cash at the desk."
+
+```bash
+# 1. Find the departure and the pricing categories whose ids the guest mix is keyed by.
+ceebee inventory availabilities list --product-option-id 88 --from 2026-05-08 --to 2026-05-09
+ceebee inventory pricing-categories list --product-id 7
+
+# 2. Preview under a key you mint yourself, so step 3 can reuse it.
+#    (Omit --idempotency-key and the CLI mints one per invocation, which means
+#     the preview and the commit would NOT share a key.)
+KEY=$(uuidgen)
+
+ceebee inventory bookings create \
+  --idempotency-key "$KEY" \
+  --availability-id 4821 \
+  --booking-type booking \
+  --guests '{"30":1,"31":2}' \
+  --is-refundable=true \
+  --customer '{"name":"Maria Papadopoulou","country":"GR","email":"maria@example.com"}' \
+  --payment-method cash \
+  --deposit 20000 --currency EUR \
+  --dry-run
+
+# 3. Commit under the SAME key. A dry run writes no idempotency row, so the
+#    key is still free for exactly one real call.
+ceebee inventory bookings create --idempotency-key "$KEY" ...   # same flags, minus --dry-run
+```
+
+Six things that are easy to get wrong:
+
+- **It charges nothing.** `--payment-method` records how the customer *is paying*; `--deposit` is money **already received**, in the account currency's minor units (`20000` = €200.00). `--payment-method card` is refused on every account — this endpoint has no card flow, so take card payments in the dashboard.
+- **A non-zero `--deposit` requires `--currency`**, and the server *validates* it against the account currency rather than converting. The CLI refuses the pair locally if you omit it.
+- **`--guests` is an OBJECT keyed by pricing category id**, not an array: `{"30":1,"31":2}`. Both shapes are well-formed JSON and only one is a guest mix, so the CLI refuses the array form before the wire. The head count is the sum and is not sent separately.
+- **Name the customer exactly once**: `--customer-id` (a UUID — `customers.id` is the one id here that is not an integer) **or** `--customer`. Both, or neither, is a 422.
+- **Fares come from the product's pricing policy.** `prices` and `price` are refused, not dropped, so a negotiated price cannot be reported back as applied. Enter one in the dashboard.
+- **Read `guest_mix_warnings` on the response.** A product may require one guest type to travel with another (a child with an adult). Staff may book past that rule, as on the dashboard — which warns on screen. This surface warns in that field instead, and `[]` means the mix satisfies every rule. Report a non-empty one.
+
+A hold rather than a booking swaps which fields are legal:
+
+```bash
+ceebee inventory bookings create \
+  --availability-id 4821 --booking-type reservation --expiry 1800 \
+  --guests '{"30":2}' --is-refundable=true --customer-id "$CUSTOMER_UUID"
+```
+
+`--expiry` is in **SECONDS** (`1800` is half an hour; the configured default is 600). It is **required** on a reservation and refused on a booking, and a reservation refuses `--deposit`, `--payment-method` and `--payment-notes` — a hold records no payment. The CLI refuses each of those combinations locally.
+
+Three of this endpoint's refusals **release their idempotency key**, because each describes a passing state: `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and `NO_RESOURCE_AVAILABLE`. Retry the identical call under the **same** key rather than minting a new one — a fresh key on a retry is how an approval that was granted during a busy minute becomes un-approvable after a cancellation frees the seat.
+
+### 0b. Amend a booking's notes (`update`)
+
+Intent: add an internal note and set a custom attribute, without telling the customer anything.
+
+```bash
+ceebee inventory bookings update bk_42 \
+  --private-notes "guide asked for the shallow route" \
+  --custom-attributes '{"dietary":"vegetarian"}' \
+  --dry-run
+```
+
+- **At least one of `--comments`, `--private-notes` or `--custom-attributes` must be present.** A request carrying none is a 422 rather than a 200 with an empty diff, because a 200 reads as "applied" — and `--dry-run` alone is not a change. The CLI names the three fields locally so the empty call does not cost a round trip.
+- **No notification is sent**, matching the dashboard's edit form. To re-send the confirmation use `bookings resend-confirmation`.
+- **`--guests` and `--extras` are deferred, not refused on principle.** Both have to recompute the booking's stored total and that calculation is not yet shared out of the dashboard. Change them there.
+- **Custom attribute slugs are per BUSINESS UNIT.** A slug from another unit is unknown here rather than mistyped, and the 422 lists the ones configured for *this booking's* unit. A definition backed by a code pool is refused outright: those change only through the atomic claim/release action, because the uniqueness constraint protects the pool table rather than the booking's copy.
+- **Clearing a note needs a JSON null**, which a string flag cannot express: `--data '{"comments": null}'`. `--comments=""` stores an empty string, which is a different value.
+
+### 0c. Move a booking to another departure (`reschedule`, CS only)
+
+Intent: the customer cannot make Friday; move them to Saturday's 10:00 on the same product option.
+
+```bash
+# The destination must be a departure of the SAME product option.
+ceebee inventory availabilities list --product-option-id 88 --from 2026-05-09 --to 2026-05-10
+
+ceebee inventory bookings reschedule bk_42 \
+  --availability-id 5190 \
+  --reschedule-notes "customer rang; moved to Saturday at their request" \
+  --dry-run
+```
+
+- **The booking keeps its id.** Extras, answers, transactions, guests and any pool access code stay on the same row, because nothing is replaced.
+- **The price does not change.** The booking keeps the fare it was taken at even when the destination is priced differently — moving a midweek booking onto a peak Saturday does not reprice it. Say so when the destination is priced differently; `prices` is refused.
+- **An option change is not available here.** On the dashboard that operation cancels the booking and creates a replacement with a new id, so a destination on another product option is refused with `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED`.
+- **The note lands on the reschedule LEDGER, not on the booking's `comments`.** `--reschedule-notes` is the note; `--comments` is the fallback used when `--reschedule-notes` is *omitted*; and `--reschedule-notes=""` records a deliberately blank note instead of falling back. Whichever is recorded reads back in `diff.after.reschedules[]`, which is where to confirm it landed.
+- **Read the ledger root-first.** `bookings get <id>` carries `reschedules[]` and `origin_booking_id` for the booking's whole *chain*, oldest first, keyed on the booking a move landed on — so asking a mid-chain booking for its own entries returns almost nothing. A booking the dashboard moved by cancel-and-replace used to read here as an ordinary cancellation, which answered "what happened to booking X" with "it was cancelled" while the customer was travelling on a different id.
+
 ### 1. List confirmed bookings starting in May
 
 ```bash
 ceebee inventory bookings list \
   --booking-status CONFIRMED \
   --from 2026-05-01 --to 2026-05-31 \
-  --product-option-id po_88
+  --product-option-id 88
 ```
 
 Status enum: `ON_HOLD`, `CONFIRMED`, `EXPIRED`, `CANCELLED`. Date filters apply to `Booking.starts_at` in tenant timezone.
@@ -166,13 +261,30 @@ A booking's resources come in **three** kinds. The split is the product option's
 
 Only `--main-resource-id` may name a capacity-bearing resource. Naming one under either plural flag is how you'd ask for a *second* guide or asset, and it's refused (`EQUIPMENT_RESOURCE_IS_MAIN` / `AUXILIARY_RESOURCE_IS_MAIN`).
 
+#### Bookings spread over several units (spec 1.49.0)
+
+A product configured for several units — five riders over three jet skis — holds **more than one** main resource, and each assigned row carries its own `seats`. `--main-resource-id` replaces **one** unit there, so it needs `--replaced-resource-id` beside it to say which:
+
+```bash
+ceebee inventory bookings set-resources bk_42 \
+  --main-resource-id 91 --replaced-resource-id 88 \
+  --expected-resource-state-token "$TOKEN"
+```
+
+- Without it the write is refused as `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS`. On a single-unit booking the flag is optional and a no-op.
+- The replacement carries **that unit's** riders, not the whole party, and nothing else on the booking moves: the other units, the equipment and their sources stay exactly as they were. There is no wholesale re-attach on this path.
+- `--replaced-resource-id` without `--main-resource-id` describes no write at all; the CLI refuses it locally rather than letting the server answer `REPLACED_RESOURCE_WITHOUT_MAIN` from inside `rejections[]`.
+- **A `resource_state_token` read before 1.49.0 is refused once as stale** on any booking whose rows carry seats — the token now folds `seats` in, so a change of mix between the same units is no longer invisible to it. Re-read the booking and retry.
+
 Candidates come from `available-resources` (main), `available-equipment-resources` (equipment) and `available-auxiliary-resources` (auxiliary). The main and auxiliary lists apply the same availability and concurrency checks as the back-office switcher; the equipment list applies none, because a null pivot capacity means the resource isn't rationed per booking — every candidate is always assignable.
 
 ### 5. Handling the two 409s from `set-resources`
 
 `BOOKING_RESOURCE_STATE_STALE` — someone changed the booking's resources between your read and your write. The token you sent is no longer current. **Re-read, re-decide, re-send.** Never blind-retry the same body: the state you based the decision on is gone, and the reason the server rejected you is precisely that it can't tell whether your intent still holds.
 
-`BOOKING_RESOURCE_CONFLICT` — your view was current, but the selection itself is illegal. Re-reading won't help. Re-run the `available-*` lists and pick from what comes back.
+`BOOKING_RESOURCE_CONFLICT` (409) — your view was current, but the selection itself is illegal. Re-reading won't help. Re-run the `available-*` lists and pick from what comes back.
+
+`BOOKING_RESOURCE_REQUEST_INVALID` (422, spec 1.49.0) — raised when *every* rejection is one of the two request-shape ones, `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` and `REPLACED_RESOURCE_WITHOUT_MAIN`. It carries the same `error.details.rejections[]`. **Nothing was applied**, so the idempotency key is released: correct the body and retry under the same key.
 
 The server doesn't short-circuit: it plans the whole write and reports **every** refused id at once in `error.details.rejections[]`, so one round trip tells you everything to fix. Each entry's `code` is `<FIELD>_RESOURCE_<PROBLEM>`, where `<FIELD>` is the flag you put the id in (`MAIN` / `EQUIPMENT` / `AUXILIARY`) — not what the resource turned out to be. So a wrong-field mistake names both halves:
 
@@ -184,6 +296,10 @@ The server doesn't short-circuit: it plans the whole write and reports **every**
 | `<FIELD>_RESOURCE_IS_AUXILIARY` | it's auxiliary. Use `--auxiliary-resource-ids` |
 | `MAIN_RESOURCE_NOT_AVAILABLE` | it *is* a main resource on the option, but can't take this booking — overlapping departure, party too large, or inside a cool-off window |
 | `AUXILIARY_RESOURCE_NOT_AVAILABLE` | it *is* auxiliary on the option, but is on an overlapping departure or can't host this party size |
+| `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` | the booking is spread over several units; name the one `--main-resource-id` replaces with `--replaced-resource-id` |
+| `REPLACED_RESOURCE_NOT_HELD` | `--replaced-resource-id` is not one of this booking's units |
+| `REPLACED_RESOURCE_WITHOUT_MAIN` | `--replaced-resource-id` was sent without a `--main-resource-id` (the CLI refuses this locally) |
+| `MAIN_RESOURCE_ALREADY_HELD` | `--main-resource-id` names another unit this booking already holds; name one it does not |
 
 There is no `EQUIPMENT_RESOURCE_NOT_AVAILABLE`: equipment is never rationed per booking, so it's either on the option or it isn't.
 
@@ -265,6 +381,12 @@ A `Transaction` of type `comp` is recorded; no Stripe call. `--notify-customer` 
 - ⚠️ **A GetYourGuide or Xola booking with an add-on over-reports its total.** Those import paths write the add-on total INTO `gross_price` *and* attach the same add-ons to the pivot, so the extras are counted twice. This is a known product-wide defect (`retail_price` carries the same doubled figure, and ~40 call sites across the product add the extras on top of it), tracked as captainbook#8616 — the CLI agrees with every other surface rather than special-casing it. Do not "fix" such a figure locally; escalate. Bokun imports attach no extras and are unaffected.
 - ⚠️ **Redaction is silent, and `null` does not mean "empty".** `customer.name`, `total_amount`, `answers` and friends come back as `null` (keys present) when the token's *user* lacks the matching permission — see example 2b. `answers: []` means "none exist"; `answers: null` means "you may not see them". Treating the two the same ships a manifest that is quietly missing every dietary requirement.
 - ⚠️ **`starts_at` / `ends_at` on a booking are in the PRODUCT's timezone, not UTC.** They are read from the linked availability, whose `from` / `to` columns store product-local wall clock: `2026-08-04T10:00:00+01:00` is a 10:00 local departure for a `Europe/London` product. The booking's own timestamps (`confirmed_at`, `cancelled_at`, `created_at`, …) are real UTC. Don't normalise the whole object to UTC with one rule.
+- ⚠️ **`create` charges nothing, whatever `--payment-method` says.** It records how the customer *is paying*; `--deposit` is money already received. Nothing is taken, no card is charged, and `--payment-method card` is refused on every account. An agent that reports "payment taken" off a 201 is reporting something that did not happen.
+- ⚠️ **`--deposit` and every money field on `create` are MINOR units.** `2000` is €20.00 for a EUR account and 2000 for a JPY one. A non-zero deposit must also state `--currency`, which the server validates rather than converts.
+- ⚠️ **`update` sends no notification, `reschedule` does.** Amending notes is silent by design, matching the dashboard's edit form; a reschedule dispatches `BookingRescheduled` after the transaction commits unless you pass `--notify-customer=false`. Don't assume the quieter one.
+- ⚠️ **A reschedule does not reprice.** The booking keeps the fare it was taken at, even onto a more expensive departure. Say so when the destination is priced differently rather than letting an operator assume the difference was collected.
+- ⚠️ **Three of `create`'s 409s release their idempotency key** — `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE`, `NO_RESOURCE_AVAILABLE` — because each describes a passing state. Retry the identical call under the **same** key. Minting a new one on retry is how a card approved during a busy minute stays un-approvable after a cancellation frees the seat.
+- ⚠️ **`reschedule` needs `cli:cs`, unlike `create` and `update`.** An operator token gets `ABILITY_MISSING` locally. It is grouped with cancel and refund on purpose: it moves a trip a customer is already on.
 - ⚠️ **`--include resources` is opt-in on list but implicit on get.** `bookings get` always carries `resources[]` + `resource_state_token`; `bookings list` only does with `--include resources`. Scripts that grab the token from a list call will silently read `null` without it.
 
 ## See also

@@ -20,7 +20,7 @@ These endpoints are the **catalogue**: what is on offer today, and repriceable. 
 ### 1. List extras for one product
 
 ```bash
-ceebee inventory extras list --product-id pr_88
+ceebee inventory extras list --product-id 88
 ```
 
 Returns table of `{id, product_id, name, amount, max_quantity, updated_at}`.
@@ -55,7 +55,7 @@ Inspect the diffs, then re-run without `--dry-run`.
 
 ```bash
 ceebee inventory extras delete ex_42        # 204
-ceebee inventory extras list --include-trashed --product-id pr_88
+ceebee inventory extras list --include-trashed --product-id 88
 ceebee inventory extras get ex_42 --include-trashed   # resolve one retired row
 ceebee inventory extras restore ex_42       # 200
 ```

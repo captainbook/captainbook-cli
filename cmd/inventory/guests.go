@@ -30,7 +30,7 @@ func guestsDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListGuestsParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "booking-id", Type: "string", Description: "Filter by booking"},
 				{Name: "customer-id", Type: "string", Description: "Guests on bookings whose booker is this customer (UUID)"},
 				{Name: "q", Type: "string", Description: "Free-text search over guest name and email"},

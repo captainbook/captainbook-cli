@@ -216,6 +216,23 @@ type FlagDef struct {
 	// to be wrong, and the drift tests can read it.
 	Min int
 
+	// Max is an inclusive upper bound for an `int` flag, mirroring the spec's
+	// `maximum`. Zero means unbounded, so no field whose legitimate maximum is
+	// 0 may use it — none exists.
+	//
+	// It exists because the lower bound alone was enforced, and the statistics
+	// lane already paid for that asymmetry: `stats products --limit` advertised
+	// "(1-50)" in its own help text, refused 0, and passed 100 straight through
+	// to a server whose spec caps it at 50 — so the caller spent a round trip
+	// having the CLI's help text read back to them as a server validation
+	// failure. internal/api.ExtraFlag grew a Max for exactly that; this is the
+	// same rule on this side of the tree, declared once rather than written
+	// into the one closure that needs it today and forgotten by the next.
+	//
+	// Validated beside Min in makeRunE, inside the same collection loop that
+	// skips unset flags, so an unset int flag still means "unfiltered".
+	Max int
+
 	// EnumList marks a string flag whose value is a COMMA-SEPARATED SUBSET of
 	// the enum in its description, not a single member of it.
 	//
@@ -679,9 +696,15 @@ func runMutation(ctx context.Context, r *Runner, def CommandDef, args RunArgs) e
 	return r.renderResult(def, res)
 }
 
-// errorCode returns the typed-error code (e.g. "VALIDATION_FAILED") for the
-// audit entry. Unknown errors surface as "" so the audit reader can
-// distinguish "code not recorded" from "code = INTERNAL_ERROR".
+// errorCode maps a typed inventory error to the code recorded in the audit row.
+//
+// EVERY type the internal/inventory registry can return needs a case here. The
+// fallthrough is `""`, and audit's `error_code` is `omitempty`, so a missing
+// case does not record a blank — it removes the field from the row entirely.
+// That is how typing three codes once made the audit WORSE than leaving them
+// untyped: an unregistered code reaches RawAPIError, whose case returns
+// e.Code, so the row carried it. Pinned by
+// TestErrorCode_CoversEveryRegisteredCode.
 func errorCode(err error) string {
 	switch e := err.(type) {
 	case *invpkg.AuthError:
@@ -722,6 +745,11 @@ func errorCode(err error) string {
 		return "RATE_LIMITED"
 	case *invpkg.ServerError:
 		return "INTERNAL_ERROR"
+	case *invpkg.KeyReleasingConflictError:
+		// Carries its own code: one type serves three of them.
+		return e.Code
+	case *invpkg.PlanLimitReachedError:
+		return "PLAN_LIMIT_REACHED"
 	case *invpkg.RawAPIError:
 		return e.Code
 	}
@@ -981,6 +1009,23 @@ func bindCommands(parent *cobra.Command, defs []CommandDef, runner *Runner) {
 			c.Annotations["intMins"] = strings.Join(mins, ",")
 		}
 
+		// Max travels in its own annotation rather than widening the intMins
+		// encoding, so the existing reader of "name=min" keeps parsing exactly
+		// what it parsed before. A bound nothing can read is a bound no test can
+		// enumerate, which is the hole intMins was added to close.
+		var maxes []string
+		for _, fd := range def.Flags {
+			if fd.Type == "int" && fd.Max != 0 {
+				maxes = append(maxes, fd.Name+"="+strconv.Itoa(fd.Max))
+			}
+		}
+		if len(maxes) > 0 {
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations["intMaxes"] = strings.Join(maxes, ",")
+		}
+
 		c.RunE = makeRunE(def, runner)
 		parent.AddCommand(c)
 	}
@@ -1184,6 +1229,12 @@ func makeRunE(def CommandDef, runner *Runner) func(*cobra.Command, []string) err
 						Code: api.ExitValidation,
 					}
 				}
+				if fd.Max != 0 && v > fd.Max {
+					return &api.ExitError{
+						Err:  fmt.Errorf("--%s must be <= %d (got %d)", fd.Name, fd.Max, v),
+						Code: api.ExitValidation,
+					}
+				}
 				args.Flags[fd.Name] = v
 			case "bool":
 				v, _ := cmd.Flags().GetBool(fd.Name)
@@ -1353,8 +1404,15 @@ func tryParseDiffEnvelope(body []byte) (*invpkg.DiffEnvelope, bool) {
 	// or the side-effect list, which is the one path that has already
 	// invalidated the QR codes customers are holding. Keep the envelope when
 	// anything renderable survived.
+	//
+	// guest_mix_warnings belongs in that list for the same reason and was
+	// missed when it was added: on the COMMIT half of POST /bookings a body
+	// whose only payload is a waived companion rule was discarded here, so the
+	// renderer never saw it and the warning vanished from table output —
+	// exactly what parsing it was meant to prevent.
 	if env.Data.Diff.Before == nil && env.Data.Diff.After == nil && !env.Data.WouldApply &&
-		env.Data.TicketReissue == nil && len(env.Data.SideEffects) == 0 {
+		env.Data.TicketReissue == nil && len(env.Data.SideEffects) == 0 &&
+		len(env.Data.GuestMixWarnings) == 0 {
 		return nil, false
 	}
 	cp := env.Data

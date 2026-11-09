@@ -31,7 +31,7 @@ func giftCertificatesDefs() []CommandDef {
 			Use: "gift-certificates list-available", Short: "List available (template) gift certs",
 			Kind: KindRead, Verb: "GET", Path: "/gift-certs/available", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -173,7 +173,7 @@ func giftCertificatesDefs() []CommandDef {
 			Use: "gift-certificates list-issued", Short: "List issued gift certs",
 			Kind: KindRead, Verb: "GET", Path: "/gift-certs/issued", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "status", Type: "string", Description: "active|redeemed|partial|void|expired"},
 				{Name: "recipient-email", Type: "string", Description: "Filter by recipient email"},
 				{Name: "code", Type: "string", Description: "Filter by code"},

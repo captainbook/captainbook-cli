@@ -36,6 +36,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -643,4 +644,156 @@ func TestDocsNeverUseSpaceFormBoolFlags(t *testing.T) {
 	if checked == 0 {
 		t.Logf("no space-form bool invocations in the docs")
 	}
+}
+
+// -----------------------------------------------------------------------------
+// Documented flag VALUES vs the flag's declared type.
+// -----------------------------------------------------------------------------
+
+// TestSkillsDocIntFlagValues catches the bug class TestSkillsDocDrift cannot
+// see. That test proves a documented `--flag` EXISTS on the resolved command;
+// it never looks at the value, so a documented invocation that dies at cobra
+// parse time is invisible to it.
+//
+// Ten such invocations were live when this test was written — `extras list
+// --product-id pr_88`, `questions list --product-option-id po_88`,
+// `pricing-tiers list --availability-id av_2026_12_31_po88` and others — each a
+// copy-paste that cannot run. The cause is a single confusion worth naming,
+// because it is the same one that makes the SERVER refuse these values: an id's
+// PATH spelling and its FLAG spelling are different contracts. `extras get
+// ex_42` is a path argument, which cobra never types, and `extras list
+// --product-id 88` is an int flag whose spec type is `PositiveIntegerId`
+// (`integer >= 1`, or `^[1-9][0-9]*$`). A prefixed id reads as idiomatic in both
+// places and is legal in only one.
+//
+// `skills/answers.md` had it exactly backwards in prose, which is how four of
+// the ten spread: it claimed `availabilities list --product-option-id po_88`
+// "works" as the contrast case for the numeric `/answers` params. That flag is
+// `int` with `minimum: 1` too. A flag's Go type decides which LAYER refuses a
+// value, never what the server accepts.
+//
+// Reads the LIVE cobra tree, not the AST, for the reason the rest of this
+// package does: a FlagDef built in a loop or behind a helper reads as empty to
+// an AST walker, and the entity is skipped in silence.
+//
+// Value: protects=every int-typed flag value in the cookbooks parses as an integer, so a documented invocation runs; fails_when=a doc gains a prefixed or otherwise non-numeric id on an int flag; why_new=TestSkillsDocDrift checks flag EXISTENCE only and ten unrunnable invocations were shipped past it; seam=live cobra tree
+func TestSkillsDocIntFlagValues(t *testing.T) {
+	docs, err := filepath.Glob(filepath.Join("..", "..", "skills", "*.md"))
+	if err != nil || len(docs) == 0 {
+		t.Fatalf("no skills/*.md found (err=%v)", err)
+	}
+	docs = append(docs, filepath.Join("..", "..", "README.md"))
+
+	root := Cmd()
+	checked := 0
+	for _, doc := range docs {
+		for _, inv := range scanDoc(t, doc) {
+			if len(inv.Args) == 0 || inv.Args[0] != "inventory" {
+				continue // `stats` / `audit` are cmd/docs_drift_test.go's half of the tree
+			}
+			cmd, _ := resolveCommand(root, inv.Args[1:])
+			if cmd == nil {
+				continue // an unresolvable path is TestSkillsDocDrift's finding, not this one
+			}
+			for name, val := range docFlagValues(inv.Text) {
+				f := cmd.Flags().Lookup(name)
+				if f == nil || f.Value.Type() != "int" {
+					continue
+				}
+				checked++
+				n, convErr := strconv.Atoi(val)
+				if convErr != nil {
+					t.Errorf("%s:%d: `%s --%s %s` — %s declares --%s as an int flag, so this "+
+						"invocation fails at cobra parse time before any request.\n"+
+						"  An id's PATH spelling is not its FLAG spelling: `get %s` is untyped, "+
+						"`--%s 88` is not. Pass the bare number.",
+						inv.File, inv.Line, cmd.CommandPath(), name, val,
+						cmd.CommandPath(), name, val, name)
+					continue
+				}
+				// Parsing is not enough: a documented value inside an int flag
+				// whose BOUNDS refuse it is just as unrunnable, and it goes
+				// stale the moment a bound is added. `resource-calendar list
+				// --limit 100` shipped exactly that way — the only --limit on
+				// this API capped at 25 rather than 200 — and the parse check
+				// alone could not see it.
+				if lo, ok := declaredBound(cmd, name, "intMins"); ok && n < lo {
+					t.Errorf("%s:%d: `%s --%s %s` — the flag's declared minimum is %d, so this "+
+						"documented invocation is refused locally before any request.",
+						inv.File, inv.Line, cmd.CommandPath(), name, val, lo)
+				}
+				if hi, ok := declaredBound(cmd, name, "intMaxes"); ok && n > hi {
+					t.Errorf("%s:%d: `%s --%s %s` — the flag's declared maximum is %d, so this "+
+						"documented invocation is refused locally before any request.",
+						inv.File, inv.Line, cmd.CommandPath(), name, val, hi)
+				}
+			}
+		}
+	}
+
+	// Fail closed: a scanner or resolver that quietly stopped matching would
+	// clear every assertion above. 20 was the count when this floor was
+	// written; raise it, never lower it.
+	const floor = 20
+	if checked < floor {
+		t.Fatalf("checked only %d documented int-flag values, want at least %d — the scanner "+
+			"or the command resolver lost coverage rather than the docs getting cleaner", checked, floor)
+	}
+	t.Logf("checked %d documented int-flag values across %d docs", checked, len(docs))
+}
+
+// docFlagValues pulls `--flag value` and `--flag=value` pairs out of one
+// documented invocation, keyed by flag name.
+//
+// A SHELL SUBSTITUTION is not a literal and is skipped: `--resource-id
+// "$KIT_ID"` is the correct way to write the two-step read-then-filter recipe
+// bookings.md example 3 teaches, and flagging it would push docs toward
+// hardcoded ids — worse documentation to satisfy a linter. `$VAR`, `"$VAR"`,
+// `${VAR}` and `$(cmd)` all count.
+//
+// A bare `--flag` followed by another flag, or by nothing, yields no entry:
+// that is a boolean, and its value is not this test's business.
+func docFlagValues(text string) map[string]string {
+	out := map[string]string{}
+	toks := strings.Fields(text)
+	for i, tok := range toks {
+		if !strings.HasPrefix(tok, "--") {
+			continue
+		}
+		name, val := strings.TrimPrefix(tok, "--"), ""
+		if eq := strings.Index(name, "="); eq >= 0 {
+			name, val = name[:eq], name[eq+1:]
+		} else if i+1 < len(toks) && !strings.HasPrefix(toks[i+1], "-") {
+			val = toks[i+1]
+		}
+		// Strip the quoting and line-continuation the docs wrap values in.
+		val = strings.Trim(val, "\"'\\`")
+		if val == "" || strings.ContainsAny(val, "$") {
+			continue
+		}
+		if _, dup := out[name]; dup {
+			continue // first occurrence wins; a repeated flag is pflag's business
+		}
+		out[name] = val
+	}
+	return out
+}
+
+// declaredBound reads one of bindCommands' bound annotations ("intMins" or
+// "intMaxes") for a flag off the LIVE command.
+//
+// Reads the annotation rather than the FlagDef for the reason the rest of this
+// package does: a FlagDef built in a loop or behind a helper reads as empty to
+// an AST walker, and the entity is skipped in silence.
+func declaredBound(cmd *cobra.Command, flag, annotation string) (int, bool) {
+	for _, pair := range strings.Split(cmd.Annotations[annotation], ",") {
+		name, raw, ok := strings.Cut(pair, "=")
+		if !ok || name != flag {
+			continue
+		}
+		if n, err := strconv.Atoi(raw); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
 }

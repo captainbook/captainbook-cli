@@ -25,7 +25,7 @@ func locationsDefs() []CommandDef {
 			Use: "locations list", Short: "List locations (start, end, meeting points)",
 			Kind: KindRead, Verb: "GET", Path: "/locations", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "type", Type: "string", Description: "PRIMARY|START|END|VISITED|SECONDARY"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
@@ -87,7 +87,16 @@ func locationsDefs() []CommandDef {
 				{Name: "attach-to-id", Type: "string", Required: true, Description: "Id of the owning record"},
 				{Name: "street-address", Type: "string", Description: "Preferred — persisted directly"},
 				{Name: "city", Type: "string", Description: "City"},
-				{Name: "country-code", Type: "string", Description: "ISO 3166-1 alpha-2"},
+				// 1.41.0 widened this and changed what comes BACK. The column is
+				// alpha-3 everywhere else in the product, so a client that
+				// followed the old "exactly two characters" wrote an alpha-2
+				// into an alpha-3 column — and the Viator tour-list feed threw
+				// on it, taking GET /viator/tourlist down for a whole account
+				// until the row was corrected. The description has to say which
+				// shape is STORED, not only which are accepted: a caller
+				// asserting country_code == "CH" on its own create's response
+				// is now wrong.
+				{Name: "country-code", Type: "string", Description: "ISO 3166-1 alpha-2, alpha-3, or an English country name. NORMALISED TO ALPHA-3 before persisting (CH, CHE and Switzerland all store CHE), so the value you read back is not necessarily the one you sent. A value resolving to no country is a 422."},
 				{Name: "postal-code", Type: "string", Description: "Postal code"},
 				{Name: "region", Type: "string", Description: "Region / state / department"},
 				{Name: "latitude", Type: "float", Description: "Latitude (decimal)"},

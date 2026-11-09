@@ -49,6 +49,15 @@ func workflowsDefs() []CommandDef {
 				"This route sits behind the workflows subscription gate, so a tenant whose " +
 				"plan does not include workflows gets a 404 carrying that reason — it is " +
 				"not a missing resource.\n\n" +
+				"The catalogue publishes each node's rules() verbatim, so it is the " +
+				"authoritative channel list for send_notification. As of spec 1.56.0 that " +
+				"includes channel: whatsapp, which previously came back 422 " +
+				"INVALID_STEP_CONFIG: the message goes out over the account's own paired " +
+				"WhatsApp and threads into the Inbox, and it is FREE TEXT, so there is no " +
+				"template to name. It needs a connected WhatsApp — without one the step " +
+				"still runs and reports sent: false with reason: no_whatsapp_sender rather " +
+				"than falling back to SMS, so a workflow that looks healthy can be " +
+				"delivering nothing.\n\n" +
 				"Every TRIGGER node comes back with config: [] (an empty JSON array) " +
 				"where the spec declares an object, because Laravel serializes an empty " +
 				"config as [] rather than {}. The CLI reads this response as raw bytes " +
@@ -86,7 +95,7 @@ func workflowsDefs() []CommandDef {
 			Use: "list", Short: "List workflows", Kind: KindRead,
 			Verb: "GET", Path: "/workflows", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1},
+				{Name: "limit", Type: "int", Min: 1, Max: 200},
 				{Name: "cursor", Type: "string"},
 				{Name: "include-trashed", Type: "bool"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
@@ -346,7 +355,13 @@ func workflowsTriggerCmd(runner *Runner) *cobra.Command {
 		Short: "Manage the workflow trigger (singleton per workflow)",
 		Long: "POST replaces the trigger atomically (force-deletes the existing one if any); " +
 			"PATCH updates only the trigger's `config`. The trigger's action_type is immutable " +
-			"via PATCH — to change it, run `trigger create` (which atomically replaces).",
+			"via PATCH — to change it, run `trigger create` (which atomically replaces).\n\n" +
+			"Three action types joined the enum in spec 1.55.0. whatsapp_message_received " +
+			"fires when a guest sends an inbound WhatsApp message to the account's connected " +
+			"number; it takes no config and fires once per inbound message, and messages the " +
+			"account SENDS do not fire it. segment_entered and segment_left were accepted " +
+			"from the day they shipped but were never written down, so the CLI has been " +
+			"refusing two live trigger types locally.",
 	}
 	bindCommands(parent, []CommandDef{
 		{
@@ -354,7 +369,7 @@ func workflowsTriggerCmd(runner *Runner) *cobra.Command {
 			Kind: KindMutation, Verb: "POST", Path: "/workflows/{id}/trigger",
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id"},
 			Flags: []FlagDef{
-				{Name: "action-type", Type: "string", Required: true, Description: "booking_confirmed|booking_cancelled|booking_changed|booking_rescheduled|booking_transaction_processed|documents_signed_complete|customer_created|diary_notes_updated|scheduled_time|webhook|unknown_booking_cancellation|booking_resource_attached|booking_resource_detached|auxiliary_resource_attached_to_booking|auxiliary_resource_detached_from_booking|all_mandatory_questions_answered|abandoned_booking|custom_attribute_updated|waitlist_joined"},
+				{Name: "action-type", Type: "string", Required: true, Description: "booking_confirmed|booking_cancelled|booking_changed|booking_rescheduled|booking_transaction_processed|documents_signed_complete|customer_created|diary_notes_updated|scheduled_time|webhook|unknown_booking_cancellation|booking_resource_attached|booking_resource_detached|auxiliary_resource_attached_to_booking|auxiliary_resource_detached_from_booking|all_mandatory_questions_answered|abandoned_booking|custom_attribute_updated|waitlist_joined|segment_entered|segment_left|whatsapp_message_received"},
 				{Name: "config", Type: "string", Description: "JSON object validated against the resolved trigger's rules() schema (literal or @file.json)"},
 			},
 			ForensicFields: []string{"action-type"},
@@ -553,7 +568,7 @@ func workflowExecutionsDefs() []CommandDef {
 			Long: "Default ordering: latest first (created_at DESC, id DESC) — the most " +
 				"common support query is \"what failed in the last hour\".",
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1},
+				{Name: "limit", Type: "int", Min: 1, Max: 200},
 				{Name: "cursor", Type: "string"},
 				{Name: "workflow-id", Type: "string", Description: "Filter to one workflow (UUID)"},
 				{Name: "status", Type: "string", Description: "pending|running|waiting|completed|failed"},
@@ -624,7 +639,7 @@ func workflowExecutionsDefs() []CommandDef {
 			Kind: KindRead, Verb: "GET", Path: "/workflow-executions/{id}/logs", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1},
+				{Name: "limit", Type: "int", Min: 1, Max: 200},
 				{Name: "cursor", Type: "string"},
 				{Name: "step-id", Type: "int", Min: 1, Description: "Filter to one step's history"},
 			},

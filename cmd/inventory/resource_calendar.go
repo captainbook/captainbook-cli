@@ -32,7 +32,7 @@ func resourceCalendarDefs() []CommandDef {
 				// `busy,unavailable`. See FlagDef.EnumList.
 				{Name: "event-types", Type: "string", EnumList: true, Description: "booking|busy|unavailable (comma-separated subset; omit for all three)"},
 				{Name: "product-option-id", Type: "int", Min: 1, Description: "Narrow to events of one product option"},
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 25, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {

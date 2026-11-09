@@ -38,8 +38,8 @@ A tier's `amount` is the **catalogue** price. Individual slots can override it t
 ### Read — scope a tier query to one slot
 
 ```bash
-ceebee inventory pricing-tiers list --availability-id av_2026_12_31_po88
-ceebee inventory pricing-tiers get 22 --availability-id av_2026_12_31_po88
+ceebee inventory pricing-tiers list --availability-id 4821
+ceebee inventory pricing-tiers get 22 --availability-id 4821
 ```
 
 Availability-scoped responses carry three fields that make an override detectable:
@@ -57,7 +57,7 @@ To scan a date range rather than a single slot, come at it from the availability
 ```bash
 # Which September slots have overridden fares, and by how much?
 ceebee inventory availabilities list \
-  --product-option-id po_88 --from 2026-09-01 --to 2026-10-01 \
+  --product-option-id 88 --from 2026-09-01 --to 2026-10-01 \
   --include-pricing --format json \
 | jq '.data[] | select(.pricing_tiers[]?.is_override)
       | {id, date,
@@ -131,7 +131,7 @@ Sending `--pricing-category-id` on PATCH moves the tier (404 if the target categ
 `pricing-tiers delete` does NOT support dry-run server-side — the CLI rejects `--dry-run`. Use the read-side check instead:
 
 ```bash
-ceebee inventory availabilities list --product-option-id po_88 \
+ceebee inventory availabilities list --product-option-id 88 \
   --include-pricing --format json \
   | jq '[.data[] | select(.pricing_tiers[]?.id == "22") | .id] | length'
 ```

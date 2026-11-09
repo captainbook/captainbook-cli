@@ -31,7 +31,7 @@ func pricingTiersDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListPricingTiersParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by parent product (via the pricing_category relation). Mutually exclusive with --availability-id."},
 				{Name: "availability-id", Type: "int", Min: 1, Description: "Scope to tiers reachable from this availability's product; overlays per-slot pivot fares onto the tier's amount and adds default_amount/is_override. Mutually exclusive with --product-id (combining the two returns 422)."},

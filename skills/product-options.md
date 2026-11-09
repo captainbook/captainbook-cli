@@ -20,7 +20,7 @@ A `ProductOption` is a variant of a `Product` — "Half-day tour" vs "Full-day t
 Intent: enumerate the variants of `prod_42` to choose one for an availability bulk-update.
 
 ```bash
-ceebee inventory product-options list --product-id prod_42
+ceebee inventory product-options list --product-id 42
 ```
 
 Returns table of `{id, product_id, title, option_code, capacity, updated_at}`. There is no `status` field — see the pitfall below.
@@ -67,9 +67,10 @@ ceebee inventory product-options restore 88                      # 200
 ## Pitfalls
 
 - ⚠️ **Cascade on delete:** `ProductOption::$cascadeDeletes` propagates the soft-delete to `virtualProductOption` and `discount`. **`PricingTier`s and `Availability` rows owned by the option are NOT cascaded** — they remain soft-readable but referenced rows may surprise you on restore.
-- ⚠️ **No server-side dry-run on delete.** Same shape as products — the CLI rejects `--dry-run` on `delete` at parse time. Inspect references first via `ceebee inventory availabilities list --product-option-id po_88`. Tiers are **not** scopable by option — `pricing-tiers list` accepts `--product-id` (or `--availability-id`), because `pricing_categories.product_option_id` was renamed to `product_id` in 2022 and tiers hang off the product, not the option.
+- ⚠️ **No server-side dry-run on delete.** Same shape as products — the CLI rejects `--dry-run` on `delete` at parse time. Inspect references first via `ceebee inventory availabilities list --product-option-id 88`. Tiers are **not** scopable by option — `pricing-tiers list` accepts `--product-id` (or `--availability-id`), because `pricing_categories.product_option_id` was renamed to `product_id` in 2022 and tiers hang off the product, not the option.
 - ⚠️ **Capacity on the option vs. on availabilities:** `ProductOption.capacity` is the default. Per-date `Availability.capacity` overrides it. Don't `update --capacity` and assume it backfills existing availability rows — it doesn't. Use `availabilities bulk-update capacity` instead.
-- ⚠️ **ProductOption has no `status` at all — soft-delete is the only state.** There is no `status` field on the resource, no `--status` flag, and no archived state: the resource returns `{id, product_id, title, option_code, capacity, min_age, max_age, deleted_at, created_at, updated_at}` and `list` filters only on `--product-id` and `--include-trashed`. Status lives on the parent Product (as `ceebee inventory product-options create --help` says). Soft-deleted rows are hidden from `list` unless you pass `--include-trashed`.
+- ⚠️ **`min_travelers` / `max_travelers` are READ-ONLY (spec 1.48.0), and `max_travelers` bounds a booking.** They are the operator's party-size bounds for a schedule, and `max_travelers` is one of the caps a slot's capacity is narrowed by — so sizing a booking off `capacity` alone can propose a party the slot then refuses at reserve time. Read both before `bookings create`. Neither is accepted on write: set them from the dashboard. Both are stored as a nullable integer where `0` means unset — the same reading the schedule chooser and the widget give it — and are published as `null` in that case rather than as a real bound of zero, so do not treat a null as "no travellers allowed".
+- ⚠️ **ProductOption has no `status` at all — soft-delete is the only state.** There is no `status` field on the resource, no `--status` flag, and no archived state: the resource returns `{id, product_id, title, option_code, capacity, min_age, max_age, min_travelers, max_travelers, deleted_at, created_at, updated_at}` and `list` filters only on `--product-id` and `--include-trashed`. Status lives on the parent Product (as `ceebee inventory product-options create --help` says). Soft-deleted rows are hidden from `list` unless you pass `--include-trashed`.
 
 ## See also
 

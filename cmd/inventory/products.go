@@ -2,16 +2,29 @@ package inventory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 )
 
-// productsDefs declares the products resource: list, get, create, update,
-// delete, restore. Multipart media upload + media list/delete live in
-// media.go since they're a separate sub-tree (`ceebee inventory media …`).
+// productsDefs declares the products resource: list, get, create,
+// create-bookable, update, duplicate, delete, restore.
+//
+// create vs create-bookable: a bare `POST /products` makes a product nothing
+// can sell, because departures, prices and questions all hang off a product
+// OPTION and a priced category needs a tier. 1.44.0 added
+// `POST /products/bookable`, which creates the product, its options and its
+// priced categories in one transaction, and the spec says to prefer it for any
+// new product. Both are bound: the plain create is still the right call for a
+// shell an operator will fill in from the dashboard.
+//
+// Multipart media upload + media list/delete live in media.go since they're a
+// separate sub-tree (`ceebee inventory media …`).
 //
 // Per spec: deleteProduct has NO dry-run support (D32: NotSupported).
 // Update + create + restore use body-level dry_run (D24).
@@ -24,7 +37,7 @@ func productsDefs() []CommandDef {
 			Use: "products list", Short: "List products", Kind: KindRead,
 			Verb: "GET", Path: "/products", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size (1-200, default 50)"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size (1-200, default 50)"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "q", Type: "string", Description: "Free-text search"},
 				{Name: "category", Type: "int", Min: 1, Description: "Filter by category ID (a ProductCategory id; 0 is refused rather than ignored)"},
@@ -179,6 +192,130 @@ func productsDefs() []CommandDef {
 			},
 		},
 		{
+			Use: "products create-bookable", Short: "Create a product that can actually be sold",
+			Kind: KindMutation, Verb: "POST", Path: "/products/bookable",
+			Ability: invpkg.Write, DryRunMode: DryRunBody,
+			Long: "Creates a product, at least one product OPTION and at least one PRICED " +
+				"pricing category in ONE call and one transaction.\n\n" +
+				"PREFER THIS OVER products create FOR ANY NEW PRODUCT. A product on its own " +
+				"cannot be sold: departures, prices and questions all hang off a product " +
+				"option, and a non-internal pricing category with no tier is filtered out of " +
+				"the booking widget — so a plain create followed by nothing leaves a product " +
+				"no customer can reach.\n\n" +
+				"Takes every flag products create takes, under the same rules (the implicit " +
+				"overrides, the update_delivery_method permission for ticketing, the " +
+				"65,535-BYTE text cap), plus --options and --pricing-categories. --status " +
+				"defaults to draft exactly as products create does, because publishing a " +
+				"product with no photo and no departures would put an empty page on the " +
+				"widget.\n\n" +
+				"BOTH ITEM SHAPES ARE CLOSED: an unlisted key is a 422 naming it rather than " +
+				"being accepted and dropped. The option key is title (the column is name) and " +
+				"the category key is amount; those are the two spellings callers get wrong, " +
+				"and silently discarding either produces a product priced at nothing under a " +
+				"201. Every category is created with is_internal false; the key is not " +
+				"accepted.\n\n" +
+				"WHAT IT DOES NOT DO: departures and the main photo. Departures need a " +
+				"schedule only the operator can state and belong to availabilities create or " +
+				"the rule/bulk commands; a photo is an upload. Both therefore stay in " +
+				"readiness.blocking on the response, which is the field to read and report " +
+				"rather than announcing a finished product.\n\n" +
+				"There is deliberately no --allocation-mode here, and that is the server's " +
+				"rule rather than an omission: a spanning mode needs a fleet to span, this " +
+				"endpoint creates the schedules but never the resources, so it REFUSES the " +
+				"field with a 422 instead of dropping it. Create the product, create its " +
+				"schedules, attach two or more assets with a capacity each, then run products " +
+				"update --allocation-mode.\n\n" +
+				"Plan limits and permissions are checked exactly as on products create — " +
+				"entitlement before permission, and both before the dry run — so a preview " +
+				"cannot answer would_apply true for a create the commit would refuse.",
+			Flags: []FlagDef{
+				{Name: "title", Type: "string", Required: true, Description: "Product title"},
+				{Name: "currency", Type: "string", Required: true, Description: "ISO currency code — must equal the account currency from whoami; not stored, but a mismatch is refused with 422"},
+				{Name: "description", Type: "string", Description: "Product description (translatable rich text)"},
+				{Name: "instructions", Type: "string", Description: "Rich text shown to confirmed customers"},
+				{Name: "requirements", Type: "string", Description: "Rich text — what the customer needs to bring/know"},
+				{Name: "inclusions", Type: "string", Description: "Rich text — what's included"},
+				{Name: "exclusions", Type: "string", Description: "Rich text — what's not included"},
+				{Name: "product-code", Type: "string", Description: "Tenant SKU (auto-gen from title when omitted)"},
+				{Name: "status", Type: "string", Description: "draft|published"},
+				{Name: "schedule-type", Type: "string", Description: "date|datetime"},
+				{Name: "delivery-method", Type: "string", Description: "TICKET|VOUCHER — \"Ticket type\". VOUCHER (the default) = one ticket per booking; TICKET = one per guest. Asking for TICKET needs the update_delivery_method permission."},
+				{Name: "redemption-method", Type: "string", Description: "MANIFEST|DIGITAL|PRINT — how the customer is admitted. MANIFEST (the default) = no identification needed. Anything else needs the update_delivery_method permission."},
+				{Name: "capacity", Type: "int", Description: "Default capacity"},
+				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
+				{Name: "from-price-label", Type: "string", Description: "Caption next to from-price (e.g. \"From €50/person\")"},
+				{Name: "category-ids", Type: "intSlice", Description: "Comma-separated category IDs (integer)"},
+				{Name: "timezone", Type: "string", Description: "IANA timezone"},
+				{Name: "locale", Type: "string", Description: "Default content locale (e.g. en, fr)"},
+				{Name: "is-private", Type: "bool", Description: "Private (one party books the whole slot) vs shared (multiple parties)"},
+				{Name: "is-priced-per-person", Type: "bool", Default: true, Description: "Price per traveler (true) vs per group/booking (false)"},
+				{Name: "is-tier-priced", Type: "bool", Description: "Quantity-based pricing tiers apply"},
+				{Name: "use-alternate-tier-pricing", Type: "bool", Description: "Alternate tier-pricing rendering"},
+				{Name: "show-last-tier", Type: "bool", Description: "Show the last tier in customer-facing pricing"},
+				{Name: "displayable", Type: "bool", Default: true, Description: "Show in widgets / catalog"},
+				{Name: "must-validate-cancellation-policy", Type: "bool", Description: "Customer must accept the cancellation policy at checkout"},
+				{Name: "cancellation-policy", Type: "string", Description: "Inline policy text (mutually exclusive with --cancellation-policy-link)"},
+				{Name: "cancellation-policy-link", Type: "string", Description: "External policy URL (mutually exclusive with --cancellation-policy)"},
+				// The two lists that make the product SELLABLE, and the whole
+				// reason this endpoint exists beside `products create`. Both
+				// are required with at least one entry: a product with neither
+				// is the shell the plain create produces, and accepting empty
+				// lists would rebuild it behind a different name.
+				{Name: "options", Type: "json", Required: true, Description: `Bookable variants (1-20) as JSON or @file.json: [{"title": "10:00 departure", "capacity": 12, "min_age": null, "max_age": null}, ...]. title is required and lands in product_options.name. Departures, prices and questions hang off these, not off the product`},
+				{Name: "pricing-categories", Type: "json", Required: true, Description: `Price buckets (1-20) as JSON or @file.json: [{"name": "Adults", "amount": 5000, "type": "ADULT"}, ...]. name and amount (MINOR units) are required; type is one of ADULT|CHILD|INFANT|YOUTH|STUDENT|SENIOR|TRAVELLER|EU_CITIZEN|MILITARY|EU_CITIZEN_STUDENT. Each also creates one open-ended tier (min 1, max null) at amount, because a category with no tier is invisible to the booking widget`},
+			},
+			// invariant: the two lists ARE the sellable product — the options
+			// departures hang off and the prices customers pay. The audit keeps
+			// only body_sha256, so without them a row records that a product was
+			// created and nothing about what it sells or costs.
+			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person", "delivery-method", "redemption-method", "options", "pricing-categories"},
+			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
+				// DERIVED, not duplicated. Every key this request takes is its
+				// flag name in snake_case, including the two that make the
+				// endpoint what it is (`options`, `pricing_categories`), so a
+				// hand-written literal here would restate 29 pairs that a rule
+				// already determines — and a restated pair is the only kind that
+				// can be typo'd. `products create` keeps its own literal, so the
+				// shared keys stay pinned against the spec from there, and the
+				// spec guarantees the two cannot drift
+				// (CreateBookableProductRequest spreads CreateProductRequest's
+				// rules() in PHP).
+				//
+				// The flag list above stays a literal: the AST walker reads
+				// `Flags:` only as a composite literal, and the coverage test
+				// unions the LIVE tree's flags, so reachability is pinned either
+				// way.
+				body, err := JSONBodyFromArgs(args, args.DryRun, snakeFieldMap(
+					"title", "currency", "description", "instructions", "requirements",
+					"inclusions", "exclusions", "product-code", "status", "schedule-type",
+					"delivery-method", "redemption-method", "capacity", "from-price",
+					"from-price-label", "category-ids", "timezone", "locale", "is-private",
+					"is-priced-per-person", "is-tier-priced", "use-alternate-tier-pricing",
+					"show-last-tier", "displayable", "must-validate-cancellation-policy",
+					"cancellation-policy", "cancellation-policy-link",
+					"options", "pricing-categories",
+				))
+				if err != nil {
+					return nil, err
+				}
+				// Validated after assembly so --data is held to the same rules as
+				// the flags: JSONBodyFromArgs copies a json-typed flag verbatim
+				// and would otherwise send either list unchecked.
+				if err := validateBookableProductBody(body); err != nil {
+					return nil, err
+				}
+				resp, err := r.Client.CreateBookableProductWithBodyWithResponse(ctx, &gen.CreateBookableProductParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
+				res, perr := ParseGenResponse(resp.Body, resp.HTTPResponse, "Product", "")
+				if res != nil {
+					res.WireBody = body
+				}
+				return res, perr
+			},
+		},
+		{
 			Use: "products update <id>", Short: "Update a product", Kind: KindMutation,
 			Verb: "PATCH", Path: "/products/{id}", Ability: invpkg.Write,
 			DryRunMode:     DryRunBody,
@@ -215,6 +352,11 @@ func productsDefs() []CommandDef {
 				{Name: "delivery-method", Type: "string", Description: "TICKET|VOUCHER — \"Ticket type\". CHANGING it reissues existing tickets and needs --confirm-ticket-reissue plus the update_delivery_method permission. Sending the stored value is not a change."},
 				{Name: "redemption-method", Type: "string", Description: "MANIFEST|DIGITAL|PRINT — how the customer is admitted. Changing it needs the update_delivery_method permission but reissues nothing."},
 				{Name: "confirm-ticket-reissue", Type: "bool", Description: "Acknowledge that changing --delivery-method invalidates the tickets customers already hold, un-notified. Nothing is stored. Ignored when --delivery-method is absent or unchanged, and never needed under --dry-run."},
+				// PATCH only. `POST /products` and `POST /products/bookable`
+				// REFUSE the field with a 422 (1.53.0), so there is deliberately
+				// no --allocation-mode on either create command: offering one
+				// would advertise a value every create answers 422 for.
+				{Name: "allocation-mode", Type: "string", Description: "single_resource|homogeneous_multi — how many resources one booking may occupy. Needs a schedule carrying two or more capacity-bearing assets; homogeneous_multi is refused with a 422 naming the gate that refused it. Echoing the stored value runs no gate."},
 				{Name: "capacity", Type: "int", Description: "Default capacity"},
 				{Name: "from-price", Type: "int", Description: "Starting price (minor units)"},
 				{Name: "from-price-label", Type: "string", Description: "Caption next to from-price"},
@@ -231,7 +373,11 @@ func productsDefs() []CommandDef {
 				{Name: "cancellation-policy", Type: "string", Description: "Inline policy text"},
 				{Name: "cancellation-policy-link", Type: "string", Description: "External policy URL"},
 			},
-			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person", "delivery-method", "redemption-method", "confirm-ticket-reissue"},
+			// allocation-mode is forensic: changing the EFFECTIVE mode
+			// republishes the product's capacity to every connected channel,
+			// and the figure a channel then advertises is chosen by the mode.
+			// A capacity edit does the same, which is why it was already here.
+			ForensicFields: []string{"from-price", "capacity", "status", "schedule-type", "is-private", "is-priced-per-person", "delivery-method", "redemption-method", "confirm-ticket-reissue", "allocation-mode"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
@@ -250,6 +396,7 @@ func productsDefs() []CommandDef {
 					"delivery-method":                   "delivery_method",
 					"redemption-method":                 "redemption_method",
 					"confirm-ticket-reissue":            "confirm_ticket_reissue",
+					"allocation-mode":                   "allocation_mode",
 					"capacity":                          "capacity",
 					"from-price":                        "from_price",
 					"from-price-label":                  "from_price_label",
@@ -375,4 +522,106 @@ func productsDefs() []CommandDef {
 			},
 		},
 	}
+}
+
+// -----------------------------------------------------------------------------
+// POST /products/bookable request-body gates.
+// -----------------------------------------------------------------------------
+
+// bookableListCaps mirror the spec's minItems/maxItems on the two lists.
+const (
+	bookableListMin = 1
+	bookableListMax = 20
+)
+
+// validateBookableProductBody checks the two lists that distinguish
+// `products create-bookable` from `products create`.
+//
+// Both item shapes are `additionalProperties: false` in the spec, so an
+// unlisted key is a 422 naming it. The spec also names the two keys callers
+// actually get wrong — `title` on an option (the column is `name`) and `amount`
+// on a category — and says why it matters that they are refused rather than
+// dropped: "silently discarding either produces a product priced at nothing
+// under a 201". A local gate is worth it for the same reason the server's is.
+// Reads the ASSEMBLED body, so --data is held to the same rules as the flags.
+func validateBookableProductBody(body []byte) error {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		return fmt.Errorf("inventory: assembled request body is not a JSON object: %w", err)
+	}
+	if err := validateBookableList(m, "options", "--options",
+		[]string{"title"},
+		[]string{"title", "option_code", "capacity", "min_age", "max_age"}); err != nil {
+		return err
+	}
+	return validateBookableList(m, "pricing_categories", "--pricing-categories",
+		[]string{"name", "amount"},
+		[]string{"name", "type", "min_age", "max_age", "amount"})
+}
+
+// validateBookableList checks one of the two arrays: present, an array, within
+// the 1-20 bounds, every item an object carrying its required keys and no key
+// outside the allowed set.
+//
+// It does NOT check value types beyond that. The server owns the per-field
+// rules (the 200-char titles, the age bounds, the pricing-category enum), and
+// restating them here would be a second implementation to drift. What is
+// checked is the SHAPE, which is the part a 422 describes least usefully: an
+// unknown key is reported against an index the caller has to count to.
+func validateBookableList(body map[string]json.RawMessage, key, flag string, required, allowed []string) error {
+	raw, ok := body[key]
+	if !ok {
+		return fmt.Errorf("%s is required: this endpoint exists to create a product that can "+
+			"be SOLD, and a product with no %s is the shell `products create` already makes", flag, key)
+	}
+	var rows []map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return fmt.Errorf("%s must be a JSON ARRAY of objects (got %s): %w", flag, raw, err)
+	}
+	if len(rows) < bookableListMin {
+		return fmt.Errorf("%s needs at least %d entry: an empty list would rebuild the "+
+			"unsellable shell `products create` produces, under a different name", flag, bookableListMin)
+	}
+	if len(rows) > bookableListMax {
+		return fmt.Errorf("%s: %d entries exceeds the %d-entry cap", flag, len(rows), bookableListMax)
+	}
+	for i, row := range rows {
+		if row == nil {
+			return fmt.Errorf("%s[%d]: expected an object, got null", flag, i)
+		}
+		for k := range row {
+			if !slices.Contains(allowed, k) {
+				return fmt.Errorf("%s[%d]: unknown key %q — the item shape is CLOSED and the "+
+					"server refuses it with a 422 rather than dropping it. Accepts: %s",
+					flag, i, k, strings.Join(allowed, ", "))
+			}
+		}
+		for _, k := range required {
+			if _, present := row[k]; !present {
+				return fmt.Errorf("%s[%d]: missing %q (required: %s)", flag, i, k, strings.Join(required, ", "))
+			}
+		}
+	}
+	return nil
+}
+
+// snakeFieldMap builds a JSONBodyFromArgs field map for flags whose JSON key is
+// simply the flag name in snake_case — `--from-price` → `from_price`.
+//
+// It exists so a command whose every key follows that rule does not restate the
+// rule once per field. A hand-written literal is worth it where a key diverges
+// from its flag (`--send-now` → `send_at`, `--include` → `include`), because
+// the pairing is real information; where it does not, the literal is 29 chances
+// to typo a pairing the compiler cannot check, and the drift tests only catch
+// the half that lands on a key the spec does not have.
+//
+// Callers pass flag names, so an unknown name yields a key the command never
+// sets rather than a wrong one: JSONBodyFromArgs skips any flag absent from
+// args.Flags, and args.Flags is built solely from the command's own Flags.
+func snakeFieldMap(names ...string) map[string]string {
+	out := make(map[string]string, len(names))
+	for _, n := range names {
+		out[n] = strings.ReplaceAll(n, "-", "_")
+	}
+	return out
 }

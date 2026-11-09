@@ -34,6 +34,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1306,6 +1307,25 @@ func parseCurrencyRequirements(data []byte) (map[string]currencyReq, error) {
 // If a future spec gives one of these tables a real currency column, this
 // test fails and the flag should be added deliberately rather than by
 // pattern-matching against create.
+//
+// conditionallyRequiredCurrency records the schemas where `required:` cannot
+// answer the question, because the requirement is conditional on ANOTHER field
+// in the same body. The rule above is binary and those schemas are a third
+// state, so each one is named here with what makes it required — not
+// suppressed, decided.
+var conditionallyRequiredCurrency = map[string]string{
+	// 1.47.0. StoreBookingRequest.deposit is money ALREADY RECEIVED and
+	// `currency` is "Required alongside a NON-ZERO deposit, and must equal the
+	// account currency". So unlike the six optional-currency schemas this flag
+	// is neither a no-op nor a footgun: without it --deposit is unusable for
+	// any non-zero amount except through --data, and the whole point of the
+	// field is that the server validates the currency rather than converting,
+	// so the amount is recorded exactly as sent. `bookings create` refuses a
+	// non-zero --deposit with no --currency locally; see
+	// validateStoreBookingBody.
+	"#/components/schemas/StoreBookingRequest": "required alongside a non-zero deposit",
+}
+
 func TestSpecDrift_CurrencyFlagTracksSpecRequirement(t *testing.T) {
 	data, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
 	if err != nil {
@@ -1326,6 +1346,13 @@ func TestSpecDrift_CurrencyFlagTracksSpecRequirement(t *testing.T) {
 		cr, ok := reqs[op.BodyRef]
 		if !ok || !cr.Declared {
 			continue // this operation's body has no currency property
+		}
+		if why, conditional := conditionallyRequiredCurrency[op.BodyRef]; conditional {
+			// Still counted, so a schema leaving this map does not silently
+			// drop out of the census the floor check below guards.
+			checked++
+			t.Logf("%s: currency is conditionally required (%s) — the required-list rule does not decide it", op.BodyRef, why)
+			continue
 		}
 		checked++
 
@@ -1523,4 +1550,338 @@ func TestSpecDrift_FlagTypesMatchSpecTypes(t *testing.T) {
 		t.Fatal("resolved 0 flag/spec type pairs — the walker or the spec parser is broken, not the CLI")
 	}
 	t.Logf("compared %d flag types against spec parameter types", checked)
+}
+
+// TestSpecDrift_FlagMaxMatchesSpecMaximum is the spec→flag direction for upper
+// bounds, and the mirror of the `minimum`/`Min` pairing.
+//
+// The gap it closes: `FlagDef.Max` was added to end the "lower bound alone was
+// enforced" asymmetry, and the only reader of it
+// (TestWire_FlagDefMaxIsEnforcedForEveryBoundedFlag) asserts that a DECLARED
+// bound is enforced. That cannot see a bound the spec declares and the CommandDef
+// omits — so `--limit` kept advertising "(1-200, default 50)" in its own help
+// text while passing 201 straight to a server whose spec caps it at 200, which
+// is verbatim the failure the statistics lane already paid for and the one
+// FlagDef.Max exists to prevent.
+//
+// Reads the LIVE cobra tree for the flags and the annotation, for the reason
+// the rest of this package does, and parses the spec's `maximum` directly
+// rather than teaching specDoc about it — the same choice, for the same reason,
+// as parseCurrencyRequirements and specRequires.
+//
+// Float flags are out of scope: FlagDef.Max is an int bound, so a spec maximum
+// on a float field (`discount_pct`, 0-100) cannot be expressed by it. Those are
+// listed as unbounded rather than silently passed.
+//
+// Value: protects=every int flag whose spec parameter or body field declares a maximum carries the matching FlagDef.Max; fails_when=a flag with a spec maximum is added or kept with no Max, or its Max drifts from the spec's number; why_new=nothing compared a spec maximum against the CLI and 27 --limit flags were unbounded against a documented cap; seam=none
+func TestSpecDrift_FlagMaxMatchesSpecMaximum(t *testing.T) {
+	maxima := specMaxima(t)
+	if len(maxima) == 0 {
+		t.Fatal("parsed no spec maxima — the reader broke, not the CLI")
+	}
+
+	var missing, wrong, invented, floats []string
+	checked := 0
+
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		verb, path := c.Annotations["verb"], c.Annotations["path"]
+		if verb != "" && path != "" {
+			declared := map[string]int{}
+			for _, pair := range strings.Split(c.Annotations["intMaxes"], ",") {
+				name, rawMax, ok := strings.Cut(pair, "=")
+				if !ok {
+					continue
+				}
+				if n, err := strconv.Atoi(rawMax); err == nil {
+					declared[name] = n
+				}
+			}
+			c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+				want, ok := maxima[verb+" "+path+"."+kebabToSnake(f.Name)]
+				if !ok {
+					// The OTHER direction, and the one that let an invented
+					// bound ship: a flag declaring Max where the spec declares
+					// no maximum is a CLI-only refusal of a value the server
+					// takes. `TimeValue.day_count` has only `default: 0`, and a
+					// 365 copied from the create/update schemas made the
+					// documented same-day value unreachable on that path.
+					if got, present := declared[f.Name]; present {
+						invented = append(invented, fmt.Sprintf(
+							"%s --%s declares Max %d, but the spec declares no maximum for it",
+							c.CommandPath(), f.Name, got))
+					}
+					return
+				}
+				switch f.Value.Type() {
+				case "int":
+					checked++
+					got, present := declared[f.Name]
+					switch {
+					case !present:
+						missing = append(missing, fmt.Sprintf("%s --%s (spec maximum %d)",
+							c.CommandPath(), f.Name, want))
+					case got != want:
+						wrong = append(wrong, fmt.Sprintf("%s --%s declares Max %d, spec says %d",
+							c.CommandPath(), f.Name, got, want))
+					}
+				case "float64", "float32":
+					floats = append(floats, fmt.Sprintf("%s --%s (spec maximum %d; FlagDef.Max is an int bound)",
+						c.CommandPath(), f.Name, want))
+				}
+			})
+		}
+		for _, child := range c.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+
+	sort.Strings(missing)
+	sort.Strings(wrong)
+	if len(missing) > 0 {
+		t.Errorf("%d int flag(s) whose spec parameter declares a maximum carry no FlagDef.Max:\n  %s\n\n"+
+			"An advertised bound the CLI does not enforce costs a round trip to have the CLI's own "+
+			"help text read back as a server validation failure. Declare Max, or widen this test's "+
+			"scope deliberately.", len(missing), strings.Join(missing, "\n  "))
+	}
+	if len(wrong) > 0 {
+		t.Errorf("%d flag bound(s) disagree with the spec:\n  %s", len(wrong), strings.Join(wrong, "\n  "))
+	}
+	sort.Strings(invented)
+	if len(invented) > 0 {
+		t.Errorf("%d flag(s) declare an upper bound the spec does not:\n  %s\n\n"+
+			"A bound the contract does not state is a CLI-only refusal: the server accepts the "+
+			"value and the CLI never sends it. Drop the Max, or get the bound into the spec.",
+			len(invented), strings.Join(invented, "\n  "))
+	}
+	for _, f := range floats {
+		t.Logf("not bounded (float flag): %s", f)
+	}
+
+	const floor = 20
+	if checked < floor {
+		t.Fatalf("compared only %d int flags against a spec maximum, want at least %d — the spec "+
+			"reader or the tree walker lost coverage", checked, floor)
+	}
+
+	// A single count is satisfied by the query-parameter branch alone (26 of the
+	// 31 comparisons come from the shared Limit $ref), so the request-body walk
+	// could stop resolving and this test would stay green. Name one key from
+	// each construction pattern instead: a count proves the extractor found
+	// SOMETHING, never that it found EVERYTHING.
+	for _, probe := range []struct{ what, key string }{
+		{"a $ref'd component query parameter", "GET /products.limit"},
+		{"an inline query parameter", "GET /resource-calendar.limit"},
+		{"a request-body property", "POST /pricing-categories.max_per_resource"},
+		{"a request-body property on a composed schema", "POST /availabilities.day_count"},
+	} {
+		if _, ok := maxima[probe.key]; !ok {
+			t.Errorf("specMaxima lost %s (%s): the reader stopped resolving that shape, so every "+
+				"bound reached only through it is now unchecked", probe.what, probe.key)
+		}
+	}
+	t.Logf("compared %d int flag bounds against the spec", checked)
+}
+
+// specMaxima maps "VERB /path.field" → the `maximum` the spec declares for that
+// query parameter or request-body property. Resolves a `$ref` one level, which
+// is how the shared Limit parameter reaches most list operations.
+func specMaxima(t *testing.T) map[string]int { return specBounds(t, "maximum") }
+
+// specBounds maps "VERB /path.field" -> the named JSON Schema bound the spec
+// declares for that query parameter or request-body property.
+func specBounds(t *testing.T, keyword string) map[string]int {
+	t.Helper()
+	raw, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("yaml.Unmarshal: %v", err)
+	}
+
+	resolve := func(n any) map[string]any {
+		m, _ := n.(map[string]any)
+		for i := 0; i < 8 && m != nil; i++ {
+			ref, ok := m["$ref"].(string)
+			if !ok {
+				return m
+			}
+			cur := any(doc)
+			for _, seg := range strings.Split(strings.TrimPrefix(ref, "#/"), "/") {
+				cm, ok := cur.(map[string]any)
+				if !ok {
+					return nil
+				}
+				cur = cm[seg]
+			}
+			m, _ = cur.(map[string]any)
+		}
+		return m
+	}
+	intOf := func(v any) (int, bool) {
+		switch n := v.(type) {
+		case int:
+			return n, true
+		case float64:
+			return int(n), true
+		}
+		return 0, false
+	}
+
+	out := map[string]int{}
+	paths, _ := doc["paths"].(map[string]any)
+	for path, item := range paths {
+		pm, _ := item.(map[string]any)
+		for method, opAny := range pm {
+			switch method {
+			case "get", "post", "put", "patch", "delete":
+			default:
+				continue
+			}
+			op, _ := opAny.(map[string]any)
+			key := strings.ToUpper(method) + " " + path
+
+			// Query parameters, including a $ref'd component parameter.
+			params, _ := op["parameters"].([]any)
+			for _, p := range params {
+				pr := resolve(p)
+				if pr == nil {
+					continue
+				}
+				name, _ := pr["name"].(string)
+				sch := resolve(pr["schema"])
+				if name == "" || sch == nil {
+					continue
+				}
+				if n, ok := intOf(sch[keyword]); ok {
+					out[key+"."+name] = n
+				}
+			}
+
+			// Request-body properties.
+			rb := resolve(op["requestBody"])
+			if rb == nil {
+				continue
+			}
+			content, _ := rb["content"].(map[string]any)
+			aj, _ := content["application/json"].(map[string]any)
+			body := resolve(aj["schema"])
+			if body == nil {
+				continue
+			}
+			// Flatten one allOf level, which is how the bookable-product and
+			// envelope schemas compose.
+			schemas := []map[string]any{body}
+			if allOf, ok := body["allOf"].([]any); ok {
+				for _, sub := range allOf {
+					if m := resolve(sub); m != nil {
+						schemas = append(schemas, m)
+					}
+				}
+			}
+			for _, sch := range schemas {
+				props, _ := sch["properties"].(map[string]any)
+				for name, propAny := range props {
+					prop := resolve(propAny)
+					if prop == nil {
+						continue
+					}
+					if n, ok := intOf(prop[keyword]); ok {
+						out[key+"."+name] = n
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// TestSpecDrift_FlagMinMatchesSpecMinimum is the mirror the Max assertion's own
+// doc comment promised and this sync did not have.
+//
+// It is not symmetry for its own sake: the absence of this direction is exactly
+// how a regression shipped inside this PR. Rolling `Max` out across the int
+// flags also stamped `Min: 1` onto `--day-count`, whose spec `minimum` is **0**
+// with `default: 0` and whose documentation calls 0 "an ordinary same-day
+// session" — so collapsing a multi-day departure back to one day became
+// locally unreachable, and nothing failed. `intMins` had exactly one reader
+// (TestWire_FlagDefMaxIsEnforcedForEveryBoundedFlag's sibling), and it checks
+// that a DECLARED bound is enforced, never that the bound is the contract's.
+//
+// A flag may legitimately declare Min where the spec declares none: `minimum: 0`
+// is the JSON Schema default for an unsigned id and several ids are typed
+// `PositiveIntegerId` through a $ref this reader does not follow. So a Min the
+// spec does not state is reported as unverified rather than failed, while a Min
+// that CONTRADICTS a stated minimum fails.
+//
+// Value: protects=no int flag declares a lower bound that contradicts the spec's minimum; fails_when=a rollout stamps Min onto a flag whose spec minimum is lower, as happened to --day-count in this very PR; why_new=nothing compared Min against the contract in either direction; seam=none
+func TestSpecDrift_FlagMinMatchesSpecMinimum(t *testing.T) {
+	minima := specBounds(t, "minimum")
+	if len(minima) == 0 {
+		t.Fatal("parsed no spec minima — the reader broke, not the CLI")
+	}
+
+	var wrong, unverified []string
+	checked := 0
+
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		verb, path := c.Annotations["verb"], c.Annotations["path"]
+		if verb != "" && path != "" {
+			declared := map[string]int{}
+			for _, pair := range strings.Split(c.Annotations["intMins"], ",") {
+				name, rawMin, ok := strings.Cut(pair, "=")
+				if !ok {
+					continue
+				}
+				if n, err := strconv.Atoi(rawMin); err == nil {
+					declared[name] = n
+				}
+			}
+			c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+				if f.Value.Type() != "int" {
+					return
+				}
+				got, present := declared[f.Name]
+				if !present {
+					return
+				}
+				want, stated := minima[verb+" "+path+"."+kebabToSnake(f.Name)]
+				if !stated {
+					unverified = append(unverified, fmt.Sprintf("%s --%s (Min %d; spec states no minimum here, "+
+						"often a PositiveIntegerId $ref)", c.CommandPath(), f.Name, got))
+					return
+				}
+				checked++
+				if got > want {
+					wrong = append(wrong, fmt.Sprintf(
+						"%s --%s declares Min %d, but the spec's minimum is %d — the values between "+
+							"are refused locally and accepted by the server",
+						c.CommandPath(), f.Name, got, want))
+				}
+			})
+		}
+		for _, child := range c.Commands() {
+			walk(child)
+		}
+	}
+	walk(Cmd())
+
+	sort.Strings(wrong)
+	if len(wrong) > 0 {
+		t.Errorf("%d flag(s) declare a lower bound stricter than the spec:\n  %s",
+			len(wrong), strings.Join(wrong, "\n  "))
+	}
+	sort.Strings(unverified)
+	for _, u := range unverified {
+		t.Logf("Min not verified against a stated minimum: %s", u)
+	}
+	if checked == 0 {
+		t.Fatalf("compared no flag Min against a stated spec minimum — the reader or the walker " +
+			"lost coverage, and this is the direction that let --day-count's Min: 1 ship")
+	}
+	t.Logf("compared %d flag lower bounds against the spec (%d unverified)", checked, len(unverified))
 }

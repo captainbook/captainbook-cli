@@ -497,3 +497,89 @@ func TestStatsWire_SingleMalformedBoundIsRefused(t *testing.T) {
 		}
 	})
 }
+
+// TestStatsWire_AttendanceHitsItsOwnPath covers the metric this spec sync added.
+//
+// It asserts the PATH as well as the query, which no other test in this file
+// does, because the failure mode of a new metric is specific: the table in
+// internal/api/endpoints.go carries Name and Path separately, and a Path
+// copy-pasted from the neighbouring row produces a command that answers with
+// another metric's numbers under this metric's heading. `attendance` is the
+// worst row to get wrong that way — its whole contract is that a zero and a null
+// mean different things, so silently reading /extras would hand back real counts
+// for a question nobody asked.
+//
+// Value: protects=`stats attendance` reaches /statistics/attendance with its two supported filters; fails_when=the Path in the Endpoints row is wrong or the filter list is widened past the spec's two parameters; why_new=the metric is new in this sync and no test asserts a stats path at all; seam=httptest stub
+func TestStatsWire_AttendanceHitsItsOwnPath(t *testing.T) {
+	var gotPath string
+	var gotQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotQuery = r.URL.Path, r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"attendance_recorded":false}}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("CEEBEE_API_URL", srv.URL+"/api/v1/cli")
+	t.Setenv("CEEBEE_API_TOKEN", "test-token")
+
+	root := &cobra.Command{Use: "ceebee", SilenceErrors: true, SilenceUsage: true}
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "")
+	root.PersistentFlags().StringVar(&profileName, "profile", "", "")
+	root.PersistentFlags().StringVarP(&formatFlag, "format", "f", "json", "")
+	root.AddCommand(statsCmd())
+	root.SetArgs([]string{"stats", "attendance",
+		"--from", "2026-01-01", "--to", "2026-01-31",
+		"--business-unit-id", "3", "--product-id", "12"})
+	root.SetOut(&strings.Builder{})
+	root.SetErr(&strings.Builder{})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("stats attendance: unexpected error: %v", err)
+	}
+
+	if want := "/api/v1/cli/statistics/attendance"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+	for key, want := range map[string]string{
+		"business_unit_id": "3",
+		"product_id":       "12",
+		"from":             "2026-01-01",
+		"to":               "2026-01-31",
+	} {
+		if gotQuery.Get(key) != want {
+			t.Errorf("%s = %q, want %q (query: %v)", key, gotQuery.Get(key), want, gotQuery)
+		}
+	}
+}
+
+// TestStatsWire_AttendanceRefusesTheFiltersItCannotApply is the per-metric
+// matrix arm for the new metric, in the shape
+// TestStatsWire_UnsupportedFilterHasNoFlag uses: the server answers 400 for a
+// filter a metric does not implement, so the flag must be ABSENT rather than
+// present and refused.
+//
+// --date-basis is the one that matters. The spec refuses it in prose — "a
+// no-show happens at the trip, so there is no second clock to offer" — and a
+// flag offering it would imply this metric has a booking-dated reading, which it
+// does not.
+//
+// Value: protects=attendance declares no filter the spec does not give it; fails_when=a copy-pasted filter grouping (filtersBookingGrain / filtersWithDateBasis) is used for this row; why_new=the metric is new and the existing matrix test enumerates other metrics; seam=none
+func TestStatsWire_AttendanceRefusesTheFiltersItCannotApply(t *testing.T) {
+	for _, tc := range []struct{ flag, value string }{
+		{"--date-basis", "trip"},     // no second clock: a no-show happens at the trip
+		{"--channel-id", "ch_42"},    // counts people off redemptions, joins no channel
+		{"--resource-id", "9"},       // likewise no resource join
+		{"--location-id", "7"},       // likewise no location join
+		{"--day-of-week", "sat,sun"}, // not a parameter of this metric
+	} {
+		_, err := runStats(t, "stats", "attendance", tc.flag, tc.value)
+		if err == nil {
+			t.Errorf("stats attendance accepted %s; the server refuses that filter with 400, so the flag should not exist", tc.flag)
+			continue
+		}
+		if !strings.Contains(err.Error(), "unknown flag") {
+			t.Errorf("stats attendance %s failed with %v, want an unknown-flag parse error — anything else means the flag EXISTS and rejected the value",
+				tc.flag, err)
+		}
+	}
+}
