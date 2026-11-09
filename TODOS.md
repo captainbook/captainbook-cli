@@ -1467,6 +1467,22 @@ assertion. A proxy or a future server change returning one of those codes under 
 status would print a false status and assert a key-release guarantee the spec grants
 only to the 409.
 
+**Two refusal-ordering findings the owner skipped at review, recorded here so they are not lost.**
+Both are live in `validateStoreBookingBody` and both were explicitly skipped, not overlooked.
+(1) The deposit/currency, deposit/payment-method and payment-notes gates all run BEFORE the
+`booking_type` switch that refuses those three fields outright on a reservation, so
+`bookings create --booking-type reservation --deposit 2000` is told to add `--currency`, then
+`--payment-method`, then `--expiry`, and only then that the payment fields were never legal on a
+hold. FOUR independent readers raised this (a p1 specialist, the p1 and p2 adversarial passes,
+and the p2 targeted reader); the owner skipped it because reordering a 300-line validator for
+message ordering, at zero blocking findings, is the shape of change that has already produced
+three fix-induced regressions on this branch. The fix is one move: hoist the switch above the
+three payment gates. (2) The payment-notes gate tests only key PRESENCE of `deposit` while its
+two siblings test a non-zero value, so `--deposit 0 --payment-notes "cheque"` passes every local
+gate and reaches the wire; a zero deposit creates no transaction, so the note has nowhere to
+land and is silently dropped rather than refused. Raised by the p2 targeted reader at
+confidence 7. Fix: decode the deposit and require non-zero in that gate, matching its siblings.
+
 **`workflows` and `workflow-executions` have no agent-facing cookbook.** Both are real command
 groups, so their verbs, the three 1.55.0 trigger action types (`segment_entered`,
 `segment_left`, `whatsapp_message_received`) and the 1.56.0 `whatsapp` channel for
@@ -1483,8 +1499,13 @@ README and `skills/index.md` only: `skills/products.md` documents `products dupl
 the couple-of-minutes window the copy job holds the source for, and `internal/inventory/errors.go`
 does not type it, so the CLI surfaces it as a raw API error with no retry guidance — even though
 the spec marks it "Transient and retriable", sets `error.retriable` true, and says the refusal
-RELEASES the `Idempotency-Key`, which is exactly the guidance a typed error would carry. It fires
-on seven product and product-option writes, not just `duplicate`.
+RELEASES the `Idempotency-Key`, which is exactly the guidance a typed error would carry. It fires on seven product and
+product-option writes and NOT on `duplicate` itself: the spec's 1.7.0 list is `PATCH
+/products/{id}`, `DELETE /products/{id}`, `POST /products/{id}/restore`, `POST
+/product-options`, `PATCH /product-options/{id}`, `DELETE /product-options/{id}` and `POST
+/product-options/{id}/restore`, while `POST /products/{id}/duplicate`'s own 409 is the plain
+`IdempotencyConflict`. An earlier draft of this entry implied `duplicate` was one of the seven,
+which would have sent a fixer to the one command that cannot raise the code.
 
 **Upstream: the spec contradicts itself on whether every other `409` is final.**
 `api/inventory/cli-v1.yaml:7980` asserts "Every other `409` describes something that will answer
