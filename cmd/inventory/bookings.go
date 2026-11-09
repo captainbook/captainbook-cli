@@ -1003,12 +1003,29 @@ func integralNumber(num json.Number) (int, bool) {
 	if err != nil || f != math.Trunc(f) || math.IsInf(f, 0) || math.IsNaN(f) {
 		return 0, false
 	}
-	if f > math.MaxInt32 || f < math.MinInt32 {
-		// Beyond this, float64 can no longer represent every integer exactly,
-		// so a conversion would silently invent a different number.
+	// Only the FLOAT-spelled path needs a width guard, and the right boundary
+	// is float64's, not int32's. float64 represents every integer exactly up to
+	// 2^53; past that the nearest representable value may be a different
+	// integer, so converting would silently invent a number the caller never
+	// wrote. Refuse instead.
+	//
+	// The previous bound here was math.MaxInt32, with the same reasoning
+	// attached — which was wrong about where float64 loses exactness, and
+	// refused legal ids between 2^31 and 2^53 when they happened to be spelled
+	// as a float. The integer path above never had that limit: it bounds by
+	// what this platform's `int` holds, so a plain `9000000000` is accepted on
+	// a 64-bit build. The spec agrees there is no 32-bit ceiling to enforce —
+	// `PositiveIntegerId` is `{type: integer, minimum: 1}` with no `maximum`
+	// and no `format`.
+	const maxExactFloat = 1 << 53
+	if f > maxExactFloat || f < -maxExactFloat {
 		return 0, false
 	}
-	return int(f), true
+	n := int64(f)
+	if int64(int(n)) != n {
+		return 0, false // out of int range on this platform
+	}
+	return int(n), true
 }
 
 // requireAnyBookingAmendment enforces UpdateBookingRequest's "at least one of

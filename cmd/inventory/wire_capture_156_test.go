@@ -1128,6 +1128,52 @@ func TestWire_BookingsCreateAcceptsNumericStrings(t *testing.T) {
 		}
 	})
 
+	// The width guard belongs to float64, not to int32.
+	//
+	// `integralNumber`'s float fallback used to refuse anything over
+	// math.MaxInt32, claiming that was where float64 stops representing
+	// integers exactly. It is not — float64 is exact to 2^53 — so ids between
+	// 2^31 and 2^53 were refused locally whenever they arrived spelled as a
+	// float, which is the same stricter-than-the-wire mistake this whole test
+	// exists to pin, one spelling deeper. The spec has no 32-bit ceiling to
+	// appeal to either: `PositiveIntegerId` is `{type: integer, minimum: 1}`
+	// with no `maximum` and no `format`.
+	//
+	// The plain-integer path is checked alongside it because it never had the
+	// int32 limit, and a future "simplification" that routes both spellings
+	// through one bound should fail here rather than quietly narrow it.
+	t.Run("a wide id is accepted in either spelling", func(t *testing.T) {
+		for _, tc := range []struct{ name, extras string }{
+			// 3000000000 > math.MaxInt32 (2147483647), well inside float64's
+			// exact range and inside a 64-bit int.
+			{"plain integer above MaxInt32", `[{"extraId":3000000000,"quantity":1}]`},
+			{"float-spelled above MaxInt32", `[{"extraId":3000000000.0,"quantity":1}]`},
+			{"exponent above MaxInt32", `[{"extraId":3e9,"quantity":1}]`},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				_, _, hit, err := capture(t, createArgs("--extras", tc.extras)...)
+				if !hit {
+					t.Errorf("--extras %s was refused locally, but the value is a whole number "+
+						"the spec places no upper bound on: %v", tc.extras, err)
+				}
+			})
+		}
+	})
+
+	// And the guard that remains must still bite: past 2^53 a float64 cannot
+	// be trusted to be the integer the caller wrote, so converting it would
+	// invent a different id. Refusing is correct there.
+	t.Run("a float beyond float64's exact integer range is refused", func(t *testing.T) {
+		// 1e19 also exceeds int64, so this is refused on both counts.
+		_, body, hit, err := capture(t, createArgs("--extras", `[{"extraId":1e19,"quantity":1}]`)...)
+		if err == nil {
+			t.Fatalf("--extras with a 1e19 id was accepted: %v", body)
+		}
+		if hit {
+			t.Errorf("--extras with a 1e19 id reached the server: %v", body)
+		}
+	})
+
 	// The other half of the rule must still hold, or the fix is just a hole.
 	t.Run("a boolean or fractional value is still refused", func(t *testing.T) {
 		for _, tc := range []struct{ name, guests, want string }{
