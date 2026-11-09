@@ -1467,6 +1467,34 @@ assertion. A proxy or a future server change returning one of those codes under 
 status would print a false status and assert a key-release guarantee the spec grants
 only to the 409.
 
+**`workflows` and `workflow-executions` have no agent-facing cookbook.** Both are real command
+groups, so their verbs, the three 1.55.0 trigger action types (`segment_entered`,
+`segment_left`, `whatsapp_message_received`) and the 1.56.0 `whatsapp` channel for
+`send_notification` are reachable only through `--help`. Reference coverage exists in README's
+resource table; there is no how-to or explanation coverage, and `workflows delete` cascades to
+steps, which makes this the most destructive family without a cookbook. Raised by both docs
+audits on 2026-11-09. **This entry exists because `skills.md` and commit 57a31e9's message both
+claimed the gap was already recorded here and it was not** — the second docs audit caught the
+false cross-reference, removed it from `skills.md`, and could not fix the commit message, so the
+honest repair is to make the claim true going forward rather than rewrite history.
+
+**`PRODUCT_BEING_DUPLICATED` is untyped and nearly undocumented.** It has reference coverage in
+README and `skills/index.md` only: `skills/products.md` documents `products duplicate` without
+the couple-of-minutes window the copy job holds the source for, and `internal/inventory/errors.go`
+does not type it, so the CLI surfaces it as a raw API error with no retry guidance — even though
+the spec marks it "Transient and retriable", sets `error.retriable` true, and says the refusal
+RELEASES the `Idempotency-Key`, which is exactly the guidance a typed error would carry. It fires
+on seven product and product-option writes, not just `duplicate`.
+
+**Upstream: the spec contradicts itself on whether every other `409` is final.**
+`api/inventory/cli-v1.yaml:7980` asserts "Every other `409` describes something that will answer
+the same way forever", while the same document's `PRODUCT_BEING_DUPLICATED` entry (≈8069) makes
+that code transient, retriable and key-releasing, and `IDEMPOTENCY_IN_PROGRESS` is auto-retried
+by this CLI's own transport. The docs here now follow the specific passages rather than the
+blanket one. Per CLAUDE.md the vendored spec is never edited locally, so the fix is a ticket on
+`captainbook/captainbook`. Found by the codex outside voice and confirmed by the second docs
+audit, independently.
+
 **`bookings create` writes customer name, email and phone verbatim to the local audit log.**
 `ForensicFields` includes `customer`, whose value is the raw
 `{"name","email","phone","zip_code",...}` object, and `forensicSummary`/`capForensicValue` apply
