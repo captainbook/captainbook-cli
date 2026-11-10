@@ -532,7 +532,7 @@ func availabilitiesDefs() []CommandDef {
 			Use: "list", Short: "List availabilities", Kind: KindRead,
 			Verb: "GET", Path: "/availabilities", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1},
+				{Name: "limit", Type: "int", Min: 1, Max: 200},
 				{Name: "cursor", Type: "string"},
 				// An integer here, unlike the string-typed flag of the same
 				// name on the two bulk endpoints. Both carry the spec's
@@ -663,7 +663,7 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "status", Type: "string", Description: "available|blocked"},
 				{Name: "is-bookable", Type: "bool", Description: "Bulk-close state, tracked independently of --status. Reads false after a bulk-update booking-status close"},
 				{Name: "fares", Type: "string", Description: "JSON array of per-slot pricing overrides: [{pricing_tier_id, amount}, ...]. amount null deletes the override"},
-				{Name: "day-count", Type: "int", Description: "Multi-day events: number of days this departure spans"},
+				{Name: "day-count", Type: "int", Max: 365, Description: "Multi-day events: number of days this departure spans. 0 (the default) is an ordinary same-day session, so this flag has no lower bound to declare."},
 				{Name: "start-time", Type: "string", Description: "HH:MM, product-local wall clock (datetime products only)"},
 				{Name: "end-time", Type: "string", Description: "HH:MM, product-local wall clock (datetime products only)"},
 			},
@@ -720,7 +720,7 @@ func availabilitiesDefs() []CommandDef {
 				{Name: "start-time", Type: "string", Required: true, Description: "HH:MM, product-local wall clock"},
 				{Name: "end-time", Type: "string", Required: true, Description: "HH:MM, product-local wall clock"},
 				{Name: "capacity", Type: "int", Required: true, Description: "Slot capacity"},
-				{Name: "day-count", Type: "int", Description: "Multi-day events: number of days this departure spans"},
+				{Name: "day-count", Type: "int", Max: 365, Description: "Multi-day events: number of days this departure spans. 0 (the default) is an ordinary same-day session, so this flag has no lower bound to declare."},
 				{Name: "end-date", Type: "string", Description: "Multi-day events: explicit end date (YYYY-MM-DD)"},
 				{Name: "is-bookable", Type: "bool", Description: "Whether the departure is open for booking"},
 			},
@@ -1003,6 +1003,10 @@ func bulkUpdateCmd(runner *Runner) *cobra.Command {
 var timeValueFlags = []FlagDef{
 	{Name: "start-time", Type: "string", Required: true, Description: "HH:MM"},
 	{Name: "end-time", Type: "string", Required: true, Description: "HH:MM"},
+	// No Min and no Max: TimeValue.day_count declares neither in the
+	// spec (only `default: 0`), unlike the create/update schemas which
+	// declare minimum 0 and maximum 365. A bound invented here would be a
+	// CLI-only refusal, and 0 is the documented same-day value.
 	{Name: "day-count", Type: "int", Description: "Days the activity spans"},
 }
 

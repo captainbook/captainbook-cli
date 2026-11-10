@@ -1,6 +1,6 @@
 # `ceebee stats` — the statistics namespace
 
-Read-only analytics over one tenant. Thirteen metrics, one shared period/comparison model, and a per-metric filter vocabulary the server **enforces** rather than suggests.
+Read-only analytics over one tenant. Fourteen metrics, one shared period/comparison model, and a per-metric filter vocabulary the server **enforces** rather than suggests.
 
 This is the cookbook the `inventory` resources have had all along and `stats` did not. If you only read one section, read [Filters are per-metric](#filters-are-per-metric-and-refused-when-unsupported) and [Dates are not what you assume](#dates-are-not-what-you-assume).
 
@@ -17,6 +17,7 @@ This is the cookbook the `inventory` resources have had all along and `stats` di
 | `ceebee stats locations` | Location rankings |
 | `ceebee stats channels` | Booking channel distribution |
 | `ceebee stats occupancy` | Slot occupancy and capacity utilisation |
+| `ceebee stats attendance` | Who turned up and who did not, from ticket redemptions |
 | `ceebee stats extras` | Extra/add-on sales performance |
 | `ceebee stats discounts` | Discount code usage |
 | `ceebee stats gift-certs` | Gift certificate issuance and redemption |
@@ -60,6 +61,7 @@ So the CLI only declares the flags a metric actually applies: if `--channel-id` 
 | `extras`, `discounts` | business-unit, product, channel, location, resource |
 | `occupancy` | business-unit, product, location |
 | `summary` | business-unit, product, location |
+| `attendance` | business-unit, product |
 | `browsing` | business-unit, day-of-week |
 | `gift-certs` | business-unit |
 
@@ -68,7 +70,58 @@ Why the narrow ones are narrow:
 - **`occupancy`** counts departure *slots*, so it joins no bookings: there is no channel to filter on, and no resource either — `booking_resource` records who *worked* a booking and an empty slot has nobody. It refuses `--date-basis` because it is dated by the departure already, and `--day-of-week` because it *groups* by weekday.
 - **`gift-certs`** — a certificate is an amount, not a trip.
 - **`browsing`** reads browsing events, which join no bookings at all.
+- **`attendance`** counts *people* off ticket redemptions, dated by the departure. It joins no channel, location or resource, and it refuses `--date-basis` outright: a no-show happens at the trip, so there is no second clock to offer.
 - **`summary`** reports only what *all* its sections can honour. Five would accept `--channel-id` and `occupancy` cannot, so a channel-scoped summary would report the whole business's occupancy rate beside channel-scoped revenue, in one object, under one period.
+
+## `attendance` — read `attendance_recorded` before quoting anything
+
+This metric is the one where a **zero and a null mean different things**, and only one of them is good news.
+
+Every count it returns is nullable, and null exactly when `attendance_recorded` is `false`:
+
+```bash
+ceebee stats attendance --from 2026-03-01 --to 2026-03-31
+ceebee stats attendance --from 2026-03-01 --to 2026-03-31 --product-id 12 --granularity week
+```
+
+```text
+attendance_recorded        true   → somebody scanned on at least one departure, so the
+                                    figures below are real. FALSE means every one of them
+                                    is null because NOBODY SCANNED — not that everybody
+                                    turned up.
+departures                 412    → departures carrying at least one confirmed booking
+departures_with_attendance 37     → how many of those had any redemption recorded
+attendance_coverage_rate   9.0    → how much of the business the rates below describe
+expected_guests            298    → confirmed guests on the 37 that were scanned
+checked_in_guests          271
+no_show_guests             19     → marked absent explicitly; never inferred from a missing scan
+unrecorded_guests          8      → on a scanned departure, neither checked in nor marked absent
+no_show_rate               6.4
+```
+
+When `attendance_recorded` is `false` the shape is different, and this is the one to
+recognise — `departures` still counts, every figure that depends on a scan is null, and
+`departures_with_attendance` is 0:
+
+```text
+attendance_recorded        false
+departures                 412
+departures_with_attendance 0
+attendance_coverage_rate   0.0
+expected_guests            null
+checked_in_guests          null
+no_show_guests             null
+unrecorded_guests          null
+no_show_rate               null
+```
+
+Three things to carry into any answer built on it:
+
+- **`no_shows = 0` from an operator who has never used check-in means "nobody was counting".** Read `attendance_recorded` first and say so, rather than reporting a flawless turnout.
+- **The figures are scoped to the departures somebody actually scanned**, not to every departure in the window. An operator who scans one product and not the other four would otherwise get a no-show rate diluted by the four nobody counted — a small, plausible, wrong number. `attendance_coverage_rate` is what says how much of the business the rate describes, so quote it beside the rate.
+- **`unrecorded_guests` is a data-quality figure, not an attendance one** — a guide who stopped scanning halfway. It is deliberately not folded into `no_show_guests`, and folding it in yourself would invent no-shows.
+
+The series is an empty array when `attendance_recorded` is false, because a series of zeros would restate the figure the metric refuses to publish.
 
 ## Dates are not what you assume
 

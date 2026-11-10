@@ -709,6 +709,191 @@ func (e *ResponseDriftError) UserMessage() string {
 }
 
 // -----------------------------------------------------------------------------
+// 14b. KeyReleasingConflictError — the three booking 409s that RELEASE their
+//      idempotency key (spec 1.47.0)
+//
+// `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and `NO_RESOURCE_AVAILABLE`
+// are the only 409s on this API that do not persist a response under their key.
+// Each describes a PASSING state — a full departure, a slot that filled or
+// closed, a guide already assigned — so the right retry is the identical call
+// under the SAME key once the cause clears.
+//
+// These get a type rather than falling through to RawAPIError for one reason,
+// and it is not the message: the server's sentence says what went wrong, and
+// nothing anywhere says what to do about the KEY. Every other 409 on this API
+// replays, so the habit a caller builds from the rest of the surface — mint a
+// fresh key and try again — is exactly wrong here. The spec is blunt about the
+// cost: "minting a new one for it is how a retry becomes a double booking",
+// and persisting one "made a card approved during a busy minute un-approvable
+// even after the cause cleared".
+//
+// Deliberately one type for three codes. They differ only in which passing
+// state they name, which the server's own message already carries, and the
+// advice is identical — three near-identical types would be three places for
+// that advice to drift.
+// -----------------------------------------------------------------------------
+
+type KeyReleasingConflictError struct {
+	Code    string
+	Message string
+
+	// Key is the Idempotency-Key the refused request carried, filled in by the
+	// caller from the outgoing request because this message is the only text a
+	// caller reads at failure time and it prescribes reusing that key.
+	//
+	// Without it the advice named a lever the CLI did not hand over: the key is
+	// minted per invocation and printed nowhere, reaching only
+	// ~/.ceebee/audit.jsonl, so the obvious retry — re-running the command —
+	// mints a FRESH key and takes the second booking this very message warns
+	// about. The three sibling idempotency errors all carry a Key for the same
+	// reason. Empty is tolerated: a caller that reads the key from its own
+	// --idempotency-key still gets the rest of the sentence.
+	Key string
+}
+
+func (e *KeyReleasingConflictError) Error() string {
+	if e.Key != "" {
+		return fmt.Sprintf("%s (status 409): %s (key=%s)", e.Code, e.Message, e.Key)
+	}
+	return fmt.Sprintf("%s (status 409): %s", e.Code, e.Message)
+}
+
+func (e *KeyReleasingConflictError) UserMessage() string {
+	retry := "Retry the identical call under the SAME key once the cause clears"
+	if e.Key != "" {
+		retry = fmt.Sprintf("Retry the identical call once the cause clears, passing that key back "+
+			"explicitly: --idempotency-key %s", e.Key)
+	}
+	return fmt.Sprintf(
+		"%s: %s\nThis refusal describes a passing state, so it did NOT store a response "+
+			"under your Idempotency-Key%s. %s — minting a new key for it is how a retry "+
+			"becomes a double booking.",
+		e.Code, e.Message, keySuffix(e.Key), retry,
+	)
+}
+
+// keySuffix names the key inline when it is known. Separate so the sentence
+// reads the same whether or not the caller supplied one.
+func keySuffix(key string) string {
+	if key == "" {
+		return ""
+	}
+	return " (" + key + ")"
+}
+
+// -----------------------------------------------------------------------------
+// 14c. PlanLimitReachedError — PLAN_LIMIT_REACHED, 403 (spec 1.38.0-1.40.0)
+//
+// Distinct from FORBIDDEN on purpose, and the distinction is the actionable
+// part: `FORBIDDEN` means this token or role may not do it, while this means
+// the ACCOUNT has run out. Nothing the caller can change about the request
+// fixes it — the operator upgrades the plan or removes a row — so a caller that
+// reads it as a permissions problem retries forever against a wall.
+//
+// It is typed rather than raw because `details` carries `plan_item`, `limit`
+// and `current`, and those three turn "forbidden" into a sentence an operator
+// can act on. The entitlement is evaluated BEFORE the permission, so one
+// account state produces one code whoever is asking — an account owner included,
+// which is the hole 1.40.0 closed: the permission system grants an owner every
+// ability before any check runs, so for an owner the allowance was never read.
+//
+// Enforcement is rolled out PER ACCOUNT, so this cannot be predicted from the
+// allowance alone: an account over its limit may still be answered 201. Treat it
+// as a refusal to handle, never one to pre-empt.
+// -----------------------------------------------------------------------------
+
+type PlanLimitReachedError struct {
+	PlanItem string
+	Limit    string
+	Current  string
+	Message  string
+}
+
+// Error prints only the slots the payload actually carried, which is the same
+// presence rule UserMessage applies.
+//
+// The naive three-slot format rendered "item= limit= current=" whenever
+// `details` was absent or partial — and `details` is `additionalProperties:
+// true`, so a partial payload is legal. Three empty slots do not read as "the
+// server did not say"; they read as "the allowance is empty", which is a
+// different and wrong fact about the account.
+//
+// Be precise about the reach, because the first version of this comment was
+// not: NO path in today's CLI prints this string. cmd/root.go tries
+// `*api.ExitError` first, `UserMessenger` second, `err.Error()` last, and this
+// type implements UserMessenger, so arm 2 always wins — verified end to end,
+// including under `--verbose`. The audit row does not carry it either; it
+// records `error_code` and no message. So this is the type's contract being
+// correct rather than an operator-visible bug being fixed, and it matters only
+// if something later wraps the error in an `api.ExitError` (arm 1 prints
+// `exitErr.Err`, which calls Error()) or formats it with `%v`.
+func (e *PlanLimitReachedError) Error() string {
+	var parts []string
+	if e.PlanItem != "" {
+		parts = append(parts, "item="+e.PlanItem)
+	}
+	if e.Limit != "" {
+		parts = append(parts, "limit="+e.Limit)
+	}
+	if e.Current != "" {
+		parts = append(parts, "current="+e.Current)
+	}
+	if len(parts) > 0 {
+		return "PLAN_LIMIT_REACHED: " + strings.Join(parts, " ")
+	}
+	// Nothing in `details` at all. Fall back to the server's own sentence if it
+	// sent one, rather than logging a bare code with no context.
+	if e.Message != "" {
+		return "PLAN_LIMIT_REACHED: " + e.Message
+	}
+	return "PLAN_LIMIT_REACHED"
+}
+
+func (e *PlanLimitReachedError) UserMessage() string {
+	msg := e.Message
+	if msg == "" {
+		msg = "the account has used up this plan allowance"
+	}
+	// The three-field sentence needs all three. `details` is
+	// `additionalProperties: true`, so a payload carrying `plan_item` with no
+	// `limit`/`current` is legal — and rendering it anyway prints
+	// "(products:  of  used)", blanking the two numbers that decide what the
+	// operator does next.
+	if e.PlanItem == "" || e.Limit == "" || e.Current == "" {
+		// Say whatever the payload did carry. Dropping the two NUMBERS because
+		// the LABEL is missing loses the part that decides what the operator
+		// does next, which is the same mistake as rendering blanks.
+		switch {
+		case e.PlanItem != "" && e.Limit != "":
+			return fmt.Sprintf("PLAN_LIMIT_REACHED: %s (%s, allowance %s). This is an account "+
+				"ENTITLEMENT, not a permission: no change to the request will help. The "+
+				"operator must upgrade the plan or remove an existing %s.",
+				msg, e.PlanItem, e.Limit, e.PlanItem)
+		case e.PlanItem != "" && e.Current != "":
+			return fmt.Sprintf("PLAN_LIMIT_REACHED: %s (%s, %s used). This is an account "+
+				"ENTITLEMENT, not a permission: no change to the request will help. The "+
+				"operator must upgrade the plan or remove an existing %s.",
+				msg, e.PlanItem, e.Current, e.PlanItem)
+		case e.PlanItem != "":
+			return fmt.Sprintf("PLAN_LIMIT_REACHED: %s (allowance: %s). This is an account "+
+				"ENTITLEMENT, not a permission: no change to the request will help. The "+
+				"operator must upgrade the plan or remove an existing %s.", msg, e.PlanItem, e.PlanItem)
+		case e.Limit != "" && e.Current != "":
+			return fmt.Sprintf("PLAN_LIMIT_REACHED: %s (%s of %s used). This is an account "+
+				"ENTITLEMENT, not a permission: no change to the request will help. The "+
+				"operator must upgrade the plan or remove an existing row.", msg, e.Current, e.Limit)
+		}
+		return fmt.Sprintf("PLAN_LIMIT_REACHED: %s. This is an account ENTITLEMENT, not a "+
+			"permission: no change to the request will help. The operator must upgrade the "+
+			"plan or remove an existing row.", msg)
+	}
+	return fmt.Sprintf("PLAN_LIMIT_REACHED: %s (%s: %s of %s used). This is an account "+
+		"ENTITLEMENT, not a permission: no change to the request will help, and it holds for "+
+		"an account owner too. The operator must upgrade the plan or remove an existing %s.",
+		msg, e.PlanItem, e.Current, e.Limit, e.PlanItem)
+}
+
+// -----------------------------------------------------------------------------
 // 15. RawAPIError — fallback when code is set but unknown to our registry,
 //     and the carrier for the flat `{"error": "<string>"}` gate shape
 //
@@ -828,6 +1013,26 @@ func init() {
 			return &ResourceInUseError{ResourceType: rt, RelatedType: rel}
 		},
 
+		// The three booking 409s that release their key. One constructor, bound
+		// three times: see KeyReleasingConflictError for why they share a type.
+		"CAPACITY_UNAVAILABLE":   keyReleasingConflict("CAPACITY_UNAVAILABLE"),
+		"DEPARTURE_NOT_BOOKABLE": keyReleasingConflict("DEPARTURE_NOT_BOOKABLE"),
+		"NO_RESOURCE_AVAILABLE":  keyReleasingConflict("NO_RESOURCE_AVAILABLE"),
+
+		"PLAN_LIMIT_REACHED": func(status int, env errorEnvelope) error {
+			// Every field is best-effort: `details` is
+			// `additionalProperties: true`, and `limit`/`current` are numbers on
+			// the wire, so they are read as raw scalars rather than decoded into
+			// an int that would silently become 0 on a string.
+			item, _ := decodeStringField(env.Error.Details, "plan_item")
+			return &PlanLimitReachedError{
+				PlanItem: item,
+				Limit:    rawScalarField(env.Error.Details, "limit"),
+				Current:  rawScalarField(env.Error.Details, "current"),
+				Message:  env.Error.Message,
+			}
+		},
+
 		"AVAILABILITY_HAS_CONFIRMED_BOOKING": func(status int, env errorEnvelope) error {
 			availabilityID, _ := decodeStringField(env.Error.Details, "availability_id")
 			totalBlocked, _ := decodeIntField(env.Error.Details, "total_blocked")
@@ -931,6 +1136,34 @@ func decodeStringField(d map[string]json.RawMessage, key string) (string, bool) 
 		return "", false
 	}
 	return s, true
+}
+
+// keyReleasingConflict builds the registry constructor for one of the three
+// 409s that release their idempotency key. The code is closed over rather than
+// read off the envelope so a registry key and the code it reports cannot
+// disagree — the envelope's own code is what selected this constructor, and
+// reading it back would make a mismatch unobservable.
+func keyReleasingConflict(code string) func(status int, env errorEnvelope) error {
+	return func(_ int, env errorEnvelope) error {
+		return &KeyReleasingConflictError{Code: code, Message: env.Error.Message}
+	}
+}
+
+// rawScalarField returns the scalar at key as the server spelled it, or "" if
+// absent. Used where `details` carries a number whose exact spelling is going
+// straight into a message: decoding through an int would turn a string "41"
+// into 0 and report a limit of zero, which reads as "this plan includes none".
+func rawScalarField(d map[string]json.RawMessage, key string) string {
+	raw, ok := d[key]
+	if !ok {
+		return ""
+	}
+	// A JSON string arrives quoted; unquote it so `"41"` and `41` print alike.
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		return str
+	}
+	return strings.TrimSpace(string(raw))
 }
 
 // decodeIntField returns the int64 at key, or 0 if absent or non-numeric.

@@ -18,7 +18,7 @@ A `Question` is a checkout-time question presented to the customer for a `Produc
 ### 1. List required questions for one option
 
 ```bash
-ceebee inventory questions list --product-option-id po_88 --required=true
+ceebee inventory questions list --product-option-id 88 --required=true
 ```
 
 Returns `{id, product_option_id, label, type, required, options, granularity, deleted_at}`.
@@ -52,7 +52,7 @@ Default `--format json` returns the diff envelope.
 
 ```bash
 ceebee inventory questions delete q_42         # 204; cascade-deletes answers
-ceebee inventory questions list --include-trashed --product-option-id po_88
+ceebee inventory questions list --include-trashed --product-option-id 88
 ceebee inventory questions restore q_42        # 200; cascade-restores answers
 ```
 
@@ -63,7 +63,7 @@ The flag does not exist here, and the endpoint refuses the parameter with **422*
 The 422 is deliberate rather than a silently-unfiltered page, which is what a nightly poller would misread as "nothing changed since last run". There is no incremental-sync signal for questions: list in full per product option and diff client-side.
 
 ```bash
-ceebee inventory questions list --product-option-id po_88
+ceebee inventory questions list --product-option-id 88
 ```
 
 Four other resources are in the same position — `guests`, `pricing-categories`, `pricing-tiers`, `categories`. Where `--since` *is* declared it still means a real lower bound on `updated_at` (`media list` excepted — see [media.md](media.md)), but plenty of endpoints simply never had one, `bookings list` among them. Check `--help` rather than assuming; [index.md](index.md#incremental-sync---since-is-not-universal) has the full picture.

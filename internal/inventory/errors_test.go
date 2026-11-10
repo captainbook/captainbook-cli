@@ -1146,3 +1146,325 @@ func TestParseError_FlatShapeDoesNotShadowTheEnvelope(t *testing.T) {
 		}
 	})
 }
+
+// TestKeyReleasingConflictError_NamesTheKeyItTellsYouToReuse is the regression
+// test for advice that named a lever the CLI did not hand over.
+//
+// The message says to retry "under the SAME key", and the type carried no key.
+// The CLI mints a UUIDv7 per invocation and prints it nowhere — it reaches
+// ~/.ceebee/audit.jsonl and no other surface — so the obvious retry, re-running
+// the command, mints a FRESH key and takes the second booking this very message
+// warns about. Two independent reviewers raised it before it was fixed.
+//
+// Value: protects=a key-releasing 409 names the key to reuse and the flag that reuses it, whenever the key is known; fails_when=the Key field is dropped, left unpopulated, or the message stops naming --idempotency-key; why_new=the sibling test asserts the code and the no-double-booking sentence but nothing carried or checked the key; seam=none; no_claim=does not prove the key reaches this type in the real CLI, which TestWire_KeyReleasing409ReportsTheKeyTheServerSaw covers
+func TestKeyReleasingConflictError_NamesTheKeyItTellsYouToReuse(t *testing.T) {
+	const key = "01a1c127-3a90-7071-9211-0a37b60358ae"
+
+	t.Run("with a key it names the key and the flag", func(t *testing.T) {
+		e := &KeyReleasingConflictError{Code: "CAPACITY_UNAVAILABLE", Message: "Full.", Key: key}
+		msg := e.UserMessage()
+		for _, want := range []string{key, "--idempotency-key", "double booking"} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("UserMessage() = %q, want it to contain %q", msg, want)
+			}
+		}
+		// The old wording told the caller to reuse a key it never showed. If
+		// that sentence comes back while a key IS known, the advice is
+		// unactionable again.
+		if strings.Contains(msg, "under the SAME key once the cause clears") {
+			t.Errorf("UserMessage() still gives the keyless instruction although the key is known: %q", msg)
+		}
+		if !strings.Contains(e.Error(), key) {
+			t.Errorf("Error() = %q, want the key for logs and %%v", e.Error())
+		}
+	})
+
+	// An unknown key must not invent one or print an empty slot: a caller who
+	// passed --idempotency-key themselves already has it.
+	t.Run("without a key it still reads correctly", func(t *testing.T) {
+		e := &KeyReleasingConflictError{Code: "NO_RESOURCE_AVAILABLE", Message: "None free."}
+		msg := e.UserMessage()
+		if !strings.Contains(msg, "SAME key") {
+			t.Errorf("UserMessage() = %q, want the same-key instruction when no key is known", msg)
+		}
+		for _, bad := range []string{"()", "--idempotency-key \n", "key="} {
+			if strings.Contains(msg, bad) {
+				t.Errorf("UserMessage() = %q, want no empty slot (%q)", msg, bad)
+			}
+		}
+		if strings.Contains(e.Error(), "key=") {
+			t.Errorf("Error() = %q, want no empty key slot", e.Error())
+		}
+	})
+}
+
+// TestParseError_KeyReleasingConflicts covers the three booking 409s spec
+// 1.47.0 added, and the one thing a RawAPIError fallback cannot say.
+//
+// The server's sentence explains what went wrong. Nothing on the wire says
+// what to do about the idempotency KEY — and every OTHER 409 on this API
+// replays a stored response, so the habit the rest of the surface teaches
+// (mint a fresh key, try again) is exactly wrong here. The spec: "minting a new
+// one for it is how a retry becomes a double booking."
+//
+// Value: protects=the three key-releasing 409s surface as a typed error whose message tells the caller to retry under the SAME key; fails_when=a code is dropped from the registry (it falls back to RawAPIError and the retry advice disappears) or the advice stops naming the key; why_new=all three codes are new in this spec sync and nothing mapped them; seam=none
+func TestParseError_KeyReleasingConflicts(t *testing.T) {
+	for _, code := range []string{"CAPACITY_UNAVAILABLE", "DEPARTURE_NOT_BOOKABLE", "NO_RESOURCE_AVAILABLE"} {
+		t.Run(code, func(t *testing.T) {
+			body := `{"meta":{"request_id":"req_1"},"error":{"code":"` + code +
+				`","message":"The departure is full.","retriable":true}}`
+			err := ParseError(409, []byte(body))
+
+			var kr *KeyReleasingConflictError
+			if !errors.As(err, &kr) {
+				t.Fatalf("want *KeyReleasingConflictError, got %T: %v", err, err)
+			}
+			if kr.Code != code {
+				t.Errorf("Code = %q, want %q", kr.Code, code)
+			}
+			um, ok := err.(UserMessenger)
+			if !ok {
+				t.Fatalf("%T does not implement UserMessenger, so the cobra path cannot render it", err)
+			}
+			msg := um.UserMessage()
+			// The server's own sentence has to survive — the advice is in
+			// addition to the reason, not instead of it.
+			if !strings.Contains(msg, "The departure is full.") {
+				t.Errorf("UserMessage dropped the server's reason: %q", msg)
+			}
+			// And the part no other surface states.
+			if !strings.Contains(msg, "SAME key") {
+				t.Errorf("UserMessage does not tell the caller to retry under the same key, "+
+					"which is the only thing this type adds over RawAPIError: %q", msg)
+			}
+		})
+	}
+
+	// The contrast case, which is what makes the advice meaningful: a 409 that
+	// DOES persist must not pick up the same message. If it did, the advice
+	// would be noise on every conflict rather than a distinction.
+	t.Run("a replaying 409 is not treated as key-releasing", func(t *testing.T) {
+		body := `{"meta":{"request_id":"req_2"},"error":{"code":"IDEMPOTENCY_CONFLICT",` +
+			`"message":"Key already used with a different body.","retriable":false}}`
+		err := ParseError(409, []byte(body))
+		var kr *KeyReleasingConflictError
+		if errors.As(err, &kr) {
+			t.Fatalf("IDEMPOTENCY_CONFLICT was typed as key-releasing; it replays its stored response")
+		}
+	})
+}
+
+// TestParseError_PlanLimitReached covers the 403 that is an ENTITLEMENT rather
+// than a permission (spec 1.38.0-1.40.0).
+//
+// The distinction is the actionable part: `FORBIDDEN` means this token or role
+// may not do it, so fixing the token helps; this means the ACCOUNT has run out,
+// so nothing about the request helps and a caller reading it as a permissions
+// problem retries forever. The three `details` keys are what turn it into a
+// sentence an operator can act on.
+//
+// Value: protects=PLAN_LIMIT_REACHED surfaces its plan_item/limit/current and says the request cannot be fixed; fails_when=the code leaves the registry, or limit/current are decoded through an int (a string "41" would silently print as 0, reading as "this plan includes none"); why_new=the code is new in this sync and nothing mapped it; seam=none
+func TestParseError_PlanLimitReached(t *testing.T) {
+	// `limit` and `current` arrive as JSON NUMBERS here...
+	numeric := `{"meta":{"request_id":"req_3"},"error":{"code":"PLAN_LIMIT_REACHED",` +
+		`"message":"Your plan includes 41 products.","retriable":false,` +
+		`"details":{"plan_item":"products","limit":41,"current":41}}}`
+	err := ParseError(403, []byte(numeric))
+
+	var pl *PlanLimitReachedError
+	if !errors.As(err, &pl) {
+		t.Fatalf("want *PlanLimitReachedError, got %T: %v", err, err)
+	}
+	if pl.PlanItem != "products" || pl.Limit != "41" || pl.Current != "41" {
+		t.Errorf("details not read: %+v", pl)
+	}
+	um, ok := err.(UserMessenger)
+	if !ok {
+		t.Fatalf("%T does not implement UserMessenger", err)
+	}
+	msg := um.UserMessage()
+	for _, want := range []string{"products", "41", "ENTITLEMENT", "upgrade"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("UserMessage is missing %q: %q", want, msg)
+		}
+	}
+
+	// ...and as JSON STRINGS on another, which is why they are read as raw
+	// scalars. Decoded through an int64 a quoted "41" fails and reports 0,
+	// which an operator reads as "this plan includes none".
+	stringy := `{"meta":{"request_id":"req_4"},"error":{"code":"PLAN_LIMIT_REACHED",` +
+		`"message":"Your plan includes 5 resources.","retriable":false,` +
+		`"details":{"plan_item":"resources","limit":"5","current":"5"}}}`
+	err = ParseError(403, []byte(stringy))
+	if !errors.As(err, &pl) {
+		t.Fatalf("want *PlanLimitReachedError, got %T: %v", err, err)
+	}
+	if pl.Limit != "5" || pl.Current != "5" {
+		t.Errorf("a string-spelled limit was lost: %+v", pl)
+	}
+
+	// Absent details must not panic or invent a limit. `details` is
+	// `additionalProperties: true`, so this shape is legal.
+	bare := `{"meta":{"request_id":"req_5"},"error":{"code":"PLAN_LIMIT_REACHED",` +
+		`"message":"Plan allowance exhausted.","retriable":false}}`
+	err = ParseError(403, []byte(bare))
+	if !errors.As(err, &pl) {
+		t.Fatalf("want *PlanLimitReachedError, got %T: %v", err, err)
+	}
+	if got := err.(UserMessenger).UserMessage(); !strings.Contains(got, "Plan allowance exhausted.") {
+		t.Errorf("UserMessage dropped the server's reason when details were absent: %q", got)
+	}
+}
+
+// TestParseError_PlanLimitReachedPartialDetails is the regression test for a
+// sentence that rendered its own blanks.
+//
+// `error.details` is `additionalProperties: true`, so a payload carrying
+// `plan_item` with no `limit`/`current` is legal — and the first version of
+// UserMessage branched only on an empty PlanItem, printing
+// "(products:  of  used)". The two numbers it blanked are the ones that decide
+// what the operator does next.
+//
+// Value: protects=a PLAN_LIMIT_REACHED with partial details renders a complete sentence with no empty slots; fails_when=UserMessage goes back to branching on PlanItem alone; why_new=the existing cases cover all-three and none, which are the two halves that already worked; seam=none
+func TestParseError_PlanLimitReachedPartialDetails(t *testing.T) {
+	for _, tc := range []struct{ name, details string }{
+		{"plan_item only", `{"plan_item":"products"}`},
+		{"missing limit", `{"plan_item":"products","current":41}`},
+		{"missing current", `{"plan_item":"products","limit":41}`},
+		{"null limit", `{"plan_item":"products","limit":null,"current":41}`},
+		// The numbers without the label: dropping them because plan_item is
+		// absent loses the part that decides what the operator does next.
+		{"numbers but no plan_item", `{"limit":41,"current":41}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"meta":{"request_id":"r1"},"error":{"code":"PLAN_LIMIT_REACHED",` +
+				`"message":"Plan allowance exhausted.","retriable":false,"details":` + tc.details + `}}`
+			err := ParseError(403, []byte(body))
+			var pl *PlanLimitReachedError
+			if !errors.As(err, &pl) {
+				t.Fatalf("want *PlanLimitReachedError, got %T", err)
+			}
+			msg := err.(UserMessenger).UserMessage()
+			// The specific shape of the bug: a blank slot between words.
+			for _, blank := range []string{" of  used", "(products:  of", ":  of"} {
+				if strings.Contains(msg, blank) {
+					t.Errorf("UserMessage renders a blank slot (%q): %q", blank, msg)
+				}
+			}
+			if !strings.Contains(msg, "Plan allowance exhausted.") {
+				t.Errorf("UserMessage dropped the server's reason: %q", msg)
+			}
+			if strings.Contains(tc.details, `"plan_item"`) && !strings.Contains(msg, "products") {
+				t.Errorf("UserMessage dropped the plan item it does know: %q", msg)
+			}
+			// Whatever numbers the payload carried must survive — including
+			// `current` with no `limit`, which used to print
+			// "(allowance: products)" and drop the 41 entirely.
+			if (strings.Contains(tc.details, `"limit":41`) || strings.Contains(tc.details, `"current":41`)) &&
+				!strings.Contains(msg, "41") {
+				t.Errorf("UserMessage dropped the number it does know: %q", msg)
+			}
+			if !strings.Contains(msg, "ENTITLEMENT") {
+				t.Errorf("UserMessage dropped the entitlement-not-permission distinction: %q", msg)
+			}
+		})
+	}
+
+	// The complete-details path must still produce the richer sentence.
+	full := `{"meta":{"request_id":"r1"},"error":{"code":"PLAN_LIMIT_REACHED",` +
+		`"message":"Your plan includes 41 products.","retriable":false,` +
+		`"details":{"plan_item":"products","limit":41,"current":41}}}`
+	msg := ParseError(403, []byte(full)).(UserMessenger).UserMessage()
+	if !strings.Contains(msg, "41 of 41 used") {
+		t.Errorf("the complete-details sentence regressed: %q", msg)
+	}
+}
+
+// TestPlanLimitReachedError_ErrorStringHasNoBlankSlots is the same assertion on
+// the OTHER renderer, which is where the fix had not reached.
+//
+// UserMessage was restructured to branch on which details arrived; Error() kept
+// a flat three-slot Sprintf, so an absent or partial `details` printed
+// "PLAN_LIMIT_REACHED: item= limit= current=" — and three empty slots do not
+// read as "the server did not say", they read as "the allowance is empty",
+// which is a different and wrong fact about the account.
+//
+// What this does NOT protect, corrected after /qa checked it instead of
+// assuming it: no CLI path prints this string. An earlier version of this
+// comment claimed the audit log recorded it. It does not — the row carries
+// `error_code` and no message — and cmd/root.go reaches UserMessage first for
+// any type implementing UserMessenger, `--verbose` included. The test is worth
+// keeping because Error() is part of the type's contract and arm 1 of that
+// handler (`*api.ExitError`) prints `exitErr.Err`, so a future wrap would
+// expose it; it is not evidence of an operator-visible bug repaired.
+//
+// Value: protects=Error() names only the detail slots the payload carried, on every partial shape; fails_when=Error() goes back to a flat three-slot format string; why_new=the partial-details test next door asserts on UserMessage only, and nothing covered Error(); seam=none; no_claim=any operator-visible surface (no CLI path prints Error() today; the audit row carries error_code, not the message)
+func TestPlanLimitReachedError_ErrorStringHasNoBlankSlots(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     *PlanLimitReachedError
+		want    []string // substrings that must appear
+		notWant []string // substrings that must not
+	}{
+		{
+			name: "all three",
+			err:  &PlanLimitReachedError{PlanItem: "products", Limit: "41", Current: "41"},
+			want: []string{"item=products", "limit=41", "current=41"},
+			// A bare "current=" would match "current=41" here, so the
+			// trailing-slot case is left to the generic check below; these two
+			// can still be spelled as a key followed by a space.
+			notWant: []string{"item= ", "limit= "},
+		},
+		{
+			name:    "plan_item only",
+			err:     &PlanLimitReachedError{PlanItem: "products"},
+			want:    []string{"item=products"},
+			notWant: []string{"limit=", "current="},
+		},
+		{
+			name:    "numbers but no plan_item",
+			err:     &PlanLimitReachedError{Limit: "41", Current: "41"},
+			want:    []string{"limit=41", "current=41"},
+			notWant: []string{"item="},
+		},
+		{
+			// Nothing in details, but the server sent a sentence. Logging a
+			// bare code throws away the only context there was.
+			name:    "no details, message only",
+			err:     &PlanLimitReachedError{Message: "Plan allowance exhausted."},
+			want:    []string{"PLAN_LIMIT_REACHED", "Plan allowance exhausted."},
+			notWant: []string{"item=", "limit=", "current="},
+		},
+		{
+			// Nothing at all: the code alone, and no empty slots after it.
+			name:    "wholly empty",
+			err:     &PlanLimitReachedError{},
+			want:    []string{"PLAN_LIMIT_REACHED"},
+			notWant: []string{"item=", "limit=", "current=", ": "},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.err.Error()
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("Error() = %q, want it to contain %q", got, w)
+				}
+			}
+			for _, n := range tc.notWant {
+				if strings.Contains(got, n) {
+					t.Errorf("Error() = %q, want it NOT to contain %q — that is the blank-slot shape", got, n)
+				}
+			}
+			// The general form of the defect, independent of the cases above:
+			// no key may be followed by nothing.
+			for _, key := range []string{"item=", "limit=", "current="} {
+				if i := strings.Index(got, key); i >= 0 {
+					rest := got[i+len(key):]
+					if rest == "" || strings.HasPrefix(rest, " ") {
+						t.Errorf("Error() = %q leaves %q with no value", got, key)
+					}
+				}
+			}
+		})
+	}
+}

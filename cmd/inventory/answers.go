@@ -55,7 +55,7 @@ func answersDefs() []CommandDef {
 				"  # Include answers to questions the operator has since retired\n" +
 				"  ceebee inventory answers list --booking-id bk_9 --include-trashed",
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "booking-id", Type: "string", Description: "Answers on one booking"},
 				{Name: "question-id", Type: "int", Description: "Answers to one question, across bookings. Numeric here (the spec types it integer on this endpoint), unlike the prefixed ids other commands take"},
 				{Name: "granularity", Type: "string", Description: "booking|guest|extra"},

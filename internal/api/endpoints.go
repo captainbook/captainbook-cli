@@ -107,7 +107,7 @@ var (
 	filtersWithDateBasis = append(append([]string{}, filtersBookingGrain...), FilterDateBasis)
 )
 
-// Endpoints is the metadata table for all 13 statistics endpoints.
+// Endpoints is the metadata table for all 14 statistics endpoints.
 var Endpoints = []Endpoint{
 	{
 		Name:        "revenue",
@@ -204,6 +204,17 @@ var Endpoints = []Endpoint{
 		ExtraFlags: []ExtraFlag{
 			{Name: "product-option-id", Type: "int", Desc: "Filter by product option ID"},
 		},
+	},
+	{
+		Name:        "attendance",
+		Path:        "/attendance",
+		Description: "No-show and check-in statistics, read from ticket redemptions",
+		// business_unit_id and product_id only. The spec refuses date_basis
+		// explicitly — "a no-show happens at the trip, so there is no second
+		// clock to offer" — and offers no channel, location or resource
+		// parameter: the metric counts PEOPLE against the departures somebody
+		// actually scanned, so there is no booking-grain join to scope by.
+		Filters: []string{FilterBusinessUnitID, FilterProductID},
 	},
 	{
 		Name:        "extras",

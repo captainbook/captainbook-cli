@@ -12,7 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -2098,5 +2100,167 @@ func TestProductsList_StatusGateRejectsArchived(t *testing.T) {
 			t.Errorf("--status %q passes the client-side gate; the server 422s on it, "+
 				"so the operator pays a round trip to learn it is invalid", v)
 		}
+	}
+}
+
+// TestErrorCode_CoversEveryRegisteredCode pins the audit row's error_code
+// against the spec's own catalogue.
+//
+// The regression it exists for: typing an error code made the audit WORSE than
+// leaving it untyped. `errorCode`'s fallthrough is `""`, and audit's
+// `error_code` is `omitempty`, so a type with no case does not record a blank —
+// it removes the field from the row entirely. An UNregistered code reaches
+// RawAPIError, whose case returns `e.Code`, so before this sync all four of
+// CAPACITY_UNAVAILABLE, DEPARTURE_NOT_BOOKABLE, NO_RESOURCE_AVAILABLE and
+// PLAN_LIMIT_REACHED were recorded correctly by accident. Registering them
+// without adding their cases dropped the field, which skills/index.md tells
+// agents to read to recover which refusal they hit and whether the idempotency
+// key may be reused.
+//
+// Driven by the spec's `Error.code` description rather than by the registry or
+// a hand-written list, because that prose is the authority ("The list below is
+// COMPLETE as of this version") and a list copied off the implementation cannot
+// catch the implementation being wrong. A code the registry does not know still
+// passes, through RawAPIError — which is the point: the invariant is that the
+// row carries a code, however the error got typed.
+//
+// Value: protects=every documented error code reaches the audit row's error_code, whichever typed error carries it; fails_when=a new typed error is registered without an errorCode() case, which silently removes error_code from the row; why_new=nothing connected the registry to the audit switch and four codes regressed in one sync; seam=none
+func TestErrorCode_CoversEveryRegisteredCode(t *testing.T) {
+	codes := specErrorCodes(t)
+	// 38 is the catalogue's full size at this spec version; raise it when the
+	// spec grows, never lower it. A floor below the real count lets a dropped
+	// code pass as "the parser found enough".
+	if len(codes) < 38 {
+		t.Fatalf("parsed only %d codes from the spec's Error.code catalogue, want at least 38 — "+
+			"the catalogue moved or the parser broke, not the CLI", len(codes))
+	}
+
+	for _, code := range codes {
+		// Status is irrelevant to the mapping: ParseError dispatches on the
+		// code, and errorCode reads the type it produced.
+		body := `{"meta":{"request_id":"r1"},"error":{"code":"` + code +
+			`","message":"refused.","retriable":false}}`
+		err := invpkg.ParseError(409, []byte(body))
+		if err == nil {
+			t.Errorf("%s: ParseError returned no error for a refusal envelope", code)
+			continue
+		}
+		if got := errorCode(err); got != code {
+			t.Errorf("%s: errorCode() = %q, want %q.\n"+
+				"  An empty value here does not write a blank field — audit's error_code is\n"+
+				"  omitempty, so the row loses the only record of WHICH refusal occurred.\n"+
+				"  Add a case for %T to errorCode().", code, got, code, err)
+		}
+	}
+	t.Logf("verified %d documented error codes reach the audit row", len(codes))
+}
+
+// specErrorCodes returns the UPPER_SNAKE codes named in the vendored spec's
+// `Error.code` description, which the spec declares complete for its version.
+//
+// Reads the prose rather than an enum because the spec deliberately types the
+// field as a bare string: "a client must tolerate a code it does not know,
+// because a new domain refusal can ship in a minor version."
+func specErrorCodes(t *testing.T) []string {
+	t.Helper()
+	raw, err := os.ReadFile("../../api/inventory/cli-v1.yaml")
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var doc struct {
+		Components struct {
+			Schemas struct {
+				Error struct {
+					Properties struct {
+						Code struct {
+							Description string `yaml:"description"`
+						} `yaml:"code"`
+					} `yaml:"properties"`
+				} `yaml:"Error"`
+			} `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("yaml.Unmarshal: %v", err)
+	}
+	desc := doc.Components.Schemas.Error.Properties.Code.Description
+	if desc == "" {
+		t.Fatal("spec has no components.schemas.Error.properties.code.description — " +
+			"the error-code catalogue moved; re-point this test rather than deleting it")
+	}
+
+	// Single-word codes need naming: an underscore filter alone drops FORBIDDEN
+	// and UNAUTHENTICATED, and FORBIDDEN is the one with no registry entry and
+	// no errorCode case at all — it reaches the audit row only by falling
+	// through to RawAPIError, which is exactly the path this test exists to
+	// keep honest. Listed rather than inferred, so a new single-word code is a
+	// deliberate addition.
+	singleWord := map[string]bool{"FORBIDDEN": true, "UNAUTHENTICATED": true}
+	seen := map[string]bool{}
+	var out []string
+	for _, tok := range regexp.MustCompile(`[A-Z][A-Z_]{4,}`).FindAllString(desc, -1) {
+		// The prose also contains ordinary shouted words; a real code either
+		// carries an underscore or is one of the two named above.
+		if !strings.Contains(tok, "_") && !singleWord[tok] {
+			continue
+		}
+		if seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	for code := range singleWord {
+		if !seen[code] {
+			t.Errorf("the spec's Error.code catalogue no longer names %s; if the code was "+
+				"removed, drop it from singleWord, but do not let the filter hide it", code)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// TestTryParseDiffEnvelope_KeepsAWarningsOnlyCommit is the commit half of the
+// guest-mix-warnings render, and sits beside
+// TestTryParseDiffEnvelope_CommittedPayloads because it is the same contract:
+// the envelope has to survive parsing for the renderer to have anything to
+// print.
+//
+// The spec makes `diff` OPTIONAL on commit, and a commit is where
+// `would_apply` is false — so a 201 whose only payload is a waived companion
+// rule hit the "nothing renderable survived" discard and the warning was lost
+// from table output, while the field's own doc comment claimed "preview and
+// commit alike".
+//
+// Value: protects=a commit body carrying only guest_mix_warnings survives envelope parsing, so the warning reaches table output; fails_when=GuestMixWarnings is dropped from the discard condition in tryParseDiffEnvelope; why_new=the render test proved the printer, not that the envelope reaches it on commit; seam=none
+func TestTryParseDiffEnvelope_KeepsAWarningsOnlyCommit(t *testing.T) {
+	// What POST /bookings returns on a 201 that waived a companion rule: no
+	// diff, would_apply false, nothing else renderable.
+	body := []byte(`{"data":{"would_apply":false,"guest_mix_warnings":[` +
+		`{"title":"Child without adult","message":"A Child must travel with at least 1 Adult."}]},` +
+		`"meta":{"request_id":"r1"}}`)
+
+	env, ok := tryParseDiffEnvelope(body)
+	if !ok {
+		t.Fatal("a commit body carrying only guest_mix_warnings was discarded as unrenderable, " +
+			"so the waived companion rule never reaches the renderer")
+	}
+	if len(env.GuestMixWarnings) != 1 || env.GuestMixWarnings[0].Title != "Child without adult" {
+		t.Fatalf("warnings did not survive parsing: %+v", env.GuestMixWarnings)
+	}
+
+	// And it renders.
+	var buf bytes.Buffer
+	if err := invpkg.RenderDiff(&buf, "Booking", *env); err != nil {
+		t.Fatalf("RenderDiff: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Child without adult") {
+		t.Errorf("the surviving warning did not render:\n%s", buf.String())
+	}
+
+	// The discard must still drop a body with nothing renderable at all, or
+	// this change turns every unrelated response into a diff envelope.
+	if _, ok := tryParseDiffEnvelope([]byte(`{"data":{"id":"bk_1"},"meta":{"request_id":"r1"}}`)); ok {
+		t.Error("an ordinary resource payload was accepted as a diff envelope")
 	}
 }

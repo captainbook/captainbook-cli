@@ -17,7 +17,7 @@ func extrasDefs() []CommandDef {
 			Use: "extras list", Short: "List extras", Kind: KindRead,
 			Verb: "GET", Path: "/extras", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by product"},
 				{Name: "include-trashed", Type: "bool"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},

@@ -1341,3 +1341,317 @@ untested.
 one that can never be written is worse than one that is absent, because its
 absence looks like an oversight.
 **Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream gstack.
+
+## Upstream: the statistics spec added a whole endpoint without moving its version
+
+`api/statistics/statistics-openapi.yml` reads `version: 1.4.0` both before and
+after the Attendance endpoint landed. Upstream commit `836e7ea965`
+("feat(statistics): report no-shows, and say when nobody was counting") added
+`GET /api/v1/statistics/attendance`, the `Attendance` tag, `AttendanceData` and
+`AttendanceSeriesItem` — 115 lines — and left `info.version` alone.
+
+The inventory spec is the contrast and shows this is a discipline gap rather
+than a convention: `cli-v1.yaml` moved 1.34.0 → 1.56.0 over the same period and
+carries a per-release changelog in `info.description` precise enough to drive a
+CLI sync on its own. The statistics spec has neither a changelog nor a moving
+version, so **the version string cannot be used to detect that this spec
+changed**, and a sync that diffs on versions alone would have skipped it
+entirely.
+
+Nothing broke here: `TestStatisticsDrift_EveryEndpointIsBound` reads the paths
+rather than the version and reported the unbound metric immediately, which is
+exactly the absence that direction of the pin exists to see. That is the
+mitigation already in place, and it is why this is P3 rather than a defect —
+but it means the statistics lane's only change signal is the drift tests, and a
+response-shape change (which nothing pins on this side) would still be
+invisible.
+
+**Fix:** upstream — bump `info.version` on a statistics spec change, and
+ideally give it the `info.description` changelog the inventory spec has. File on
+`captainbook/captainbook`; do not patch the vendored copy, which must stay
+byte-identical.
+**Why:** a version that does not move is worse than no version, because a reader
+reasonably concludes nothing changed.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** upstream.
+
+## Two new nullable fields can be set but not cleared from a typed flag
+
+The 1.56.0 sync added two fields the spec types as nullable, where `null` is a
+meaningful value the flag cannot express:
+
+- `bookings update --comments` / `--private-notes` — the spec says "Send null to
+  clear", and a string flag cannot. `--comments=""` stores an empty string,
+  which is a different value the server keeps.
+- `pricing-categories update --max-per-resource` — "null removes the limit", and
+  an int flag has no null. `0` is out of the spec's 1-99 range and is refused.
+
+Both are reachable with `--data '{"comments": null}'` and both `--help` strings
+say so, so this is a documented ergonomic gap rather than a capability one. It
+is the same shape as the `intSlice` entry above: the CLI can set these fields
+but never clear them without dropping to the raw body.
+
+A general fix would be a nullable flag type (a `--clear-<field>` companion, or a
+sentinel the parser maps to JSON null) rather than three per-field workarounds —
+which is why this is recorded once instead of being patched twice.
+
+**Why:** "set but never unset" is a silent half-surface; an agent reading
+`--help` sees the field and not the asymmetry unless it reads to the end of the
+description.
+**Effort:** human M / CC M. **Priority:** P3. **Depends on:** nothing.
+
+## Six error codes added in 1.47.0-1.49.0 fall back to RawAPIError
+
+The sync typed two of the new codes — the three key-releasing booking 409s
+(`KeyReleasingConflictError`) and `PLAN_LIMIT_REACHED`
+(`PlanLimitReachedError`) — because each says something the server's own message
+does not: what to do about the idempotency key, and that no change to the
+request will help.
+
+The rest reach the user through `RawAPIError`, which preserves the code and the
+message verbatim: `DEPOSIT_EXCEEDS_TOTAL`, `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED`,
+`DESTINATION_ALREADY_STARTED`, `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE`,
+`BOOKING_HAS_NO_DEPARTURE` and `BOOKING_RESOURCE_REQUEST_INVALID`. That is a
+deliberate choice, not an oversight — the registry has always been selective,
+and a dozen older codes sit in the same fallback — but it is worth naming the
+criterion so the next sync applies the same one: **a code earns a type when the
+CLI can add a REMEDY the message cannot carry.** By that test,
+`BOOKING_RESOURCE_REQUEST_INVALID` is the strongest remaining candidate, because
+it releases its idempotency key for the same counter-intuitive reason the three
+409s do and nothing in its message says so.
+
+Note there is still no test pinning the registry against the spec's `Error.code`
+catalogue in either direction, so a code the server starts emitting is invisible
+here until someone hits it.
+
+**Why:** the fallback is honest, so nothing is lost today; the gap is that
+"which codes deserve a type" is decided per sync with no written rule.
+**Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
+
+## Review notes from the 1.56.0 sync that were not fixed in that PR
+
+Six findings from the pre-landing review of the 1.56.0 spec sync landed below the
+blocking floor and ship as notes rather than fixes. Recorded together because four
+of them are one defect class — a bound or a gate that is only half-pinned.
+
+**`--day-count -1` reaches the wire against a spec `minimum: 0`.** Pre-existing: `main`
+declared no lower bound on the three `--day-count` flags either. The 1.56.0 sync briefly
+added `Min: 1` there as a side effect of the `Max` rollout, which was worse — the spec
+documents `0` as "an ordinary same-day session" — so it was removed rather than
+corrected downward. The real obstacle is structural: `FlagDef.Min` treats `0` as
+"unset", so a spec minimum of 0 cannot be expressed as a bound and no drift direction
+can cover it. Fixing it means either a `MinSet bool` beside `Min`, or a pointer.
+
+**`TestSpecDrift_FlagMinMatchesSpecMinimum` is one-directional.** It fails where the spec
+STATES a minimum and merely logs where a flag declares a `Min` the spec does not state.
+Its sibling `TestSpecDrift_FlagMaxMatchesSpecMaximum` gained that second direction in the
+same commit, which is what catches an invented bound; the `Min` side still has the hole.
+Restoring `Min: 1` on `timeValueFlags` is reported as "unverified" and passes.
+
+**That same test guards coverage with `checked == 0` only.** The `Max` test gained
+per-construction-pattern probes (a `$ref`'d parameter, an inline parameter, a body
+property, a composed-schema body property) precisely because a single count is satisfied
+by the query-parameter branch alone. The `Min` test still relies on the count, so if
+`specBounds`' request-body walk stopped resolving, every body-field `Min` would become a
+log line while the query-parameter minima kept `checked > 0`.
+
+**`extras: null` and `customer_id: null` slip past `validateStoreBookingBody`.** An
+explicit `null` on `extras` skips the closed-shape check, and a `null` `customer_id`
+satisfies the "exactly one customer" rule and then 422s on the wire. The sibling
+companions gate refuses `null` explicitly and documents why ("null is not in the
+contract and must not be guessed at"); these two take the opposite position silently.
+Reachable only through `--data`.
+
+**`KeyReleasingConflictError.Error()` hardcodes "status 409"** while its constructor
+discards the real status, and `ParseError` dispatches on the code with no status
+assertion. A proxy or a future server change returning one of those codes under another
+status would print a false status and assert a key-release guarantee the spec grants
+only to the 409.
+
+**Two refusal-ordering findings the owner skipped at review, recorded here so they are not lost.**
+Both are live in `validateStoreBookingBody` and both were explicitly skipped, not overlooked.
+(1) The deposit/currency, deposit/payment-method and payment-notes gates all run BEFORE the
+`booking_type` switch that refuses those three fields outright on a reservation, so
+`bookings create --booking-type reservation --deposit 2000` is told to add `--currency`, then
+`--payment-method`, then `--expiry`, and only then that the payment fields were never legal on a
+hold. FOUR independent readers raised this (a p1 specialist, the p1 and p2 adversarial passes,
+and the p2 targeted reader); the owner skipped it because reordering a 300-line validator for
+message ordering, at zero blocking findings, is the shape of change that has already produced
+three fix-induced regressions on this branch. The fix is one move: hoist the switch above the
+three payment gates. (2) The payment-notes gate tests only key PRESENCE of `deposit` while its
+two siblings test a non-zero value, so `--deposit 0 --payment-notes "cheque"` passes every local
+gate and reaches the wire; a zero deposit creates no transaction, so the note has nowhere to
+land and is silently dropped rather than refused. Raised by the p2 targeted reader at
+confidence 7. Fix: decode the deposit and require non-zero in that gate, matching its siblings.
+
+**`workflows` and `workflow-executions` have no agent-facing cookbook.** Both are real command
+groups, so their verbs, the three 1.55.0 trigger action types (`segment_entered`,
+`segment_left`, `whatsapp_message_received`) and the 1.56.0 `whatsapp` channel for
+`send_notification` are reachable only through `--help`. Reference coverage exists in README's
+resource table; there is no how-to or explanation coverage, and `workflows delete` cascades to
+steps, which makes this the most destructive family without a cookbook. Raised by both docs
+audits on 2026-11-09. **This entry exists because `skills.md` and commit 57a31e9's message both
+claimed the gap was already recorded here and it was not** — the second docs audit caught the
+false cross-reference, removed it from `skills.md`, and could not fix the commit message, so the
+honest repair is to make the claim true going forward rather than rewrite history.
+
+**`PRODUCT_BEING_DUPLICATED` is untyped and nearly undocumented.** It has reference coverage in
+README and `skills/index.md` only: `skills/products.md` documents `products duplicate` without
+the couple-of-minutes window the copy job holds the source for, and `internal/inventory/errors.go`
+does not type it, so the CLI surfaces it as a raw API error with no retry guidance — even though
+the spec marks it "Transient and retriable", sets `error.retriable` true, and says the refusal
+RELEASES the `Idempotency-Key`, which is exactly the guidance a typed error would carry. It fires on seven product and
+product-option writes and NOT on `duplicate` itself: the spec's 1.7.0 list is `PATCH
+/products/{id}`, `DELETE /products/{id}`, `POST /products/{id}/restore`, `POST
+/product-options`, `PATCH /product-options/{id}`, `DELETE /product-options/{id}` and `POST
+/product-options/{id}/restore`, while `POST /products/{id}/duplicate`'s own 409 is the plain
+`IdempotencyConflict`. An earlier draft of this entry implied `duplicate` was one of the seven,
+which would have sent a fixer to the one command that cannot raise the code.
+
+**Upstream: the spec contradicts itself on whether every other `409` is final.**
+`api/inventory/cli-v1.yaml:7980` asserts "Every other `409` describes something that will answer
+the same way forever", while the same document's `PRODUCT_BEING_DUPLICATED` entry (≈8069) makes
+that code transient, retriable and key-releasing, and `IDEMPOTENCY_IN_PROGRESS` is auto-retried
+by this CLI's own transport. The docs here now follow the specific passages rather than the
+blanket one. Per CLAUDE.md the vendored spec is never edited locally, so the fix is a ticket on
+`captainbook/captainbook`. Found by the codex outside voice and confirmed by the second docs
+audit, independently.
+
+**`bookings create` writes customer name, email and phone verbatim to the local audit log.**
+`ForensicFields` includes `customer`, whose value is the raw
+`{"name","email","phone","zip_code",...}` object, and `forensicSummary`/`capForensicValue` apply
+only a 16 KiB size cap with no redaction — so every booking taken through the CLI persists
+plaintext PII to `~/.ceebee/audit.jsonl` (50 MB × 3 rotation). `bookings update` and
+`reschedule` add free-text `comments`, `private-notes` and `reschedule-notes` to the same sink.
+This follows existing precedent (`guests.go` already captures `passport`, `dob`, `email`,
+`phone`), so it is a convention this PR WIDENS rather than a new policy break — but it widens it
+to every create, and nothing in `FlagDef` can mark a field redact-on-audit. Raised by the
+adversarial reader on 2026-11-09 as INVESTIGATE/Low; the owner's call at review was to record it
+and decide later, with no behaviour change in this PR. Deciding it needs a redaction design
+(hash, omit, or truncate) and probably spans more than the CLI.
+
+**`specBounds` is blind to every `PositiveIntegerId` body property, and an earlier version of
+this entry named the wrong cause.** `resolve()` in `cmd/inventory/spec_drift_test.go` DOES follow
+`$ref`, up to 8 hops — the hole is that `PositiveIntegerId` is a `oneOf`, so its `minimum: 1`
+sits in `oneOf[0]` where `prop["minimum"]` never reads it. Observable: `--replaced-resource-id`
+is logged as "spec states no minimum here" and `--main-resource-id` never reaches the `missing`
+arm, though both `$ref` it. That matters for this branch specifically, because it DELETED
+`Min: 1` from `--main-resource-id`'s `FlagDef` and moved enforcement into the hand-written
+`validateBookingResourcesBody`: if that gate were dropped, no drift direction would see it. Fix
+is to flatten `oneOf`/`anyOf` in `specBounds` the way `allOf` already is. Found by the
+adversarial reader, which also caught that the previous wording here ("a `$ref` this reader does
+not follow") would have sent the next fixer to code that already works.
+
+**Two self-inflicted notes from this branch's own review, left unfixed at the frozen cap.**
+Fixing either would have destaled the only review record that bound CURRENT, and the cap left no
+round to re-bind, so they ship disclosed instead. (1) Inserting two regression tests between
+`TestWire_MainResourceBoundReadsTheAssembledBody`'s doc comment and its `func` orphaned that
+comment: its `Value:` card now heads `TestWire_ExpiryNullIsNotAWindow` and the original function
+has none. Documentation only. (2) The new null refusal reuses the phrase "cannot be cleared, only
+replaced", which was the only text assertion the `0`-path test made, so that assertion no longer
+tells which guard fired and a widened null check that swallowed `0` would stay green. Both are a
+comment move and an assertion split respectively — small, and worth doing in one focused commit.
+
+**`docFlagValues` cannot see a documented negative int value.** The extractor behind
+`TestSkillsDocIntFlagValues` treats any token starting with `-` as the next flag, so
+`--day-count -1` yields no entry: the value is neither parsed nor bound-checked and `checked`
+does not increment, which the test's own floor guard cannot notice because the omission is
+per-value. Negative is the one value class that gate cannot see, and it is exactly the class the
+`FlagDef.Min` entry above records as reaching the wire today. Fix: accept `^-?[0-9]` as a value.
+Latent rather than active — no cookbook currently documents a negative literal.
+
+**`--format table` and `csv` drop fields the operator needs and erase null-vs-zero.** Two
+findings with one shape, both reachable only by asking for a non-default format (mutations
+default to `json`, reads to `table`). (1) `bookings create` and `reschedule` route through the
+shared diff renderer, whose `DiffEnvelope` carries neither `payment_url` nor
+`departure_time_unverified`, and `runMutation` early-returns on `res.DiffEnv != nil && Format ==
+"table"` — so a reschedule's "the destination may already have departed" warning and a booking's
+hosted-checkout link are not rendered. Raised by the codex outside voice, which called it
+blocking; the owner's call at review was to ship it as a disclosed note, on the grounds that the
+default format shows both fields, nothing is lost server-side and no test fails. (2)
+`internal/output/formatter.go` renders a JSON `null` as an empty cell, so attendance's
+`no_show_guests: null` is indistinguishable from `0` — the exact conflation the statistics spec
+forbids ("zero and null mean different things here and only one of them is good news").
+`formatTable` also reads only `data`, so a metric's `series` is dropped entirely, which is
+pre-existing for every series metric.
+
+**The new body gates exit 1 while the bounds added beside them exit 12.**
+`validateStoreBookingBody`, `requireAnyBookingAmendment`, `validateBookingResourcesBody` and
+`validateBookableProductBody` all return a bare `fmt.Errorf`, so `cmd/root.go` exits 1, while the
+`FlagDef.Max` check added in the same change returns `api.ExitError{Code: api.ExitValidation}`
+and exits 12. Same class of refusal, two exit codes, so an agent branching on exit status to
+separate "my payload was wrong" from "something else broke" gets inconsistent answers. Confirms
+the existing learning `ceebee-inventory-typed-errors-all-exit-1-not-the-taxonomy`: there is no
+`invpkg`→exit-code mapper anywhere. Pre-existing for the one gate that existed before, now five.
+
+**~~`KeyReleasingConflictError` names an action the operator cannot take.~~ FIXED** on
+jbajou/cli-specs-update, 2026-11-09. Raised by the red-team reader, skipped once as "message
+actionability", then raised AGAIN by the adversarial reader at High/Blocks:yes with the argument
+that settled it: the message said to retry under the **same** idempotency key, the type carried
+none, and the CLI mints a UUIDv7 per invocation and prints it nowhere, so the obvious retry of
+re-running the command mints a fresh key and takes the second booking the message itself warns
+about. The type now carries `Key`, `ParseGenResponse` fills it from the outgoing request's
+`Idempotency-Key` header (the request is what the server saw, and where an explicit
+`--idempotency-key` and the transport's minted one converge), and the message names both the key
+and the flag. Pinned by `TestKeyReleasingConflictError_NamesTheKeyItTellsYouToReuse` and
+`TestWire_KeyReleasing409ReportsTheKeyTheServerSaw`, both proven red against the unfixed code.
+Remaining limit, disclosed: the wire test covers only an explicitly passed `--idempotency-key`,
+because `fakeServer` omits the minting round-tripper; `transport_test.go` owns the minted path.
+
+**No rule owns `{type: ["null"]}` spelled as a bare one-member sequence.** `rewriteNullOnlyType`
+declines it via the `len == 2` guard, and rule 1's `isNullTypeSchema` cannot match it because it
+requires `val.Kind == yaml.ScalarNode` — it owns only the scalar `{type: null}`. So that
+construct is owned by neither rule and would fail `make codegen` loudly. Failing beats silently
+erasing a union branch, so this is the safe direction and not urgent, but the guard's comment,
+the README paragraph and an earlier draft of this entry all claimed rule 1 owned it, which is
+wrong; all three now say so. The fix, if upstream ever emits that spelling, is to widen
+`isNullTypeSchema` to accept a one-member sequence, or narrow the guard to "the only key is
+`type` AND its value is a scalar". Found by the red-team reader on 2026-11-09, which proved it
+by running `normalize()` over three fixtures: `{type: ["null"], description: …}` rewrites,
+`{type: ["null"]}` alone does not, and `oneOf: [$ref, {type: ["null"]}]` survives verbatim.
+
+**`rewriteNullOnlyType` can widen a union branch rule 1 declined.** Its `len == 2` guard
+skips a bare `{type: ["null"]}` union member but not a two-key one, so where
+`rewriteNullableUnion` declines a pathological parent (both `oneOf` and `anyOf`), a
+branch spelled `{type: ["null"], description: …}` is still stripped to an untyped
+`nullable: true` — widening the union instead of failing loudly, which is the one
+outcome that package calls worse than not helping. No such construct exists in today's
+spec, and `TestRewriteNullOnlyType_VendoredSpecCarriesNoneAfterNormalize` says so. The
+tightening would be "skip any mapping that is a member of a `oneOf`/`anyOf` sequence".
+
+**`FlagDef.Min` cannot express a lower bound of 0, so 41 int flags accept a negative.**
+`Min` is a plain `int` whose zero value means "unbounded", so `Min: 0` and "no Min" are
+one declaration, and `makeRunE` gates the check on `fd.Min != 0`. Every flag whose spec
+`minimum` is 0 — `--capacity`, `--amount`, `--min-age`, `--from-price`,
+`--max-credits-per-run` and 36 more — therefore passes `-5` straight to a server that
+refuses it. `TestSpecDrift_FlagMinMatchesSpecMinimum` now names all 41 in a single log
+line rather than leaving the limit invisible, which is how this was found. The fix is to
+make the bound's presence separable from its value (`MinSet bool`, or `*int`) and widen
+the `makeRunE` condition; it touches every `CommandDef` that declares an int flag, which
+is why it is not folded into a review-response commit.
+
+**Three benign `pii.phone.e164` pregate warns need an allowlist entry on `main`.**
+`gstack-pregate` reports MEDIUM `pii.phone.e164` on three ten-digit integer bounds: one
+in the `integralNumber` comment in `cmd/inventory/bookings.go`, and two in the wide-id
+subtest in `cmd/inventory/wire_capture_156_test.go` — one of which is `math.MaxInt32`
+spelled out, the value that subtest exists to probe. None is a phone number. The verdict
+is `warn`, not `fail`, so nothing is blocked, and the bounds are deliberately not
+respelled: obscuring `math.MaxInt32` to satisfy a phone-number regex would cost more
+legibility than the warn costs noise. Allowlists only count from `origin/main` and
+`--policy-from head` may only ADD test lanes, so the entry (by id + path) has to land in
+the policy on `main`. (This entry names no digits on purpose: an earlier draft quoted
+them and raised the count from three to five.)
+
+**`PlanLimitReachedError.UserMessage` prints a double period on its no-details arm.**
+The fallback arm is `"PLAN_LIMIT_REACHED: %s. This is an account ENTITLEMENT…"`, and the
+server's `message` normally ends in a period of its own, so a 403 carrying no `details`
+renders `Plan allowance exhausted.. This is an account ENTITLEMENT…`. Observed by /qa on
+jbajou/cli-specs-update against a loopback stub (capture 006); the partial- and
+full-details arms interpolate before a parenthetical instead and read correctly
+(captures 005, 017). Pre-existing, not introduced by the Optibot-response commits.
+Cosmetic, severity Low, deferred by the Standard fix tier. The fix is to trim a trailing
+`.` from `msg` before interpolating, in that arm and any sibling with the same shape.
+
+**Why:** each is a gate or bound that is pinned in one direction only, which is the
+shape that let a real regression through during that very sync.
+**Effort:** human S / CC S each, except the `FlagDef.Min` change (human M / CC M — wide
+but mechanical). **Priority:** P3. **Depends on:** nothing.

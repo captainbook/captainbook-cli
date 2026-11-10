@@ -57,6 +57,12 @@ tags:
     description: Booking channel distribution
   - name: Occupancy
     description: Slot occupancy and capacity utilisation
+  - name: Attendance
+    description: >-
+      Who turned up and who did not, read from ticket redemptions. Every count is
+      null until something was scanned: `no_shows = 0` from an operator who has
+      never used check-in means "nobody was counting", not "everybody turned up",
+      and the two must never be conflated. Read `attendance_recorded` first.
   - name: Extras
     description: Extra/add-on sales performance
   - name: Discounts
@@ -465,6 +471,53 @@ paths:
                         type: array
                         items:
                           $ref: "#/components/schemas/OccupancySeriesItem"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/statistics/attendance:
+    get:
+      operationId: getAttendance
+      summary: No-show and check-in statistics
+      description: >-
+        Counts PEOPLE, dated by the DEPARTURE, over the departures somebody
+        actually scanned. `date_basis` is not accepted: a no-show happens at the
+        trip, so there is no second clock to offer.
+
+        The figures are deliberately scoped to the departures that have
+        attendance data rather than to every departure in the window. An operator
+        who scans one product and not the other four would otherwise get a
+        no-show rate diluted by the four nobody counted - a small, plausible,
+        wrong number. `attendance_coverage_rate` is what says how much of the
+        business the rate describes.
+      tags: [Attendance]
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/granularity"
+        - $ref: "#/components/parameters/business_unit_id"
+        - $ref: "#/components/parameters/product_id"
+        - $ref: "#/components/parameters/compare_from"
+        - $ref: "#/components/parameters/compare_to"
+      responses:
+        "200":
+          description: Attendance data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatisticsEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AttendanceData"
+                      series:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AttendanceSeriesItem"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -1625,6 +1678,68 @@ components:
                 type: [number, "null"]
 
     # ── Occupancy ────────────────────────
+    AttendanceData:
+      type: object
+      description: >-
+        Every count below is NULLABLE and is null exactly when
+        `attendance_recorded` is false. That is not a missing-value convention
+        to be defaulted away: zero and null mean different things here and only
+        one of them is good news.
+      properties:
+        attendance_recorded:
+          type: boolean
+          description: >-
+            Whether anybody scanned a ticket on any departure in this window.
+            False means every count below is null because there is no data, NOT
+            that everybody turned up. Read this before quoting any figure.
+        departures:
+          type: integer
+          description: Departures in the window carrying at least one confirmed booking.
+        departures_with_attendance:
+          type: integer
+          description: How many of those had any redemption recorded.
+        attendance_coverage_rate:
+          type: number
+          format: float
+          description: >-
+            `departures_with_attendance` as a percentage of `departures` - how
+            much of the business the rates below describe.
+        expected_guests:
+          # 3.1 unions, not the 3.0 `nullable` keyword -- pinned by
+          # tests/Architecture/OpenApiNullabilityTest.php.
+          type: [integer, "null"]
+          description: Confirmed guests on the departures that were scanned. The denominator of `no_show_rate`.
+        checked_in_guests:
+          type: [integer, "null"]
+        no_show_guests:
+          type: [integer, "null"]
+          description: Guests explicitly marked absent. Never inferred from an absent scan.
+        unrecorded_guests:
+          type: [integer, "null"]
+          description: >-
+            Guests on a scanned departure who were neither checked in nor marked
+            absent - a guide who stopped scanning halfway. A data-quality figure,
+            not an attendance one, and deliberately NOT folded into
+            `no_show_guests`.
+        no_show_rate:
+          type: [number, "null"]
+          format: float
+
+    AttendanceSeriesItem:
+      type: object
+      description: >-
+        Empty array when `attendance_recorded` is false - a series of zeros would
+        restate the figure the metric refuses to publish.
+      properties:
+        date:
+          type: string
+        expected_guests:
+          type: integer
+        checked_in_guests:
+          type: integer
+        no_show_guests:
+          type: integer
+
     OccupancyData:
       type: object
       properties:

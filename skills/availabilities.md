@@ -150,6 +150,31 @@ ceebee inventory availabilities bulk-update pricing \
 
 A slot with no override today that is being written to the catalogue value still counts as changed: the write pins it.
 
+### 5a. A reprice can SKIP departures and still report success (spec 1.54.0)
+
+`bulk-update pricing` validates at request time and applies in a worker, and since 1.54.0 the worker refuses a fare that does not belong where it is being written. **A refused departure is skipped, not fatal** — the call still succeeds — so an agent reading only the status code will report a reprice that partly did not happen.
+
+Two payload shapes are refused **whole** rather than per departure, because filtering per departure would silently drop the rest of the fares and still report success:
+
+| reason | meaning |
+|---|---|
+| `pricing_tier_foreign_to_product` | the tiers resolve to more than one product's pricing ladder |
+| `pricing_tier_unresolvable` | a named tier resolves to no ladder at all — it does not exist, or it or its category is soft-deleted |
+
+Past those, a single departure can still be skipped on its own, and the two causes are counted apart:
+
+| reason | meaning |
+|---|---|
+| `pricing_tier_foreign_to_product` | that departure belongs to another product |
+| `departure_has_no_pricing_ladder` | it hangs off no product at all — a `Resource`-backed departure, or one whose option is trashed. Not another experience's price; a departure with nothing to write a price to. |
+
+What to do with this:
+
+- **Read `skip_reasons` on the audit row**, which is where `bulk-update` persists them. `PATCH /availabilities/{id}` validates ownership synchronously and answers 422 before the write, so the single-slot path never reaches this.
+- **A skipped departure is not written to at all**, so its existing overrides survive. For a departure that *is* repriced, the write still replaces that departure's whole override set.
+- **The dry run predicts the same refusals through the same predicate**, so `would_update` and the applied count agree. `total_changed` is computed separately and is **not** refusal-aware — do not read it as "this many will be written".
+- The window this closed was a real one: `availability_pricing_tier` constrains both ids but nothing tied them together, and every pricing read scopes tiers by product, so a tier from another product inserted cleanly and no reader ever surfaced it. The caller got a success and an unchanged price while the departure quietly carried a row belonging to a different product.
+
 ### 5b. Hand a range back to the catalogue price (`amount: null`)
 
 Intent: the July premium is over; the Adult tier should follow the catalogue again.

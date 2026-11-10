@@ -23,7 +23,7 @@ func discountsDefs() []CommandDef {
 			Use: "discounts list", Short: "List discounts", Kind: KindRead,
 			Verb: "GET", Path: "/discounts", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "code", Type: "string", Description: "Filter by code"},
 				{Name: "product-option-id", Type: "string", Description: "Filter by option"},
@@ -122,18 +122,20 @@ func discountsDefs() []CommandDef {
 					"start-date":        "start_date",
 					"end-date":          "end_date",
 					"discounted-price":  "discounted_price",
-					"discount-pct":     "discount_pct",
+					"discount-pct":      "discount_pct",
 					"nb-offers":         "nb_offers",
 					"auto-apply":        "auto_apply",
 					"product-option-id": "product_option_id",
-					"discount-text":    "discount_text",
-					"discount-image":   "discount_image",
+					"discount-text":     "discount_text",
+					"discount-image":    "discount_image",
 				})
 				if err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.CreateDiscountWithBodyWithResponse(ctx, &gen.CreateDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", "")
 				if res != nil {
 					res.WireBody = body
@@ -187,7 +189,9 @@ func discountsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.ApplyDiscountWithBodyWithResponse(ctx, id, &gen.ApplyDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
 				if res != nil {
 					res.WireBody = body
@@ -210,7 +214,9 @@ func discountsDefs() []CommandDef {
 					return nil, err
 				}
 				resp, err := r.Client.RestoreDiscountWithBodyWithResponse(ctx, id, &gen.RestoreDiscountParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
-				if err != nil { return &RunResult{WireBody: body}, err }
+				if err != nil {
+					return &RunResult{WireBody: body}, err
+				}
 				res, err := ParseGenResponse(resp.Body, resp.HTTPResponse, "Discount", id)
 				if res != nil {
 					res.WireBody = body

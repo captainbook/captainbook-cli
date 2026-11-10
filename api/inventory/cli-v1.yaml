@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Inventory CLI API
-  version: 1.34.0
+  version: 1.56.0
   description: |
     Internal HTTP JSON API serving the CaptainBook inventory CLI client
     (which lives in a separate repository). Primary consumer is Claude Code
@@ -165,6 +165,568 @@ info:
     known consumer; breaking changes ship here without a major bump and are
     marked **Breaking** below. The URL major (`/api/v1/cli`) is a separate axis
     and does not move.
+
+    - **1.56.0** — **Added.** `send_notification` accepts
+      `config.channel: "whatsapp"`, which previously came back
+      `422 INVALID_STEP_CONFIG`. The message goes out over the account's own
+      paired WhatsApp and threads into the Inbox; it is free text, so there is no
+      template to name. Needs a connected WhatsApp — without one the step runs and
+      reports `sent: false` with `reason: no_whatsapp_sender` rather than falling
+      back to SMS. The full channel list stays readable from
+      `GET /workflow-nodes`, which publishes each node's `rules()` verbatim.
+
+    - **1.55.0** — **Added.** `whatsapp_message_received` joins the
+      `action_type` enum on `POST /workflows/{id}/trigger`: a workflow can now
+      fire when a guest sends an inbound WhatsApp message to the account's
+      connected number. Takes no `config`. Fires once per inbound message —
+      messages the account SENDS do not fire it.
+
+      The enum list here also regains `segment_entered` and `segment_left`,
+      which have been accepted since they shipped but were never written down.
+
+    - **1.54.0** — **Fix.** A reprice can no longer cross from one product's
+      pricing ladder onto another product's departures.
+
+      `availability_pricing_tier` constrains both ids but nothing ties them
+      together, so a tier from another product inserted cleanly and no reader
+      ever surfaced it — every pricing read scopes tiers by product. The caller
+      got a success and an unchanged price, and the departure quietly carried a
+      row belonging to a different product.
+
+      `AvailabilityFares::assertTiersBelongToOption()` already answered 422 for
+      this at REQUEST time, and `PATCH /availabilities/{id}` is unchanged. What
+      moves is `POST /availabilities/bulk-update` with `setting=pricing`, which
+      validates at request time and applies in a worker: reparenting a tier in
+      between (`PATCH /pricing-tiers/{id}` takes `pricing_category_id`) used to
+      land the cross-product row anyway. That window is now closed at the write
+      instead of the request, so it covers the race rather than racing it.
+
+      - A refused departure is SKIPPED, not fatal, and a departure is either
+        fully repriced or fully untouched. Two payload shapes are refused
+        WHOLE rather than applied per departure, because filtering per
+        departure would silently drop the rest of the fares and still report
+        success: `pricing_tier_foreign_to_product` when the tiers resolve to
+        more than one product's ladder, and `pricing_tier_unresolvable` when a
+        named tier resolves to no ladder at all — it does not exist, or it or
+        its category is soft-deleted. The second needs its own check: an
+        unresolvable tier is simply absent from the lookup, so counting
+        distinct products cannot see it and one live tier among four deleted
+        ones would read as a single clean ladder.
+      - Past those two, a departure can still be skipped on its own, and the
+        two causes are counted apart: `pricing_tier_foreign_to_product` when
+        it belongs to another product, and `departure_has_no_pricing_ladder`
+        when it hangs off no product at all — a `Resource`-backed departure,
+        or one whose option is trashed. The second is not another
+        experience's price; it is a departure with nothing to write a price
+        to.
+      - A refused departure is not written to at all, so its existing overrides
+        survive. For a departure that IS repriced, `replaceAll` keeps its
+        meaning and replaces that departure's whole override set.
+      - A `Resource`-backed availability owns no pricing tier at all and
+        refuses every fare, which is what the synchronous 422 already said.
+      - The dry run predicts the same refusal through the same predicate, so
+        `would_update` and the applied count agree. Note the assistant's typed
+        confirmation token for a reprice is drawn from `total_changed`, which
+        is computed separately and is NOT refusal-aware.
+      - Where the refusal is reported depends on the caller.
+        `POST /availabilities/bulk-update` persists `skip_reasons` on its audit
+        row. `PATCH /availabilities/{id}` validates ownership synchronously and
+        answers 422 before the write, so it never reaches this path. The
+        assistant's apply job discards the service result today, so a refusal
+        there is recorded nowhere — tracked as follow-up, not closed by this
+        change.
+
+    - **1.53.0** — Additive, plus one field that is now REFUSED where it used
+      to be dropped.
+
+      A product's `allocation_mode` — how many resources one booking may occupy
+      — reaches the API. It was writable from the product edit page alone, and a
+      value sent to `PATCH /products/{id}` was dropped and answered `200`.
+
+      - READ: two keys on `Product`, not one. `allocation_mode` is what the
+        operator configured (`single_resource` | `homogeneous_multi`);
+        `spans_several_resources` is what the platform is actually honouring.
+        They differ behind four account- and product-level gates that all
+        degrade silently, so publishing the column alone would have reproduced
+        the same "saved but nothing changed" failure inside the payload. Never
+        price a party off `allocation_mode`: on a per-group-priced product each
+        unit a party takes is one group, so five riders on three jet skis pay
+        three times — and a party that spans nothing pays once.
+      - WRITE: `PATCH /products/{id}` only, and `homogeneous_multi` is refused
+        with a 422 naming which gate refused it. Echoing the stored value is not
+        a change and runs no gate, so a read-modify-write round trip is never
+        refused over this field. A `capacity` above 0 that STARTS sharing IS
+        judged, because that is the same downgrade through the other field;
+        lowering or clearing one never is.
+      - `POST /products` and `POST /products/bookable` now REFUSE
+        `allocation_mode` instead of silently dropping it. A spanning mode needs
+        a fleet to span and neither endpoint creates resources, so no value but
+        the default could ever have been honoured. The 422 names the sequence:
+        create the product, create its schedules, attach two or more assets with
+        a capacity each, then PATCH the mode.
+      - Changing the EFFECTIVE mode now republishes the product's capacity to
+        every connected channel, and so does changing `capacity` — which this
+        endpoint never announced, where the identical dashboard edit always has.
+        A CLI capacity edit used to recompute the stored seat counts and leave
+        GetYourGuide, Viator and Octo advertising the old number.
+
+    - **1.52.0** — **Fix, and two corrected descriptions.**
+
+      `custom_attributes` on a booking is now resolved in the business unit the
+      BOOKING belongs to. It followed the unit the operator's browser session
+      was on, which on a token pinned to a business unit at issuance is
+      routinely a different one — so a booking read on a pinned token published
+      the OTHER unit's definitions: its slugs, and its `default_value` for each,
+      while the booking's own attributes were missing. `PATCH /bookings/{id}`
+      made the same mistake in reverse, refusing a slug the booking's unit
+      defines with "Unknown custom attribute(s)" and accepting one only the
+      session's unit defines. No request shape changes; the values a correct
+      request reads and writes do. Nothing to do on the client side.
+
+      Separately, `origin_booking_id` and `reschedules` were documented as
+      "present on `GET /bookings/{id}` only". They are also in BOTH halves of
+      the `POST /bookings/{id}/reschedule` diff, and have been since 1.47.0 —
+      the ledger is the only place that endpoint's `reschedule_notes` lands, so
+      a diff without it could not show the note at all. They remain absent from
+      list reads and from the `PATCH /bookings/{id}` diff. Wire behaviour
+      unchanged; the two descriptions were wrong.
+
+    - **1.51.0** — Additive. A pricing category gains `max_per_resource`:
+      how many guests of it one resource may carry on a product that spreads a
+      party over resources (1 Driver per jet ski), `null` for no limit. Read
+      always returns it; create and update accept it (1-99, or `null`), and
+      omitting it on update leaves it unchanged. A party is then seated on the
+      fewest resources that respect it, so three Drivers capped at one take
+      three jet skis.
+
+    - **1.50.0** — Additive. A `companions` link gains `same_resource`: when
+      `true`, the companions must sit on every resource that carries a guest
+      of the category (a Passenger needs a Driver on their own jet ski), not
+      merely be in the booking. Read always returns it. On create and update
+      it is optional: a link sent without it keeps the stored value, `false`
+      for a new link, so re-sending links written before this release changes
+      nothing. Send `false` to switch it off. Any other value than a boolean
+      is a 422 under `companions.{n}.same_resource`.
+
+    - **1.49.0** — **Breaking, narrowly.** Bookings spread over several
+      capacity-bearing units (a party on three jet skis) are now handled by the
+      resource endpoints instead of being repacked.
+
+      - `AssignedBookingResource.seats` is new: the riders on that unit, `null`
+        for equipment, auxiliaries and rows written before it was recorded.
+      - `resource_state_token` now folds in `seats` where a row has them, so a
+        change of mix between the same units is no longer invisible to it.
+        **A token read before this release is refused once as stale** on any
+        booking whose rows carry seats; re-read the booking and retry.
+      - `UpdateBookingResourcesRequest.replaced_resource_id` names the unit a
+        `main_resource_id` takes over from. Required on a fleet booking (refused
+        as `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` without it); optional and
+        no-op on a single-unit booking. The replacement carries that unit's
+        riders, and the other units, the equipment and their sources are left
+        exactly as they were.
+      - New rejection codes: `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS`,
+        `REPLACED_RESOURCE_NOT_HELD`, `REPLACED_RESOURCE_WITHOUT_MAIN`,
+        `MAIN_RESOURCE_ALREADY_HELD` (a `main_resource_id` naming another unit
+        the booking already holds; refused by the dry run as by the commit).
+      - New error code `BOOKING_RESOURCE_REQUEST_INVALID` (**422**), raised
+        when every rejection is one of the two request-shape ones,
+        `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` and `REPLACED_RESOURCE_WITHOUT_MAIN`.
+        It carries the same `error.details.rejections[]` as
+        `BOOKING_RESOURCE_CONFLICT`, which stays **409** and is raised whenever
+        any rejection is refused by the booking's state. Nothing was applied on
+        a 422, so the idempotency key is released: correct the body and retry
+        under the same key.
+      - On a product configured for several units, `main_resource_id` now lands
+        the booking on the resource you named. It previously handed the party
+        to the packer, which usually put it straight back where it was.
+
+    - **1.48.0** — Additive. `ProductOption` gains `min_travelers` and
+      `max_travelers`, the operator's party-size bounds for a schedule.
+      `max_travelers` is one of the caps a slot's capacity is narrowed by, so a
+      caller sizing a booking without it can propose a party the slot then
+      refuses at reserve time. Both are stored as a nullable integer where `0`
+      means unset — the same reading the schedule chooser and the widget give
+      it — and are published as `null` in that case rather than as a real bound
+      of zero. Read-only for now: neither is accepted on write.
+
+    - **1.47.0** — **Three new endpoints**: `POST /bookings`,
+      `PATCH /bookings/{id}` and `POST /bookings/{id}/reschedule`. Plus four new
+      fields on the `Booking` read — `quantity` on every read, and `comments`,
+      `private_notes` and `custom_attributes` on the detail.
+
+      Taking, amending and moving a booking were dashboard-only. An agent could
+      read every booking on the account, reassign its guide, cancel it, comp it
+      and refund it, but could not create one — so "book Mrs Papadopoulou onto
+      Friday's 10:00" ended in a hand-off to a screen.
+
+      - `POST /bookings` takes a booking or holds a reservation. **It charges
+        nothing**: `payment_method` records how the customer is paying and
+        `deposit` what they have already handed over. `payment_method: card` is
+        refused on every account, as are `prices`, `price`, `voucher`,
+        `existingPm`, `payment_method_id` and `quantity` — refused, not dropped,
+        each with a message naming where the operation does belong. Fares come
+        from the product's pricing policy, and the `guests` keys are checked
+        against the departure's own product: a pricing category (or an `extraId`)
+        belonging to a different product is a `422`, because the category NAMES
+        the fare and accepting a foreign one was a way to choose it. A deposit
+        must state its `payment_method` — the booking engine's default for an
+        absent one is `card` — and `payment_notes` needs a deposit to attach to.
+        The response carries `guest_mix_warnings`: companion-rule violations the
+        booking was allowed anyway. Staff may book a child with no adult, as
+        they may on the dashboard — but the dashboard warns on screen and this
+        surface did not, so the rule was waived for every AI caller silently.
+      - `PATCH /bookings/{id}` amends notes and non-pool-backed custom
+        attributes. `guests` and `extras` are refused **for now**: changing
+        either has to recompute the booking's stored total, and that calculation
+        is not yet shared out of the dashboard. They open when it is.
+      - `POST /bookings/{id}/reschedule` moves a booking to another departure of
+        the same product option, **in place** — the booking keeps its id and its
+        fare. An option change is refused (`PRODUCT_OPTION_CHANGE_NOT_SUPPORTED`)
+        because on the dashboard it cancels the booking and creates a
+        replacement. Needs the `cli:cs` ability, like cancel and refund: it moves
+        a trip a customer is already on.
+      - `quantity` on the `Booking` read is the head count, and its absence was
+        a gap rather than a choice: the only way to count a party was the
+        detail-only `guests` array, which needs `view_booker_of_booking` and
+        carries every traveller's passport — so an inventory-scoped read token
+        could not answer "how many people are on this".
+      - `comments`, `private_notes` and `custom_attributes` are on
+        `GET /bookings/{id}` and in the `PATCH` diff, not on the list. Without
+        them that `PATCH` wrote three fields no read surface published, so it
+        would have answered `200` with two identical diff halves.
+      - `reschedules` and `origin_booking_id` on `GET /bookings/{id}` **and in
+        both halves of the `POST /bookings/{id}/reschedule` diff**: the
+        reschedule ledger for the booking's whole CHAIN, oldest first. The diff
+        needs it because `comments` and `reschedule_notes` on that operation are
+        recorded on the ledger and never on the booking, so a ledger row is the
+        only place either is readable back — without it the operation answered
+        `200` with no trace of the note it had just stored. The preview shows the
+        ledger as it stands: the row a move appends is minted at commit, and
+        synthesizing one would vary between two runs of the same payload and
+        make every approval `changed_since_preview`. A booking
+        the dashboard moved by cancel-and-replace previously read as an ordinary
+        cancellation here, so "what happened to booking X" answered "it was
+        cancelled" while the customer was travelling on a different id. Entries
+        are keyed on the booking a move landed on, so this resolves the chain
+        ROOT first — asking a mid-chain booking for its own entries returns
+        almost nothing.
+
+      - `customer_id`, `partner_id` and `branding_id` on `POST /bookings` are
+        resolved **before the dry run answers**, and against the business unit
+        the TOKEN is pinned to rather than whichever unit the operator's web
+        session is on. An id that does not exist is a `422` naming the field —
+        previously the preview returned an approvable `would_apply: true` card
+        and the commit then 404'd, and a `404` does not release an idempotency
+        key, so correcting the id and retrying as instructed answered
+        `IDEMPOTENCY_CONFLICT` for a booking that was never created. An id
+        belonging to another unit is the same `422`: these three models are
+        scoped by a global scope that reads the operator's session unit, so on a
+        pinned token it confines nothing.
+
+      Eight new `error.code` values, all documented per endpoint:
+      `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE`,
+      `NO_RESOURCE_AVAILABLE`, `DEPOSIT_EXCEEDS_TOTAL`,
+      `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED`, `DESTINATION_ALREADY_STARTED`,
+      `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE` and `BOOKING_HAS_NO_DEPARTURE`.
+
+      Three of them RELEASE their idempotency key — `CAPACITY_UNAVAILABLE`,
+      `DEPARTURE_NOT_BOOKABLE` and `NO_RESOURCE_AVAILABLE` — because each
+      describes a passing state: a full departure, a slot that filled or is
+      closed, a guide already assigned. The other refusals on these endpoints
+      will answer the same thing forever, so replaying a stored response is
+      correct. Persisting one of those three 409s under the key made a card
+      approved during a busy minute un-approvable even after a cancellation
+      freed the seat. Retry the identical call under the SAME key rather than
+      minting a new one. The authoritative list is on the `Idempotency-Key`
+      parameter.
+
+      `Idempotency-Key` is declared on all three, as on every other mutating
+      operation. `POST /bookings` also documents its dry-run `200` separately
+      from the `201`: `booking` and `payment_url` are null there, and
+      `diff.after` is a summary carrying the departure window in the product's
+      own timezone, the product title and the customer — the whole of what an
+      operator's confirmation card can show them.
+
+      **Fixed in the same release, and worth calling out because a client may
+      have worked around it:** `StoreBookingRequest`'s `customer_id` is a
+      `string`/`uuid`, not an `integer`. `customers.id` is a UUID.
+
+    - **1.46.0** — `POST /products` and `PATCH /products/{id}` refuse a product
+      `capacity` above 0 on a plan that does not include shared capacity between
+      schedules (free and legacy), with a 422 `VALIDATION_FAILED` naming the
+      plan. No change for a caller on Starter or above, or for one that sends
+      `0`, `null` or nothing.
+
+      A product's `capacity` is the number its schedules SHARE. The endpoint
+      used to store it on any plan while nothing read it on those two: a 200, a
+      product reading back with the number asked for, and schedules that never
+      shared a seat. `0` and `null` mean "not shared" and stay accepted on every
+      plan, and so does a value that only repeats what the product already
+      holds, so a read-modify-write client is not refused over a field it did
+      not move. A `null` is stored as `0`, so the product reads back with
+      `capacity: 0`. `dry_run: true` is refused exactly when the commit would
+      be.
+
+      Also changed: a product only shares when `capacity` is ABOVE 0. The column
+      defaults to 0, and 0 used to count as a shared capacity for the tenants
+      that had the feature. Setting it back to `0` now switches sharing off and
+      leaves each product option its own capacity, instead of copying 0 seats
+      onto every option and every future availability.
+
+      This replaces the 1.37.0 gate, which asked a per-account switch. The
+      refusal is the same 422 `VALIDATION_FAILED` and the same field, and
+      clearing a shared capacity is still never refused; what decides is now
+      the plan, and an echo of the stored value is accepted.
+
+    - **1.45.0** — `PATCH /products`: switching `is_private` now recomputes
+      inventory after the request commits, one schedule at a time, from the start
+      of yesterday onwards. Every Availability still gets the new `is_private` in
+      the request, past ones included, but past departures keep the vacancies and
+      fully-booked state they were last computed with. `booked_quantity` is no
+      longer recomputed by this switch: it counts booked guests and does not depend
+      on `is_private`. Reads straight after a `200` can therefore still show the old
+      inventory for a short while.
+
+    - **1.44.0** — **New endpoint** `POST /products/bookable`, and two new
+      fields on every `Product` read: `can_be_sold` and `readiness`.
+
+      `POST /products` creates a product that cannot be sold by anyone:
+      departures, prices and questions all hang off a product OPTION, and a
+      non-internal pricing category with no tier is filtered out of the booking
+      widget. Finishing the job took four calls, and over MCP four calls is four
+      confirmation cards on four separate turns — `ProposeInventoryChangeTool`
+      allows one live card per turn — so in practice the assistant proposed the
+      product, stopped, and left a shell nobody could book. Nothing in this API
+      said so either: `Product::updateCanBeSold()` has always computed the
+      answer on every write and `ProductResource` never published it.
+      captainbook#8803.
+
+      - `POST /products/bookable` takes everything `POST /products` takes plus
+        `options` and `pricing_categories` (both required, `minItems: 1`) and
+        creates the product, its options, and each category with one
+        open-ended pricing tier, in one transaction. It does NOT create
+        departures or set a main photo — see `readiness.blocking` on the
+        response, which is the field to report to a human.
+      - `Product.can_be_sold` — the stored column every selling surface filters
+        on. A create answers `false`.
+      - `Product.readiness` — `{missing[], blocking[]}`. `blocking == []` is the
+        definition of `can_be_sold`. `missing` additionally carries the advisory
+        `no_future_departure`, which is true of every product a seasonal
+        operator owns out of season and is NOT a reason a product cannot sell.
+      - **Behaviour change, deliberate:** `can_be_sold` now also requires that
+        at least one non-internal pricing category have a pricing tier
+        (`no_priced_category`). Such a product was already unsellable — both
+        `Embedded\ProductPage` and `Embedded\CalendarWidget` load pricing
+        categories filtered on `whereHas('pricingTiers')`, so its product page
+        renders nothing bookable — the column simply did not notice. Products
+        this moves to `false` were not selling before the change.
+
+    - **1.43.0** — Documentation only; no endpoint, payload or status changed.
+      `Customer.locales[]` was described as an ISO 639-1 code. The panel's
+      language picker offers the whole CLDR catalogue, 17 entries of which
+      carry a region (`en-GB`, `de-AT`, `fr-CA`, `zh-Hans`, `es-419`,
+      `hi-Latn`, …), so a region-qualified code has always been storable and
+      is now reachable without the operator doing anything: creating a
+      customer in the panel seeds `locales` from the account's configured
+      default languages. Read-side only — there is no CLI write path for this
+      field. A client that assumed two characters needs to stop.
+
+    - **1.42.0** — Documentation only; no endpoint, payload or status changed.
+      Five shapes that this file left to be inferred are now written down,
+      because the inventory MCP server's per-operation tools COMPILE their typed
+      input schemas out of this document and an undocumented shape became an
+      untyped `object` in front of a model.
+
+      - `POST /products/{id}/media` says in prose that `multipart/form-data` is
+        the only shape it accepts, and that the MCP tool
+        `inventory_upload_product_media` takes a public `url` and fetches it
+        SERVER-SIDE behind an SSRF guard before calling this endpoint with a
+        real multipart file. Deliberately prose and NOT a second
+        `application/json` content type: `UploadProductMediaRequest::rules()`
+        requires `file` and declares no `url`, so advertising a JSON body would
+        send a generated client straight into a 422. The MCP path also accepts
+        images only (`application/pdf` is multipart-ONLY) and carries no
+        `Idempotency-Key`, so a retry uploads a second copy — both true before
+        and stated nowhere.
+      - The five `config` objects on the workflow trigger and step payloads now
+        share one `WorkflowNodeConfig` definition saying that there is no fixed
+        shape, that it is validated against the resolved node's own `rules()`,
+        and that `GET /workflow-nodes` is where the shape comes from. Two of
+        the five carried no description at all and the other three pointed at
+        PHP class names, which is not a thing a client can read.
+      - `CreateSegmentRequest`'s `conditions.filters[]` items say why they have
+        no listed properties — the tree nests to arbitrary depth over a
+        PER-TENANT field catalogue assembled at runtime — and name
+        `GET /segment-fields` and `GET /segments/{id}` as the two ways to learn
+        it.
+      - `UpdateGuestRequest.custom_attributes` says it is an open key/value map
+        of the account's own attributes and that the keys should be read off an
+        existing guest rather than invented.
+
+      Nothing here narrows or widens validation. A payload that was accepted
+      before is accepted now.
+
+    - **1.41.0** — **Breaking (shape, not status).** `country_code` on
+      `POST /locations` was declared as exactly two characters. The column is
+      ISO 3166-1 **alpha-3** everywhere else in the product — the web country
+      picker writes alpha-3, the Bokun imports write alpha-3,
+      `Organisation::isCompanySetup()` compares against `'USA'`, and the Viator
+      tour-list feed converts alpha-3 → alpha-2 on the way out. So a client
+      that followed this spec wrote an alpha-2 into an alpha-3 column, and the
+      Viator conversion threw on it: one such row took `GET /viator/tourlist`
+      down for an entire account, for every product in it, until the row was
+      corrected.
+
+      The field now accepts an alpha-2 code, an alpha-3 code, or an English
+      country name, and **normalises to alpha-3 before persisting**. `CH`,
+      `CHE` and `Switzerland` all store `CHE`, and the dry-run preview echoes
+      the normalised value, so a preview and its commit agree. A value that
+      resolves to no country is a `422 VALIDATION_FAILED` instead of being
+      stored as-is. Nothing that worked before fails now; what changes is the
+      value you read back, so a client asserting `country_code == "CH"` on the
+      response of its own create must be updated.
+
+      `Location` responses now also carry `city`, `region`, `postal_code` and
+      `country_code`. All four were writable and none were readable, which is
+      why a `country_code` that did not round-trip could sit wrong
+      indefinitely: the only place it surfaced was the derived `address`
+      string, which does not include it.
+
+    - **1.40.0** — `PLAN_LIMIT_REACHED` (403): the plan allowance is now asked
+      OUTSIDE the permission system on `POST /products`, `POST /resources` and both
+      restore endpoints, so it can bind an account owner.
+
+      Every countable allowance used to be enforced inside a permission check, and
+      the permission system grants the account owner every ability before any such
+      check runs — so for an owner the allowance was never read. Measured: a
+      super-admin token POSTing `/products` at 42 products against a limit of 41 got
+      a `201`. A permission answers "may this user act"; an entitlement answers
+      "does this plan include it", and only the first is something an owner grant
+      should waive.
+
+      Two codes now, not one. `FORBIDDEN` means this token or role may not do it;
+      `PLAN_LIMIT_REACHED` means the account has run out, and its `details` carry
+      `plan_item`, `limit` and `current`. Branch on the code, as always.
+
+      On an enforced account with no room the answer is `PLAN_LIMIT_REACHED`
+      whoever is asking: the entitlement is evaluated before the permission, so one
+      account state produces one code rather than `FORBIDDEN` for a staff role and
+      `PLAN_LIMIT_REACHED` for an owner.
+
+      `POST /products/{id}/duplicate` is included — a copy is a new product.
+      Restores are included too, but only when the row is actually trashed:
+      restoring an already-active row adds nothing to the count, so an idempotent
+      retry of a restore that already succeeded stays a `200`.
+
+      **Rolled out per account.** Accounts are over their allowances today, because
+      nothing has ever stopped them, so enforcement is off until it is switched on
+      for an account — an account over its limit may still get a `201` from these
+      endpoints. Treat `PLAN_LIMIT_REACHED` as a refusal you must handle, not one
+      you can predict from the allowance alone.
+
+    - **1.39.0** — **Breaking.** `POST /products` now enforces the `create_product`
+      permission and the tenant's `products` plan limit, and answers `403 FORBIDDEN`
+      when either refuses.
+
+      `POST /products/{id}/duplicate` has always checked both, so the endpoint that
+      COPIES a catalogue was strict while the one that grows it called no
+      `authorize()` at all. `products` is the one countable allowance on this API
+      that is finite on every plan — 10 on starter, 50 on extended, 100 on ultra —
+      so the gap was the entitlement itself rather than a per-unit charge: a starter
+      tenant could hold any number of products by asking an agent for them.
+
+      The `403` was already documented on this operation, for the
+      `update_delivery_method` permission; there are now three ways to earn it.
+
+      Note for MCP clients: route middleware does not run on that path, so this
+      controller check is the only per-resource gate between a write-tier token and
+      a product.
+
+      `POST /products/{id}/restore` is gated the same way and for the same reason: a
+      trashed product is not counted, so restoring one adds to the count, and without
+      the check it was a second door to the overage. Restoring therefore needs
+      `create_product` now, not just the write ability.
+
+      A client at the limit now needs the operator to upgrade the plan or delete a
+      product. `duplicate` is unchanged.
+
+    - **1.38.0** — **Breaking.** `POST /resources` now enforces the `create_resource`
+      permission and the tenant's `resources` plan limit, and answers `403 FORBIDDEN`
+      when either refuses.
+
+      It previously enforced neither: the endpoint gated on the `cli:write` ability
+      alone, with no `authorize()` call of any kind, so a token holder whose role was
+      denied resource creation in the web UI could create them here, past the plan
+      limit, without the web path's per-unit charge ever being raised. On the plans
+      that price resources (`starter` 1, `extended` 5, `ultra` 20) that charge is a
+      Stripe subscription quantity nothing reconciles afterwards, so the resources
+      were free and uncounted — permanently, and silently, since the call returned
+      `201`. Agents creating resources on an operator's behalf are the main consumer
+      of this endpoint and are therefore the main way it happened.
+
+      The limit is counted TENANT-WIDE, so a multi-business-unit tenant cannot pass
+      it one unit at a time. The refusal message names the limit, so the two
+      refusals — missing permission, full plan — can be told apart and relayed.
+
+      `POST /resources/{id}/restore` is gated the same way and for the same reason:
+      a trashed resource is not counted, so restoring one adds to the count, and
+      without the check it was a second door to the overage. Restoring therefore
+      needs `create_resource` now, not just the write ability.
+
+      A client at the limit now needs the operator to upgrade the plan or remove a
+      resource; the endpoint will not buy capacity. Nothing on this API ever raises
+      a customer's bill, and that stays true.
+
+    - **1.37.0** — `capacity` on `POST /products` and `PATCH /products/{id}` now
+      requires the shared-capacity feature on the account: a positive value is
+      refused with 422 when it is off. Clearing one (0 or null) is always
+      accepted, so an account already carrying a pool can always get rid of it.
+      Both product `capacity` fields and both product-option `capacity` fields
+      also gained the descriptions they never had.
+
+      The field is a POOL shared across CONCURRENT departures, and it was the
+      only ungated way to set one. The booking engine applies
+      `products.capacity > 0` with no feature flag (`Availability::isAvailable()`,
+      the no-resources branch), while the dashboard control for it sits behind
+      the beta flag and the product form additionally dropped the value from
+      persistence while that flag was off. So this endpoint could create a state
+      the account could neither see nor undo, and `capacity` sitting undescribed
+      next to the product option's own `capacity` — which really does mean "how
+      many people one departure takes" — made it an easy thing to send by
+      mistake.
+
+      It stays invisible for as long as the product's departures never overlap:
+      with no concurrent departure the pooled arithmetic reduces to the per-slot
+      one. The day two overlap, the engine refuses every booking on both while
+      the OTA feeds keep advertising per-slot seats, and GetYourGuide
+      auto-deactivates the product for refusing a slot our own feed reports as
+      available (Oct 2026: an 8-seat pool nobody had asked for, an afternoon
+      departure moved into the already 13-booked morning window).
+    - **1.36.0** — `?q=` on `GET /products` is case- and accent-insensitive, and was neither.
+
+      `products.title` is a JSON column, and MySQL hands every extracted value
+      back as `utf8mb4_bin` — a BINARY collation — so `title->en LIKE '%Foo%'`
+      never matched a product titled `foo`. The other FOUR free-text searches on
+      this API compare real varchar columns under the table's ci collation and
+      were already case- and accent-insensitive: `/customers`, which shares this
+      parameter, and `/guests`, `/bookings` and `/partners`, which declare their
+      own `q`. So `/products` was the only one of the five where case mattered,
+      and nothing said so.
+
+      `utf8mb4_unicode_ci` folds ACCENTS as well as case, so `?q=croisiere` now
+      returns a product titled "Croisière" and `?q=resume` matches "Résumé".
+      That is the same semantics the other four have always had — this makes
+      `/products` consistent rather than exceptional — but it was undocumented
+      on all five, so do not read a single hit as an identity match.
+
+      Found by the operator assistant's tool-selection eval: it searched the
+      capitalised form of a product's own name, got an empty page, and reported
+      "No product found matching 'Ticket Issuer'" for a product sitting in that
+      operator's catalogue. To a caller, a case-sensitive search on a
+      human-entered name is indistinguishable from the record not existing.
+
+      Widening only — a term that matched before still matches, and the literal
+      handling of `%` and `_` is unchanged.
 
     - **1.34.0** — **Breaking for anyone reconciling a figure.**
       `Booking.total_amount` now includes the booking's purchased extras, and
@@ -1034,7 +1596,6 @@ info:
 
       On MCP, `inventory_browse` passes `filters` through as these query
       parameters, so an unknown filter returns a `validation_error` naming it.
-
     - **1.14.0** — **Breaking.** The availability writes now run the web UI's
       permissions, which the Authorization convention above always claimed and
       four endpoints did not: they checked the token's tier and nothing else.
@@ -1590,6 +2151,11 @@ paths:
       operationId: createProduct
       summary: Create a product
       description: |
+        Requires the `create_product` permission and room under the tenant's
+        `products` plan limit; either refusal is a `403`. The limit is counted
+        tenant-wide, not per business unit. This endpoint does not buy capacity —
+        a tenant at its limit has to upgrade the plan or delete a product.
+
         Creates a Product and mirrors the supplier-side metadata to
         `central_products` via `App\Observers\ProductObserver`. The
         controller enforces the same implicit-override rules the Livewire
@@ -1628,6 +2194,11 @@ paths:
         Omitting both is likewise unrestricted. A brand new product has no
         bookings, so nothing is reissued and `confirm_ticket_reissue` has no
         meaning on create.
+
+        The account's entitlement is checked separately from the caller's permission, so a
+        refusal is one of two codes: `FORBIDDEN` when the token or role may not do it, and
+        `PLAN_LIMIT_REACHED` when the account has no room. Entitlement enforcement is being
+        rolled out per account, so an account over its allowance may still succeed today.
       tags: [Products]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -1653,6 +2224,81 @@ paths:
                           - type: object
                             properties:
                               product: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /products/bookable:
+    post:
+      operationId: createBookableProduct
+      summary: Create a product that can actually be sold
+      tags: [Products]
+      description: |
+        Creates a Product, at least one ProductOption and at least one priced
+        PricingCategory (category + one open-ended PricingTier) in ONE call and
+        ONE transaction.
+
+        **Prefer this over `POST /products` for any new product.** A product on
+        its own cannot be sold: departures, prices and questions all hang off a
+        product OPTION, and a non-internal pricing category with no tier is
+        filtered out of the booking widget. So `POST /products` followed by
+        nothing leaves a product no customer can reach — and over MCP that is
+        the normal outcome rather than the unlucky one, because
+        `ProposeInventoryChangeTool` parks ONE confirmation card per turn, so
+        the option and the prices never arrive (captainbook#8803).
+
+        Takes every field `CreateProductRequest` takes, under the same rules
+        (implicit overrides, the refused pricing-mode trio, the
+        `update_delivery_method` permission for ticketing, the 65,535-byte text
+        cap), plus `options` and `pricing_categories`. `status` defaults to
+        `draft` exactly as `POST /products` does — publishing a product that has
+        no photo and no departures would put an empty page on the widget.
+
+        **What it does NOT do:** departures and the main photo. Departures need
+        a schedule only the operator can state and belong to
+        `POST /availabilities` or the rule/bulk endpoints; a photo is an upload.
+        Both therefore remain in `readiness.blocking` on the response, which is
+        the field to read and report rather than announcing a finished product.
+
+        Plan limits and permissions are checked exactly as on `POST /products`,
+        entitlement before permission, and both before the dry run — so a
+        preview cannot answer `would_apply: true` for a create the commit would
+        refuse.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBookableProductRequest" }
+      responses:
+        "200":
+          description: Dry-run preview. Built entirely from unsaved models, so it is reproducible — `uuid`, `product_code`, `option_code` and `color` are minted only on commit.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - $ref: "#/components/schemas/BookableProductResult"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - $ref: "#/components/schemas/BookableProductResult"
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
@@ -1728,25 +2374,35 @@ paths:
         its own values back — still works.
 
         **Cascading side effects** (only fire when the relevant input
-        actually changed; under dry-run they're surfaced via the
-        `MutationResult.side_effects` array rather than executed):
+        actually changed; a dry run executes none of them, and does not list
+        them in `MutationResult.side_effects` either — only a ticket reissue
+        is listed there):
 
         - `is_private` toggled — every Availability of every related
-          ProductOption is bulk-updated to match, then dispatches
-          `UpdateBookedQuantityJob`, `UpdateCumulativeCapacityJob`,
-          `UpdateIsFullyBookedJob`, `UpdateIsOpenForBookingJob`,
-          `UpdateAvailableResourcesCountJob`,
-          `UpdateMaxHostableGuestsNumberJob`, and `UpdateVacanciesJob`
-          per chunk of 1000 Availabilities.
+          ProductOption is bulk-updated to match, then, once the update
+          commits, one schedule inventory recompute is queued per
+          ProductOption. It recomputes departures from the start of
+          yesterday onwards, running `UpdateCumulativeCapacityJob`,
+          `UpdateIsOpenForBookingJob`, `UpdateAvailableResourcesCountJob`,
+          `UpdateIsFullyBookedJob`, `UpdateMaxHostableGuestsNumberJob` and
+          `UpdateVacanciesJob` in that order per chunk of 1000
+          Availabilities. `booked_quantity` is not recomputed: it does not
+          depend on `is_private`.
         - `schedule_type` switched to `date` — Availability `from`/`to`
           windows are collapsed to full-day spans and any
           `resourceables` rows for the related ProductOptions are deleted
           (DATE products are inherently resource-less).
-        - `capacity` changed (only when the `ProductLevelCapacity` feature
-          flag is on) — cascades to all options, then to all future
-          Availabilities, and re-runs the inventory derivation jobs.
-          Deferred via `defer()` so the response returns before the heavy
-          fan-out runs.
+        - `capacity` changed (only on a plan that includes shared capacity
+          between schedules — Starter and above) — a value above 0 cascades to
+          all options, then to all future Availabilities, and re-runs the
+          inventory derivation jobs, deferred via `defer()` so the response
+          returns before the heavy fan-out runs. Back to `0` switches sharing
+          off: nothing is copied down, the options keep their own capacity, and
+          a queued job recalculates the saved seat counts of the future
+          Availabilities and then sends the new numbers to the booking
+          channels. On free and legacy a value above 0 is a 422, while `0` is
+          always honoured there too — recalculation included — so a number left
+          over from a plan that had the feature can be switched off.
 
         **Ticket reissue.** Changing `delivery_method` dispatches
         `DeliverTicketOrVoucher`, which deletes every ticket on every booking
@@ -2547,7 +3203,7 @@ paths:
                               skip_reasons:
                                 type: object
                                 additionalProperties: { type: integer }
-                                description: "Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`."
+                                description: "Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`, `pricing_tier_foreign_to_product`, `pricing_tier_unresolvable`, `departure_has_no_pricing_ladder`."
                               notes:
                                 type: object
                                 additionalProperties: { type: integer }
@@ -2564,7 +3220,16 @@ paths:
                                   by a refusal in `skip_reasons`.
                               total_changed:
                                 type: integer
-                                description: "`setting=pricing` dry-run only. Matched slots whose fares would actually move."
+                                description: |
+                                  `setting=pricing` dry-run only. Matched slots
+                                  whose fares would actually move. NOT
+                                  refusal-aware: it is computed separately from
+                                  `would_update` / `skip_reasons` and still
+                                  counts a slot that the write will refuse
+                                  under `pricing_tier_foreign_to_product`. Read
+                                  it for "will this change any price at all",
+                                  and the `would_update` / `skip_reasons` pair
+                                  for "how many departures will be written".
                               preview_limit:
                                 type: integer
                                 description: "`setting=pricing` dry-run only. How many slots `diff` spells out."
@@ -3963,11 +4628,328 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+    post:
+      operationId: createBooking
+      summary: Create a booking
+      tags: [Bookings]
+      description: |
+        Creates a booking or a held reservation on one availability, for one
+        customer, with a guest mix. Derived field for field from the back-office
+        create form (`app/Livewire/Bookings/Create.php`), with the divergences
+        below.
+
+        **NOTHING IS CHARGED HERE, and `card` is refused.** `payment_method`
+        records how the customer is paying — `cash`, `paypal` or
+        `bank_transfer`. It does not take a payment. `card` is rejected with an
+        ordinary `422 VALIDATION_FAILED` naming `payment_method`, on every
+        account, which is stricter than the dashboard: there, a card-marked
+        booking with no charge is
+        allowed on an account without MOTO, and refused on one with it
+        (`Create::expectsCardCharge()`) because the booking would otherwise be
+        "recorded as paid by card without the card ever being charged". This
+        endpoint has no card flow at all, so it refuses the value outright
+        rather than recording a payment method it cannot honour. Take card
+        payments in the CaptainBook dashboard.
+
+        `deposit` is money ALREADY RECEIVED, not money charged — the cash the
+        customer handed over at the desk, in the account currency's MINOR units
+        like every other money field here. It is what makes
+        `payment_method: cash` mean anything. When present it requires
+        `currency` when it is non-zero, and that currency must be the account's
+        and is validated rather than converted: there is one currency per
+        account, and a caller asking for another gets a `422` naming it rather
+        than a `200` and a confidently wrong denominator. The server also
+        refuses a deposit above the booking's computed total, which it can only
+        check after composing fares against the locked availability.
+
+        **Fares come from the product's pricing policy, not the payload.**
+        `prices` and `price` are REFUSED (`422`) rather than ignored. The
+        dashboard lets an operator type a per-category price and stamps it
+        `FareSource::MANUAL` so no later recompute overwrites it; that is a
+        screen decision made while looking at the booking. Accepting and
+        silently dropping the field would let an agent report a negotiated
+        price that nothing downstream contradicts. To enter a negotiated price,
+        create the booking in the dashboard.
+
+        `quantity` is derived (`array_sum(guests)`) and is not accepted.
+        `business_unit_id` comes from the token's user, as on every CLI
+        endpoint. `voucher` is refused: pass `partner_id` to attribute the
+        booking to a partner and their commission is applied from the partner's
+        own configuration.
+
+        Omitting `partner_id` means a Direct booking, which is what
+        `Create::makeProvider()` resolves to the authenticated user. Omitting
+        `resource_id` leaves resource assignment automatic; reassign afterwards
+        with `POST /bookings/{id}/resources`.
+
+        Notifications default **on**: the customer receives their confirmation
+        and admins are notified. Suppress with `notify_customer: false` /
+        `notify_admins: false`. They are dispatched after the transaction
+        commits, so a create that fails sends nothing.
+
+        Capacity is checked under a row lock on the availability inside the
+        write transaction, so a slot that fills between read and write is a
+        `409` rather than an oversell.
+
+        **The dry run refuses what it can already decide.** A departure that is
+        closed (`is_bookable: false`), short of seats, outside the token's
+        business unit, not a product-option departure, or carrying a pricing
+        category, extra, answer, `resource_id` or `branding_id` that does not
+        belong to it is refused on the PREVIEW as well as the commit — so an
+        approval card is never parked for a payload the commit would reject.
+        Two causes are still commit-only, because they live inside the booking
+        engine and a second implementation here would drift from it: the
+        departure's cut-off window, and a party size no pricing tier covers.
+        Both answer `409 DEPARTURE_NOT_BOOKABLE`, and both release their key.
+
+        On a `dry_run`, `diff.after` is a **summary of what would be booked**
+        rather than a `Booking` shape: there is no booking yet to describe, and
+        inventing one would mean minting the id and the payment link that the
+        commit then replaces. The `200` response below lists its keys.
+
+        Two of them are DISPLAY TEXT and do not appear on the booking read:
+        `product` is the product's title in the API's fallback locale, and
+        `customer` is a label (a name, falling back to an email or an id), not
+        the `{id, name, email, phone}` object the read publishes under the same
+        word. They are there because the summary is what an operator's
+        confirmation card shows them, and an availability id is not something
+        anyone can check against the person at the desk. Read them as prose; do
+        not diff them against the `201`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreBookingRequest"
+      responses:
+        "200":
+          description: |
+            Dry-run preview. `booking` and `payment_url` are both NULL on
+            purpose: bookings are UUID-keyed and the payment link embeds that
+            id, so neither exists until the commit mints it, and previewing
+            either would promise the caller a value the write replaces.
+            `diff.after` is a SUMMARY — the availability, the booking type, the
+            head count, the account currency, the product title, the
+            product-local departure window and the customer being booked — not
+            a `Booking`. Reproducible: every value in it is stable for a fixed
+            payload, which is what lets an approval be re-checked against a
+            second run of the same preview.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              booking:
+                                type: ["null"]
+                                description: Always null on a dry run.
+                              payment_url:
+                                type: ["null"]
+                                description: Always null on a dry run.
+                              guest_mix_warnings:
+                                type: array
+                                description: |
+                                  Companion-rule violations the booking was
+                                  allowed to carry anyway. A product may declare
+                                  that one guest type must travel with another
+                                  (a child with an adult); staff may book past
+                                  that rule, as they may on the dashboard, which
+                                  warns on screen instead of refusing. This
+                                  surface had no equivalent, so the rule was
+                                  waived for every caller and nothing said so.
+                                  `[]` means the mix satisfies every rule —
+                                  distinguishable from the key being absent.
+                                items:
+                                  type: object
+                                  additionalProperties: false
+                                  required: [title, message]
+                                  properties:
+                                    title:   { type: string }
+                                    message: { type: string }
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              booking: { $ref: "#/components/schemas/Booking" }
+                              payment_url:
+                                type: [string, "null"]
+                                description: |
+                                  Hosted checkout link for the outstanding
+                                  balance, for the operator to pass to the
+                                  customer. Null when, and only when, the
+                                  booking owes nothing. The link needs no
+                                  further credential, so treat it as the
+                                  booking's bearer token: send it to the
+                                  operator who asked, and nowhere else.
+                              guest_mix_warnings:
+                                type: array
+                                description: |
+                                  Companion-rule violations the booking was
+                                  allowed to carry anyway. A product may declare
+                                  that one guest type must travel with another
+                                  (a child with an adult); staff may book past
+                                  that rule, as they may on the dashboard, which
+                                  warns on screen instead of refusing. This
+                                  surface had no equivalent, so the rule was
+                                  waived for every caller and nothing said so.
+                                  `[]` means the mix satisfies every rule —
+                                  distinguishable from the key being absent.
+                                items:
+                                  type: object
+                                  additionalProperties: false
+                                  required: [title, message]
+                                  properties:
+                                    title:   { type: string }
+                                    message: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: |
+            No such `availability_id`. Raised on the DRY RUN as well as the
+            commit, which is the point of resolving the departure before the
+            preview branch: a preview that answers `wouldApply: true` for a slot
+            the commit then refuses is a guess, not a preview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: |
+            Idempotency replay conflict (see
+            `#/components/responses/IdempotencyConflict`), or:
+
+            - `CAPACITY_UNAVAILABLE` — the departure cannot hold the requested
+              party. Checked under a row lock inside the write transaction, so
+              nothing was created. `retriable: false`, because the call as sent
+              hits the same lock and the same answer — but it RELEASES its
+              `Idempotency-Key` (the `Idempotency-Key` parameter carries the
+              full release list), so the identical call with the SAME key
+              succeeds once a seat frees. Read the departure with
+              `GET /availabilities`, or choose another.
+            - `DEPARTURE_NOT_BOOKABLE` — the booking ENGINE refused the
+              departure, and it does not distinguish why: the slot is full on
+              its own count, `is_bookable` is false, the departure is inside its
+              cut-off window (the documented behaviour when the caller lacks
+              `create_booking_after_cut_off`), or no pricing tier covers the
+              party size. The engine's message is passed through because it is
+              the only thing that separates them. `retriable: false`, but it
+              RELEASES its key: three of those four causes clear on their own.
+              A departure that is simply full normally answers
+              `CAPACITY_UNAVAILABLE` instead — the seat guard runs first — so
+              this code means the engine refused for a reason that guard cannot
+              see.
+            - `NO_RESOURCE_AVAILABLE` — every guide or asset that can host the
+              departure is already assigned. The only refusal here that is
+              `retriable: true`, and it releases its `Idempotency-Key`: a
+              resource freeing up is exactly the state an identical later call
+              can find changed. `POST /bookings/{id}/reschedule` raises it too,
+              since it forwards `resource_id`.
+
+            Match on `error.code`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: |
+            Ordinary validation failure (see
+            `#/components/responses/ValidationError`), which is also how every
+            refused field is reported — `payment_method: card`, `prices`,
+            `price`, `voucher`, `existingPm`, `payment_method_id`, `quantity`
+            (derived from `guests`) and `customer.locales` (send `locales` at
+            the top level). The same status covers the payload-level
+            refusals that no single field rule can express:
+
+            - **A guest mix of all zeroes.** `guests.*` accepts `0` so a
+              caller may name a category and book none of it, but a booking of
+              nobody is refused here rather than by the engine, which answers
+              with a complaint about `fare` — a parameter you never sent.
+            - **A pricing category or an extra from another product.** The
+              `guests` map is keyed by pricing category id and the fare comes
+              from whichever category you name, so an id belonging to a
+              different product WAS a way to choose the fare. Both are now
+              refused by name, listing the ids this departure's product has.
+            - **A deposit with no `payment_method`.** The field is optional in
+              general and required alongside money, because the booking engine
+              defaults an absent method to `card` — recording a card payment
+              that was never taken.
+            - **`payment_notes` with no deposit.** The note is written onto the
+              transaction the deposit creates, so without one it has nowhere
+              to go. Put it in `private_notes` instead.
+            - **A `resource_id` not attached to this departure's option.** Two
+              opposite failures before this: on a product with capacity
+              resources the engine refused with nothing named, and on a product
+              without them the pin was accepted and silently discarded.
+            - **A `branding_id` from another business unit, or none at all.** It
+              is a widget id and it reached the INSERT raw — a nonexistent one
+              was a 500 where every sibling id gives a 404, and another unit's
+              was accepted, after which the customer's confirmation email
+              carried that unit's branding.
+            - **An `availability_id` that is not a product-option departure.**
+              `availabilities.bookable` is polymorphic over `ProductOption` and
+              `Resource`; a resource-backed slot has no pricing categories and
+              no fare, so it cannot be booked. Raised on the dry run as well as
+              the commit.
+            - **An `availability_id` from another business unit.** Nothing
+              scoped it: `Availability` carries no business-unit scope and both
+              relation hops to its product strip the one that would have
+              applied. A token could consume another unit's seats and record
+              the booking against its own.
+
+            Or:
+
+            - `DEPOSIT_EXCEEDS_TOTAL` — the recorded deposit is larger than the
+              booking's total. The total is the composed pricing-tier total PLUS
+              any booked extras — `gross_price` alone is tiers only, and
+              bounding by it refused a legitimate deposit on any booking
+              carrying an extra. It is only known once fares are composed
+              against the locked departure, which is why this is not a
+              validation rule. `error.details` carries `deposit` and `total` as
+              integers in the account currency's minor units, plus `currency` —
+              the account's three-letter code, or `null` when the account has
+              no currency on file. Do not assume a string there.
+
+            Match on `error.code`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /bookings/{id}:
     get:
       operationId: showBooking
       summary: Show a booking
-      description: Inlines guests, most-recent transactions, purchased extras and answers.
+      description: |
+        Inlines guests, most-recent transactions, purchased extras and answers,
+        and adds `comments`, `private_notes` and `custom_attributes` — the three
+        fields `GET /bookings` omits and `PATCH /bookings/{id}` writes — plus
+        `reschedules` and `origin_booking_id`, the booking's reschedule ledger
+        resolved across its whole chain.
+
+        `private_notes` travels with this payload and is NOT separately
+        permission-gated: a read-only token receives it, as does the read-tier
+        MCP browse surface. It is internal in the sense that the customer never
+        sees it, not in the sense that staff do not — the mobile check-in
+        payload shows it to any handset that may update the booking's tickets.
+        A token minted for a third party will carry whatever staff typed there.
       tags: [Bookings]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -3984,6 +4966,272 @@ paths:
                       data: { $ref: "#/components/schemas/Booking" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      operationId: updateBooking
+      summary: Edit a booking
+      tags: [Bookings]
+      description: |
+        Edits a booking's NOTES and its operator metadata: `comments`,
+        `private_notes` and non-pool-backed custom attributes. Derived from the
+        dashboard's edit form (`app/Livewire/Bookings/EditModal.php`), narrowed.
+
+        **A booking outside the business unit your token is pinned to answers
+        `404`, not `403`.** It is indistinguishable from a booking that does not
+        exist, deliberately: the id is a path parameter, so naming the unit
+        would turn it into an existence oracle across units. If you are
+        confident the id is right, the token is pinned to a different unit than
+        the booking — do not tell the operator the booking is gone.
+
+        **It never changes what the customer OWES, or what they GET.** `prices`
+        and `price` are refused with a `422`: the dashboard form can rewrite any
+        pricing category's fare, that is the one field on it that moves revenue,
+        and no money event exists downstream to notice an agent zeroing a booking
+        out. Nothing here changes the party, the departure or the add-ons either,
+        so this endpoint runs no capacity check and recomputes no total.
+
+        **The guest mix and extras are deferred, not rejected.** Both are
+        refused with a `422` today. Changing either has to recompute what the
+        booking is worth, and that calculation currently lives only inside the
+        dashboard's edit form — writing the pivots without it would answer `200`
+        while the booking's published total silently went stale. They open here
+        once the calculation is shared. Until then, change them in the
+        CaptainBook dashboard. To move a booking to another departure use
+        `POST /bookings/{id}/reschedule`.
+
+        **No notification is sent**, matching the dashboard, which passes
+        `notify_admins: false, notify_customer: false` from this form. The
+        notify flags are therefore refused rather than ignored. To re-send a
+        confirmation use
+        `POST /bookings/{id}/notifications/resend-confirmation`.
+
+        **Custom attributes are a patch, not desired-state** — the opposite of
+        `update_booking_resources`. An omitted slug is left alone; only the slugs
+        you send are written. An unknown slug is a `422` that lists the ones this
+        tenant has configured. The whole payload is validated before any of it is
+        written, so one bad value cannot leave the rest half-applied.
+
+        A custom attribute whose definition is pool-backed is refused with a
+        `422`: a pool-backed value may only change through the atomic
+        claim/release action, because the uniqueness constraint protects the pool
+        table rather than the booking's copy, so writing one directly can leave
+        two bookings holding the same code.
+
+        A request carrying NONE of the three editable fields is a `422`, not a
+        `200` with an empty diff. `dry_run` on its own is not a change. The
+        check is on field PRESENCE, not on value: resending a field's current
+        value is a `200` whose `before` and `after` agree, which is the honest
+        answer to "set this to what it already is".
+
+        Requires BOTH the `update_booking` and `update_booking_after_date`
+        permissions. The second one's name is misleading — the dashboard's edit
+        form checks it on every booking, departed or not — and this endpoint
+        matches the screen rather than being wider than it.
+
+        `before` and `after` carry `comments`, `private_notes` and
+        `custom_attributes`, which the default booking read shape does not. They
+        deliberately do NOT inline guests, transactions or answers: a preview
+        envelope is persisted for later approval, and illustrating a change to a
+        note with every guest's passport number is not a trade worth making.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/MutationResult" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            Idempotency replay conflict (see
+            `#/components/responses/IdempotencyConflict`), or:
+
+            - `BOOKING_ALREADY_CANCELLED` — the booking is already cancelled
+              and its contents cannot be edited.
+
+            Match on `error.code`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: |
+            Ordinary validation failure (see
+            `#/components/responses/ValidationError`), including a request that
+            changes nothing, an unknown custom attribute slug, a value that
+            fails its own definition's rules, and the refused fields `prices`,
+            `price`, `guests`, `extras`, `quantity`, `expiry`,
+            `notify_admins` and `notify_customer`. Or:
+
+            - `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE` — one or more named custom
+              attributes draw from a code pool, whose values are claimed and
+              released atomically rather than set. `error.details.slugs` lists
+              them.
+
+            Match on `error.code`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /bookings/{id}/reschedule:
+    post:
+      operationId: rescheduleBooking
+      summary: Move a booking to another departure
+      tags: [Bookings]
+      description: |
+        Moves a booking to another departure **of the same product option**, in
+        place. The booking KEEPS ITS ID. Extras, answers, transactions, guests
+        and any pool access code stay on the same row, because nothing is
+        replaced.
+
+        **An option change is not available here.** Moving a booking to a
+        different product option is a different operation entirely: the
+        dashboard cancels the booking and creates a replacement with a new id,
+        re-replicating its contents and repricing against the destination. This
+        endpoint refuses it with a `422`, detected by comparing the destination
+        departure's product option against the booking's current one. Naming an
+        option explicitly via `product_option_id` is also a `422`, so a caller
+        who tries is told why rather than having the field ignored.
+
+        **The price does not change.** The booking keeps the fare it was taken
+        at, even when the destination departure is priced differently — moving a
+        midweek booking onto a peak Saturday does not reprice it. Say so when
+        the destination is priced differently; `prices` is refused.
+
+        `origin_booking_id` stays null, because this is the same booking. That
+        field is populated only by the dashboard's replacement reschedule and by
+        channel-manager amendments.
+
+
+        **A booking outside the business unit your token is pinned to answers
+        `404`, not `403`.** It is indistinguishable from a booking that does not
+        exist, deliberately: the id is a path parameter, so naming the unit
+        would turn it into an existence oracle across units. If you are
+        confident the id is right, the token is pinned to a different unit than
+        the booking — do not tell the operator the booking is gone.
+
+        Capacity at the destination is checked under a row lock. The booking's
+        own seats are NOT yet counted there, so the whole party counts as new
+        load — except on a same-slot move, where it counts as zero. Both the
+        source and destination rows are locked in ascending id order, matching
+        the inventory recompute that runs inside the same transaction; two
+        reschedules crossing between one pair of slots therefore serialise
+        instead of deadlocking.
+
+        A destination that has already departed is a `409`. A destination whose
+        timezone cannot be resolved from its columns passes the guard — "one we
+        cannot place in time is not one we can prove has departed" — and the
+        response says the departure time could not be verified.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescheduleBookingRequest"
+      responses:
+        "200":
+          description: Rescheduled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/MutationResult"
+                          - type: object
+                            properties:
+                              departure_time_unverified:
+                                type: boolean
+                                description: |
+                                  True when the destination departure's timezone
+                                  could not be resolved, so the guard that
+                                  refuses a departed slot could not prove this
+                                  one has not departed. The move still applied.
+                              # No top-level `booking` key here, unlike
+                              # `POST /bookings`. A reschedule has a `before`
+                              # AND an `after`, so the moved booking IS
+                              # `diff.after`; a create has no `before`, which is
+                              # the only reason it repeats the object under its
+                              # own key.
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            Idempotency replay conflict (see
+            `#/components/responses/IdempotencyConflict`), or:
+
+            - `BOOKING_ALREADY_CANCELLED` — a cancelled booking cannot be moved.
+            - `DESTINATION_ALREADY_STARTED` — the destination departure has
+              already begun. One case this does NOT cover: a departure whose
+              timezone cannot be resolved from its columns passes the guard and
+              the move applies, reported as `departure_time_unverified` on the
+              200.
+            - `CAPACITY_UNAVAILABLE` — the destination cannot hold the booking's
+              party. Its seats are not counted there yet, so the whole party
+              counts as new load, except on a same-slot move.
+            - `NO_RESOURCE_AVAILABLE` — no guide or asset is free to host the
+              destination. Reachable here because this endpoint forwards
+              `resource_id` into the same `attachResources()` the create uses.
+
+              Both of the above RELEASE their `Idempotency-Key`, so the
+              identical call with the same key succeeds once the cause clears.
+              `BOOKING_ALREADY_CANCELLED` and `DESTINATION_ALREADY_STARTED` do
+              not, and correctly so — a cancelled booking stays cancelled and a
+              departed slot stays departed.
+
+            Match on `error.code`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: |
+            Ordinary validation failure (see
+            `#/components/responses/ValidationError`), including the refused
+            fields `product_option_id`, `prices`, `price`, `extras` and
+            `guests`. Or:
+
+            - `BOOKING_HAS_NO_DEPARTURE` — the booking has no availability
+              attached, so there is nothing to move and no product option to
+              match the destination against. Its `availability_booking` rows
+              are gone (a channel-manager amendment, a partial cleanup), so the
+              remedy is the dashboard rather than another destination. Reported
+              under its own code precisely because the one below hints "choose a
+              departure of the same product option", which can never clear this.
+            - `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED` — the destination departure
+              belongs to a different product option. That operation cancels the
+              booking and creates a replacement, and is available only in the
+              CaptainBook dashboard. The option is implied by the destination
+              rather than named, so this is raised after loading it.
+
+            Match on `error.code`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /bookings/{id}/resources/available:
     get:
@@ -4080,7 +5328,8 @@ paths:
         The caller sends the desired booking resource state plus the last-read
         `expected_resource_state_token`. The server rejects stale writes with
         `BOOKING_RESOURCE_STATE_STALE`, rejects invalid resource selections with
-        `BOOKING_RESOURCE_CONFLICT`, and commits booking/resource DB state
+        `BOOKING_RESOURCE_CONFLICT` (or `BOOKING_RESOURCE_REQUEST_INVALID` when the
+        request is merely incomplete), and commits booking/resource DB state
         atomically. Side effects (notifications, workflows, calendar jobs) are
         emitted after commit.
       tags: [Bookings, Resources]
@@ -4121,7 +5370,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-        "422": { $ref: "#/components/responses/ValidationError" }
+        "422":
+          description: |
+            Either an ordinary validation failure (`VALIDATION_FAILED`) or
+            `BOOKING_RESOURCE_REQUEST_INVALID`, raised when every rejection is
+            `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` or `REPLACED_RESOURCE_WITHOUT_MAIN`.
+            Both release the `Idempotency-Key`, so the corrected retry may reuse it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /bookings/{id}/transactions:
     get:
@@ -5037,6 +6295,18 @@ paths:
     post:
       operationId: createResource
       summary: Create a resource
+      description: |
+        Requires the `create_resource` permission and room under the tenant's
+        `resources` plan limit; either refusal is a `403`, and its message says
+        which. The limit is counted tenant-wide, not per business unit.
+
+        This endpoint does not buy capacity. A tenant at its limit has to upgrade
+        the plan or remove a resource — nothing here raises their bill.
+
+        The account's entitlement is checked separately from the caller's permission, so a
+        refusal is one of two codes: `FORBIDDEN` when the token or role may not do it, and
+        `PLAN_LIMIT_REACHED` when the account has no room. Entitlement enforcement is being
+        rolled out per account, so an account over its allowance may still succeed today.
       tags: [Resources]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -5063,6 +6333,7 @@ paths:
                             properties:
                               resource: { $ref: "#/components/schemas/Resource" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
@@ -5132,6 +6403,15 @@ paths:
     post:
       operationId: restoreResource
       summary: Restore a soft-deleted resource
+      description: |
+        Subject to the same `create_resource` permission and `resources` plan
+        allowance as creating one: a trashed resource is not counted, so restoring
+        it adds to the count. Either refusal is a `403`.
+
+        The account's entitlement is checked separately from the caller's permission, so a
+        refusal is one of two codes: `FORBIDDEN` when the token or role may not do it, and
+        `PLAN_LIMIT_REACHED` when the account has no room. Entitlement enforcement is being
+        rolled out per account, so an account over its allowance may still succeed today.
       tags: [Resources]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -5148,6 +6428,7 @@ paths:
                     properties:
                       data: { $ref: "#/components/schemas/MutationResult" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /product-options/{id}/resources:
@@ -5415,6 +6696,32 @@ paths:
         Multipart upload of an image or document. Server enforces max-size,
         accepted MIME types per tenant plan, and runs through `ProductAttachment`
         ingestion (Paperclip variants generated async).
+
+        **`multipart/form-data` is the ONLY shape this endpoint accepts.**
+        `UploadProductMediaRequest::rules()` requires `file`, so a JSON body is
+        a `422` whatever it contains.
+
+        Note for anyone changing this endpoint: the MCP tool
+        `inventory_upload_product_media` does NOT call it with a body of its
+        own. There is no way to put bytes in a JSON-RPC argument, so that tool
+        takes a PUBLIC `url` plus a `product_id` from the agent, fetches the URL
+        **server-side** behind the SSRF guard in
+        `App\Mcp\Tools\Inventory\MediaTool::validateUrlSafety()` (a denylist of
+        private, loopback and reserved IPs, with the resolved address pinned
+        through `CURLOPT_RESOLVE` so the connect cannot be retargeted after the
+        check, and no redirect followed), and then calls this controller with a
+        real multipart file. So the request this endpoint sees is always the one
+        documented below, and the `{url, product_id}` shape is the MCP TOOL's
+        input schema, not a second content type here. It is stated in this
+        description rather than as a `requestBody` precisely so no generated
+        client concludes it may post JSON.
+
+        Two further differences on that MCP path, both invisible from here: it
+        accepts images only — the fetch rejects `application/pdf`, which the
+        multipart shape below accepts — and it carries **no `Idempotency-Key`**,
+        because `MediaTool::upload()` composes its request directly instead of
+        threading it through `IdempotencyMiddleware`, so a retry uploads a
+        SECOND copy.
       tags: [Media]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -5509,7 +6816,17 @@ paths:
     post:
       operationId: restoreProduct
       summary: Restore a soft-deleted product
-      description: Resurrects a soft-deleted product by clearing `deleted_at`.
+      description: |
+        Resurrects a soft-deleted product by clearing `deleted_at`.
+
+        Subject to the same `create_product` permission and `products` plan allowance as
+        creating one: a trashed product is not counted, so restoring it adds to the count.
+        Either refusal is a `403`.
+
+        The account's entitlement is checked separately from the caller's permission, so a
+        refusal is one of two codes: `FORBIDDEN` when the token or role may not do it, and
+        `PLAN_LIMIT_REACHED` when the account has no room. Entitlement enforcement is being
+        rolled out per account, so an account over its allowance may still succeed today.
       tags: [Products]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -5533,6 +6850,7 @@ paths:
                     properties:
                       data: { $ref: "#/components/schemas/MutationResult" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/IdempotencyConflictOrProductBeingDuplicated" }
 
@@ -5567,6 +6885,10 @@ paths:
         preview, show a human, and then commit (the operator assistant does
         exactly this, and compares a hash of the two) can rely on the second
         dry run matching the first.
+
+        A copy is a new product, so this is subject to the `products` plan allowance exactly as
+        `POST /products` is: `FORBIDDEN` when the token or role may not create products,
+        `PLAN_LIMIT_REACHED` when the account has no room.
       tags: [Products]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -6547,8 +7869,8 @@ components:
         | Ability     | Required for                                                           |
         | ----------- | ---------------------------------------------------------------------- |
         | `cli:read`  | Always granted alongside read endpoints; not enforced explicitly.      |
-        | `cli:write` | Every mutating endpoint **not** listed under `cli:cs`: products, product-options, availabilities (incl. availability-rules, bulk-update, bulk-delete), pricing-categories, pricing-tiers, discounts (incl. apply), gift-certs (available CRUD + issue / resend), guests, extras, questions, resources (incl. attach / detach on product-options and `POST /bookings/{id}/resources`), locations, media, workflows (incl. steps + trigger), segments (create). Stated as the complement of `cli:cs` on purpose: an enumeration drifts every time a resource is added. |
-        | `cli:cs`    | CS-only sensitive ops: booking **cancel**, comp, refund, and confirmation resend, plus issued gift-cert **void** — the five routes gated on `abilities:cli:cs` (they sit in two groups in `routes/api_cli_v1.php`, not one). Cancel is CS for **every** `refund_policy` value, `none` (which moves no money) included; void is CS because it kills an instrument the customer paid for. Ticking it requires the `issue_cli_cs_token` permission (admin by default), so it is a privilege boundary rather than only a blast-radius control. |
+        | `cli:write` | Every mutating endpoint **not** listed under `cli:cs`: products, product-options, availabilities (incl. availability-rules, bulk-update, bulk-delete), pricing-categories, pricing-tiers, discounts (incl. apply), gift-certs (available CRUD + issue / resend), guests, extras, questions, resources (incl. attach / detach on product-options and `POST /bookings/{id}/resources`), booking create (`POST /bookings`) and booking edit (`PATCH /bookings/{id}`, notes + custom attributes), locations, media, workflows (incl. steps + trigger), segments (create). Stated as the complement of `cli:cs` on purpose: an enumeration drifts every time a resource is added. |
+        | `cli:cs`    | CS-only sensitive ops: booking **cancel**, comp, refund, **reschedule**, and confirmation resend, plus issued gift-cert **void** — the six routes gated on `abilities:cli:cs` (they sit in two groups in `routes/api_cli_v1.php`, not one). Cancel is CS for **every** `refund_policy` value, `none` (which moves no money) included; void is CS because it kills an instrument the customer paid for; reschedule is CS because it moves a live booking a customer is already travelling on, which is a judgement about a person's trip rather than a catalogue edit. Ticking it requires the `issue_cli_cs_token` permission (admin by default), so it is a privilege boundary rather than only a blast-radius control. |
 
         Recommended issuance: a dedicated `cli:read` token for scripted
         reporting, a `cli:read` + `cli:write` token for inventory editors, and
@@ -6591,9 +7913,15 @@ components:
       name: q
       in: query
       description: |
-        Free-text search across primary string fields (name, email, reference).
+        Free-text search across the endpoint's primary string fields — name,
+        email and reference on `/customers`; the English `title` and
+        `product_code` on `/products`.
         `%` and `_` in the term are matched literally, so `?q=%` finds the rows
-        containing a percent sign rather than every row.
+        containing a percent sign rather than every row. Matching through this
+        parameter is case- AND accent-insensitive (`utf8mb4_unicode_ci`), so
+        `croisiere` matches `Croisière`. `/bookings`, `/guests` and `/partners`
+        declare their own `q` with the same semantics; the guarantee is stated
+        here only for the operations that reference this component.
       schema:
         type: string
         maxLength: 255
@@ -6633,6 +7961,26 @@ components:
         409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
         IDEMPOTENCY_UNKNOWN. Required for production use; optional for
         ad-hoc CLI invocations where the server auto-generates one.
+
+        **Not every answer is stored.** A key is RELEASED — not persisted, so
+        the identical call may be retried under it — when nothing was applied
+        and a later attempt may succeed. This is the whole list, and the only
+        place it is stated:
+
+        - `401`, `403`, `422`, `429`
+        - a refusal from an admission gate
+        - on the booking writes, these three `409`s:
+          `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+          `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+          departure, a slot that filled or is closed, a guide already assigned
+          — so persisting one made a card approved during a busy minute
+          un-approvable even after the cause cleared.
+
+        Every other `409` describes something that will answer the same way
+        forever (a cancelled booking stays cancelled, a departed slot stays
+        departed), so replaying its stored response is correct. Retry a released
+        refusal under the SAME key; minting a new one for it is how a retry
+        becomes a double booking.
 
         **Dry-run interaction:** when `dry_run: true`, the server does NOT
         persist an idempotency row. The same key may be reused once for the
@@ -6886,13 +8234,29 @@ components:
             BOOKING_ALREADY_CANCELLED, REFUND_AMOUNT_EXCEEDS_CHARGE,
             REFUND_REQUIRES_STRIPE_CHARGE, NO_CHARGE_FOUND,
             POLICY_AUTO_NOT_READY, BOOKING_RESOURCE_STATE_STALE,
-            BOOKING_RESOURCE_CONFLICT, GIFT_CERT_ALREADY_REDEEMED,
+            BOOKING_RESOURCE_CONFLICT, BOOKING_RESOURCE_REQUEST_INVALID,
+            GIFT_CERT_ALREADY_REDEEMED,
             DISCOUNT_NOT_APPLICABLE.
+
+            Booking lifecycle writes:
+            CAPACITY_UNAVAILABLE, DEPOSIT_EXCEEDS_TOTAL,
+            DESTINATION_ALREADY_STARTED, PRODUCT_OPTION_CHANGE_NOT_SUPPORTED,
+            BOOKING_HAS_NO_DEPARTURE, DEPARTURE_NOT_BOOKABLE,
+            NO_RESOURCE_AVAILABLE (retriable),
+            POOL_BACKED_ATTRIBUTE_NOT_EDITABLE.
 
             Catalogue and inventory:
             PRODUCT_BEING_DUPLICATED, TICKET_REISSUE_NOT_CONFIRMED,
             AVAILABILITY_HAS_ACTIVE_BOOKING, AVAILABILITY_HAS_CONFIRMED_BOOKING,
             RESOURCE_IN_USE.
+
+            Plan entitlement:
+            PLAN_LIMIT_REACHED (403). Distinct from FORBIDDEN on purpose: that
+            one means this token or role may not do it, this one means the
+            ACCOUNT has run out. The next step differs — a role change under
+            Settings > Roles, versus an upgrade or a deletion — and `details`
+            carries `plan_item`, `limit` and `current` so a client can say which
+            and by how much.
 
             Workflows:
             WORKFLOW_NOT_ACTIVATABLE, WORKFLOW_NOT_EDITABLE,
@@ -7065,7 +8429,48 @@ components:
             - $ref: "#/components/schemas/Money"
         from_price_label: { type: [string, "null"], description: "Caption shown next to `from_price` (e.g., `From €50/person`)." }
         currency: { type: [string, "null"], description: "The tenant's currency — no column on `products`; `from_price` and every downstream fare are denominated in it. Null only when no tenant is bound, which no route can reach; there is no default." }
-        capacity: { type: [integer, "null"] }
+        capacity: { type: [integer, "null"], description: "The capacity all of this product's schedules share. `0` or `null` means the schedules do not share one." }
+        allocation_mode:
+          type: [string, "null"]
+          enum: [single_resource, homogeneous_multi, null]
+          description: |
+            How many resources ONE booking may occupy, as the operator
+            CONFIGURED it. `single_resource` = a party has to fit inside one
+            resource (two boats of 3 seat six people but cannot take a group of
+            four); `homogeneous_multi` = a party is spread across several
+            interchangeable units of the same size, and is CHARGED FOR EACH ONE
+            on a product priced per group (five riders take three 2-seat jet
+            skis and pay three times).
+
+            This is the stored column, not the behaviour. Read
+            `spans_several_resources` for what the platform is actually doing —
+            they differ behind four gates that all degrade silently. Null only
+            on the unsaved preview a `dry_run` create returns; the column is NOT
+            NULL with a `single_resource` default, so a persisted row always has
+            one.
+        spans_several_resources:
+          type: boolean
+          description: |
+            Whether a booking on this product may actually span several
+            resources RIGHT NOW — `Product::allocationStrategy()`, the value
+            every pricing, capacity and channel read goes through.
+
+            `false` while `allocation_mode` is `homogeneous_multi` means the
+            configuration is not being honoured, and all four reasons are
+            account- or product-level rather than anything in the payload: the
+            `MultiResourceAllocation` account feature is off, the product sets a
+            shared `capacity` above 0, a schedule gives a capacity to a guide or
+            a piece of equipment rather than an asset, or the Payroll app is
+            installed on a product whose schedule has several guides. Each one
+            degrades SILENTLY by design — half-applying a mode nothing
+            downstream supports is worse — so the only way to tell is to read
+            this key. `PATCH /products/{id}` names the specific reason in its
+            422 when you try to SET a mode one of them blocks.
+
+            NEVER quote a party's price from `allocation_mode`. On a
+            per-group-priced product the number of units a party takes is the
+            number of groups it pays for, and a party that spans nothing pays
+            once.
         cancellation_policy: { type: [string, "null"], description: "Inline policy text. Mutually exclusive with `cancellation_policy_link` in the UI." }
         cancellation_policy_link: { type: [string, "null"], format: uri, description: "External URL with the policy. Mutually exclusive with `cancellation_policy` in the UI." }
         locale: { type: [string, "null"], description: "Default content locale for this product." }
@@ -7074,6 +8479,52 @@ components:
           type: array
           items: { type: string }
           description: "IDs of attached `ProductCategory` rows; empty array when the relation isn't eager-loaded."
+        can_be_sold:
+          type: boolean
+          description: |
+            Whether this product is actually on sale. Read from the
+            `can_be_sold` column, which is what every selling surface filters
+            on, and re-derived by `Product::updateCanBeSold()` on each write.
+
+            A create answers `false`: a brand-new product has no departures and
+            no main photo, whatever else was supplied. Read `readiness` to find
+            out what is still missing rather than inferring it.
+        readiness:
+          type: object
+          description: |
+            What the product is still missing, from
+            `App\Support\Inventory\ProductReadiness`.
+
+            `blocking` is the subset that stops a sale: empty means the product
+            sells, and it is the live answer where `can_be_sold` is the stored
+            one — the two differ only in the window between a related write and
+            its recompute.
+
+            `missing` additionally carries `no_future_departure`, which is NOT
+            blocking: it is true of every product a seasonal operator owns in
+            the off-season, and it is the most common reason an operator reports
+            that a product has disappeared. Do not treat the two lists as
+            interchangeable.
+          properties:
+            missing:
+              type: array
+              items:
+                type: string
+                enum: [no_uuid, inactive, no_option, no_departure, no_future_departure, no_pricing_category, no_priced_category, no_main_photo]
+              description: |
+                `inactive` — not published. `no_option` — no schedule, and
+                departures, prices and questions all hang off one.
+                `no_departure` — nothing to book. `no_future_departure` — has
+                departures, none upcoming (advisory). `no_pricing_category` —
+                no customer-facing category. `no_priced_category` — has
+                categories but none with a pricing tier, which the booking
+                widget filters out, so the product page renders nothing
+                bookable. `no_main_photo` — the widget requires one.
+                `no_uuid` — internal data fault, not operator-actionable.
+            blocking:
+              type: array
+              items: { type: string }
+              description: "The `missing` entries that stop a sale, in the same order. `can_be_sold` is exactly `blocking == []`."
         deleted_at: { type: [string, "null"], format: date-time, description: "Set when soft-deleted; null otherwise" }
         created_at: { type: [string, "null"], format: date-time }
         updated_at: { type: [string, "null"], format: date-time }
@@ -7094,6 +8545,8 @@ components:
         title: { type: [string, "null"], description: "Sourced from the `name` column (no translatable layer)." }
         option_code: { type: [string, "null"], description: "Tenant-supplied SKU. Auto-generated from the title slug + random suffix when omitted on create." }
         capacity: { type: [integer, "null"] }
+        min_travelers: { type: [integer, "null"], description: "Smallest party this schedule accepts. `0` in storage means unset and is published as null." }
+        max_travelers: { type: [integer, "null"], description: "Largest party this schedule accepts, and one of the caps a slot's available capacity is narrowed by — a caller sizing a booking without it can propose a party the slot refuses. `0` in storage means unset and is published as null." }
         min_age: { type: [integer, "null"] }
         max_age: { type: [integer, "null"] }
         deleted_at: { type: [string, "null"], format: date-time, description: "Set when soft-deleted; null otherwise" }
@@ -7366,6 +8819,7 @@ components:
         min_age: { type: [integer, "null"] }
         max_age: { type: [integer, "null"] }
         is_internal: { type: [boolean, "null"], description: "Internal categories are excluded from public-facing checkout flows." }
+        max_per_resource: { type: [integer, "null"], minimum: 1, maximum: 99, description: "How many guests of this category one resource may carry on a product that spreads a party over resources (1 Driver per jet ski); null is no limit. Since 1.50.0." }
         companions:
           type: array
           description: |
@@ -7381,11 +8835,12 @@ components:
 
     PricingCategoryCompanion:
       type: object
-      required: [category_id, min_quantity]
+      required: [category_id, min_quantity, same_resource]
       description: One "Must travel with" link, as returned on read.
       properties:
         category_id: { type: string, description: "Another pricing category of the same product." }
         min_quantity: { type: integer, minimum: 1, maximum: 999, description: "Guests of `category_id` needed in the booking for this link to be met." }
+        same_resource: { type: boolean, description: "`true` when those guests must also sit on every resource that carries one of this category (a Passenger needs a Driver on their own jet ski), not just be in the booking. Since 1.49.0." }
 
     PricingCategoryCompanionInput:
       type: object
@@ -7398,6 +8853,12 @@ components:
       properties:
         category_id: { $ref: "#/components/schemas/PositiveIntegerId" }
         min_quantity: { type: integer, minimum: 1, maximum: 999 }
+        same_resource:
+          type: boolean
+          default: false
+          description: |
+            Optional. Omitted, the link keeps its stored value (`false` for a
+            new link); send `false` explicitly to switch it off.
 
     PricingTier:
       type: object
@@ -7606,7 +9067,7 @@ components:
         notes: { type: [string, "null"], description: "Free-form internal notes" }
         locales:
           type: array
-          items: { type: string, description: "ISO 639-1 code (e.g. 'en', 'el')" }
+          items: { type: string, description: "CLDR language code. Usually ISO 639-1 ('en', 'el'), but may carry a region ('en-GB', 'fr-CA', 'zh-Hans')." }
           description: |
             Customer's preferred locales in priority order.
             `Customer::preferredLocale()` returns `locales->first()` (defaulting
@@ -7620,6 +9081,54 @@ components:
         deleted_at: { type: [string, "null"], format: date-time, description: "Set when soft-deleted; null otherwise" }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    BookingReschedule:
+      type: object
+      description: |
+        One entry in a booking's reschedule ledger.
+
+        **`from_booking_id` is the field that matters.** Null means a SIMPLE
+        reschedule: the same booking swapped departures and kept its id, its
+        extras, its answers and its transactions — the only kind
+        `POST /bookings/{id}/reschedule` can produce. Non-null means a
+        CANCEL-AND-REPLACE: the booking it names was cancelled and this one
+        created in its place, with everything re-replicated and repriced against
+        the destination. That only happens in the CaptainBook dashboard, when an
+        operator changes the product OPTION.
+
+        Without this field a superseded booking reads as an ordinary
+        cancellation — so a caller asked "what happened to booking X" answers
+        "it was cancelled" while the customer is travelling, on a different id.
+      properties:
+        booking_id:
+          type: string
+          description: |
+            Which booking in the chain this entry sits on. On a
+            cancel-and-replace that is the SUCCESSOR, so an entry whose
+            `from_booking_id` is the booking you are reading tells you where it
+            went.
+        from_booking_id:
+          type: [string, "null"]
+          description: The booking this one replaced, or null for a simple move. See above.
+        from_availability_id: { type: [string, "null"] }
+        to_availability_id: { type: [string, "null"] }
+        rescheduled_at:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            A real UTC instant, unlike `starts_at` / `ends_at` on the booking
+            itself, which are the departure's product-local wall clock. This one
+            records when a person did something, so it carries a true offset.
+        notes: { type: [string, "null"] }
+        rescheduled_by:
+          type: [object, "null"]
+          description: |
+            The operator who did it. **Null for a channel-manager amendment** —
+            an OTA moving its own booking has no CaptainBook user behind it, and
+            naming one would invent an accountable person.
+          properties:
+            id: { type: string }
+            name: { type: string }
 
     Booking:
       type: object
@@ -7645,6 +9154,14 @@ components:
             underlying timestamps.
         product_option_id: { type: string }
         availability_id: { type: string }
+        quantity:
+          type: integer
+          description: |
+            The booking's head count — the sum of its guest mix. Present on the
+            list and the detail alike, and not permission-gated: it is an
+            operational fact rather than money, booker identity or guest
+            documents. The per-traveller breakdown is `guests`, which is
+            detail-only and needs `view_booker_of_booking`.
         customer:
           type: [object, "null"]
           description: |
@@ -7777,7 +9294,22 @@ components:
             IDs of discounts attached to this booking via `BookingDiscount`
             pivot rows (with `applied_at` timestamps). Updated by
             `POST /discounts/{id}/apply`.
-        currency: { type: [string, "null"], description: "The first transaction's currency (a real column). Falls back to the tenant's currency when the booking has no transaction yet; null only when no tenant is bound." }
+        currency:
+          type: [string, "null"]
+          description: |
+            The denominator for every amount on this payload.
+
+            The first transaction's currency when that row was denominated
+            DELIBERATELY — only an external charge does that, an OTA billing in
+            its own currency — and the account currency otherwise. A row whose
+            currency equals the platform default is not trusted: no CaptainBook
+            write path passes a currency to the booking engine, so the engine
+            defaults that column on every platform-written row, and reading it
+            published the platform default as a USD account's currency.
+            captainbook#8835 tracks giving `bookings` a currency of its own,
+            which is what would let the two cases be told apart properly.
+
+            Null only when no tenant is bound.
         starts_at:
           type: string
           format: date-time
@@ -7849,6 +9381,78 @@ components:
           description: |
             Aggregate booking resource state token used for stale-state guarded
             booking resource mutations. Present wherever `resources` are included.
+        comments:
+          type: [string, "null"]
+          description: |
+            Public notes on the booking, written by an operator and shown with
+            it. Present on `GET /bookings/{id}` and in the `before` / `after`
+            of `PATCH /bookings/{id}`; absent from `GET /bookings`, where
+            5000 characters a row would dominate a page nobody asked notes for.
+        private_notes:
+          type: [string, "null"]
+          description: |
+            Internal notes. Never shown to the customer, but visible to any
+            operator who may read the booking — the same audience the mobile
+            check-in payload shows them to. Same presence rule as `comments`.
+        origin_booking_id:
+          type: [string, "null"]
+          description: |
+            The ROOT of this booking's reschedule chain, or null when it is the
+            root. Every member of a chain carries the root rather than its own
+            parent, which is what makes the whole chain reachable from any one
+            of them. Present on `GET /bookings/{id}` and in both halves of the
+            `POST /bookings/{id}/reschedule` diff, like `reschedules` below.
+            Absent from the list and from the `PATCH /bookings/{id}` diff: the
+            ledger costs an extra query per booking rendered, and a PATCH
+            changes nothing in it.
+        reschedules:
+          type: array
+          items: { $ref: "#/components/schemas/BookingReschedule" }
+          description: |
+            Every reschedule recorded anywhere in this booking's CHAIN, oldest
+            first — not just the ones that landed on the id you asked for.
+            Entries are keyed on the booking a move landed ON, so a mid-chain
+            booking has one of its own and would otherwise look barely
+            rescheduled; this resolves the chain root first.
+
+            `[]` means no reschedule has ever touched the chain. It is never a
+            redaction — nothing in this block is permission-gated.
+
+            Present on `GET /bookings/{id}` and in both halves of the
+            `POST /bookings/{id}/reschedule` diff — THE LEDGER IS THE ONLY PLACE
+            that endpoint's `reschedule_notes` (or `comments`) lands, so without
+            it the diff could not show the note at all.
+
+            Absent from the list, and from the `PATCH /bookings/{id}` diff. The
+            reason for the list is query cost: it is one extra query per booking
+            rendered, so on a page of a hundred it would be a hundred. The
+            reason for the PATCH is that nothing it writes touches the ledger,
+            so both halves would carry the same thing.
+        custom_attributes:
+          type: object
+          additionalProperties: true
+          description: |
+            The operator's own metadata on this booking, keyed by the attribute
+            definition's SLUG — the same shape `PATCH /bookings/{id}` accepts,
+            so a read can be edited and sent back. Values are typed by their
+            definition: a `number` reads as a number, a `multi_select` as an
+            array of strings, a `checkbox` as a boolean.
+
+            Every definition configured for bookings in THIS BOOKING's business
+            unit appears, including ones with no stored value — those read as
+            their definition default, or `null` where there is none. `{}` means
+            that unit has no booking attributes configured. Attribute
+            definitions are per business unit, so two bookings on one account
+            can publish entirely different slugs; the set here is the same set
+            `PATCH /bookings/{id}` will accept for this booking, and a slug from
+            another unit is refused there by name.
+
+            A value drawn from a code pool (a self-guided-tour access code, for
+            instance) appears here but cannot be written back: `PATCH` refuses
+            it with `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE`. Treat such a value
+            like a credential — it is what admits the customer.
+
+            Same presence rule as `comments`.
 
     AssignedBookingResource:
       type: object
@@ -7859,6 +9463,7 @@ components:
         capacity: { type: [integer, "null"] }
         category: { type: [string, "null"] }
         source: { type: [string, "null"], description: "Pivot source on the booking_resource row when assigned." }
+        seats: { type: [integer, "null"], description: "Riders on this unit. Null for equipment, auxiliaries, and rows written before seats were recorded." }
         user:
           type: [object, "null"]
           properties:
@@ -8678,6 +10283,12 @@ components:
         custom_attributes:
           type: object
           additionalProperties: true
+          description: |
+            An OPEN key/value map of the tenant's own custom guest attributes;
+            there is no fixed set of keys, which is why no properties are
+            listed. Read the keys this tenant actually uses off an existing
+            guest (`GET /guests/{id}`) rather than inventing them — a key
+            nothing else writes is stored and read by nothing.
         dry_run: { type: boolean, default: false }
 
     ProductPage:
@@ -8840,7 +10451,26 @@ components:
             filters:
               type: array
               minItems: 1
-              items: { type: object, additionalProperties: true }
+              items:
+                type: object
+                additionalProperties: true
+                description: |
+                  ONE condition, or a nested group of them. There is no fixed
+                  shape and no listed properties, deliberately: the tree nests
+                  to arbitrary depth and the legal fields are PER TENANT —
+                  `SegmentFieldProvider` assembles them at runtime from the
+                  account's custom attributes, so no document can enumerate
+                  them. `CreateSegmentRequest::rules()` stops at this level for
+                  the same reason its docblock gives: a second definition of a
+                  legal segment would drift from the evaluator, "whose failure
+                  mode is not an error but a segment that quietly collects the
+                  wrong people."
+
+                  Get the vocabulary from `GET /segment-fields`, and get a
+                  working `conditions` tree to copy from `GET /segments/{id}`
+                  (MCP: `segments_browse` on the statistics server). A filter
+                  naming a field or operator this account does not have is
+                  refused with a 422 that names what is wrong.
         dry_run: { type: boolean }
 
     SegmentMutationResult:
@@ -8999,16 +10629,28 @@ components:
         a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
         `MEETING` — earlier spec drafts listed it but it was never a valid
         value; the column write would silently coerce to NULL).
-        `address` is a derived accessor (`getAddressAttribute()` composing
-        `street_address` + city + country). `timezone` and `notes` have no
-        underlying columns and read as null today.
+        `address` is a derived accessor (`getAddressAttribute()`, which
+        interpolates `street_address`, `city` and `country` — there is no
+        `country` column, so that last part is always empty and `address`
+        carries a trailing space). Read the components individually instead.
+        `timezone` and `notes` have no underlying columns and read as null
+        today.
       properties:
         id: { type: string }
         type:
           type: [string, "null"]
           enum: [PRIMARY, START, END, VISITED, SECONDARY, null]
         name: { type: [string, "null"] }
-        address: { type: [string, "null"], description: "Derived from `street_address` (+ optional city/country)." }
+        address: { type: [string, "null"], description: "Derived from `street_address` + `city`. Prefer the component fields." }
+        city: { type: [string, "null"] }
+        region: { type: [string, "null"] }
+        postal_code: { type: [string, "null"] }
+        country_code:
+          type: [string, "null"]
+          description: |
+            ISO 3166-1 **alpha-3**, whatever shape was sent to the create
+            endpoint. Added in 1.41.0; before that these four address columns
+            were writable but absent from every read.
         latitude: { type: [number, "null"], format: float }
         longitude: { type: [number, "null"], format: float }
         google_place_id: { type: [string, "null"] }
@@ -9163,6 +10805,340 @@ components:
               type: array
               items: { $ref: "#/components/schemas/Media" }
 
+    RescheduleBookingRequest:
+      type: object
+      required: [availability_id]
+      description: |
+        Mirrors `RescheduleBookingRequest::rules()`.
+
+        Four fields are REFUSED rather than ignored, each with a message naming
+        where the operation belongs: `product_option_id` (the destination
+        departure determines the option, and an option change is not available
+        here), `prices` / `price` (an in-place move never reprices) and
+        `extras` / `guests` (the booking keeps its own; change them with
+        `PATCH /bookings/{id}`).
+
+        Numeric fields validate as `numeric` BEFORE `integer`, because
+        Laravel's `integer` stringifies first and a JSON `true` would otherwise
+        pass as `"1"`.
+      properties:
+        availability_id:
+          type: integer
+          minimum: 1
+          description: |
+            The DESTINATION departure. Required. It also determines the product
+            option, which is why none is accepted separately — and why a
+            destination belonging to a different option is a `422`.
+        resource_id:
+          type: [integer, "null"]
+          minimum: 1
+          description: |
+            Reassign the guide or asset as part of the move. Omit to let the
+            engine reassign automatically; it preserves the original assignment
+            source when the resource is unchanged.
+        comments:
+          type: [string, "null"]
+          maxLength: 5000
+          description: |
+            A note on the move. Recorded on the reschedule ledger, as the
+            fallback used when `reschedule_notes` is **omitted** — send
+            `reschedule_notes: ""` to record a deliberately blank note instead
+            of falling back to this one.
+
+            It does **not** amend the booking's own `comments` field, which only
+            `PATCH /bookings/{id}` writes. Whichever note is recorded appears in
+            this operation's `diff.after.reschedules[]`, which is where to
+            confirm it landed.
+        reschedule_notes:
+          type: [string, "null"]
+          maxLength: 5000
+          description: |
+            Why the booking moved. Recorded on the reschedule ledger and
+            readable back in this operation's `diff.after.reschedules[]`; it
+            does not touch the booking's `comments`.
+        notify_admins:
+          type: boolean
+          default: true
+        notify_customer:
+          type: boolean
+          default: true
+          description: |
+            Defaults ON. `BookingRescheduled` is dispatched after the
+            transaction commits, so a move that fails sends nothing.
+        dry_run:
+          type: boolean
+          description: |
+            Preview without writing. Returns `would_apply: true` with the
+            before/after diff and the side effects the real call would cause.
+            No idempotency row is written for a dry run.
+
+    UpdateBookingRequest:
+      type: object
+      description: |
+        Mirrors `UpdateBookingRequest::rules()`. **At least one of `comments`,
+        `private_notes` or `custom_attributes` must be present** — a request
+        carrying none of them is a `422`, not a `200` with an empty diff,
+        because an agent reads a `200` as "applied". The check is on PRESENCE:
+        resending a value the booking already has is a `200` with matching diff
+        halves. `dry_run` alone is not a change.
+
+        Amends a booking's notes and its operator metadata. Nothing here changes
+        what the customer gets or what they owe, so there is no capacity check
+        and no money recompute. **No notification is sent**, matching the
+        dashboard's edit form.
+
+        Eight fields are REFUSED rather than ignored:
+
+          - `prices` / `price` — this endpoint edits what the customer gets,
+            never what they owe.
+          - `guests` / `extras` — DEFERRED, not rejected. Both have to recompute
+            the booking's stored total afterwards, and that calculation is not
+            yet available outside the dashboard. Change them there; this field
+            opens once the calculation is shared.
+          - `quantity` — follows the guest mix and cannot be set. The party
+            size is dashboard-only on this endpoint, for the same reason
+            `guests` is deferred: changing it has to recompute what the booking
+            is worth.
+          - `expiry` — a reservation's hold window is out of scope here.
+          - `notify_admins` / `notify_customer` — an edit never notifies, so
+            offering the flags would imply it might. To re-send the
+            confirmation, use
+            `POST /bookings/{id}/notifications/resend-confirmation`.
+
+        Requires BOTH `update_booking` and `update_booking_after_date`. The
+        second one's name is misleading: the dashboard's edit form checks it on
+        every booking, not only a departed one, so this endpoint checks it too
+        rather than being wider than the screen.
+      properties:
+        comments:
+          type: [string, "null"]
+          maxLength: 5000
+          description: Public notes. Send null to clear.
+        private_notes:
+          type: [string, "null"]
+          maxLength: 5000
+          description: Internal notes, never shown to the customer. Send null to clear.
+        custom_attributes:
+          type: object
+          minProperties: 1
+          description: |
+            Keyed by the attribute definition's SLUG, the same shape the booking
+            read publishes. A PATCH: an omitted slug is left alone, and only the
+            slugs you send are written. An unknown slug is a `422` listing the
+            ones configured for THIS BOOKING's business unit — definitions are
+            per unit, so a slug from another one is unknown here rather than
+            mistyped — and `{}` is a `422` too: it satisfies "at least one field
+            present" while changing nothing.
+
+            Each value is validated against its definition's own type and rules
+            (a `select` must be one of its options, a `date` must be `Y-m-d`,
+            and any `validation_rules` the definition carries apply) — and the
+            WHOLE payload is validated before any of it is written, so one bad
+            value cannot leave the others half-applied.
+
+            Clearing a field that carries a definition default reverts it TO
+            that default rather than to empty. The dry run reports the default,
+            not null.
+
+            A definition backed by a code pool is refused with a `422`: those
+            values change only through the atomic claim/release action, because
+            the uniqueness constraint protects the pool table rather than the
+            booking's copy. Writing one directly would leave the same code
+            drawable for a second customer.
+        dry_run:
+          type: boolean
+          description: |
+            Preview without writing. Not a change on its own — a request
+            carrying only `dry_run` is a `422`.
+
+    StoreBookingRequest:
+      type: object
+      required: [availability_id, booking_type, guests, is_refundable]
+      description: |
+        Mirrors `StoreBookingRequest::rules()`, which is itself derived from
+        `Create::rules()`, `getBookingParameters()` and
+        `getReservationParameters()`.
+
+        Send either `customer_id` for an existing customer or `customer` to
+        create one. Sending both, or neither, is a `422`.
+
+        Seven fields are REFUSED rather than ignored, each with a message naming
+        where the operation belongs: `prices`, `price` (fares come from pricing
+        policy), `voucher` (use `partner_id`), `existingPm` and
+        `payment_method_id` (no card path exists here), `quantity` (derived from
+        `guests`) and `customer.locales` (send `locales` at the top level). A
+        refused field is a `422`, never a silent drop. `deposit`,
+        `payment_method` and `payment_notes` are refused conditionally too, on
+        `booking_type: reservation`, and `expiry` on `booking_type: booking`.
+
+        Numeric fields validate as `numeric` BEFORE `integer`. Laravel's
+        `integer` rule stringifies first, so a JSON `true` would otherwise pass
+        as `"1"` — and over MCP the arguments are real JSON, so a boolean guest
+        count is reachable. A numeric string (`"2"`) is still accepted.
+      properties:
+        availability_id:
+          type: integer
+          minimum: 1
+          description: The departure to book. Required.
+        booking_type:
+          type: string
+          enum: [booking, reservation]
+          description: |
+            `booking` is a real booking; `reservation` is a hold that expires.
+            Only a reservation accepts `expiry`.
+        guests:
+          type: object
+          minProperties: 1
+          additionalProperties:
+            type: integer
+            minimum: 0
+          description: |
+            Guest mix keyed by pricing category id, e.g. `{"3": 2, "4": 1}`.
+            `quantity` is the sum and is not accepted separately.
+        customer_id:
+          type: string
+          format: uuid
+          description: |
+            An existing customer, by UUID — `customers.id` is a UUID, not an
+            integer, unlike every other id on this request. Mutually exclusive
+            with `customer`. Take it from `customer.id` on a booking read or
+            from `GET /customers`.
+        customer:
+          type: object
+          description: Create a new customer. Mutually exclusive with `customer_id`.
+          required: [name, country]
+          properties:
+            name:     { type: string, maxLength: 255 }
+            country:  { type: string, minLength: 2, maxLength: 2, description: ISO 3166-1 alpha-2. }
+            email:    { type: [string, "null"], format: email, maxLength: 255, description: "Validated as RFC only. The dashboard additionally resolves DNS; this endpoint does not, because a live lookup on an API path fails closed on a resolver blip." }
+            phone:    { type: [string, "null"], description: International format. }
+            zip_code: { type: [string, "null"], maxLength: 20 }
+        is_refundable:
+          type: boolean
+          description: Required, as on the dashboard form.
+        payment_method:
+          type: [string, "null"]
+          enum: [cash, paypal, bank_transfer, null]
+          description: |
+            How the customer is paying. Records intent; takes no payment.
+            `card` is refused with `422` on every account — take card payments
+            in the CaptainBook dashboard.
+        payment_notes:
+          type: [string, "null"]
+          maxLength: 2000
+        deposit:
+          type: [integer, "null"]
+          minimum: 0
+          description: |
+            Money ALREADY RECEIVED — the cash handed over at the desk — in the
+            account currency's MINOR units, like every other money field here
+            (`2000` = 20.00 EUR; `2000` = 2000 JPY). It is not a charge and
+            nothing is taken. A NON-ZERO deposit requires `currency`, which must
+            be the account's —
+            it is validated and NOT converted: the amount is recorded exactly as
+            sent, so the hosted-checkout link bills the difference you expect.
+            (The stored transaction's own `currency` column reads the platform
+            default rather than the account's, on every surface including the
+            dashboard — captainbook#8835. That is a platform-wide inaccuracy
+            this endpoint inherits; recording the amount faithfully is the half
+            it can guarantee.)
+            Refused with `DEPOSIT_EXCEEDS_TOTAL` above the booking's computed
+            total. Spelled `deposit_minor` by the CaptainbookAI propose tool,
+            which refuses the bare name so a major-unit amount cannot be read
+            as minor; the MCP inventory tools take `deposit`, as here.
+
+            **`booking_type: booking` only.** A reservation records no payment,
+            so `deposit`, `payment_method` and `payment_notes` are all refused
+            with a `422` on one — refused rather than accepted and dropped,
+            which is what they were.
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: |
+            Required alongside a NON-ZERO `deposit`, and must equal the account
+            currency. `deposit: 0` records no money, so it needs no currency.
+            There is one currency per account and only CaptainBook support can
+            change it.
+        private_notes:
+          type: [string, "null"]
+          maxLength: 5000
+          description: Internal. Not shown to the customer.
+        comments:
+          type: [string, "null"]
+          maxLength: 5000
+        expiry:
+          type: integer
+          minimum: 0
+          description: |
+            **SECONDS** until a reservation lapses — `1800` is half an hour.
+            The engine applies it with `addSeconds()` and the configured default
+            is `600`, so seconds is the unit every surface here uses.
+            **Required when `booking_type: reservation`** —
+            `CreatesReservations` validates it as `required|numeric`, so a
+            reservation without one is refused. Sending it with
+            `booking_type: booking` is a `422`, not a silent drop.
+        locales:
+          type: array
+          items: { type: string, maxLength: 10 }
+        answers:
+          type: object
+          description: |
+            Answers to the product's custom booking questions, keyed by question
+            id. The value's shape is the QUESTION's — a string, a date, a list of
+            selected options — so it is per-tenant and cannot be enumerated here.
+            Read the questions with `GET /questions?product_id=` first.
+        extras:
+          type: array
+          description: |
+            Add-ons to purchase, one entry per add-on. The product's mandatory
+            extras are attached by the engine whether or not they appear here.
+          items:
+            type: object
+            required: [extraId, quantity]
+            additionalProperties: false
+            properties:
+              extraId:
+                type: integer
+                minimum: 1
+                description: The add-on's id, from `GET /extras?product_id=`.
+              quantity:
+                type: integer
+                minimum: 1
+                description: How many of it. Omit the entry rather than sending 0.
+        resource_id:
+          type: [integer, "null"]
+          minimum: 1
+          description: |
+            Omit for automatic assignment. Reassign later with
+            `POST /bookings/{id}/resources`.
+        branding_id:
+          type: [integer, "null"]
+          minimum: 1
+        partner_id:
+          type: [integer, "null"]
+          minimum: 1
+          description: |
+            Attributes the booking to a partner. Omit for a Direct booking,
+            which records the authenticated user as the provider. The partner's
+            commission comes from their own configuration; `voucher` is refused.
+        notify_admins:
+          type: boolean
+          default: true
+        notify_customer:
+          type: boolean
+          default: true
+          description: |
+            Defaults ON. The confirmation is dispatched after the write commits,
+            so a create that rolls back sends nothing.
+        dry_run:
+          type: boolean
+          description: |
+            Preview without writing. Returns `would_apply: true` with the
+            before/after diff and the side effects the real call would cause.
+            No idempotency row is written for a dry run, so the same
+            `Idempotency-Key` may be reused once on the real call.
+
     CreateProductRequest:
       type: object
       required: [title, currency]
@@ -9201,6 +11177,20 @@ components:
         Measured in BYTES. `maxLength` here is a character count, so for
         non-ASCII text the server may refuse a value this schema accepts —
         validate on byte length if you gate locally.
+
+        One field is REFUSED (`422`) rather than ignored:
+
+          - `allocation_mode` — how many resources one booking may take. A
+            spanning mode needs two or more capacity-bearing ASSETS on one
+            schedule, and a product created in a single call has no schedules
+            yet, let alone resources on them, so no value but the default could
+            ever be honoured here. Create the product, create its schedules,
+            attach the assets, then send it to `PATCH /products/{id}`. Refused
+            rather than dropped because dropping it is the bug: the caller would
+            be told the product saved with a fleet mode it does not have.
+
+        The refusal is INHERITED by `POST /products/bookable`, which creates the
+        schedules but never the resources, so the same sequence applies there.
       properties:
         title: { type: string, maxLength: 200 }
         product_code: { type: [string, "null"], maxLength: 50, description: "Tenant-supplied SKU. Auto-generated from title when omitted, on the real write only — a dry run echoes null." }
@@ -9238,7 +11228,7 @@ components:
         from_price: { type: [integer, "null"], minimum: 0, description: "Minor units." }
         from_price_label: { type: [string, "null"], maxLength: 255, description: "Caption shown next to `from_price` (e.g., `From €50/person`)." }
         currency: { type: string, minLength: 3, maxLength: 3, description: "Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose." }
-        capacity: { type: [integer, "null"], minimum: 0 }
+        capacity: { type: [integer, "null"], minimum: 0, description: "The capacity all of this product's schedules SHARE: a pool across CONCURRENT departures of this product, not how many people one departure takes, which is the product option's own `capacity`. A positive value makes the booking engine subtract the booked quantity of every OVERLAPPING departure of the product from this pool, so two departures that overlap in time compete for it. `0` or `null` means not shared, which is the default, and a `null` is stored as `0`. A value above 0 needs a plan that includes shared capacity between schedules (Starter and above); on free and legacy it is a 422. Sending `0` or `null` is always accepted." }
         cancellation_policy: { type: [string, "null"], maxLength: 65535, description: "Inline policy text. Mutually exclusive with `cancellation_policy_link`. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422." }
         cancellation_policy_link: { type: [string, "null"], format: uri, maxLength: 500, description: "External URL with the policy. Mutually exclusive with `cancellation_policy`." }
         locale: { type: [string, "null"], maxLength: 10, description: "Default content locale for this product (e.g., `en`)." }
@@ -9247,6 +11237,100 @@ components:
           items: { $ref: "#/components/schemas/PositiveIntegerId" }
         timezone: { type: [string, "null"], maxLength: 64 }
         dry_run: { type: boolean, default: false }
+
+    CreateBookableProductRequest:
+      type: object
+      required: [title, currency, options, pricing_categories]
+      description: |
+        `CreateProductRequest` plus the two lists that make the product
+        sellable. Every field and every rule of `CreateProductRequest` applies
+        unchanged — the PHP request literally spreads its `rules()`, so the two
+        cannot drift.
+
+        `options` and `pricing_categories` are REQUIRED with at least one entry
+        each. That is the whole point of the endpoint: a product with neither is
+        the shell `POST /products` produces, and a composite action that
+        accepted empty lists would rebuild it behind a different name.
+
+        Both item shapes are CLOSED (`array:` validation): an unlisted key is a
+        `422` naming it, rather than being accepted and dropped. `title` on an
+        option (the column is `name`) and `amount` on a category are the two
+        spellings callers get wrong, and silently discarding either produces a
+        product priced at nothing under a `201`.
+      allOf:
+        - $ref: "#/components/schemas/CreateProductRequest"
+        - type: object
+          properties:
+            options:
+              type: array
+              minItems: 1
+              maxItems: 20
+              description: "Bookable variants — a departure time band, a boat, a language, a difficulty. Departures, prices and questions hang off these, not off the product."
+              items:
+                type: object
+                required: [title]
+                additionalProperties: false
+                properties:
+                  title: { type: string, maxLength: 200, description: "Stored in `product_options.name`." }
+                  option_code: { type: [string, "null"], maxLength: 50, description: "Auto-generated from the title plus a random suffix when omitted, **on the real write only** — a `dry_run` returns null, for the reason `CreateProductRequest.product_code` documents." }
+                  capacity: { type: [integer, "null"], minimum: 0, description: "How many people ONE departure of this option takes. The PRODUCT's own `capacity` is a pool shared across concurrent departures and means something else." }
+                  min_age: { type: [integer, "null"], minimum: 0 }
+                  max_age: { type: [integer, "null"], minimum: 0 }
+            pricing_categories:
+              type: array
+              minItems: 1
+              maxItems: 20
+              description: "Customer-facing price buckets. Each creates the category AND one open-ended PricingTier (`min: 1`, `max: null`) at `amount`, because a category with no tier is invisible to the booking widget. All are created with `is_internal: false`; the key is not accepted."
+              items:
+                type: object
+                required: [name, amount]
+                additionalProperties: false
+                properties:
+                  name: { type: string, maxLength: 200, description: "Wrapped server-side into the `{\"en\": \"...\"}` translation bag." }
+                  type:
+                    type: string
+                    # Source of truth is `CreatePricingCategoryRequest`'s `in:`
+                    # rule, which `CreateBookableProductRequest` reads at
+                    # runtime. This list and the three others in this document
+                    # are pinned to it by
+                    # tests/Architecture/PricingCategoryTypesSingleSourceTest —
+                    # these enums compile into the MCP tools' input schemas, so
+                    # a stale one advertises a type the validator refuses.
+                    enum: [ADULT, CHILD, INFANT, YOUTH, STUDENT, SENIOR, TRAVELLER, EU_CITIZEN, MILITARY, EU_CITIZEN_STUDENT]
+                  min_age: { type: [integer, "null"], minimum: 0 }
+                  max_age: { type: [integer, "null"], minimum: 0 }
+                  amount:
+                    allOf:
+                      - $ref: "#/components/schemas/Money"
+                    description: "The tier's `fare`, in minor units. Spelled `amount_minor` on the MCP/assistant surface, which refuses the bare name."
+
+    BookableProductResult:
+      type: object
+      description: |
+        The extras `POST /products/bookable` adds to `MutationResult`. Identical
+        on the dry run and the commit, except that the preview's rows carry no
+        ids and no minted codes.
+      properties:
+        product: { $ref: "#/components/schemas/Product" }
+        product_options:
+          type: array
+          items: { $ref: "#/components/schemas/ProductOption" }
+        pricing_categories:
+          type: array
+          items: { $ref: "#/components/schemas/PricingCategory" }
+        pricing_tiers:
+          type: array
+          items: { $ref: "#/components/schemas/PricingTier" }
+        notes:
+          type: object
+          additionalProperties: { type: integer }
+          description: |
+            Present only when `product.readiness.blocking` is non-empty, keyed
+            by the blocking code with a value of 1. This is what the operator
+            assistant's confirmation card renders as "This product will not sell
+            yet: …", so a caller reporting readiness to a human should read
+            `readiness.blocking` and not this bag — the bag exists for the card
+            and carries no information the readiness block does not.
 
     UpdateProductRequest:
       type: object
@@ -9281,7 +11365,58 @@ components:
           type: boolean
           default: false
           description: "Acknowledgement, not a field — nothing is stored. Required to commit a `delivery_method` change on a product that has bookings. Ignored when `delivery_method` is absent or unchanged, and never required under `dry_run`."
-        is_private: { type: boolean, description: "Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and seven inventory recompute jobs are dispatched. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description." }
+        is_private: { type: boolean, description: "Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and a schedule inventory recompute is queued per ProductOption. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description." }
+        allocation_mode:
+          type: string
+          enum: [single_resource, homogeneous_multi]
+          description: |
+            How many resources one booking may occupy. The ONLY endpoint that
+            writes it — `POST /products` and `POST /products/bookable` REFUSE
+            the field, because a spanning mode needs a fleet to span and a
+            product created in one call has no schedules yet.
+
+            So the sequence is: create the product, create its schedules, attach
+            two or more ASSETS with a capacity each to one schedule, then send
+            this. `homogeneous_multi` before that is a 422 saying so.
+
+            Asking for `homogeneous_multi` is refused with 422 when the platform
+            would not honour it, and the message names which of four gates
+            refused:
+
+              - the `MultiResourceAllocation` account feature is off. **Not
+                operator-fixable and not self-serve** — the message says to
+                contact CaptainBook support, and for most accounts this is the
+                answer, so do not retry.
+              - the product sets a shared `capacity` above 0 on a plan that
+                includes shared capacity. Clear it (`capacity: 0`) first, or in
+                the same PATCH — the pair is judged on the state the product
+                will be in, so `{allocation_mode, capacity}` sent together is
+                refused if the capacity would still be sharing.
+              - a schedule gives a capacity to a guide or a piece of equipment.
+                A party is spread over assets only; remove that capacity first.
+              - the Payroll app is installed and a schedule has several guides.
+                One guide is paid the whole booking total, so a split booking
+                cannot be paid out. Not fixable short of restructuring the crew.
+              - no schedule carries two or more capacity-bearing assets.
+
+            `single_resource` is NEVER refused, so a product can always be moved
+            back off a spanning mode. ECHOING THE STORED VALUE IS NOT A CHANGE
+            and runs none of the gates: a read-modify-write that sends a product
+            back unchanged is never refused over this field, even on a row whose
+            mode one of the gates now blocks. Sending a `capacity` above 0 that
+            STARTS sharing is judged, though, because that is the same silent
+            downgrade reached through the other field; lowering or clearing a
+            capacity never is. THE REFUSAL LANDS UNDER
+            `error.details.allocation_mode` either way, including on a payload
+            that sent only `capacity` — the mode is the thing that could not be
+            honoured, and the message names the capacity as the remedy.
+
+            Changing the EFFECTIVE mode (`spans_several_resources` on the
+            response) republishes the product's capacity to every connected
+            channel, because the figure a channel publishes is chosen by the
+            mode: the SUM of free seats across the fleet for a spanning product,
+            the largest single free unit otherwise. Nothing else about the
+            product changes, and no departure is rewritten.
         is_priced_per_person: { type: boolean }
         is_tier_priced: { type: boolean }
         use_alternate_tier_pricing: { type: boolean, description: "Keys the pricing tier on the TOTAL party size instead of the per-category quantity. The effective post-write state must be per-person AND tier priced, or the request is refused with 422 — see the endpoint description for the exemption that keeps a read-modify-write round trip working on an already-conflicting row." }
@@ -9291,7 +11426,7 @@ components:
         from_price: { type: [integer, "null"], minimum: 0 }
         from_price_label: { type: [string, "null"], maxLength: 255 }
         currency: { type: string, minLength: 3, maxLength: 3, description: "Optional. Not stored — no per-row column — but it must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-record currency to change." }
-        capacity: { type: [integer, "null"], minimum: 0 }
+        capacity: { type: [integer, "null"], minimum: 0, description: "The capacity all of this product's schedules SHARE: a pool across CONCURRENT departures of this product, not how many people one departure takes, which is the product option's own `capacity`. A positive value makes the booking engine subtract the booked quantity of every OVERLAPPING departure of the product from this pool, so two departures that overlap in time compete for it. `0` or `null` means not shared, which is the default, and a `null` is stored as `0`. A value above 0 needs a plan that includes shared capacity between schedules (Starter and above); on free and legacy it is a 422. Sending `0` or `null` is always accepted, and so is a value that only repeats what the product already holds." }
         cancellation_policy: { type: [string, "null"], maxLength: 65535, description: "Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422." }
         cancellation_policy_link: { type: [string, "null"], format: uri, maxLength: 500 }
         locale: { type: [string, "null"], maxLength: 10 }
@@ -9316,7 +11451,7 @@ components:
         product_id: { $ref: "#/components/schemas/PositiveIntegerId" }
         title: { type: string, maxLength: 200, description: "Persisted as the `name` column." }
         option_code: { type: [string, "null"], maxLength: 50, description: "Tenant-supplied SKU. Auto-generated from title when omitted, on the real write only — a dry run echoes null." }
-        capacity: { type: [integer, "null"], minimum: 0 }
+        capacity: { type: [integer, "null"], minimum: 0, description: "How many people ONE departure of this schedule takes. Unrelated to the product's own `capacity`, which pools seats across concurrent departures." }
         min_age: { type: [integer, "null"], minimum: 0 }
         max_age: { type: [integer, "null"], minimum: 0 }
         dry_run: { type: boolean, default: false }
@@ -9329,7 +11464,7 @@ components:
       properties:
         title: { type: string, maxLength: 200 }
         option_code: { type: string, maxLength: 50 }
-        capacity: { type: [integer, "null"], minimum: 0 }
+        capacity: { type: [integer, "null"], minimum: 0, description: "How many people ONE departure of this schedule takes. Unrelated to the product's own `capacity`, which pools seats across concurrent departures." }
         min_age: { type: [integer, "null"], minimum: 0 }
         max_age: { type: [integer, "null"], minimum: 0 }
         dry_run: { type: boolean, default: false }
@@ -9350,6 +11485,7 @@ components:
         min_age: { type: [integer, "null"], minimum: 0 }
         max_age: { type: [integer, "null"], minimum: 0 }
         is_internal: { type: boolean, default: false }
+        max_per_resource: { type: [integer, "null"], minimum: 1, maximum: 99, description: "Optional; null or omitted is no limit." }
         companions:
           type: array
           maxItems: 20
@@ -9375,6 +11511,7 @@ components:
         min_age: { type: [integer, "null"], minimum: 0 }
         max_age: { type: [integer, "null"], minimum: 0 }
         is_internal: { type: boolean, description: "`true` is refused with 422 while another category's `companions` names this one." }
+        max_per_resource: { type: [integer, "null"], minimum: 1, maximum: 99, description: "Omit to leave unchanged; null removes the limit." }
         companions:
           type: array
           maxItems: 20
@@ -9617,7 +11754,7 @@ components:
 
         | kind | on the product option | per booking | field |
         | --- | --- | --- | --- |
-        | main | non-auxiliary, pivot capacity SET | exactly one | `main_resource_id` |
+        | main | non-auxiliary, pivot capacity SET | exactly one (one per unit on a product configured for several units; each row carries `seats`) | `main_resource_id` |
         | equipment | non-auxiliary, pivot capacity NULL | many | `equipment_resource_ids` |
         | auxiliary | `category = auxiliary` | many | `auxiliary_resource_ids` |
 
@@ -9626,8 +11763,9 @@ components:
         departure — an `equipment` resource is forced to a null capacity on
         every write path, so the capacity split and the category agree.
 
-        `main_resource_id` is singular because the booking holds one, and it
-        ASSIGNS: it replaces the current main resource if there is one and makes
+        `main_resource_id` is singular because a single-unit booking holds one
+        (a booking spread over several units holds one per unit, and names the
+        unit a new one replaces with `replaced_resource_id`), and it ASSIGNS: it replaces the current main resource if there is one and makes
         the first assignment if there is not. There is no separate attach verb —
         the request is the same sentence either way ("the main resource is now
         X") and you should not have to read the booking's state to know which
@@ -9653,16 +11791,31 @@ components:
         and the dry run reports it faithfully. Send the set you want alongside
         `main_resource_id` if you need to keep a narrowed one.
 
-        On a `409 BOOKING_RESOURCE_CONFLICT`, `error.details.rejections[]`
+        A booking on a product configured for several units can hold more than
+        one main resource — five riders over three jet skis. Each assigned row
+        then carries `seats`, and `main_resource_id` replaces ONE unit, so it
+        needs `replaced_resource_id` beside it to say which. The replacement
+        has to seat that unit's riders, not the whole party, and nothing else on
+        the booking moves: the other units, the equipment and their sources stay
+        as they were (there is no wholesale re-attach on this path).
+
+        On a `409 BOOKING_RESOURCE_CONFLICT`, or a `422 BOOKING_RESOURCE_REQUEST_INVALID`
+        when the only rejections are `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` /
+        `REPLACED_RESOURCE_WITHOUT_MAIN`,
+        `error.details.rejections[]`
         carries one entry per refused id with a `code`:
 
         | code | meaning |
         | --- | --- |
         | `<FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION` | the booking's product option does not carry that resource at all — attach it to the option first |
-        | `<FIELD>_RESOURCE_IS_MAIN` | it is a main resource (capacity-bearing). A booking holds one; use `main_resource_id` |
+        | `<FIELD>_RESOURCE_IS_MAIN` | it is a main resource (capacity-bearing), assigned through `main_resource_id` |
         | `<FIELD>_RESOURCE_IS_EQUIPMENT` | it is equipment (no pivot capacity). Use `equipment_resource_ids` |
         | `<FIELD>_RESOURCE_IS_AUXILIARY` | it is auxiliary. Use `auxiliary_resource_ids` |
         | `MAIN_RESOURCE_NOT_AVAILABLE` | it IS a main resource on the option, but cannot take this booking — already on an overlapping departure, cannot host this party size, or inside a cool-off window |
+        | `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` | the booking is spread over several units; name the one `main_resource_id` replaces with `replaced_resource_id` |
+        | `REPLACED_RESOURCE_NOT_HELD` | `replaced_resource_id` is not one of this booking's units |
+        | `REPLACED_RESOURCE_WITHOUT_MAIN` | `replaced_resource_id` was sent without a `main_resource_id` |
+        | `MAIN_RESOURCE_ALREADY_HELD` | `main_resource_id` names another unit this booking already holds; name one it does not hold |
         | `AUXILIARY_RESOURCE_NOT_AVAILABLE` | it IS auxiliary on the option, but is on an overlapping departure or cannot host this party size |
 
         `<FIELD>` is `MAIN`, `EQUIPMENT` or `AUXILIARY` — the field you put the
@@ -9678,6 +11831,9 @@ components:
         candidates and retry.
       properties:
         main_resource_id: { $ref: "#/components/schemas/PositiveIntegerId" }
+        replaced_resource_id:
+          $ref: "#/components/schemas/PositiveIntegerId"
+          description: The unit `main_resource_id` takes over from. Required when the booking holds several main resources; needs `main_resource_id` beside it.
         equipment_resource_ids:
           type: array
           description: Full desired equipment set. Omit to leave equipment untouched.
@@ -9713,7 +11869,16 @@ components:
         address: { type: string, description: "Used as `street_address` when `street_address` is not explicitly supplied." }
         street_address: { type: string, description: "Preferred; persisted directly." }
         city: { type: string }
-        country_code: { type: string, minLength: 2, maxLength: 2 }
+        country_code:
+          type: string
+          minLength: 2
+          description: |
+            ISO 3166-1 alpha-2, alpha-3, or an English country name. Normalised
+            to **alpha-3** before persisting (`CH` → `CHE`), which is the shape
+            the column holds and every reader assumes; the dry-run preview
+            shows the normalised value. 422 if it resolves to no country.
+            Before 1.41.0 this was declared as exactly two characters and
+            stored verbatim — see **Changes**.
         postal_code: { type: [string, "null"] }
         region: { type: [string, "null"] }
         latitude: { type: [number, "null"], format: float }
@@ -9841,7 +12006,7 @@ components:
           description: "Parent step in the tree (CONDITION/LOOP children)."
         branch_type:
           type: [string, "null"]
-          enum: [true, false, null]
+          enum: ["true", "false", null]
           description: "Branch tag for CONDITION children (true/false) or LOOP children (true)."
         deleted_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
@@ -10010,8 +12175,7 @@ components:
           type: string
           description: "A TriggerType — see GET /workflow-nodes."
         config:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/WorkflowNodeConfig"
 
     ComposedWorkflowStep:
       type: object
@@ -10037,12 +12201,7 @@ components:
           type: [string, "null"]
           description: "Required for `condition`."
         config:
-          type: object
-          additionalProperties: true
-          description: |
-            Validated against the node's own `rules()`. A shape that does not
-            match is a 422 `INVALID_STEP_CONFIG`, in dry-run as well as on
-            commit.
+          $ref: "#/components/schemas/WorkflowNodeConfig"
         order:
           type: integer
           minimum: 0
@@ -10076,6 +12235,23 @@ components:
         max_credits_per_run: { type: [integer, "null"], minimum: 0 }
         notify_on_fail: { type: boolean }
         dry_run: { type: boolean, default: false }
+
+    WorkflowNodeConfig:
+      type: object
+      additionalProperties: true
+      description: |
+        The node's own settings. There is NO fixed shape and no listed
+        properties: `config` is validated against the resolved trigger's or
+        action's own `rules()`, those differ per node, and which nodes exist at
+        all depends on the account's plan — so no document can enumerate the
+        keys.
+
+        Read the shape from `GET /workflow-nodes` (MCP:
+        `inventory_workflow_list` with `resource: workflow-nodes`), which
+        returns every trigger and action with its `step_type` and the `config`
+        it needs. Guessing is not a near miss: an `action_type` outside that
+        catalogue is a 422, and a config that does not match the node's rules is
+        a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
 
     CreateWorkflowTriggerRequest:
       type: object
@@ -10119,9 +12295,11 @@ components:
             - abandoned_booking
             - custom_attribute_updated
             - waitlist_joined
+            - segment_entered
+            - segment_left
+            - whatsapp_message_received
         config:
-          type: object
-          description: "Validated against the resolved trigger's rules() schema."
+          $ref: "#/components/schemas/WorkflowNodeConfig"
         dry_run: { type: boolean, default: false }
 
     UpdateWorkflowTriggerRequest:
@@ -10131,7 +12309,8 @@ components:
         Replaces the trigger's `config`. `action_type` is immutable —
         to change it, call POST /trigger (which atomically replaces).
       properties:
-        config: { type: object }
+        config:
+          $ref: "#/components/schemas/WorkflowNodeConfig"
         dry_run: { type: boolean, default: false }
 
     CreateWorkflowStepRequest:
@@ -10162,7 +12341,8 @@ components:
           type: [string, "null"]
           enum: [value_check, filter, null]
           description: "Required for CONDITION step_type."
-        config: { type: object }
+        config:
+          $ref: "#/components/schemas/WorkflowNodeConfig"
         order: { type: integer, minimum: 0 }
         parent_step_id:
           oneOf:
@@ -10170,7 +12350,7 @@ components:
             - type: "null"
         branch_type:
           type: [string, "null"]
-          enum: [true, false, null]
+          enum: ["true", "false", null]
           description: "Required when parent_step_id is set."
         dry_run: { type: boolean, default: false }
 
@@ -10182,5 +12362,6 @@ components:
         branch_type, order, step_type, and action_type are immutable
         post-create — to move or reshape a step, delete and re-create.
       properties:
-        config: { type: object }
+        config:
+          $ref: "#/components/schemas/WorkflowNodeConfig"
         dry_run: { type: boolean, default: false }

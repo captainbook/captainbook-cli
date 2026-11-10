@@ -80,7 +80,7 @@ The CLI talks to `https://{tenant_slug}.captainbook.io/api/v1/cli/*` with a Sanc
 
 - `cli:read` — list / show / get
 - `cli:write` — create / update / delete / restore / attach / detach
-- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings resend-confirmation`, `gift-certificates void`). `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy. `gift-certificates void` needs it because voiding kills an instrument the customer paid for — every other gift-cert command is `cli:write`.
+- `cli:cs` — customer-success ops (`bookings cancel`, `bookings refund`, `bookings comp`, `bookings reschedule`, `bookings resend-confirmation`, whose top-level alias is `notifications resend` — and `gift-certificates void`). `bookings reschedule` needs it because it moves a live booking a customer is already travelling on — `bookings create` and `bookings update` are ordinary `cli:write`. `bookings cancel` needs it for every `--refund-policy` value, `none` included: all three are CS-only overrides of the product's cancellation policy. `gift-certificates void` needs it because voiding kills an instrument the customer paid for — every other gift-cert command is `cli:write`.
 
 Inspect what your token has:
 
@@ -117,6 +117,7 @@ ceebee stats summary --business-unit-id 42
 | `stats customers` | New vs returning, retention rate, top spenders |
 | `stats channels` | Booking channel distribution |
 | `stats occupancy` | Slot availability and capacity utilisation |
+| `stats attendance` | Check-ins and no-shows, read from ticket redemptions |
 | `stats extras` | Extra/add-on sales performance |
 | `stats discounts` | Discount code usage statistics |
 | `stats gift-certs` | Gift certificate issuance and redemption |
@@ -125,7 +126,7 @@ ceebee stats summary --business-unit-id 42
 
 ### `ceebee inventory` — read + write
 
-The inventory namespace covers 125+ endpoints across 24 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
+The inventory namespace covers 125+ endpoints across 25 resources. Every mutation supports per-call idempotency (UUIDv7 minted automatically), per-endpoint dry-run where the server allows it, and is audited to `~/.ceebee/audit.jsonl`.
 
 ```bash
 # Read
@@ -171,14 +172,14 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | Resource | Verbs available |
 |---|---|
 | `whoami` | get |
-| `products` | list, get, create, update, delete, restore |
+| `products` | list, get, create, **create-bookable**, update, duplicate, delete, restore |
 | `product-options` | list, get, create, update, delete, restore |
 | `availabilities` | list, get, update, delete, **bulk-update** (capacity / booking-status / pricing / start-time / end-time), **bulk-delete**, **create-rule** |
 | `pricing-categories` | list, get, create, update, delete, restore |
 | `pricing-tiers` | list, get, create, update, delete, restore |
 | `resources` | list, get, create, update, delete, restore, **attach**, **detach** |
 | `locations` | list, get, create, update, delete |
-| `bookings` | list, get, transactions, **available-resources**, **available-equipment-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
+| `bookings` | list, get, **create**, **update**, **reschedule**, transactions, **available-resources**, **available-equipment-resources**, **available-auxiliary-resources**, **set-resources**, cancel, refund, comp, resend-confirmation |
 | `transactions` | list, get |
 | `customers` | list, get |
 | `guests` | list, get, update |
@@ -190,8 +191,11 @@ ceebee inventory gift-certificates issue --available-gift-certificate-id <sku-id
 | `media` | list, get, upload, delete |
 | `categories` | list, get *(read-only)* |
 | `notifications` | resend |
-| `workflows` | list, get, create, update, delete, restore, **activate**, **deactivate**, **trigger** (create / update), **steps** (create / update / delete) |
+| `workflows` | list, get, create, update, delete, restore, **activate**, **deactivate**, **trigger** (create / update), **steps** (create / update / delete), **nodes** *(read-only node catalogue)* |
 | `workflow-executions` | list, get, logs *(read-only)* |
+| `partners` | list, get *(read-only)* |
+| `segments` | list, get, create, **fields**, **members** |
+| `resource-calendar` | list *(read-only)* |
 
 Run `ceebee inventory <resource> --help` for full flag listings. See [skills/index.md](skills/index.md) for agent-facing cookbooks per resource.
 
@@ -227,6 +231,10 @@ ceebee inventory products update 42 --title "New title" --dry-run
 UUIDv7 is auto-minted per call and sent as the `Idempotency-Key` header. Override with `--idempotency-key <uuid>` to replay a specific call (server returns the cached original response). Retries within an invocation reuse the same key automatically.
 
 A key is bound to the operation it was first used on — method, path (including query string) and body — so it is one key per operation, not per script. Aiming a used key at a different endpoint or a different resource id returns `409 IDEMPOTENCY_CONFLICT` rather than replaying. Requests refused before the handler runs (`401`, `403`, `422`, `429`, and the workflows plan-gate `404`) release their key, so fixing the token or the body and retrying with the same key is safe.
+
+Three `409`s release it too, on the booking **writes** rather than on `create` alone — `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and `NO_RESOURCE_AVAILABLE` each describe a passing state (a full departure, a slot that closed, a guide already assigned) rather than a stored outcome. The CLI types them by code with no endpoint scope, and the spec declares the release on `POST /bookings/{id}/reschedule` as well, for `CAPACITY_UNAVAILABLE` and `NO_RESOURCE_AVAILABLE`. Retry the identical call under the **same** key once the cause clears; minting a fresh one is how a retry becomes a double booking.
+
+Most other `409`s do describe a stored outcome, so replaying their response is correct — but not all of them, and the exceptions matter for the same reason. `IDEMPOTENCY_IN_PROGRESS` is transient and the transport already auto-retries it once at 250 ms. `PRODUCT_BEING_DUPLICATED` is transient *and* releases its key (`error.retriable` is `true`): a copy job holds the source for a couple of minutes, and the intended recovery is the identical request under the same key once it finishes. Read `error.retriable` and the code rather than assuming a `409` is final.
 
 ## Shell completions
 
@@ -271,11 +279,11 @@ make clean           # Remove binaries
 
 The inventory CLI's wire shapes are codegen'd from `api/inventory/cli-v1.yaml`. The hand-written cobra layer in `cmd/inventory/` references the generated client. CI-enforced drift tests keep spec, code, and docs in sync:
 
-- `cmd/inventory/spec_drift_test.go` — six checks against the spec (flag/JSON-key drift, enum-token drift in flag descriptions, flag TYPE drift, idempotency-key threading regressions, the `cli:cs` ability set both per-operation and by cardinality, and `--currency` tracking the endpoints where the spec makes it required), plus one `CommandDef` integrity check that every `ForensicFields` entry names a flag that exists. Several of them read the LIVE cobra tree rather than the `CommandDef` AST, because an AST walker reads a non-literal field as empty and skips the entity in silence. See CLAUDE.md for the three things these deliberately do NOT prove.
+- `cmd/inventory/spec_drift_test.go` — nine checks against the spec (flag/JSON-key drift, enum-token drift in flag descriptions, flag TYPE drift, idempotency-key threading regressions, the `cli:cs` ability set both per-operation and by cardinality, `--currency` tracking the endpoints where the spec makes it required, and three bound checks: a flag's `Max` against the spec's `maximum`, its `Min` against the spec's `minimum`, and the hand-copied Go constants for array-`items` bounds against the spec's own numbers), plus one `CommandDef` integrity check that every `ForensicFields` entry names a flag that exists. Several of them read the LIVE cobra tree rather than the `CommandDef` AST, because an AST walker reads a non-literal field as empty and skips the entity in silence. See CLAUDE.md for the four things these deliberately do NOT prove.
 - `cmd/inventory/since_flag_test.go` — a `--since` flag must exist exactly where the spec declares the `since` query param. Both directions are silent failures: a flag the spec dropped is parsed and thrown away, handing the caller a full unfiltered page they read as an incremental sync.
-- `cmd/inventory/skills_drift_test.go` — every `ceebee inventory …` invocation in `skills/*.md` and this README must resolve against the live cobra tree, and the endpoint tables in the cookbooks must match each command's bound verb, path, ability, and dry-run mode. It also forbids the space form of a bool flag in docs: write `--flag=false`, never `--flag false`.
+- `cmd/inventory/skills_drift_test.go` — every `ceebee inventory …` invocation in `skills/*.md` and this README must resolve against the live cobra tree, and the endpoint tables in the cookbooks must match each command's bound verb, path, ability, and dry-run mode. It also forbids the space form of a bool flag in docs: write `--flag=false`, never `--flag false`. And every documented int-flag *value* has to parse and fall inside that flag's declared bounds — a documented flag can exist and still carry a value that cannot run, which is how ten invocations passing a prefixed id (`--product-id pr_88`) to an int flag shipped. Shell substitutions (`$VAR`) are skipped, so the rule does not push docs toward hardcoded ids.
 
-**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Two spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`) and nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) and a bare `type: ["null"]` have no 3.0 spelling and are left alone, so they fail codegen loudly rather than being silently mangled. Any other 3.1-only construct upstream adopts does the same. The type-array rewrite checks schema *position*, not just the key name: every non-null member must be one of the seven JSON Schema type names, so an `example:` or `default:` block that happens to contain `type: [guest, "null"]` stays data instead of being collapsed and stamped with a fabricated `nullable: true`.
+**Syncing the spec** is a straight copy from the server repo — never hand-edit `api/inventory/cli-v1.yaml`, since the drift tests read it as the source of truth. The spec is OpenAPI 3.1 and oapi-codegen only supports 3.0, so `make codegen` first runs `tools/speccompat` to rewrite 3.1-only nullability into its 3.0 equivalent in a temp copy. Three spellings are handled: nullable-ref unions (`oneOf: [$ref, {type: "null"}]` → `allOf` + `nullable: true`), nullable type-arrays (`type: [array, "null"]` → `type: array` + `nullable: true`), and null-only types (`type: ["null"]`, which 1.56.0 introduced on the dry-run branch of `POST /bookings` to say a field is always null there — the `type` key is dropped and only `nullable: true` remains, so codegen renders the field as a plain `interface{}` — no pointer, since `interface{}` is already nilable). The transform is deliberately narrow — a genuine multi-type union (`type: [string, integer, "null"]`) has no 3.0 spelling and is left alone, as is a mapping whose *only* key is `type`. The first rule owns the scalar spelling of that (`{type: null}`) but not the one-member sequence spelling (`{type: ["null"]}`), which no rule claims — so those fail codegen loudly rather than being silently mangled, which is the safe direction but not the same thing as being handled. Any other 3.1-only construct upstream adopts does the same. The type-array rewrite checks schema *position*, not just the key name: every non-null member must be one of the seven JSON Schema type names, so an `example:` or `default:` block that happens to contain `type: [guest, "null"]` stays data instead of being collapsed and stamped with a fabricated `nullable: true`.
 
 ## AI agents
 

@@ -27,7 +27,7 @@ func transactionsDefs() []CommandDef {
 			// was a no-op trap and the server team dropped it. `comp` left
 			// the --type enum in the same release.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1}, {Name: "cursor", Type: "string"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200}, {Name: "cursor", Type: "string"},
 				{Name: "type", Type: "string", Description: "charge|refund"},
 				{Name: "from", Type: "string", Description: "Transaction created_at >= ISO 8601"},
 				{Name: "to", Type: "string", Description: "Transaction created_at <= ISO 8601"},

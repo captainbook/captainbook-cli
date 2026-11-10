@@ -298,6 +298,123 @@ func (e ComposedWorkflowStepStepType) Valid() bool {
 	}
 }
 
+// Defines values for CreateBookableProductRequestDeliveryMethod.
+const (
+	CreateBookableProductRequestDeliveryMethodTICKET  CreateBookableProductRequestDeliveryMethod = "TICKET"
+	CreateBookableProductRequestDeliveryMethodVOUCHER CreateBookableProductRequestDeliveryMethod = "VOUCHER"
+)
+
+// Valid indicates whether the value is a known member of the CreateBookableProductRequestDeliveryMethod enum.
+func (e CreateBookableProductRequestDeliveryMethod) Valid() bool {
+	switch e {
+	case CreateBookableProductRequestDeliveryMethodTICKET:
+		return true
+	case CreateBookableProductRequestDeliveryMethodVOUCHER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateBookableProductRequestPricingCategoriesType.
+const (
+	CreateBookableProductRequestPricingCategoriesTypeADULT            CreateBookableProductRequestPricingCategoriesType = "ADULT"
+	CreateBookableProductRequestPricingCategoriesTypeCHILD            CreateBookableProductRequestPricingCategoriesType = "CHILD"
+	CreateBookableProductRequestPricingCategoriesTypeEUCITIZEN        CreateBookableProductRequestPricingCategoriesType = "EU_CITIZEN"
+	CreateBookableProductRequestPricingCategoriesTypeEUCITIZENSTUDENT CreateBookableProductRequestPricingCategoriesType = "EU_CITIZEN_STUDENT"
+	CreateBookableProductRequestPricingCategoriesTypeINFANT           CreateBookableProductRequestPricingCategoriesType = "INFANT"
+	CreateBookableProductRequestPricingCategoriesTypeMILITARY         CreateBookableProductRequestPricingCategoriesType = "MILITARY"
+	CreateBookableProductRequestPricingCategoriesTypeSENIOR           CreateBookableProductRequestPricingCategoriesType = "SENIOR"
+	CreateBookableProductRequestPricingCategoriesTypeSTUDENT          CreateBookableProductRequestPricingCategoriesType = "STUDENT"
+	CreateBookableProductRequestPricingCategoriesTypeTRAVELLER        CreateBookableProductRequestPricingCategoriesType = "TRAVELLER"
+	CreateBookableProductRequestPricingCategoriesTypeYOUTH            CreateBookableProductRequestPricingCategoriesType = "YOUTH"
+)
+
+// Valid indicates whether the value is a known member of the CreateBookableProductRequestPricingCategoriesType enum.
+func (e CreateBookableProductRequestPricingCategoriesType) Valid() bool {
+	switch e {
+	case CreateBookableProductRequestPricingCategoriesTypeADULT:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeCHILD:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeEUCITIZEN:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeEUCITIZENSTUDENT:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeINFANT:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeMILITARY:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeSENIOR:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeSTUDENT:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeTRAVELLER:
+		return true
+	case CreateBookableProductRequestPricingCategoriesTypeYOUTH:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateBookableProductRequestRedemptionMethod.
+const (
+	CreateBookableProductRequestRedemptionMethodDIGITAL  CreateBookableProductRequestRedemptionMethod = "DIGITAL"
+	CreateBookableProductRequestRedemptionMethodMANIFEST CreateBookableProductRequestRedemptionMethod = "MANIFEST"
+	CreateBookableProductRequestRedemptionMethodPRINT    CreateBookableProductRequestRedemptionMethod = "PRINT"
+)
+
+// Valid indicates whether the value is a known member of the CreateBookableProductRequestRedemptionMethod enum.
+func (e CreateBookableProductRequestRedemptionMethod) Valid() bool {
+	switch e {
+	case CreateBookableProductRequestRedemptionMethodDIGITAL:
+		return true
+	case CreateBookableProductRequestRedemptionMethodMANIFEST:
+		return true
+	case CreateBookableProductRequestRedemptionMethodPRINT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateBookableProductRequestScheduleType.
+const (
+	CreateBookableProductRequestScheduleTypeDate     CreateBookableProductRequestScheduleType = "date"
+	CreateBookableProductRequestScheduleTypeDatetime CreateBookableProductRequestScheduleType = "datetime"
+)
+
+// Valid indicates whether the value is a known member of the CreateBookableProductRequestScheduleType enum.
+func (e CreateBookableProductRequestScheduleType) Valid() bool {
+	switch e {
+	case CreateBookableProductRequestScheduleTypeDate:
+		return true
+	case CreateBookableProductRequestScheduleTypeDatetime:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateBookableProductRequestStatus.
+const (
+	CreateBookableProductRequestStatusDraft     CreateBookableProductRequestStatus = "draft"
+	CreateBookableProductRequestStatusPublished CreateBookableProductRequestStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the CreateBookableProductRequestStatus enum.
+func (e CreateBookableProductRequestStatus) Valid() bool {
+	switch e {
+	case CreateBookableProductRequestStatusDraft:
+		return true
+	case CreateBookableProductRequestStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateLocationRequestAttachTo.
 const (
 	CreateLocationRequestAttachToOrganisation CreateLocationRequestAttachTo = "organisation"
@@ -616,9 +733,12 @@ const (
 	DiaryNotesUpdated                    CreateWorkflowTriggerRequestActionType = "diary_notes_updated"
 	DocumentsSignedComplete              CreateWorkflowTriggerRequestActionType = "documents_signed_complete"
 	ScheduledTime                        CreateWorkflowTriggerRequestActionType = "scheduled_time"
+	SegmentEntered                       CreateWorkflowTriggerRequestActionType = "segment_entered"
+	SegmentLeft                          CreateWorkflowTriggerRequestActionType = "segment_left"
 	UnknownBookingCancellation           CreateWorkflowTriggerRequestActionType = "unknown_booking_cancellation"
 	WaitlistJoined                       CreateWorkflowTriggerRequestActionType = "waitlist_joined"
 	Webhook                              CreateWorkflowTriggerRequestActionType = "webhook"
+	WhatsappMessageReceived              CreateWorkflowTriggerRequestActionType = "whatsapp_message_received"
 )
 
 // Valid indicates whether the value is a known member of the CreateWorkflowTriggerRequestActionType enum.
@@ -656,11 +776,17 @@ func (e CreateWorkflowTriggerRequestActionType) Valid() bool {
 		return true
 	case ScheduledTime:
 		return true
+	case SegmentEntered:
+		return true
+	case SegmentLeft:
+		return true
 	case UnknownBookingCancellation:
 		return true
 	case WaitlistJoined:
 		return true
 	case Webhook:
+		return true
+	case WhatsappMessageReceived:
 		return true
 	default:
 		return false
@@ -856,6 +982,24 @@ func (e PricingCategoryType) Valid() bool {
 	}
 }
 
+// Defines values for ProductAllocationMode.
+const (
+	ProductAllocationModeHomogeneousMulti ProductAllocationMode = "homogeneous_multi"
+	ProductAllocationModeSingleResource   ProductAllocationMode = "single_resource"
+)
+
+// Valid indicates whether the value is a known member of the ProductAllocationMode enum.
+func (e ProductAllocationMode) Valid() bool {
+	switch e {
+	case ProductAllocationModeHomogeneousMulti:
+		return true
+	case ProductAllocationModeSingleResource:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProductDeliveryMethod.
 const (
 	ProductDeliveryMethodTICKET  ProductDeliveryMethod = "TICKET"
@@ -868,6 +1012,42 @@ func (e ProductDeliveryMethod) Valid() bool {
 	case ProductDeliveryMethodTICKET:
 		return true
 	case ProductDeliveryMethodVOUCHER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProductReadinessMissing.
+const (
+	Inactive          ProductReadinessMissing = "inactive"
+	NoDeparture       ProductReadinessMissing = "no_departure"
+	NoFutureDeparture ProductReadinessMissing = "no_future_departure"
+	NoMainPhoto       ProductReadinessMissing = "no_main_photo"
+	NoOption          ProductReadinessMissing = "no_option"
+	NoPricedCategory  ProductReadinessMissing = "no_priced_category"
+	NoPricingCategory ProductReadinessMissing = "no_pricing_category"
+	NoUuid            ProductReadinessMissing = "no_uuid"
+)
+
+// Valid indicates whether the value is a known member of the ProductReadinessMissing enum.
+func (e ProductReadinessMissing) Valid() bool {
+	switch e {
+	case Inactive:
+		return true
+	case NoDeparture:
+		return true
+	case NoFutureDeparture:
+		return true
+	case NoMainPhoto:
+		return true
+	case NoOption:
+		return true
+	case NoPricedCategory:
+		return true
+	case NoPricingCategory:
+		return true
+	case NoUuid:
 		return true
 	default:
 		return false
@@ -1183,6 +1363,45 @@ func (e SegmentType) Valid() bool {
 	}
 }
 
+// Defines values for StoreBookingRequestBookingType.
+const (
+	StoreBookingRequestBookingTypeBooking     StoreBookingRequestBookingType = "booking"
+	StoreBookingRequestBookingTypeReservation StoreBookingRequestBookingType = "reservation"
+)
+
+// Valid indicates whether the value is a known member of the StoreBookingRequestBookingType enum.
+func (e StoreBookingRequestBookingType) Valid() bool {
+	switch e {
+	case StoreBookingRequestBookingTypeBooking:
+		return true
+	case StoreBookingRequestBookingTypeReservation:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StoreBookingRequestPaymentMethod.
+const (
+	StoreBookingRequestPaymentMethodBankTransfer StoreBookingRequestPaymentMethod = "bank_transfer"
+	StoreBookingRequestPaymentMethodCash         StoreBookingRequestPaymentMethod = "cash"
+	StoreBookingRequestPaymentMethodPaypal       StoreBookingRequestPaymentMethod = "paypal"
+)
+
+// Valid indicates whether the value is a known member of the StoreBookingRequestPaymentMethod enum.
+func (e StoreBookingRequestPaymentMethod) Valid() bool {
+	switch e {
+	case StoreBookingRequestPaymentMethodBankTransfer:
+		return true
+	case StoreBookingRequestPaymentMethodCash:
+		return true
+	case StoreBookingRequestPaymentMethodPaypal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TicketReissueDeliveryMethodFrom.
 const (
 	TicketReissueDeliveryMethodFromTICKET  TicketReissueDeliveryMethodFrom = "TICKET"
@@ -1221,28 +1440,28 @@ func (e TicketReissueDeliveryMethodTo) Valid() bool {
 
 // Defines values for TransactionMethod.
 const (
-	Card     TransactionMethod = "card"
-	Cash     TransactionMethod = "cash"
-	Gift     TransactionMethod = "gift"
-	Paypal   TransactionMethod = "paypal"
-	Transfer TransactionMethod = "transfer"
-	Voucher  TransactionMethod = "voucher"
+	TransactionMethodCard     TransactionMethod = "card"
+	TransactionMethodCash     TransactionMethod = "cash"
+	TransactionMethodGift     TransactionMethod = "gift"
+	TransactionMethodPaypal   TransactionMethod = "paypal"
+	TransactionMethodTransfer TransactionMethod = "transfer"
+	TransactionMethodVoucher  TransactionMethod = "voucher"
 )
 
 // Valid indicates whether the value is a known member of the TransactionMethod enum.
 func (e TransactionMethod) Valid() bool {
 	switch e {
-	case Card:
+	case TransactionMethodCard:
 		return true
-	case Cash:
+	case TransactionMethodCash:
 		return true
-	case Gift:
+	case TransactionMethodGift:
 		return true
-	case Paypal:
+	case TransactionMethodPaypal:
 		return true
-	case Transfer:
+	case TransactionMethodTransfer:
 		return true
-	case Voucher:
+	case TransactionMethodVoucher:
 		return true
 	default:
 		return false
@@ -1329,40 +1548,58 @@ func (e UpdateLocationRequestType) Valid() bool {
 
 // Defines values for UpdatePricingCategoryRequestType.
 const (
-	ADULT            UpdatePricingCategoryRequestType = "ADULT"
-	CHILD            UpdatePricingCategoryRequestType = "CHILD"
-	EUCITIZEN        UpdatePricingCategoryRequestType = "EU_CITIZEN"
-	EUCITIZENSTUDENT UpdatePricingCategoryRequestType = "EU_CITIZEN_STUDENT"
-	INFANT           UpdatePricingCategoryRequestType = "INFANT"
-	MILITARY         UpdatePricingCategoryRequestType = "MILITARY"
-	SENIOR           UpdatePricingCategoryRequestType = "SENIOR"
-	STUDENT          UpdatePricingCategoryRequestType = "STUDENT"
-	TRAVELLER        UpdatePricingCategoryRequestType = "TRAVELLER"
-	YOUTH            UpdatePricingCategoryRequestType = "YOUTH"
+	UpdatePricingCategoryRequestTypeADULT            UpdatePricingCategoryRequestType = "ADULT"
+	UpdatePricingCategoryRequestTypeCHILD            UpdatePricingCategoryRequestType = "CHILD"
+	UpdatePricingCategoryRequestTypeEUCITIZEN        UpdatePricingCategoryRequestType = "EU_CITIZEN"
+	UpdatePricingCategoryRequestTypeEUCITIZENSTUDENT UpdatePricingCategoryRequestType = "EU_CITIZEN_STUDENT"
+	UpdatePricingCategoryRequestTypeINFANT           UpdatePricingCategoryRequestType = "INFANT"
+	UpdatePricingCategoryRequestTypeMILITARY         UpdatePricingCategoryRequestType = "MILITARY"
+	UpdatePricingCategoryRequestTypeSENIOR           UpdatePricingCategoryRequestType = "SENIOR"
+	UpdatePricingCategoryRequestTypeSTUDENT          UpdatePricingCategoryRequestType = "STUDENT"
+	UpdatePricingCategoryRequestTypeTRAVELLER        UpdatePricingCategoryRequestType = "TRAVELLER"
+	UpdatePricingCategoryRequestTypeYOUTH            UpdatePricingCategoryRequestType = "YOUTH"
 )
 
 // Valid indicates whether the value is a known member of the UpdatePricingCategoryRequestType enum.
 func (e UpdatePricingCategoryRequestType) Valid() bool {
 	switch e {
-	case ADULT:
+	case UpdatePricingCategoryRequestTypeADULT:
 		return true
-	case CHILD:
+	case UpdatePricingCategoryRequestTypeCHILD:
 		return true
-	case EUCITIZEN:
+	case UpdatePricingCategoryRequestTypeEUCITIZEN:
 		return true
-	case EUCITIZENSTUDENT:
+	case UpdatePricingCategoryRequestTypeEUCITIZENSTUDENT:
 		return true
-	case INFANT:
+	case UpdatePricingCategoryRequestTypeINFANT:
 		return true
-	case MILITARY:
+	case UpdatePricingCategoryRequestTypeMILITARY:
 		return true
-	case SENIOR:
+	case UpdatePricingCategoryRequestTypeSENIOR:
 		return true
-	case STUDENT:
+	case UpdatePricingCategoryRequestTypeSTUDENT:
 		return true
-	case TRAVELLER:
+	case UpdatePricingCategoryRequestTypeTRAVELLER:
 		return true
-	case YOUTH:
+	case UpdatePricingCategoryRequestTypeYOUTH:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProductRequestAllocationMode.
+const (
+	UpdateProductRequestAllocationModeHomogeneousMulti UpdateProductRequestAllocationMode = "homogeneous_multi"
+	UpdateProductRequestAllocationModeSingleResource   UpdateProductRequestAllocationMode = "single_resource"
+)
+
+// Valid indicates whether the value is a known member of the UpdateProductRequestAllocationMode enum.
+func (e UpdateProductRequestAllocationMode) Valid() bool {
+	switch e {
+	case UpdateProductRequestAllocationModeHomogeneousMulti:
+		return true
+	case UpdateProductRequestAllocationModeSingleResource:
 		return true
 	default:
 		return false
@@ -1371,16 +1608,16 @@ func (e UpdatePricingCategoryRequestType) Valid() bool {
 
 // Defines values for UpdateProductRequestDeliveryMethod.
 const (
-	TICKET  UpdateProductRequestDeliveryMethod = "TICKET"
-	VOUCHER UpdateProductRequestDeliveryMethod = "VOUCHER"
+	UpdateProductRequestDeliveryMethodTICKET  UpdateProductRequestDeliveryMethod = "TICKET"
+	UpdateProductRequestDeliveryMethodVOUCHER UpdateProductRequestDeliveryMethod = "VOUCHER"
 )
 
 // Valid indicates whether the value is a known member of the UpdateProductRequestDeliveryMethod enum.
 func (e UpdateProductRequestDeliveryMethod) Valid() bool {
 	switch e {
-	case TICKET:
+	case UpdateProductRequestDeliveryMethodTICKET:
 		return true
-	case VOUCHER:
+	case UpdateProductRequestDeliveryMethodVOUCHER:
 		return true
 	default:
 		return false
@@ -1389,19 +1626,19 @@ func (e UpdateProductRequestDeliveryMethod) Valid() bool {
 
 // Defines values for UpdateProductRequestRedemptionMethod.
 const (
-	DIGITAL  UpdateProductRequestRedemptionMethod = "DIGITAL"
-	MANIFEST UpdateProductRequestRedemptionMethod = "MANIFEST"
-	PRINT    UpdateProductRequestRedemptionMethod = "PRINT"
+	UpdateProductRequestRedemptionMethodDIGITAL  UpdateProductRequestRedemptionMethod = "DIGITAL"
+	UpdateProductRequestRedemptionMethodMANIFEST UpdateProductRequestRedemptionMethod = "MANIFEST"
+	UpdateProductRequestRedemptionMethodPRINT    UpdateProductRequestRedemptionMethod = "PRINT"
 )
 
 // Valid indicates whether the value is a known member of the UpdateProductRequestRedemptionMethod enum.
 func (e UpdateProductRequestRedemptionMethod) Valid() bool {
 	switch e {
-	case DIGITAL:
+	case UpdateProductRequestRedemptionMethodDIGITAL:
 		return true
-	case MANIFEST:
+	case UpdateProductRequestRedemptionMethodMANIFEST:
 		return true
-	case PRINT:
+	case UpdateProductRequestRedemptionMethodPRINT:
 		return true
 	default:
 		return false
@@ -1446,28 +1683,28 @@ func (e UpdateProductRequestStatus) Valid() bool {
 
 // Defines values for UpdateQuestionRequestType.
 const (
-	Boolean  UpdateQuestionRequestType = "boolean"
-	Date     UpdateQuestionRequestType = "date"
-	Number   UpdateQuestionRequestType = "number"
-	Select   UpdateQuestionRequestType = "select"
-	Text     UpdateQuestionRequestType = "text"
-	Textarea UpdateQuestionRequestType = "textarea"
+	UpdateQuestionRequestTypeBoolean  UpdateQuestionRequestType = "boolean"
+	UpdateQuestionRequestTypeDate     UpdateQuestionRequestType = "date"
+	UpdateQuestionRequestTypeNumber   UpdateQuestionRequestType = "number"
+	UpdateQuestionRequestTypeSelect   UpdateQuestionRequestType = "select"
+	UpdateQuestionRequestTypeText     UpdateQuestionRequestType = "text"
+	UpdateQuestionRequestTypeTextarea UpdateQuestionRequestType = "textarea"
 )
 
 // Valid indicates whether the value is a known member of the UpdateQuestionRequestType enum.
 func (e UpdateQuestionRequestType) Valid() bool {
 	switch e {
-	case Boolean:
+	case UpdateQuestionRequestTypeBoolean:
 		return true
-	case Date:
+	case UpdateQuestionRequestTypeDate:
 		return true
-	case Number:
+	case UpdateQuestionRequestTypeNumber:
 		return true
-	case Select:
+	case UpdateQuestionRequestTypeSelect:
 		return true
-	case Text:
+	case UpdateQuestionRequestTypeText:
 		return true
-	case Textarea:
+	case UpdateQuestionRequestTypeTextarea:
 		return true
 	default:
 		return false
@@ -2091,19 +2328,19 @@ func (e ListWorkflowNodesParamsKind) Valid() bool {
 
 // Defines values for ListWorkflowsParamsStatus.
 const (
-	Active ListWorkflowsParamsStatus = "active"
-	Draft  ListWorkflowsParamsStatus = "draft"
-	Paused ListWorkflowsParamsStatus = "paused"
+	ListWorkflowsParamsStatusActive ListWorkflowsParamsStatus = "active"
+	ListWorkflowsParamsStatusDraft  ListWorkflowsParamsStatus = "draft"
+	ListWorkflowsParamsStatusPaused ListWorkflowsParamsStatus = "paused"
 )
 
 // Valid indicates whether the value is a known member of the ListWorkflowsParamsStatus enum.
 func (e ListWorkflowsParamsStatus) Valid() bool {
 	switch e {
-	case Active:
+	case ListWorkflowsParamsStatusActive:
 		return true
-	case Draft:
+	case ListWorkflowsParamsStatusDraft:
 		return true
-	case Paused:
+	case ListWorkflowsParamsStatusPaused:
 		return true
 	default:
 		return false
@@ -2225,6 +2462,9 @@ type AssignedBookingResource struct {
 	Category *string `json:"category,omitempty"`
 	Id       *string `json:"id,omitempty"`
 	Name     *string `json:"name,omitempty"`
+
+	// Seats Riders on this unit. Null for equipment, auxiliaries, and rows written before seats were recorded.
+	Seats *int `json:"seats,omitempty"`
 
 	// Source Pivot source on the booking_resource row when assigned.
 	Source *string `json:"source,omitempty"`
@@ -2510,6 +2750,41 @@ type AvailableGiftCertificate struct {
 	UpdatedAt              *time.Time `json:"updated_at,omitempty"`
 }
 
+// BookableProductResult The extras `POST /products/bookable` adds to `MutationResult`. Identical
+// on the dry run and the commit, except that the preview's rows carry no
+// ids and no minted codes.
+type BookableProductResult struct {
+	// Notes Present only when `product.readiness.blocking` is non-empty, keyed
+	// by the blocking code with a value of 1. This is what the operator
+	// assistant's confirmation card renders as "This product will not sell
+	// yet: …", so a caller reporting readiness to a human should read
+	// `readiness.blocking` and not this bag — the bag exists for the card
+	// and carries no information the readiness block does not.
+	Notes             *map[string]int    `json:"notes,omitempty"`
+	PricingCategories *[]PricingCategory `json:"pricing_categories,omitempty"`
+	PricingTiers      *[]PricingTier     `json:"pricing_tiers,omitempty"`
+
+	// Product Mirrors `ProductResource::toArray()`. Translatable text fields
+	// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+	// `exclusions`) are returned in English via
+	// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+	// `requirements` are rich-text (HTML accepted). `inclusions` and
+	// `exclusions` are plain text — the dashboard renders them as a bullet
+	// list, splitting on newlines. `status` is derived from `is_active`
+	// (`is_active` is also surfaced directly for clients that prefer the
+	// canonical boolean).
+	//
+	// A value READ here can exceed the 65,535-byte cap the write schemas
+	// enforce. The cap arrived in 1.17.0 and rows written before it were not
+	// rewritten, and an image pasted into the dashboard editor lands as an
+	// inline base64 data URI. So a read-modify-write that echoes one of these
+	// fields back unchanged is a 422 naming that field, on a request that
+	// meant to change something else entirely. Shorten or clear the named
+	// field; retrying the same body cannot succeed.
+	Product        *Product         `json:"product,omitempty"`
+	ProductOptions *[]ProductOption `json:"product_options,omitempty"`
+}
+
 // BookedExtra One extra the customer bought on a booking — a `booking_extra` pivot
 // row. Mirrors `BookedExtraResource::toArray()`.
 //
@@ -2645,12 +2920,53 @@ type Booking struct {
 	BookingStatus *BookingBookingStatus `json:"booking_status,omitempty"`
 	CancelledAt   *time.Time            `json:"cancelled_at,omitempty"`
 
+	// Comments Public notes on the booking, written by an operator and shown with
+	// it. Present on `GET /bookings/{id}` and in the `before` / `after`
+	// of `PATCH /bookings/{id}`; absent from `GET /bookings`, where
+	// 5000 characters a row would dominate a page nobody asked notes for.
+	Comments *string `json:"comments,omitempty"`
+
 	// ConfirmedAt Set when the booking transitions to confirmed; null on held/expired/cancelled rows.
 	ConfirmedAt *time.Time `json:"confirmed_at,omitempty"`
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
 
-	// Currency The first transaction's currency (a real column). Falls back to the tenant's currency when the booking has no transaction yet; null only when no tenant is bound.
+	// Currency The denominator for every amount on this payload.
+	//
+	// The first transaction's currency when that row was denominated
+	// DELIBERATELY — only an external charge does that, an OTA billing in
+	// its own currency — and the account currency otherwise. A row whose
+	// currency equals the platform default is not trusted: no CaptainBook
+	// write path passes a currency to the booking engine, so the engine
+	// defaults that column on every platform-written row, and reading it
+	// published the platform default as a USD account's currency.
+	// captainbook#8835 tracks giving `bookings` a currency of its own,
+	// which is what would let the two cases be told apart properly.
+	//
+	// Null only when no tenant is bound.
 	Currency *string `json:"currency,omitempty"`
+
+	// CustomAttributes The operator's own metadata on this booking, keyed by the attribute
+	// definition's SLUG — the same shape `PATCH /bookings/{id}` accepts,
+	// so a read can be edited and sent back. Values are typed by their
+	// definition: a `number` reads as a number, a `multi_select` as an
+	// array of strings, a `checkbox` as a boolean.
+	//
+	// Every definition configured for bookings in THIS BOOKING's business
+	// unit appears, including ones with no stored value — those read as
+	// their definition default, or `null` where there is none. `{}` means
+	// that unit has no booking attributes configured. Attribute
+	// definitions are per business unit, so two bookings on one account
+	// can publish entirely different slugs; the set here is the same set
+	// `PATCH /bookings/{id}` will accept for this booking, and a slug from
+	// another unit is refused there by name.
+	//
+	// A value drawn from a code pool (a self-guided-tour access code, for
+	// instance) appears here but cannot be written back: `PATCH` refuses
+	// it with `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE`. Treat such a value
+	// like a credential — it is what admits the customer.
+	//
+	// Same presence rule as `comments`.
+	CustomAttributes *map[string]interface{} `json:"custom_attributes,omitempty"`
 
 	// Customer Null when the booking has no linked Customer, OR when the caller
 	// lacks the `view_booker_of_booking` permission. The key is always
@@ -2698,12 +3014,34 @@ type Booking struct {
 	HeldUntil *time.Time     `json:"held_until,omitempty"`
 	Id        *string        `json:"id,omitempty"`
 
+	// OriginBookingId The ROOT of this booking's reschedule chain, or null when it is the
+	// root. Every member of a chain carries the root rather than its own
+	// parent, which is what makes the whole chain reachable from any one
+	// of them. Present on `GET /bookings/{id}` and in both halves of the
+	// `POST /bookings/{id}/reschedule` diff, like `reschedules` below.
+	// Absent from the list and from the `PATCH /bookings/{id}` diff: the
+	// ledger costs an extra query per booking rendered, and a PATCH
+	// changes nothing in it.
+	OriginBookingId *string `json:"origin_booking_id,omitempty"`
+
 	// PaidAmount Sum of charge `BookingTransaction.amount` (rows with
 	// `refund_for IS NULL`). Computed at serialization time from
 	// eager-loaded transactions.
 	// Null for a caller without the `see_money_of_booking` permission.
-	PaidAmount      *Money  `json:"paid_amount,omitempty"`
+	PaidAmount *Money `json:"paid_amount,omitempty"`
+
+	// PrivateNotes Internal notes. Never shown to the customer, but visible to any
+	// operator who may read the booking — the same audience the mobile
+	// check-in payload shows them to. Same presence rule as `comments`.
+	PrivateNotes    *string `json:"private_notes,omitempty"`
 	ProductOptionId *string `json:"product_option_id,omitempty"`
+
+	// Quantity The booking's head count — the sum of its guest mix. Present on the
+	// list and the detail alike, and not permission-gated: it is an
+	// operational fact rather than money, booker identity or guest
+	// documents. The per-traveller breakdown is `guests`, which is
+	// detail-only and needs `view_booker_of_booking`.
+	Quantity *int `json:"quantity,omitempty"`
 
 	// Reference Sourced from `bookings.reseller_reference` — there's no plain
 	// `reference` column on bookings. Populated for reseller-imported
@@ -2715,6 +3053,27 @@ type Booking struct {
 	// response value is positive.
 	// Null for a caller without the `see_money_of_booking` permission.
 	RefundedAmount *Money `json:"refunded_amount,omitempty"`
+
+	// Reschedules Every reschedule recorded anywhere in this booking's CHAIN, oldest
+	// first — not just the ones that landed on the id you asked for.
+	// Entries are keyed on the booking a move landed ON, so a mid-chain
+	// booking has one of its own and would otherwise look barely
+	// rescheduled; this resolves the chain root first.
+	//
+	// `[]` means no reschedule has ever touched the chain. It is never a
+	// redaction — nothing in this block is permission-gated.
+	//
+	// Present on `GET /bookings/{id}` and in both halves of the
+	// `POST /bookings/{id}/reschedule` diff — THE LEDGER IS THE ONLY PLACE
+	// that endpoint's `reschedule_notes` (or `comments`) lands, so without
+	// it the diff could not show the note at all.
+	//
+	// Absent from the list, and from the `PATCH /bookings/{id}` diff. The
+	// reason for the list is query cost: it is one extra query per booking
+	// rendered, so on a page of a hundred it would be a hundred. The
+	// reason for the PATCH is that nothing it writes touches the ledger,
+	// so both halves would carry the same thing.
+	Reschedules *[]BookingReschedule `json:"reschedules,omitempty"`
 
 	// ResourceStateToken Aggregate booking resource state token used for stale-state guarded
 	// booking resource mutations. Present wherever `resources` are included.
@@ -2778,6 +3137,47 @@ type BookingPage struct {
 	Data       []Booking   `json:"data"`
 	Meta       Meta        `json:"meta"`
 	Pagination *Pagination `json:"pagination,omitempty"`
+}
+
+// BookingReschedule One entry in a booking's reschedule ledger.
+//
+// **`from_booking_id` is the field that matters.** Null means a SIMPLE
+// reschedule: the same booking swapped departures and kept its id, its
+// extras, its answers and its transactions — the only kind
+// `POST /bookings/{id}/reschedule` can produce. Non-null means a
+// CANCEL-AND-REPLACE: the booking it names was cancelled and this one
+// created in its place, with everything re-replicated and repriced against
+// the destination. That only happens in the CaptainBook dashboard, when an
+// operator changes the product OPTION.
+//
+// Without this field a superseded booking reads as an ordinary
+// cancellation — so a caller asked "what happened to booking X" answers
+// "it was cancelled" while the customer is travelling, on a different id.
+type BookingReschedule struct {
+	// BookingId Which booking in the chain this entry sits on. On a
+	// cancel-and-replace that is the SUCCESSOR, so an entry whose
+	// `from_booking_id` is the booking you are reading tells you where it
+	// went.
+	BookingId          *string `json:"booking_id,omitempty"`
+	FromAvailabilityId *string `json:"from_availability_id,omitempty"`
+
+	// FromBookingId The booking this one replaced, or null for a simple move. See above.
+	FromBookingId *string `json:"from_booking_id,omitempty"`
+	Notes         *string `json:"notes,omitempty"`
+
+	// RescheduledAt A real UTC instant, unlike `starts_at` / `ends_at` on the booking
+	// itself, which are the departure's product-local wall clock. This one
+	// records when a person did something, so it carries a true offset.
+	RescheduledAt *time.Time `json:"rescheduled_at,omitempty"`
+
+	// RescheduledBy The operator who did it. **Null for a channel-manager amendment** —
+	// an OTA moving its own booking has no CaptainBook user behind it, and
+	// naming one would invent an accountable person.
+	RescheduledBy *struct {
+		Id   *string `json:"id,omitempty"`
+		Name *string `json:"name,omitempty"`
+	} `json:"rescheduled_by,omitempty"`
+	ToAvailabilityId *string `json:"to_availability_id,omitempty"`
 }
 
 // BulkDeleteAvailabilityRequest Filter shape mirrors `BulkUpdateAvailabilityRequest` field for field,
@@ -3022,10 +3422,19 @@ type ComposedWorkflowStep struct {
 	// ConditionType Required for `condition`.
 	ConditionType *string `json:"condition_type,omitempty"`
 
-	// Config Validated against the node's own `rules()`. A shape that does not
-	// match is a 422 `INVALID_STEP_CONFIG`, in dry-run as well as on
-	// commit.
-	Config *map[string]interface{} `json:"config,omitempty"`
+	// Config The node's own settings. There is NO fixed shape and no listed
+	// properties: `config` is validated against the resolved trigger's or
+	// action's own `rules()`, those differ per node, and which nodes exist at
+	// all depends on the account's plan — so no document can enumerate the
+	// keys.
+	//
+	// Read the shape from `GET /workflow-nodes` (MCP:
+	// `inventory_workflow_list` with `resource: workflow-nodes`), which
+	// returns every trigger and action with its `step_type` and the `config`
+	// it needs. Guessing is not a near miss: an `action_type` outside that
+	// catalogue is a 422, and a config that does not match the node's rules is
+	// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+	Config *WorkflowNodeConfig `json:"config,omitempty"`
 
 	// Order Defaults to the step's position in the list, 1-based.
 	Order *int `json:"order,omitempty"`
@@ -3055,8 +3464,21 @@ type ComposedWorkflowStepStepType string
 // takes order 0.
 type ComposedWorkflowTrigger struct {
 	// ActionType A TriggerType — see GET /workflow-nodes.
-	ActionType string                  `json:"action_type"`
-	Config     *map[string]interface{} `json:"config,omitempty"`
+	ActionType string `json:"action_type"`
+
+	// Config The node's own settings. There is NO fixed shape and no listed
+	// properties: `config` is validated against the resolved trigger's or
+	// action's own `rules()`, those differ per node, and which nodes exist at
+	// all depends on the account's plan — so no document can enumerate the
+	// keys.
+	//
+	// Read the shape from `GET /workflow-nodes` (MCP:
+	// `inventory_workflow_list` with `resource: workflow-nodes`), which
+	// returns every trigger and action with its `step_type` and the `config`
+	// it needs. Guessing is not a near miss: an `action_type` outside that
+	// catalogue is a 422, and a config that does not match the node's rules is
+	// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+	Config *WorkflowNodeConfig `json:"config,omitempty"`
 }
 
 // CreateAvailabilityRequest `date`, `start_time` and `end_time` are the PRODUCT'S LOCAL wall
@@ -3197,6 +3619,126 @@ type CreateAvailableGiftCertRequest struct {
 	Name                   string `json:"name"`
 }
 
+// CreateBookableProductRequest defines model for CreateBookableProductRequest.
+type CreateBookableProductRequest struct {
+	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
+
+	// CancellationPolicyLink External URL with the policy. Mutually exclusive with `cancellation_policy`.
+	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
+
+	// Capacity The capacity all of this product's schedules SHARE: a pool across CONCURRENT departures of this product, not how many people one departure takes, which is the product option's own `capacity`. A positive value makes the booking engine subtract the booked quantity of every OVERLAPPING departure of the product from this pool, so two departures that overlap in time compete for it. `0` or `null` means not shared, which is the default, and a `null` is stored as `0`. A value above 0 needs a plan that includes shared capacity between schedules (Starter and above); on free and legacy it is a 422. Sending `0` or `null` is always accepted.
+	Capacity    *int                 `json:"capacity,omitempty"`
+	CategoryIds *[]PositiveIntegerId `json:"category_ids,omitempty"`
+
+	// Currency Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose.
+	Currency string `json:"currency"`
+
+	// DeliveryMethod "Ticket type". `VOUCHER` = one ticket per booking; `TICKET` = one per guest. Asking for `TICKET` requires the `update_delivery_method` permission; sending `VOUCHER`, or omitting the field, does not — both take the column default.
+	DeliveryMethod *CreateBookableProductRequestDeliveryMethod `json:"delivery_method,omitempty"`
+
+	// Description Defaults to empty string server-side when omitted (central_products.description is NOT NULL). Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Description *string `json:"description,omitempty"`
+
+	// Displayable Whether the product is shown in widgets / catalog.
+	Displayable *bool `json:"displayable,omitempty"`
+	DryRun      *bool `json:"dry_run,omitempty"`
+
+	// Exclusions Plain text — what's not included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Exclusions *string `json:"exclusions,omitempty"`
+
+	// FromPrice Minor units.
+	FromPrice *int `json:"from_price,omitempty"`
+
+	// FromPriceLabel Caption shown next to `from_price` (e.g., `From €50/person`).
+	FromPriceLabel *string `json:"from_price_label,omitempty"`
+
+	// Inclusions Plain text — what's included. One bullet per newline. Translatable. NOT rich-text — payloads containing HTML tags are rejected with 422. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Inclusions *string `json:"inclusions,omitempty"`
+
+	// Instructions Rich text shown to confirmed customers. Translatable. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Instructions *string `json:"instructions,omitempty"`
+
+	// IsPricedPerPerson `true` = price applies per traveler; `false` = price applies per group/booking. Implicitly forced to `true` when `is_private=false`.
+	IsPricedPerPerson *bool `json:"is_priced_per_person,omitempty"`
+
+	// IsPrivate `true` = a single party books the whole experience (private); `false` = multiple parties share the slot (shared). When `false`, `is_priced_per_person` is forced to `true` and `use_alternate_tier_pricing` to `false` regardless of what the caller supplied.
+	IsPrivate *bool `json:"is_private,omitempty"`
+
+	// IsTierPriced Whether quantity-based pricing tiers apply.
+	IsTierPriced *bool `json:"is_tier_priced,omitempty"`
+
+	// Locale Default content locale for this product (e.g., `en`).
+	Locale *string `json:"locale,omitempty"`
+
+	// MustValidateCancellationPolicy Customer must explicitly accept the cancellation policy at checkout. When `false`, both `cancellation_policy` and `cancellation_policy_link` are nulled regardless of what the caller supplied — set `true` to retain a policy.
+	MustValidateCancellationPolicy *bool `json:"must_validate_cancellation_policy,omitempty"`
+
+	// Options Bookable variants — a departure time band, a boat, a language, a difficulty. Departures, prices and questions hang off these, not off the product.
+	Options *[]struct {
+		// Capacity How many people ONE departure of this option takes. The PRODUCT's own `capacity` is a pool shared across concurrent departures and means something else.
+		Capacity *int `json:"capacity,omitempty"`
+		MaxAge   *int `json:"max_age,omitempty"`
+		MinAge   *int `json:"min_age,omitempty"`
+
+		// OptionCode Auto-generated from the title plus a random suffix when omitted, **on the real write only** — a `dry_run` returns null, for the reason `CreateProductRequest.product_code` documents.
+		OptionCode *string `json:"option_code,omitempty"`
+
+		// Title Stored in `product_options.name`.
+		Title string `json:"title"`
+	} `json:"options,omitempty"`
+
+	// PricingCategories Customer-facing price buckets. Each creates the category AND one open-ended PricingTier (`min: 1`, `max: null`) at `amount`, because a category with no tier is invisible to the booking widget. All are created with `is_internal: false`; the key is not accepted.
+	PricingCategories *[]struct {
+		// Amount The tier's `fare`, in minor units. Spelled `amount_minor` on the MCP/assistant surface, which refuses the bare name.
+		Amount Money `json:"amount"`
+		MaxAge *int  `json:"max_age,omitempty"`
+		MinAge *int  `json:"min_age,omitempty"`
+
+		// Name Wrapped server-side into the `{"en": "..."}` translation bag.
+		Name string                                             `json:"name"`
+		Type *CreateBookableProductRequestPricingCategoriesType `json:"type,omitempty"`
+	} `json:"pricing_categories,omitempty"`
+
+	// ProductCode Tenant-supplied SKU. Auto-generated from title when omitted, on the real write only — a dry run echoes null.
+	ProductCode *string `json:"product_code,omitempty"`
+
+	// RedemptionMethod How the customer is admitted. Asking for `DIGITAL` or `PRINT` requires the `update_delivery_method` permission — the same one gates both ticketing fields, matching the form they live on. Sending `MANIFEST`, or omitting the field, does not.
+	RedemptionMethod *CreateBookableProductRequestRedemptionMethod `json:"redemption_method,omitempty"`
+
+	// Requirements Rich text — what the customer needs. Translatable. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
+	Requirements *string `json:"requirements,omitempty"`
+
+	// ScheduleType `date` for date-only products; `datetime` for products with a starting time.
+	ScheduleType *CreateBookableProductRequestScheduleType `json:"schedule_type,omitempty"`
+
+	// ShowLastTier Whether the last tier is displayed in customer-facing pricing.
+	ShowLastTier *bool `json:"show_last_tier,omitempty"`
+
+	// Status Translates to the underlying `is_active` boolean.
+	Status   *CreateBookableProductRequestStatus `json:"status,omitempty"`
+	Timezone *string                             `json:"timezone,omitempty"`
+	Title    string                              `json:"title"`
+
+	// UseAlternateTierPricing Keys the pricing tier on the TOTAL party size instead of the per-category quantity. Only valid on a product that is both `is_priced_per_person: true` and `is_tier_priced: true` — anything else is refused with 422. Implicitly forced to `false` when `is_private=false`, so in practice this only applies to private products.
+	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
+}
+
+// CreateBookableProductRequestDeliveryMethod "Ticket type". `VOUCHER` = one ticket per booking; `TICKET` = one per guest. Asking for `TICKET` requires the `update_delivery_method` permission; sending `VOUCHER`, or omitting the field, does not — both take the column default.
+type CreateBookableProductRequestDeliveryMethod string
+
+// CreateBookableProductRequestPricingCategoriesType defines model for CreateBookableProductRequest.PricingCategories.Type.
+type CreateBookableProductRequestPricingCategoriesType string
+
+// CreateBookableProductRequestRedemptionMethod How the customer is admitted. Asking for `DIGITAL` or `PRINT` requires the `update_delivery_method` permission — the same one gates both ticketing fields, matching the form they live on. Sending `MANIFEST`, or omitting the field, does not.
+type CreateBookableProductRequestRedemptionMethod string
+
+// CreateBookableProductRequestScheduleType `date` for date-only products; `datetime` for products with a starting time.
+type CreateBookableProductRequestScheduleType string
+
+// CreateBookableProductRequestStatus Translates to the underlying `is_active` boolean.
+type CreateBookableProductRequestStatus string
+
 // CreateDiscountRequest Provide exactly one of `discounted_price` (fixed-amount) or
 // `discount_pct` (percentage). Server returns 422 if both or neither
 // are provided. `product_option_id` null = global discount; otherwise
@@ -3279,8 +3821,15 @@ type CreateLocationRequest struct {
 	// accepted too, and deliberately not advertised: the string
 	// spelling covers every `attach_to`, so a client generated from
 	// this document can always send one.
-	AttachToId    string   `json:"attach_to_id"`
-	City          *string  `json:"city,omitempty"`
+	AttachToId string  `json:"attach_to_id"`
+	City       *string `json:"city,omitempty"`
+
+	// CountryCode ISO 3166-1 alpha-2, alpha-3, or an English country name. Normalised
+	// to **alpha-3** before persisting (`CH` → `CHE`), which is the shape
+	// the column holds and every reader assumes; the dry-run preview
+	// shows the normalised value. 422 if it resolves to no country.
+	// Before 1.41.0 this was declared as exactly two characters and
+	// stored verbatim — see **Changes**.
 	CountryCode   *string  `json:"country_code,omitempty"`
 	DryRun        *bool    `json:"dry_run,omitempty"`
 	GooglePlaceId *string  `json:"google_place_id,omitempty"`
@@ -3318,8 +3867,11 @@ type CreatePricingCategoryRequest struct {
 	DryRun     *bool                            `json:"dry_run,omitempty"`
 	IsInternal *bool                            `json:"is_internal,omitempty"`
 	MaxAge     *int                             `json:"max_age,omitempty"`
-	MinAge     *int                             `json:"min_age,omitempty"`
-	Name       string                           `json:"name"`
+
+	// MaxPerResource Optional; null or omitted is no limit.
+	MaxPerResource *int   `json:"max_per_resource,omitempty"`
+	MinAge         *int   `json:"min_age,omitempty"`
+	Name           string `json:"name"`
 
 	// ProductId A positive integer id, in either spelling this API accepts.
 	//
@@ -3400,6 +3952,7 @@ type CreatePricingTierRequest struct {
 // description or published/draft flag of its own — those live on the
 // parent Product.
 type CreateProductOptionRequest struct {
+	// Capacity How many people ONE departure of this schedule takes. Unrelated to the product's own `capacity`, which pools seats across concurrent departures.
 	Capacity *int  `json:"capacity,omitempty"`
 	DryRun   *bool `json:"dry_run,omitempty"`
 	MaxAge   *int  `json:"max_age,omitempty"`
@@ -3463,14 +4016,30 @@ type CreateProductOptionRequest struct {
 // Measured in BYTES. `maxLength` here is a character count, so for
 // non-ASCII text the server may refuse a value this schema accepts —
 // validate on byte length if you gate locally.
+//
+// One field is REFUSED (`422`) rather than ignored:
+//
+//   - `allocation_mode` — how many resources one booking may take. A
+//     spanning mode needs two or more capacity-bearing ASSETS on one
+//     schedule, and a product created in a single call has no schedules
+//     yet, let alone resources on them, so no value but the default could
+//     ever be honoured here. Create the product, create its schedules,
+//     attach the assets, then send it to `PATCH /products/{id}`. Refused
+//     rather than dropped because dropping it is the bug: the caller would
+//     be told the product saved with a fleet mode it does not have.
+//
+// The refusal is INHERITED by `POST /products/bookable`, which creates the
+// schedules but never the resources, so the same sequence applies there.
 type CreateProductRequest struct {
 	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link`. Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
 
 	// CancellationPolicyLink External URL with the policy. Mutually exclusive with `cancellation_policy`.
-	CancellationPolicyLink *string              `json:"cancellation_policy_link,omitempty"`
-	Capacity               *int                 `json:"capacity,omitempty"`
-	CategoryIds            *[]PositiveIntegerId `json:"category_ids,omitempty"`
+	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
+
+	// Capacity The capacity all of this product's schedules SHARE: a pool across CONCURRENT departures of this product, not how many people one departure takes, which is the product option's own `capacity`. A positive value makes the booking engine subtract the booked quantity of every OVERLAPPING departure of the product from this pool, so two departures that overlap in time compete for it. `0` or `null` means not shared, which is the default, and a `null` is stored as `0`. A value above 0 needs a plan that includes shared capacity between schedules (Starter and above); on free and legacy it is a 422. Sending `0` or `null` is always accepted.
+	Capacity    *int                 `json:"capacity,omitempty"`
+	CategoryIds *[]PositiveIntegerId `json:"category_ids,omitempty"`
 
 	// Currency Required, but not stored — `products` has no currency column. It must equal the account currency (`meta.currency`) or the request is refused with 422. There is no per-product currency to choose.
 	Currency string `json:"currency"`
@@ -3697,11 +4266,24 @@ type CreateWorkflowStepRequest struct {
 
 	// ConditionType Required for CONDITION step_type.
 	ConditionType *CreateWorkflowStepRequestConditionType `json:"condition_type,omitempty"`
-	Config        *map[string]interface{}                 `json:"config,omitempty"`
-	DryRun        *bool                                   `json:"dry_run,omitempty"`
-	Order         int                                     `json:"order"`
-	ParentStepId  *PositiveIntegerId                      `json:"parent_step_id,omitempty"`
-	StepType      CreateWorkflowStepRequestStepType       `json:"step_type"`
+
+	// Config The node's own settings. There is NO fixed shape and no listed
+	// properties: `config` is validated against the resolved trigger's or
+	// action's own `rules()`, those differ per node, and which nodes exist at
+	// all depends on the account's plan — so no document can enumerate the
+	// keys.
+	//
+	// Read the shape from `GET /workflow-nodes` (MCP:
+	// `inventory_workflow_list` with `resource: workflow-nodes`), which
+	// returns every trigger and action with its `step_type` and the `config`
+	// it needs. Guessing is not a near miss: an `action_type` outside that
+	// catalogue is a 422, and a config that does not match the node's rules is
+	// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+	Config       *WorkflowNodeConfig               `json:"config,omitempty"`
+	DryRun       *bool                             `json:"dry_run,omitempty"`
+	Order        int                               `json:"order"`
+	ParentStepId *PositiveIntegerId                `json:"parent_step_id,omitempty"`
+	StepType     CreateWorkflowStepRequestStepType `json:"step_type"`
 }
 
 // CreateWorkflowStepRequestBranchType Required when parent_step_id is set.
@@ -3733,9 +4315,20 @@ type CreateWorkflowStepRequestStepType string
 type CreateWorkflowTriggerRequest struct {
 	ActionType CreateWorkflowTriggerRequestActionType `json:"action_type"`
 
-	// Config Validated against the resolved trigger's rules() schema.
-	Config *map[string]interface{} `json:"config,omitempty"`
-	DryRun *bool                   `json:"dry_run,omitempty"`
+	// Config The node's own settings. There is NO fixed shape and no listed
+	// properties: `config` is validated against the resolved trigger's or
+	// action's own `rules()`, those differ per node, and which nodes exist at
+	// all depends on the account's plan — so no document can enumerate the
+	// keys.
+	//
+	// Read the shape from `GET /workflow-nodes` (MCP:
+	// `inventory_workflow_list` with `resource: workflow-nodes`), which
+	// returns every trigger and action with its `step_type` and the `config`
+	// it needs. Guessing is not a near miss: an `action_type` outside that
+	// catalogue is a 422, and a config that does not match the node's rules is
+	// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+	Config *WorkflowNodeConfig `json:"config,omitempty"`
+	DryRun *bool               `json:"dry_run,omitempty"`
 }
 
 // CreateWorkflowTriggerRequestActionType defines model for CreateWorkflowTriggerRequest.ActionType.
@@ -3922,13 +4515,29 @@ type Error struct {
 	// BOOKING_ALREADY_CANCELLED, REFUND_AMOUNT_EXCEEDS_CHARGE,
 	// REFUND_REQUIRES_STRIPE_CHARGE, NO_CHARGE_FOUND,
 	// POLICY_AUTO_NOT_READY, BOOKING_RESOURCE_STATE_STALE,
-	// BOOKING_RESOURCE_CONFLICT, GIFT_CERT_ALREADY_REDEEMED,
+	// BOOKING_RESOURCE_CONFLICT, BOOKING_RESOURCE_REQUEST_INVALID,
+	// GIFT_CERT_ALREADY_REDEEMED,
 	// DISCOUNT_NOT_APPLICABLE.
+	//
+	// Booking lifecycle writes:
+	// CAPACITY_UNAVAILABLE, DEPOSIT_EXCEEDS_TOTAL,
+	// DESTINATION_ALREADY_STARTED, PRODUCT_OPTION_CHANGE_NOT_SUPPORTED,
+	// BOOKING_HAS_NO_DEPARTURE, DEPARTURE_NOT_BOOKABLE,
+	// NO_RESOURCE_AVAILABLE (retriable),
+	// POOL_BACKED_ATTRIBUTE_NOT_EDITABLE.
 	//
 	// Catalogue and inventory:
 	// PRODUCT_BEING_DUPLICATED, TICKET_REISSUE_NOT_CONFIRMED,
 	// AVAILABILITY_HAS_ACTIVE_BOOKING, AVAILABILITY_HAS_CONFIRMED_BOOKING,
 	// RESOURCE_IN_USE.
+	//
+	// Plan entitlement:
+	// PLAN_LIMIT_REACHED (403). Distinct from FORBIDDEN on purpose: that
+	// one means this token or role may not do it, this one means the
+	// ACCOUNT has run out. The next step differs — a role change under
+	// Settings > Roles, versus an upgrade or a deletion — and `details`
+	// carries `plan_item`, `limit` and `current` so a client can say which
+	// and by how much.
 	//
 	// Workflows:
 	// WORKFLOW_NOT_ACTIVATABLE, WORKFLOW_NOT_EDITABLE,
@@ -4115,12 +4724,21 @@ type ListBookingsIncludeParam1 = []ListBookingsIncludeItem
 // a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
 // `MEETING` — earlier spec drafts listed it but it was never a valid
 // value; the column write would silently coerce to NULL).
-// `address` is a derived accessor (`getAddressAttribute()` composing
-// `street_address` + city + country). `timezone` and `notes` have no
-// underlying columns and read as null today.
+// `address` is a derived accessor (`getAddressAttribute()`, which
+// interpolates `street_address`, `city` and `country` — there is no
+// `country` column, so that last part is always empty and `address`
+// carries a trailing space). Read the components individually instead.
+// `timezone` and `notes` have no underlying columns and read as null
+// today.
 type Location struct {
-	// Address Derived from `street_address` (+ optional city/country).
-	Address       *string    `json:"address,omitempty"`
+	// Address Derived from `street_address` + `city`. Prefer the component fields.
+	Address *string `json:"address,omitempty"`
+	City    *string `json:"city,omitempty"`
+
+	// CountryCode ISO 3166-1 **alpha-3**, whatever shape was sent to the create
+	// endpoint. Added in 1.41.0; before that these four address columns
+	// were writable but absent from every read.
+	CountryCode   *string    `json:"country_code,omitempty"`
 	CreatedAt     *time.Time `json:"created_at,omitempty"`
 	GooglePlaceId *string    `json:"google_place_id,omitempty"`
 	Id            *string    `json:"id,omitempty"`
@@ -4129,7 +4747,9 @@ type Location struct {
 	Name          *string    `json:"name,omitempty"`
 
 	// Notes Always null today — no underlying column.
-	Notes *string `json:"notes,omitempty"`
+	Notes      *string `json:"notes,omitempty"`
+	PostalCode *string `json:"postal_code,omitempty"`
+	Region     *string `json:"region,omitempty"`
 
 	// Timezone Always null today — no underlying column.
 	Timezone *string       `json:"timezone,omitempty"`
@@ -4312,7 +4932,10 @@ type PricingCategory struct {
 	// IsInternal Internal categories are excluded from public-facing checkout flows.
 	IsInternal *bool `json:"is_internal,omitempty"`
 	MaxAge     *int  `json:"max_age,omitempty"`
-	MinAge     *int  `json:"min_age,omitempty"`
+
+	// MaxPerResource How many guests of this category one resource may carry on a product that spreads a party over resources (1 Driver per jet ski); null is no limit. Since 1.50.0.
+	MaxPerResource *int `json:"max_per_resource,omitempty"`
+	MinAge         *int `json:"min_age,omitempty"`
 
 	// Name Translatable; English value returned.
 	Name      *string              `json:"name,omitempty"`
@@ -4333,6 +4956,9 @@ type PricingCategoryCompanion struct {
 
 	// MinQuantity Guests of `category_id` needed in the booking for this link to be met.
 	MinQuantity int `json:"min_quantity"`
+
+	// SameResource `true` when those guests must also sit on every resource that carries one of this category (a Passenger needs a Driver on their own jet ski), not just be in the booking. Since 1.49.0.
+	SameResource bool `json:"same_resource"`
 }
 
 // PricingCategoryCompanionInput One "Must travel with" link on a write. `category_id` must be another
@@ -4356,6 +4982,10 @@ type PricingCategoryCompanionInput struct {
 	// generates from this document can fail to be accepted.
 	CategoryId  PositiveIntegerId `json:"category_id"`
 	MinQuantity int               `json:"min_quantity"`
+
+	// SameResource Optional. Omitted, the link keeps its stored value (`false` for a
+	// new link); send `false` explicitly to switch it off.
+	SameResource *bool `json:"same_resource,omitempty"`
 }
 
 // PricingCategoryPage defines model for PricingCategoryPage.
@@ -4448,12 +5078,39 @@ type PricingTierPage struct {
 // meant to change something else entirely. Shorten or clear the named
 // field; retrying the same body cannot succeed.
 type Product struct {
+	// AllocationMode How many resources ONE booking may occupy, as the operator
+	// CONFIGURED it. `single_resource` = a party has to fit inside one
+	// resource (two boats of 3 seat six people but cannot take a group of
+	// four); `homogeneous_multi` = a party is spread across several
+	// interchangeable units of the same size, and is CHARGED FOR EACH ONE
+	// on a product priced per group (five riders take three 2-seat jet
+	// skis and pay three times).
+	//
+	// This is the stored column, not the behaviour. Read
+	// `spans_several_resources` for what the platform is actually doing —
+	// they differ behind four gates that all degrade silently. Null only
+	// on the unsaved preview a `dry_run` create returns; the column is NOT
+	// NULL with a `single_resource` default, so a persisted row always has
+	// one.
+	AllocationMode *ProductAllocationMode `json:"allocation_mode,omitempty"`
+
+	// CanBeSold Whether this product is actually on sale. Read from the
+	// `can_be_sold` column, which is what every selling surface filters
+	// on, and re-derived by `Product::updateCanBeSold()` on each write.
+	//
+	// A create answers `false`: a brand-new product has no departures and
+	// no main photo, whatever else was supplied. Read `readiness` to find
+	// out what is still missing rather than inferring it.
+	CanBeSold *bool `json:"can_be_sold,omitempty"`
+
 	// CancellationPolicy Inline policy text. Mutually exclusive with `cancellation_policy_link` in the UI.
 	CancellationPolicy *string `json:"cancellation_policy,omitempty"`
 
 	// CancellationPolicyLink External URL with the policy. Mutually exclusive with `cancellation_policy` in the UI.
 	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
-	Capacity               *int    `json:"capacity,omitempty"`
+
+	// Capacity The capacity all of this product's schedules share. `0` or `null` means the schedules do not share one.
+	Capacity *int `json:"capacity,omitempty"`
 
 	// CategoryIds IDs of attached `ProductCategory` rows; empty array when the relation isn't eager-loaded.
 	CategoryIds *[]string  `json:"category_ids,omitempty"`
@@ -4507,6 +5164,35 @@ type Product struct {
 	// ProductCode Tenant-supplied SKU. Auto-generated when `CreateProductRequest` omits it.
 	ProductCode *string `json:"product_code,omitempty"`
 
+	// Readiness What the product is still missing, from
+	// `App\Support\Inventory\ProductReadiness`.
+	//
+	// `blocking` is the subset that stops a sale: empty means the product
+	// sells, and it is the live answer where `can_be_sold` is the stored
+	// one — the two differ only in the window between a related write and
+	// its recompute.
+	//
+	// `missing` additionally carries `no_future_departure`, which is NOT
+	// blocking: it is true of every product a seasonal operator owns in
+	// the off-season, and it is the most common reason an operator reports
+	// that a product has disappeared. Do not treat the two lists as
+	// interchangeable.
+	Readiness *struct {
+		// Blocking The `missing` entries that stop a sale, in the same order. `can_be_sold` is exactly `blocking == []`.
+		Blocking *[]string `json:"blocking,omitempty"`
+
+		// Missing `inactive` — not published. `no_option` — no schedule, and
+		// departures, prices and questions all hang off one.
+		// `no_departure` — nothing to book. `no_future_departure` — has
+		// departures, none upcoming (advisory). `no_pricing_category` —
+		// no customer-facing category. `no_priced_category` — has
+		// categories but none with a pricing tier, which the booking
+		// widget filters out, so the product page renders nothing
+		// bookable. `no_main_photo` — the widget requires one.
+		// `no_uuid` — internal data fault, not operator-actionable.
+		Missing *[]ProductReadinessMissing `json:"missing,omitempty"`
+	} `json:"readiness,omitempty"`
+
 	// RedemptionMethod How the customer proves they are booked: `MANIFEST` = no identification needed, `DIGITAL` = digital or printed tickets accepted, `PRINT` = printed only. Null only on a `dry_run` create preview; the column defaults to `MANIFEST`.
 	RedemptionMethod *ProductRedemptionMethod `json:"redemption_method,omitempty"`
 
@@ -4519,6 +5205,28 @@ type Product struct {
 	// ShowLastTier Whether the last tier is displayed in customer-facing pricing.
 	ShowLastTier *bool `json:"show_last_tier,omitempty"`
 
+	// SpansSeveralResources Whether a booking on this product may actually span several
+	// resources RIGHT NOW — `Product::allocationStrategy()`, the value
+	// every pricing, capacity and channel read goes through.
+	//
+	// `false` while `allocation_mode` is `homogeneous_multi` means the
+	// configuration is not being honoured, and all four reasons are
+	// account- or product-level rather than anything in the payload: the
+	// `MultiResourceAllocation` account feature is off, the product sets a
+	// shared `capacity` above 0, a schedule gives a capacity to a guide or
+	// a piece of equipment rather than an asset, or the Payroll app is
+	// installed on a product whose schedule has several guides. Each one
+	// degrades SILENTLY by design — half-applying a mode nothing
+	// downstream supports is worse — so the only way to tell is to read
+	// this key. `PATCH /products/{id}` names the specific reason in its
+	// 422 when you try to SET a mode one of them blocks.
+	//
+	// NEVER quote a party's price from `allocation_mode`. On a
+	// per-group-priced product the number of units a party takes is the
+	// number of groups it pays for, and a party that spans nothing pays
+	// once.
+	SpansSeveralResources *bool `json:"spans_several_resources,omitempty"`
+
 	// Status Derived from `is_active` (`true` → published, `false` → draft).
 	Status    *ProductStatus `json:"status,omitempty"`
 	Timezone  *string        `json:"timezone,omitempty"`
@@ -4529,8 +5237,27 @@ type Product struct {
 	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
 
+// ProductAllocationMode How many resources ONE booking may occupy, as the operator
+// CONFIGURED it. `single_resource` = a party has to fit inside one
+// resource (two boats of 3 seat six people but cannot take a group of
+// four); `homogeneous_multi` = a party is spread across several
+// interchangeable units of the same size, and is CHARGED FOR EACH ONE
+// on a product priced per group (five riders take three 2-seat jet
+// skis and pay three times).
+//
+// This is the stored column, not the behaviour. Read
+// `spans_several_resources` for what the platform is actually doing —
+// they differ behind four gates that all degrade silently. Null only
+// on the unsaved preview a `dry_run` create returns; the column is NOT
+// NULL with a `single_resource` default, so a persisted row always has
+// one.
+type ProductAllocationMode string
+
 // ProductDeliveryMethod "Ticket type" in the dashboard. `VOUCHER` = one ticket for the whole booking; `TICKET` = one per guest. Decides the shape of the QR tokens a booking carries, and therefore how attendance is counted. Null only on the unsaved preview a `dry_run` create returns — the column has a `VOUCHER` default, so a persisted row always has one.
 type ProductDeliveryMethod string
+
+// ProductReadinessMissing defines model for Product.Readiness.Missing.
+type ProductReadinessMissing string
 
 // ProductRedemptionMethod How the customer proves they are booked: `MANIFEST` = no identification needed, `DIGITAL` = digital or printed tickets accepted, `PRINT` = printed only. Null only on a `dry_run` create preview; the column defaults to `MANIFEST`.
 type ProductRedemptionMethod string
@@ -4556,7 +5283,13 @@ type ProductOption struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	Id        *string    `json:"id,omitempty"`
 	MaxAge    *int       `json:"max_age,omitempty"`
-	MinAge    *int       `json:"min_age,omitempty"`
+
+	// MaxTravelers Largest party this schedule accepts, and one of the caps a slot's available capacity is narrowed by — a caller sizing a booking without it can propose a party the slot refuses. `0` in storage means unset and is published as null.
+	MaxTravelers *int `json:"max_travelers,omitempty"`
+	MinAge       *int `json:"min_age,omitempty"`
+
+	// MinTravelers Smallest party this schedule accepts. `0` in storage means unset and is published as null.
+	MinTravelers *int `json:"min_travelers,omitempty"`
 
 	// OptionCode Tenant-supplied SKU. Auto-generated from the title slug + random suffix when omitted on create.
 	OptionCode *string `json:"option_code,omitempty"`
@@ -4670,6 +5403,56 @@ type RefundBookingRequest struct {
 
 	// TransactionId Specific charge to refund (otherwise newest succeeded charge). `booking_transactions.id` is a UUID.
 	TransactionId *openapi_types.UUID `json:"transaction_id,omitempty"`
+}
+
+// RescheduleBookingRequest Mirrors `RescheduleBookingRequest::rules()`.
+//
+// Four fields are REFUSED rather than ignored, each with a message naming
+// where the operation belongs: `product_option_id` (the destination
+// departure determines the option, and an option change is not available
+// here), `prices` / `price` (an in-place move never reprices) and
+// `extras` / `guests` (the booking keeps its own; change them with
+// `PATCH /bookings/{id}`).
+//
+// Numeric fields validate as `numeric` BEFORE `integer`, because
+// Laravel's `integer` stringifies first and a JSON `true` would otherwise
+// pass as `"1"`.
+type RescheduleBookingRequest struct {
+	// AvailabilityId The DESTINATION departure. Required. It also determines the product
+	// option, which is why none is accepted separately — and why a
+	// destination belonging to a different option is a `422`.
+	AvailabilityId int `json:"availability_id"`
+
+	// Comments A note on the move. Recorded on the reschedule ledger, as the
+	// fallback used when `reschedule_notes` is **omitted** — send
+	// `reschedule_notes: ""` to record a deliberately blank note instead
+	// of falling back to this one.
+	//
+	// It does **not** amend the booking's own `comments` field, which only
+	// `PATCH /bookings/{id}` writes. Whichever note is recorded appears in
+	// this operation's `diff.after.reschedules[]`, which is where to
+	// confirm it landed.
+	Comments *string `json:"comments,omitempty"`
+
+	// DryRun Preview without writing. Returns `would_apply: true` with the
+	// before/after diff and the side effects the real call would cause.
+	// No idempotency row is written for a dry run.
+	DryRun       *bool `json:"dry_run,omitempty"`
+	NotifyAdmins *bool `json:"notify_admins,omitempty"`
+
+	// NotifyCustomer Defaults ON. `BookingRescheduled` is dispatched after the
+	// transaction commits, so a move that fails sends nothing.
+	NotifyCustomer *bool `json:"notify_customer,omitempty"`
+
+	// RescheduleNotes Why the booking moved. Recorded on the reschedule ledger and
+	// readable back in this operation's `diff.after.reschedules[]`; it
+	// does not touch the booking's `comments`.
+	RescheduleNotes *string `json:"reschedule_notes,omitempty"`
+
+	// ResourceId Reassign the guide or asset as part of the move. Omit to let the
+	// engine reassign automatically; it preserves the original assignment
+	// source when the resource is unchanged.
+	ResourceId *int `json:"resource_id,omitempty"`
 }
 
 // Resource Physical or human inventory bound to a ProductOption (a boat, a
@@ -4856,6 +5639,157 @@ type SegmentPage struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+// StoreBookingRequest Mirrors `StoreBookingRequest::rules()`, which is itself derived from
+// `Create::rules()`, `getBookingParameters()` and
+// `getReservationParameters()`.
+//
+// Send either `customer_id` for an existing customer or `customer` to
+// create one. Sending both, or neither, is a `422`.
+//
+// Seven fields are REFUSED rather than ignored, each with a message naming
+// where the operation belongs: `prices`, `price` (fares come from pricing
+// policy), `voucher` (use `partner_id`), `existingPm` and
+// `payment_method_id` (no card path exists here), `quantity` (derived from
+// `guests`) and `customer.locales` (send `locales` at the top level). A
+// refused field is a `422`, never a silent drop. `deposit`,
+// `payment_method` and `payment_notes` are refused conditionally too, on
+// `booking_type: reservation`, and `expiry` on `booking_type: booking`.
+//
+// Numeric fields validate as `numeric` BEFORE `integer`. Laravel's
+// `integer` rule stringifies first, so a JSON `true` would otherwise pass
+// as `"1"` — and over MCP the arguments are real JSON, so a boolean guest
+// count is reachable. A numeric string (`"2"`) is still accepted.
+type StoreBookingRequest struct {
+	// Answers Answers to the product's custom booking questions, keyed by question
+	// id. The value's shape is the QUESTION's — a string, a date, a list of
+	// selected options — so it is per-tenant and cannot be enumerated here.
+	// Read the questions with `GET /questions?product_id=` first.
+	Answers *map[string]interface{} `json:"answers,omitempty"`
+
+	// AvailabilityId The departure to book. Required.
+	AvailabilityId int `json:"availability_id"`
+
+	// BookingType `booking` is a real booking; `reservation` is a hold that expires.
+	// Only a reservation accepts `expiry`.
+	BookingType StoreBookingRequestBookingType `json:"booking_type"`
+	BrandingId  *int                           `json:"branding_id,omitempty"`
+	Comments    *string                        `json:"comments,omitempty"`
+
+	// Currency Required alongside a NON-ZERO `deposit`, and must equal the account
+	// currency. `deposit: 0` records no money, so it needs no currency.
+	// There is one currency per account and only CaptainBook support can
+	// change it.
+	Currency *string `json:"currency,omitempty"`
+
+	// Customer Create a new customer. Mutually exclusive with `customer_id`.
+	Customer *struct {
+		// Country ISO 3166-1 alpha-2.
+		Country string `json:"country"`
+
+		// Email Validated as RFC only. The dashboard additionally resolves DNS; this endpoint does not, because a live lookup on an API path fails closed on a resolver blip.
+		Email *openapi_types.Email `json:"email,omitempty"`
+		Name  string               `json:"name"`
+
+		// Phone International format.
+		Phone   *string `json:"phone,omitempty"`
+		ZipCode *string `json:"zip_code,omitempty"`
+	} `json:"customer,omitempty"`
+
+	// CustomerId An existing customer, by UUID — `customers.id` is a UUID, not an
+	// integer, unlike every other id on this request. Mutually exclusive
+	// with `customer`. Take it from `customer.id` on a booking read or
+	// from `GET /customers`.
+	CustomerId *openapi_types.UUID `json:"customer_id,omitempty"`
+
+	// Deposit Money ALREADY RECEIVED — the cash handed over at the desk — in the
+	// account currency's MINOR units, like every other money field here
+	// (`2000` = 20.00 EUR; `2000` = 2000 JPY). It is not a charge and
+	// nothing is taken. A NON-ZERO deposit requires `currency`, which must
+	// be the account's —
+	// it is validated and NOT converted: the amount is recorded exactly as
+	// sent, so the hosted-checkout link bills the difference you expect.
+	// (The stored transaction's own `currency` column reads the platform
+	// default rather than the account's, on every surface including the
+	// dashboard — captainbook#8835. That is a platform-wide inaccuracy
+	// this endpoint inherits; recording the amount faithfully is the half
+	// it can guarantee.)
+	// Refused with `DEPOSIT_EXCEEDS_TOTAL` above the booking's computed
+	// total. Spelled `deposit_minor` by the CaptainbookAI propose tool,
+	// which refuses the bare name so a major-unit amount cannot be read
+	// as minor; the MCP inventory tools take `deposit`, as here.
+	//
+	// **`booking_type: booking` only.** A reservation records no payment,
+	// so `deposit`, `payment_method` and `payment_notes` are all refused
+	// with a `422` on one — refused rather than accepted and dropped,
+	// which is what they were.
+	Deposit *int `json:"deposit,omitempty"`
+
+	// DryRun Preview without writing. Returns `would_apply: true` with the
+	// before/after diff and the side effects the real call would cause.
+	// No idempotency row is written for a dry run, so the same
+	// `Idempotency-Key` may be reused once on the real call.
+	DryRun *bool `json:"dry_run,omitempty"`
+
+	// Expiry **SECONDS** until a reservation lapses — `1800` is half an hour.
+	// The engine applies it with `addSeconds()` and the configured default
+	// is `600`, so seconds is the unit every surface here uses.
+	// **Required when `booking_type: reservation`** —
+	// `CreatesReservations` validates it as `required|numeric`, so a
+	// reservation without one is refused. Sending it with
+	// `booking_type: booking` is a `422`, not a silent drop.
+	Expiry *int `json:"expiry,omitempty"`
+
+	// Extras Add-ons to purchase, one entry per add-on. The product's mandatory
+	// extras are attached by the engine whether or not they appear here.
+	Extras *[]struct {
+		// ExtraId The add-on's id, from `GET /extras?product_id=`.
+		ExtraId int `json:"extraId"`
+
+		// Quantity How many of it. Omit the entry rather than sending 0.
+		Quantity int `json:"quantity"`
+	} `json:"extras,omitempty"`
+
+	// Guests Guest mix keyed by pricing category id, e.g. `{"3": 2, "4": 1}`.
+	// `quantity` is the sum and is not accepted separately.
+	Guests map[string]int `json:"guests"`
+
+	// IsRefundable Required, as on the dashboard form.
+	IsRefundable bool      `json:"is_refundable"`
+	Locales      *[]string `json:"locales,omitempty"`
+	NotifyAdmins *bool     `json:"notify_admins,omitempty"`
+
+	// NotifyCustomer Defaults ON. The confirmation is dispatched after the write commits,
+	// so a create that rolls back sends nothing.
+	NotifyCustomer *bool `json:"notify_customer,omitempty"`
+
+	// PartnerId Attributes the booking to a partner. Omit for a Direct booking,
+	// which records the authenticated user as the provider. The partner's
+	// commission comes from their own configuration; `voucher` is refused.
+	PartnerId *int `json:"partner_id,omitempty"`
+
+	// PaymentMethod How the customer is paying. Records intent; takes no payment.
+	// `card` is refused with `422` on every account — take card payments
+	// in the CaptainBook dashboard.
+	PaymentMethod *StoreBookingRequestPaymentMethod `json:"payment_method,omitempty"`
+	PaymentNotes  *string                           `json:"payment_notes,omitempty"`
+
+	// PrivateNotes Internal. Not shown to the customer.
+	PrivateNotes *string `json:"private_notes,omitempty"`
+
+	// ResourceId Omit for automatic assignment. Reassign later with
+	// `POST /bookings/{id}/resources`.
+	ResourceId *int `json:"resource_id,omitempty"`
+}
+
+// StoreBookingRequestBookingType `booking` is a real booking; `reservation` is a hold that expires.
+// Only a reservation accepts `expiry`.
+type StoreBookingRequestBookingType string
+
+// StoreBookingRequestPaymentMethod How the customer is paying. Records intent; takes no payment.
+// `card` is refused with `422` on every account — take card payments
+// in the CaptainBook dashboard.
+type StoreBookingRequestPaymentMethod string
+
 // TicketReissue Present on `PATCH /products/{id}` — both the dry-run preview and the
 // committed response — ONLY when the request moves `delivery_method`.
 // Absent when the field is omitted, or carries the value the product
@@ -4988,6 +5922,77 @@ type UpdateAvailableGiftCertRequest struct {
 	Name                   *string `json:"name,omitempty"`
 }
 
+// UpdateBookingRequest Mirrors `UpdateBookingRequest::rules()`. **At least one of `comments`,
+// `private_notes` or `custom_attributes` must be present** — a request
+// carrying none of them is a `422`, not a `200` with an empty diff,
+// because an agent reads a `200` as "applied". The check is on PRESENCE:
+// resending a value the booking already has is a `200` with matching diff
+// halves. `dry_run` alone is not a change.
+//
+// Amends a booking's notes and its operator metadata. Nothing here changes
+// what the customer gets or what they owe, so there is no capacity check
+// and no money recompute. **No notification is sent**, matching the
+// dashboard's edit form.
+//
+// Eight fields are REFUSED rather than ignored:
+//
+//   - `prices` / `price` — this endpoint edits what the customer gets,
+//     never what they owe.
+//   - `guests` / `extras` — DEFERRED, not rejected. Both have to recompute
+//     the booking's stored total afterwards, and that calculation is not
+//     yet available outside the dashboard. Change them there; this field
+//     opens once the calculation is shared.
+//   - `quantity` — follows the guest mix and cannot be set. The party
+//     size is dashboard-only on this endpoint, for the same reason
+//     `guests` is deferred: changing it has to recompute what the booking
+//     is worth.
+//   - `expiry` — a reservation's hold window is out of scope here.
+//   - `notify_admins` / `notify_customer` — an edit never notifies, so
+//     offering the flags would imply it might. To re-send the
+//     confirmation, use
+//     `POST /bookings/{id}/notifications/resend-confirmation`.
+//
+// Requires BOTH `update_booking` and `update_booking_after_date`. The
+// second one's name is misleading: the dashboard's edit form checks it on
+// every booking, not only a departed one, so this endpoint checks it too
+// rather than being wider than the screen.
+type UpdateBookingRequest struct {
+	// Comments Public notes. Send null to clear.
+	Comments *string `json:"comments,omitempty"`
+
+	// CustomAttributes Keyed by the attribute definition's SLUG, the same shape the booking
+	// read publishes. A PATCH: an omitted slug is left alone, and only the
+	// slugs you send are written. An unknown slug is a `422` listing the
+	// ones configured for THIS BOOKING's business unit — definitions are
+	// per unit, so a slug from another one is unknown here rather than
+	// mistyped — and `{}` is a `422` too: it satisfies "at least one field
+	// present" while changing nothing.
+	//
+	// Each value is validated against its definition's own type and rules
+	// (a `select` must be one of its options, a `date` must be `Y-m-d`,
+	// and any `validation_rules` the definition carries apply) — and the
+	// WHOLE payload is validated before any of it is written, so one bad
+	// value cannot leave the others half-applied.
+	//
+	// Clearing a field that carries a definition default reverts it TO
+	// that default rather than to empty. The dry run reports the default,
+	// not null.
+	//
+	// A definition backed by a code pool is refused with a `422`: those
+	// values change only through the atomic claim/release action, because
+	// the uniqueness constraint protects the pool table rather than the
+	// booking's copy. Writing one directly would leave the same code
+	// drawable for a second customer.
+	CustomAttributes *map[string]interface{} `json:"custom_attributes,omitempty"`
+
+	// DryRun Preview without writing. Not a change on its own — a request
+	// carrying only `dry_run` is a `422`.
+	DryRun *bool `json:"dry_run,omitempty"`
+
+	// PrivateNotes Internal notes, never shown to the customer. Send null to clear.
+	PrivateNotes *string `json:"private_notes,omitempty"`
+}
+
 // UpdateBookingResourcesRequest Normalized desired-state request for booking resource writes. Every
 // field is optional and an OMITTED field means "leave this kind alone" —
 // only what you send is reconciled.
@@ -5003,7 +6008,7 @@ type UpdateAvailableGiftCertRequest struct {
 //
 // | kind | on the product option | per booking | field |
 // | --- | --- | --- | --- |
-// | main | non-auxiliary, pivot capacity SET | exactly one | `main_resource_id` |
+// | main | non-auxiliary, pivot capacity SET | exactly one (one per unit on a product configured for several units; each row carries `seats`) | `main_resource_id` |
 // | equipment | non-auxiliary, pivot capacity NULL | many | `equipment_resource_ids` |
 // | auxiliary | `category = auxiliary` | many | `auxiliary_resource_ids` |
 //
@@ -5012,8 +6017,9 @@ type UpdateAvailableGiftCertRequest struct {
 // departure — an `equipment` resource is forced to a null capacity on
 // every write path, so the capacity split and the category agree.
 //
-// `main_resource_id` is singular because the booking holds one, and it
-// ASSIGNS: it replaces the current main resource if there is one and makes
+// `main_resource_id` is singular because a single-unit booking holds one
+// (a booking spread over several units holds one per unit, and names the
+// unit a new one replaces with `replaced_resource_id`), and it ASSIGNS: it replaces the current main resource if there is one and makes
 // the first assignment if there is not. There is no separate attach verb —
 // the request is the same sentence either way ("the main resource is now
 // X") and you should not have to read the booking's state to know which
@@ -5039,16 +6045,31 @@ type UpdateAvailableGiftCertRequest struct {
 // and the dry run reports it faithfully. Send the set you want alongside
 // `main_resource_id` if you need to keep a narrowed one.
 //
-// On a `409 BOOKING_RESOURCE_CONFLICT`, `error.details.rejections[]`
+// A booking on a product configured for several units can hold more than
+// one main resource — five riders over three jet skis. Each assigned row
+// then carries `seats`, and `main_resource_id` replaces ONE unit, so it
+// needs `replaced_resource_id` beside it to say which. The replacement
+// has to seat that unit's riders, not the whole party, and nothing else on
+// the booking moves: the other units, the equipment and their sources stay
+// as they were (there is no wholesale re-attach on this path).
+//
+// On a `409 BOOKING_RESOURCE_CONFLICT`, or a `422 BOOKING_RESOURCE_REQUEST_INVALID`
+// when the only rejections are `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` /
+// `REPLACED_RESOURCE_WITHOUT_MAIN`,
+// `error.details.rejections[]`
 // carries one entry per refused id with a `code`:
 //
 // | code | meaning |
 // | --- | --- |
 // | `<FIELD>_RESOURCE_NOT_ON_PRODUCT_OPTION` | the booking's product option does not carry that resource at all — attach it to the option first |
-// | `<FIELD>_RESOURCE_IS_MAIN` | it is a main resource (capacity-bearing). A booking holds one; use `main_resource_id` |
+// | `<FIELD>_RESOURCE_IS_MAIN` | it is a main resource (capacity-bearing), assigned through `main_resource_id` |
 // | `<FIELD>_RESOURCE_IS_EQUIPMENT` | it is equipment (no pivot capacity). Use `equipment_resource_ids` |
 // | `<FIELD>_RESOURCE_IS_AUXILIARY` | it is auxiliary. Use `auxiliary_resource_ids` |
 // | `MAIN_RESOURCE_NOT_AVAILABLE` | it IS a main resource on the option, but cannot take this booking — already on an overlapping departure, cannot host this party size, or inside a cool-off window |
+// | `MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` | the booking is spread over several units; name the one `main_resource_id` replaces with `replaced_resource_id` |
+// | `REPLACED_RESOURCE_NOT_HELD` | `replaced_resource_id` is not one of this booking's units |
+// | `REPLACED_RESOURCE_WITHOUT_MAIN` | `replaced_resource_id` was sent without a `main_resource_id` |
+// | `MAIN_RESOURCE_ALREADY_HELD` | `main_resource_id` names another unit this booking already holds; name one it does not hold |
 // | `AUXILIARY_RESOURCE_NOT_AVAILABLE` | it IS auxiliary on the option, but is on an overlapping departure or cannot host this party size |
 //
 // `<FIELD>` is `MAIN`, `EQUIPMENT` or `AUXILIARY` — the field you put the
@@ -5089,6 +6110,23 @@ type UpdateBookingResourcesRequest struct {
 	// is the safe direction — both still work if sent, and nothing a client
 	// generates from this document can fail to be accepted.
 	MainResourceId *PositiveIntegerId `json:"main_resource_id,omitempty"`
+
+	// ReplacedResourceId A positive integer id, in either spelling this API accepts.
+	//
+	// The validator is `['numeric', 'integer', 'min:1']`, and Laravel's
+	// `integer` is `filter_var(..., FILTER_VALIDATE_INT)`, which
+	// STRINGIFIES first — so a digit string is accepted as readily as a
+	// number, and the operator assistant sends one (`(string) $option->id`).
+	// Measured against the real validator: `5` and `"5"` are accepted;
+	// `"abc"`, `"05"`, `"1e0"`, `"5.0"`, `true`, `0` and `-1` are all 422.
+	//
+	// `"+5"` and a leading-space `" 5"` are accepted too, by accident of
+	// `filter_var`, and are deliberately NOT described here: a contract
+	// that advertises them invites a client to rely on them. So this schema
+	// is narrower than the validator on exactly those two spellings, which
+	// is the safe direction — both still work if sent, and nothing a client
+	// generates from this document can fail to be accepted.
+	ReplacedResourceId *PositiveIntegerId `json:"replaced_resource_id,omitempty"`
 }
 
 // UpdateExtraRequest Mirrors `UpdateExtraRequest::rules()`. Same field-to-column mappings
@@ -5106,6 +6144,11 @@ type UpdateExtraRequest struct {
 
 // UpdateGuestRequest defines model for UpdateGuestRequest.
 type UpdateGuestRequest struct {
+	// CustomAttributes An OPEN key/value map of the tenant's own custom guest attributes;
+	// there is no fixed set of keys, which is why no properties are
+	// listed. Read the keys this tenant actually uses off an existing
+	// guest (`GET /guests/{id}`) rather than inventing them — a key
+	// nothing else writes is stored and read by nothing.
 	CustomAttributes *map[string]interface{} `json:"custom_attributes,omitempty"`
 	Dietary          *string                 `json:"dietary,omitempty"`
 	Dob              *openapi_types.Date     `json:"dob,omitempty"`
@@ -5153,11 +6196,14 @@ type UpdatePricingCategoryRequest struct {
 	DryRun     *bool                            `json:"dry_run,omitempty"`
 
 	// IsInternal `true` is refused with 422 while another category's `companions` names this one.
-	IsInternal *bool                             `json:"is_internal,omitempty"`
-	MaxAge     *int                              `json:"max_age,omitempty"`
-	MinAge     *int                              `json:"min_age,omitempty"`
-	Name       *string                           `json:"name,omitempty"`
-	Type       *UpdatePricingCategoryRequestType `json:"type,omitempty"`
+	IsInternal *bool `json:"is_internal,omitempty"`
+	MaxAge     *int  `json:"max_age,omitempty"`
+
+	// MaxPerResource Omit to leave unchanged; null removes the limit.
+	MaxPerResource *int                              `json:"max_per_resource,omitempty"`
+	MinAge         *int                              `json:"min_age,omitempty"`
+	Name           *string                           `json:"name,omitempty"`
+	Type           *UpdatePricingCategoryRequestType `json:"type,omitempty"`
 }
 
 // UpdatePricingCategoryRequestType defines model for UpdatePricingCategoryRequest.Type.
@@ -5202,6 +6248,7 @@ type UpdatePricingTierRequest struct {
 // UpdateProductOptionRequest Mirrors `UpdateProductOptionRequest::rules()`. Same field semantics as
 // `CreateProductOptionRequest` (title → name).
 type UpdateProductOptionRequest struct {
+	// Capacity How many people ONE departure of this schedule takes. Unrelated to the product's own `capacity`, which pools seats across concurrent departures.
 	Capacity   *int    `json:"capacity,omitempty"`
 	DryRun     *bool   `json:"dry_run,omitempty"`
 	MaxAge     *int    `json:"max_age,omitempty"`
@@ -5214,11 +6261,62 @@ type UpdateProductOptionRequest struct {
 // `CreateProductRequest`. Every field is optional — only supplied
 // keys are updated.
 type UpdateProductRequest struct {
+	// AllocationMode How many resources one booking may occupy. The ONLY endpoint that
+	// writes it — `POST /products` and `POST /products/bookable` REFUSE
+	// the field, because a spanning mode needs a fleet to span and a
+	// product created in one call has no schedules yet.
+	//
+	// So the sequence is: create the product, create its schedules, attach
+	// two or more ASSETS with a capacity each to one schedule, then send
+	// this. `homogeneous_multi` before that is a 422 saying so.
+	//
+	// Asking for `homogeneous_multi` is refused with 422 when the platform
+	// would not honour it, and the message names which of four gates
+	// refused:
+	//
+	//   - the `MultiResourceAllocation` account feature is off. **Not
+	//     operator-fixable and not self-serve** — the message says to
+	//     contact CaptainBook support, and for most accounts this is the
+	//     answer, so do not retry.
+	//   - the product sets a shared `capacity` above 0 on a plan that
+	//     includes shared capacity. Clear it (`capacity: 0`) first, or in
+	//     the same PATCH — the pair is judged on the state the product
+	//     will be in, so `{allocation_mode, capacity}` sent together is
+	//     refused if the capacity would still be sharing.
+	//   - a schedule gives a capacity to a guide or a piece of equipment.
+	//     A party is spread over assets only; remove that capacity first.
+	//   - the Payroll app is installed and a schedule has several guides.
+	//     One guide is paid the whole booking total, so a split booking
+	//     cannot be paid out. Not fixable short of restructuring the crew.
+	//   - no schedule carries two or more capacity-bearing assets.
+	//
+	// `single_resource` is NEVER refused, so a product can always be moved
+	// back off a spanning mode. ECHOING THE STORED VALUE IS NOT A CHANGE
+	// and runs none of the gates: a read-modify-write that sends a product
+	// back unchanged is never refused over this field, even on a row whose
+	// mode one of the gates now blocks. Sending a `capacity` above 0 that
+	// STARTS sharing is judged, though, because that is the same silent
+	// downgrade reached through the other field; lowering or clearing a
+	// capacity never is. THE REFUSAL LANDS UNDER
+	// `error.details.allocation_mode` either way, including on a payload
+	// that sent only `capacity` — the mode is the thing that could not be
+	// honoured, and the message names the capacity as the remedy.
+	//
+	// Changing the EFFECTIVE mode (`spans_several_resources` on the
+	// response) republishes the product's capacity to every connected
+	// channel, because the figure a channel publishes is chosen by the
+	// mode: the SUM of free seats across the fleet for a spanning product,
+	// the largest single free unit otherwise. Nothing else about the
+	// product changes, and no departure is rewritten.
+	AllocationMode *UpdateProductRequestAllocationMode `json:"allocation_mode,omitempty"`
+
 	// CancellationPolicy Capped at 64 KiB (65,535 BYTES); a larger value is rejected with 422.
-	CancellationPolicy     *string              `json:"cancellation_policy,omitempty"`
-	CancellationPolicyLink *string              `json:"cancellation_policy_link,omitempty"`
-	Capacity               *int                 `json:"capacity,omitempty"`
-	CategoryIds            *[]PositiveIntegerId `json:"category_ids,omitempty"`
+	CancellationPolicy     *string `json:"cancellation_policy,omitempty"`
+	CancellationPolicyLink *string `json:"cancellation_policy_link,omitempty"`
+
+	// Capacity The capacity all of this product's schedules SHARE: a pool across CONCURRENT departures of this product, not how many people one departure takes, which is the product option's own `capacity`. A positive value makes the booking engine subtract the booked quantity of every OVERLAPPING departure of the product from this pool, so two departures that overlap in time compete for it. `0` or `null` means not shared, which is the default, and a `null` is stored as `0`. A value above 0 needs a plan that includes shared capacity between schedules (Starter and above); on free and legacy it is a 422. Sending `0` or `null` is always accepted, and so is a value that only repeats what the product already holds.
+	Capacity    *int                 `json:"capacity,omitempty"`
+	CategoryIds *[]PositiveIntegerId `json:"category_ids,omitempty"`
 
 	// ConfirmTicketReissue Acknowledgement, not a field — nothing is stored. Required to commit a `delivery_method` change on a product that has bookings. Ignored when `delivery_method` is absent or unchanged, and never required under `dry_run`.
 	ConfirmTicketReissue *bool `json:"confirm_ticket_reissue,omitempty"`
@@ -5246,7 +6344,7 @@ type UpdateProductRequest struct {
 	Instructions      *string `json:"instructions,omitempty"`
 	IsPricedPerPerson *bool   `json:"is_priced_per_person,omitempty"`
 
-	// IsPrivate Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and seven inventory recompute jobs are dispatched. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description.
+	// IsPrivate Switching this triggers an inventory cascade: every Availability of every related ProductOption is bulk-updated and a schedule inventory recompute is queued per ProductOption. See the endpoint-level description for the full chain. When `false`, `is_priced_per_person` and `use_alternate_tier_pricing` are implicitly overridden — see Create description.
 	IsPrivate                      *bool   `json:"is_private,omitempty"`
 	IsTierPriced                   *bool   `json:"is_tier_priced,omitempty"`
 	Locale                         *string `json:"locale,omitempty"`
@@ -5269,6 +6367,55 @@ type UpdateProductRequest struct {
 	// UseAlternateTierPricing Keys the pricing tier on the TOTAL party size instead of the per-category quantity. The effective post-write state must be per-person AND tier priced, or the request is refused with 422 — see the endpoint description for the exemption that keeps a read-modify-write round trip working on an already-conflicting row.
 	UseAlternateTierPricing *bool `json:"use_alternate_tier_pricing,omitempty"`
 }
+
+// UpdateProductRequestAllocationMode How many resources one booking may occupy. The ONLY endpoint that
+// writes it — `POST /products` and `POST /products/bookable` REFUSE
+// the field, because a spanning mode needs a fleet to span and a
+// product created in one call has no schedules yet.
+//
+// So the sequence is: create the product, create its schedules, attach
+// two or more ASSETS with a capacity each to one schedule, then send
+// this. `homogeneous_multi` before that is a 422 saying so.
+//
+// Asking for `homogeneous_multi` is refused with 422 when the platform
+// would not honour it, and the message names which of four gates
+// refused:
+//
+//   - the `MultiResourceAllocation` account feature is off. **Not
+//     operator-fixable and not self-serve** — the message says to
+//     contact CaptainBook support, and for most accounts this is the
+//     answer, so do not retry.
+//   - the product sets a shared `capacity` above 0 on a plan that
+//     includes shared capacity. Clear it (`capacity: 0`) first, or in
+//     the same PATCH — the pair is judged on the state the product
+//     will be in, so `{allocation_mode, capacity}` sent together is
+//     refused if the capacity would still be sharing.
+//   - a schedule gives a capacity to a guide or a piece of equipment.
+//     A party is spread over assets only; remove that capacity first.
+//   - the Payroll app is installed and a schedule has several guides.
+//     One guide is paid the whole booking total, so a split booking
+//     cannot be paid out. Not fixable short of restructuring the crew.
+//   - no schedule carries two or more capacity-bearing assets.
+//
+// `single_resource` is NEVER refused, so a product can always be moved
+// back off a spanning mode. ECHOING THE STORED VALUE IS NOT A CHANGE
+// and runs none of the gates: a read-modify-write that sends a product
+// back unchanged is never refused over this field, even on a row whose
+// mode one of the gates now blocks. Sending a `capacity` above 0 that
+// STARTS sharing is judged, though, because that is the same silent
+// downgrade reached through the other field; lowering or clearing a
+// capacity never is. THE REFUSAL LANDS UNDER
+// `error.details.allocation_mode` either way, including on a payload
+// that sent only `capacity` — the mode is the thing that could not be
+// honoured, and the message names the capacity as the remedy.
+//
+// Changing the EFFECTIVE mode (`spans_several_resources` on the
+// response) republishes the product's capacity to every connected
+// channel, because the figure a channel publishes is chosen by the
+// mode: the SUM of free seats across the fleet for a spanning product,
+// the largest single free unit otherwise. Nothing else about the
+// product changes, and no departure is rewritten.
+type UpdateProductRequestAllocationMode string
 
 // UpdateProductRequestDeliveryMethod "Ticket type". CHANGING it requires the `update_delivery_method` permission and reissues the tickets of every existing booking in the next 10 years, invalidating the QR codes customers already hold without notifying them — so it is refused with `422 TICKET_REISSUE_NOT_CONFIRMED` unless `confirm_ticket_reissue: true` is sent alongside. Sending the value the product already has is not a change: no permission needed, nothing reissued, no `ticket_reissue` block.
 type UpdateProductRequestDeliveryMethod string
@@ -5328,15 +6475,39 @@ type UpdateWorkflowRequest struct {
 // branch_type, order, step_type, and action_type are immutable
 // post-create — to move or reshape a step, delete and re-create.
 type UpdateWorkflowStepRequest struct {
-	Config map[string]interface{} `json:"config"`
-	DryRun *bool                  `json:"dry_run,omitempty"`
+	// Config The node's own settings. There is NO fixed shape and no listed
+	// properties: `config` is validated against the resolved trigger's or
+	// action's own `rules()`, those differ per node, and which nodes exist at
+	// all depends on the account's plan — so no document can enumerate the
+	// keys.
+	//
+	// Read the shape from `GET /workflow-nodes` (MCP:
+	// `inventory_workflow_list` with `resource: workflow-nodes`), which
+	// returns every trigger and action with its `step_type` and the `config`
+	// it needs. Guessing is not a near miss: an `action_type` outside that
+	// catalogue is a 422, and a config that does not match the node's rules is
+	// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+	Config WorkflowNodeConfig `json:"config"`
+	DryRun *bool              `json:"dry_run,omitempty"`
 }
 
 // UpdateWorkflowTriggerRequest Replaces the trigger's `config`. `action_type` is immutable —
 // to change it, call POST /trigger (which atomically replaces).
 type UpdateWorkflowTriggerRequest struct {
-	Config map[string]interface{} `json:"config"`
-	DryRun *bool                  `json:"dry_run,omitempty"`
+	// Config The node's own settings. There is NO fixed shape and no listed
+	// properties: `config` is validated against the resolved trigger's or
+	// action's own `rules()`, those differ per node, and which nodes exist at
+	// all depends on the account's plan — so no document can enumerate the
+	// keys.
+	//
+	// Read the shape from `GET /workflow-nodes` (MCP:
+	// `inventory_workflow_list` with `resource: workflow-nodes`), which
+	// returns every trigger and action with its `step_type` and the `config`
+	// it needs. Guessing is not a near miss: an `action_type` outside that
+	// catalogue is a 422, and a config that does not match the node's rules is
+	// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+	Config WorkflowNodeConfig `json:"config"`
+	DryRun *bool              `json:"dry_run,omitempty"`
 }
 
 // WhoamiData defines model for WhoamiData.
@@ -5502,6 +6673,20 @@ type WorkflowNode struct {
 // because `delay` and `delay_until` are ActionTypes whose step_type is
 // their own name rather than `action`.
 type WorkflowNodeStepType string
+
+// WorkflowNodeConfig The node's own settings. There is NO fixed shape and no listed
+// properties: `config` is validated against the resolved trigger's or
+// action's own `rules()`, those differ per node, and which nodes exist at
+// all depends on the account's plan — so no document can enumerate the
+// keys.
+//
+// Read the shape from `GET /workflow-nodes` (MCP:
+// `inventory_workflow_list` with `resource: workflow-nodes`), which
+// returns every trigger and action with its `step_type` and the `config`
+// it needs. Guessing is not a near miss: an `action_type` outside that
+// catalogue is a 422, and a config that does not match the node's rules is
+// a 422 `INVALID_STEP_CONFIG` — on the dry run as well as on the commit.
+type WorkflowNodeConfig map[string]interface{}
 
 // WorkflowPage defines model for WorkflowPage.
 type WorkflowPage struct {
@@ -5701,6 +6886,26 @@ type CreateAvailabilityParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -5718,6 +6923,26 @@ type BulkDeleteAvailabilitiesParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -5737,6 +6962,26 @@ type BulkUpdateAvailabilitiesParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -5754,6 +6999,26 @@ type DeleteAvailabilityParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -5780,6 +7045,26 @@ type UpdateAvailabilityParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -5797,6 +7082,26 @@ type CreateAvailabilityRuleParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -5928,6 +7233,82 @@ type ListBookingsParamsBookingStatus string
 // ListBookingsParamsOriginType defines parameters for ListBookings.
 type ListBookingsParamsOriginType string
 
+// CreateBookingParams defines parameters for CreateBooking.
+type CreateBookingParams struct {
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateBookingParams defines parameters for UpdateBooking.
+type UpdateBookingParams struct {
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // CancelBookingParams defines parameters for CancelBooking.
 type CancelBookingParams struct {
 	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
@@ -5938,6 +7319,26 @@ type CancelBookingParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -5963,6 +7364,26 @@ type CompBookingParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -5991,6 +7412,26 @@ type ResendBookingConfirmationParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6012,6 +7453,64 @@ type RefundBookingParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RescheduleBookingParams defines parameters for RescheduleBooking.
+type RescheduleBookingParams struct {
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6029,6 +7528,26 @@ type UpdateBookingResourcesParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6066,9 +7585,15 @@ type ListCustomersParams struct {
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// Q Free-text search across primary string fields (name, email, reference).
+	// Q Free-text search across the endpoint's primary string fields — name,
+	// email and reference on `/customers`; the English `title` and
+	// `product_code` on `/products`.
 	// `%` and `_` in the term are matched literally, so `?q=%` finds the rows
-	// containing a percent sign rather than every row.
+	// containing a percent sign rather than every row. Matching through this
+	// parameter is case- AND accent-insensitive (`utf8mb4_unicode_ci`), so
+	// `croisiere` matches `Croisière`. `/bookings`, `/guests` and `/partners`
+	// declare their own `q` with the same semantics; the guarantee is stated
+	// here only for the operations that reference this component.
 	Q *Q `form:"q,omitempty" json:"q,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
@@ -6131,6 +7656,26 @@ type CreateDiscountParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6150,6 +7695,26 @@ type DeleteDiscountParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6175,6 +7740,26 @@ type ApplyDiscountParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6197,6 +7782,26 @@ type RestoreDiscountParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6236,6 +7841,26 @@ type CreateExtraParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6253,6 +7878,26 @@ type DeleteExtraParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6282,6 +7927,26 @@ type UpdateExtraParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6304,6 +7969,26 @@ type RestoreExtraParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6335,6 +8020,26 @@ type CreateAvailableGiftCertParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6353,6 +8058,26 @@ type DeleteAvailableGiftCertificateParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6370,6 +8095,26 @@ type UpdateAvailableGiftCertParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6414,6 +8159,26 @@ type IssueGiftCertParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6440,6 +8205,26 @@ type ResendGiftCertParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6464,6 +8249,26 @@ type VoidGiftCertParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6505,6 +8310,26 @@ type UpdateGuestParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6539,6 +8364,26 @@ type CreateLocationParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6556,6 +8401,26 @@ type DeleteLocationParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6575,6 +8440,26 @@ type UpdateLocationParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6592,6 +8477,26 @@ type DeleteMediaParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6665,6 +8570,26 @@ type CreatePricingCategoryParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6682,6 +8607,26 @@ type DeletePricingCategoryParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6701,6 +8646,26 @@ type UpdatePricingCategoryParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6718,6 +8683,26 @@ type RestorePricingCategoryParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6761,6 +8746,26 @@ type CreatePricingTierParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6778,6 +8783,26 @@ type DeletePricingTierParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6812,6 +8837,26 @@ type UpdatePricingTierParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6834,6 +8879,26 @@ type RestorePricingTierParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6873,6 +8938,26 @@ type CreateProductOptionParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6890,6 +8975,26 @@ type DeleteProductOptionParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6909,6 +9014,26 @@ type UpdateProductOptionParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6926,6 +9051,26 @@ type AttachResourceToProductOptionParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6950,6 +9095,26 @@ type RestoreProductOptionParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -6967,6 +9132,26 @@ type DetachResourceFromProductOptionParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -6990,9 +9175,15 @@ type ListProductsParams struct {
 	// Cursor Opaque cursor returned by previous page's `pagination.cursor_next`
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// Q Free-text search across primary string fields (name, email, reference).
+	// Q Free-text search across the endpoint's primary string fields — name,
+	// email and reference on `/customers`; the English `title` and
+	// `product_code` on `/products`.
 	// `%` and `_` in the term are matched literally, so `?q=%` finds the rows
-	// containing a percent sign rather than every row.
+	// containing a percent sign rather than every row. Matching through this
+	// parameter is case- AND accent-insensitive (`utf8mb4_unicode_ci`), so
+	// `croisiere` matches `Croisière`. `/bookings`, `/guests` and `/partners`
+	// declare their own `q` with the same semantics; the guarantee is stated
+	// here only for the operations that reference this component.
 	Q *Q `form:"q,omitempty" json:"q,omitempty"`
 
 	// Since ISO 8601 lower-bound on `updated_at`. Only offered by endpoints whose table actually carries timestamps — `questions`, `pricing-categories`, `pricing-tiers`, `guests` and `categories` have no `updated_at` column and refuse the parameter with 422 instead of returning an unfiltered page.
@@ -7021,6 +9212,64 @@ type CreateProductParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
+	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
+	// persist an idempotency row. The same key may be reused once for the
+	// real (non-dry-run) call — the dry-run is a "free" preview. If the
+	// same key is sent on two real calls, normal idempotency rules apply.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateBookableProductParams defines parameters for CreateBookableProduct.
+type CreateBookableProductParams struct {
+	// IdempotencyKey UUIDv7 recommended. **One key per operation.** A key is bound to the
+	// method, path and body of its first use; replays of completed keys
+	// matching all three return the original response. A conflicting body,
+	// or the same key aimed at a different endpoint or resource, returns 409
+	// IDEMPOTENCY_CONFLICT. In-flight (request in progress on server) returns
+	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
+	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
+	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7039,6 +9288,26 @@ type DeleteProductParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7056,6 +9325,26 @@ type UpdateProductParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7088,6 +9377,26 @@ type DuplicateProductParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7135,6 +9444,26 @@ type UploadProductMediaParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7157,6 +9486,26 @@ type RestoreProductParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7197,6 +9546,26 @@ type CreateQuestionParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7215,6 +9584,26 @@ type DeleteQuestionParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7232,6 +9621,26 @@ type UpdateQuestionParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7255,6 +9664,26 @@ type RestoreQuestionParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7345,6 +9774,26 @@ type CreateResourceParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7362,6 +9811,26 @@ type DeleteResourceParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7381,6 +9850,26 @@ type UpdateResourceParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7398,6 +9887,26 @@ type RestoreResourceParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7537,6 +10046,26 @@ type CreateWorkflowParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7559,6 +10088,26 @@ type DestroyWorkflowParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7588,6 +10137,26 @@ type UpdateWorkflowParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7610,6 +10179,26 @@ type ActivateWorkflowParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7634,6 +10223,26 @@ type DeactivateWorkflowParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7657,6 +10266,26 @@ type RestoreWorkflowParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7674,6 +10303,26 @@ type CreateWorkflowStepParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7698,6 +10347,26 @@ type DestroyWorkflowStepParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7715,6 +10384,26 @@ type UpdateWorkflowStepParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7734,6 +10423,26 @@ type UpdateWorkflowTriggerParams struct {
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
 	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
+	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
 	// real (non-dry-run) call — the dry-run is a "free" preview. If the
@@ -7751,6 +10460,26 @@ type CreateWorkflowTriggerParams struct {
 	// 409 IDEMPOTENCY_IN_PROGRESS. Swept (server crashed) returns 409
 	// IDEMPOTENCY_UNKNOWN. Required for production use; optional for
 	// ad-hoc CLI invocations where the server auto-generates one.
+	//
+	// **Not every answer is stored.** A key is RELEASED — not persisted, so
+	// the identical call may be retried under it — when nothing was applied
+	// and a later attempt may succeed. This is the whole list, and the only
+	// place it is stated:
+	//
+	// - `401`, `403`, `422`, `429`
+	// - a refusal from an admission gate
+	// - on the booking writes, these three `409`s:
+	//   `CAPACITY_UNAVAILABLE`, `DEPARTURE_NOT_BOOKABLE` and
+	//   `NO_RESOURCE_AVAILABLE`. Each describes a PASSING state — a full
+	//   departure, a slot that filled or is closed, a guide already assigned
+	//   — so persisting one made a card approved during a busy minute
+	//   un-approvable even after the cause cleared.
+	//
+	// Every other `409` describes something that will answer the same way
+	// forever (a cancelled booking stays cancelled, a departed slot stays
+	// departed), so replaying its stored response is correct. Retry a released
+	// refusal under the SAME key; minting a new one for it is how a retry
+	// becomes a double booking.
 	//
 	// **Dry-run interaction:** when `dry_run: true`, the server does NOT
 	// persist an idempotency row. The same key may be reused once for the
@@ -7774,6 +10503,12 @@ type UpdateAvailabilityJSONRequestBody = UpdateAvailabilityRequest
 // CreateAvailabilityRuleJSONRequestBody defines body for CreateAvailabilityRule for application/json ContentType.
 type CreateAvailabilityRuleJSONRequestBody = CreateAvailabilityRuleRequest
 
+// CreateBookingJSONRequestBody defines body for CreateBooking for application/json ContentType.
+type CreateBookingJSONRequestBody = StoreBookingRequest
+
+// UpdateBookingJSONRequestBody defines body for UpdateBooking for application/json ContentType.
+type UpdateBookingJSONRequestBody = UpdateBookingRequest
+
 // CancelBookingJSONRequestBody defines body for CancelBooking for application/json ContentType.
 type CancelBookingJSONRequestBody = CancelBookingRequest
 
@@ -7785,6 +10520,9 @@ type ResendBookingConfirmationJSONRequestBody ResendBookingConfirmationJSONBody
 
 // RefundBookingJSONRequestBody defines body for RefundBooking for application/json ContentType.
 type RefundBookingJSONRequestBody = RefundBookingRequest
+
+// RescheduleBookingJSONRequestBody defines body for RescheduleBooking for application/json ContentType.
+type RescheduleBookingJSONRequestBody = RescheduleBookingRequest
 
 // UpdateBookingResourcesJSONRequestBody defines body for UpdateBookingResources for application/json ContentType.
 type UpdateBookingResourcesJSONRequestBody = UpdateBookingResourcesRequest
@@ -7860,6 +10598,9 @@ type RestoreProductOptionJSONRequestBody RestoreProductOptionJSONBody
 
 // CreateProductJSONRequestBody defines body for CreateProduct for application/json ContentType.
 type CreateProductJSONRequestBody = CreateProductRequest
+
+// CreateBookableProductJSONRequestBody defines body for CreateBookableProduct for application/json ContentType.
+type CreateBookableProductJSONRequestBody = CreateBookableProductRequest
 
 // UpdateProductJSONRequestBody defines body for UpdateProduct for application/json ContentType.
 type UpdateProductJSONRequestBody = UpdateProductRequest
@@ -8606,8 +11347,18 @@ type ClientInterface interface {
 	// ListBookings request
 	ListBookings(ctx context.Context, params *ListBookingsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateBookingWithBody request with any body
+	CreateBookingWithBody(ctx context.Context, params *CreateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateBooking(ctx context.Context, params *CreateBookingParams, body CreateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ShowBooking request
 	ShowBooking(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBookingWithBody request with any body
+	UpdateBookingWithBody(ctx context.Context, id IdPath, params *UpdateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateBooking(ctx context.Context, id IdPath, params *UpdateBookingParams, body UpdateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CancelBookingWithBody request with any body
 	CancelBookingWithBody(ctx context.Context, id IdPath, params *CancelBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8628,6 +11379,11 @@ type ClientInterface interface {
 	RefundBookingWithBody(ctx context.Context, id IdPath, params *RefundBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	RefundBooking(ctx context.Context, id IdPath, params *RefundBookingParams, body RefundBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RescheduleBookingWithBody request with any body
+	RescheduleBookingWithBody(ctx context.Context, id IdPath, params *RescheduleBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	RescheduleBooking(ctx context.Context, id IdPath, params *RescheduleBookingParams, body RescheduleBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateBookingResourcesWithBody request with any body
 	UpdateBookingResourcesWithBody(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8873,6 +11629,11 @@ type ClientInterface interface {
 	CreateProductWithBody(ctx context.Context, params *CreateProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateProduct(ctx context.Context, params *CreateProductParams, body CreateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBookableProductWithBody request with any body
+	CreateBookableProductWithBody(ctx context.Context, params *CreateBookableProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateBookableProduct(ctx context.Context, params *CreateBookableProductParams, body CreateBookableProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteProduct request
 	DeleteProduct(ctx context.Context, id IdPath, params *DeleteProductParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9242,8 +12003,56 @@ func (c *Client) ListBookings(ctx context.Context, params *ListBookingsParams, r
 	return c.Client.Do(req)
 }
 
+func (c *Client) CreateBookingWithBody(ctx context.Context, params *CreateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBookingRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateBooking(ctx context.Context, params *CreateBookingParams, body CreateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBookingRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ShowBooking(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewShowBookingRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateBookingWithBody(ctx context.Context, id IdPath, params *UpdateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBookingRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateBooking(ctx context.Context, id IdPath, params *UpdateBookingParams, body UpdateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBookingRequest(c.Server, id, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9340,6 +12149,30 @@ func (c *Client) RefundBookingWithBody(ctx context.Context, id IdPath, params *R
 
 func (c *Client) RefundBooking(ctx context.Context, id IdPath, params *RefundBookingParams, body RefundBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRefundBookingRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RescheduleBookingWithBody(ctx context.Context, id IdPath, params *RescheduleBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRescheduleBookingRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RescheduleBooking(ctx context.Context, id IdPath, params *RescheduleBookingParams, body RescheduleBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRescheduleBookingRequest(c.Server, id, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10420,6 +13253,30 @@ func (c *Client) CreateProductWithBody(ctx context.Context, params *CreateProduc
 
 func (c *Client) CreateProduct(ctx context.Context, params *CreateProductParams, body CreateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateProductRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateBookableProductWithBody(ctx context.Context, params *CreateBookableProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBookableProductRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateBookableProduct(ctx context.Context, params *CreateBookableProductParams, body CreateBookableProductJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBookableProductRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -12354,6 +15211,61 @@ func NewListBookingsRequest(server string, params *ListBookingsParams) (*http.Re
 	return req, nil
 }
 
+// NewCreateBookingRequest calls the generic CreateBooking builder with application/json body
+func NewCreateBookingRequest(server string, params *CreateBookingParams, body CreateBookingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBookingRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateBookingRequestWithBody generates requests for CreateBooking with any type of body
+func NewCreateBookingRequestWithBody(server string, params *CreateBookingParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewShowBookingRequest generates requests for ShowBooking
 func NewShowBookingRequest(server string, id IdPath) (*http.Request, error) {
 	var err error
@@ -12383,6 +15295,68 @@ func NewShowBookingRequest(server string, id IdPath) (*http.Request, error) {
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateBookingRequest calls the generic UpdateBooking builder with application/json body
+func NewUpdateBookingRequest(server string, id IdPath, params *UpdateBookingParams, body UpdateBookingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateBookingRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUpdateBookingRequestWithBody generates requests for UpdateBooking with any type of body
+func NewUpdateBookingRequestWithBody(server string, id IdPath, params *UpdateBookingParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -12602,6 +15576,68 @@ func NewRefundBookingRequestWithBody(server string, id IdPath, params *RefundBoo
 	}
 
 	operationPath := fmt.Sprintf("/bookings/%s/refund", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRescheduleBookingRequest calls the generic RescheduleBooking builder with application/json body
+func NewRescheduleBookingRequest(server string, id IdPath, params *RescheduleBookingParams, body RescheduleBookingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRescheduleBookingRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewRescheduleBookingRequestWithBody generates requests for RescheduleBooking with any type of body
+func NewRescheduleBookingRequestWithBody(server string, id IdPath, params *RescheduleBookingParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bookings/%s/reschedule", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -16873,6 +19909,61 @@ func NewCreateProductRequestWithBody(server string, params *CreateProductParams,
 	return req, nil
 }
 
+// NewCreateBookableProductRequest calls the generic CreateBookableProduct builder with application/json body
+func NewCreateBookableProductRequest(server string, params *CreateBookableProductParams, body CreateBookableProductJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBookableProductRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateBookableProductRequestWithBody generates requests for CreateBookableProduct with any type of body
+func NewCreateBookableProductRequestWithBody(server string, params *CreateBookableProductParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/products/bookable")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewDeleteProductRequest generates requests for DeleteProduct
 func NewDeleteProductRequest(server string, id IdPath, params *DeleteProductParams) (*http.Request, error) {
 	var err error
@@ -19911,8 +23002,18 @@ type ClientWithResponsesInterface interface {
 	// ListBookingsWithResponse request
 	ListBookingsWithResponse(ctx context.Context, params *ListBookingsParams, reqEditors ...RequestEditorFn) (*ListBookingsResponse, error)
 
+	// CreateBookingWithBodyWithResponse request with any body
+	CreateBookingWithBodyWithResponse(ctx context.Context, params *CreateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBookingResponse, error)
+
+	CreateBookingWithResponse(ctx context.Context, params *CreateBookingParams, body CreateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBookingResponse, error)
+
 	// ShowBookingWithResponse request
 	ShowBookingWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowBookingResponse, error)
+
+	// UpdateBookingWithBodyWithResponse request with any body
+	UpdateBookingWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBookingResponse, error)
+
+	UpdateBookingWithResponse(ctx context.Context, id IdPath, params *UpdateBookingParams, body UpdateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBookingResponse, error)
 
 	// CancelBookingWithBodyWithResponse request with any body
 	CancelBookingWithBodyWithResponse(ctx context.Context, id IdPath, params *CancelBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CancelBookingResponse, error)
@@ -19933,6 +23034,11 @@ type ClientWithResponsesInterface interface {
 	RefundBookingWithBodyWithResponse(ctx context.Context, id IdPath, params *RefundBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RefundBookingResponse, error)
 
 	RefundBookingWithResponse(ctx context.Context, id IdPath, params *RefundBookingParams, body RefundBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*RefundBookingResponse, error)
+
+	// RescheduleBookingWithBodyWithResponse request with any body
+	RescheduleBookingWithBodyWithResponse(ctx context.Context, id IdPath, params *RescheduleBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RescheduleBookingResponse, error)
+
+	RescheduleBookingWithResponse(ctx context.Context, id IdPath, params *RescheduleBookingParams, body RescheduleBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*RescheduleBookingResponse, error)
 
 	// UpdateBookingResourcesWithBodyWithResponse request with any body
 	UpdateBookingResourcesWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateBookingResourcesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBookingResourcesResponse, error)
@@ -20178,6 +23284,11 @@ type ClientWithResponsesInterface interface {
 	CreateProductWithBodyWithResponse(ctx context.Context, params *CreateProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProductResponse, error)
 
 	CreateProductWithResponse(ctx context.Context, params *CreateProductParams, body CreateProductJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProductResponse, error)
+
+	// CreateBookableProductWithBodyWithResponse request with any body
+	CreateBookableProductWithBodyWithResponse(ctx context.Context, params *CreateBookableProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBookableProductResponse, error)
+
+	CreateBookableProductWithResponse(ctx context.Context, params *CreateBookableProductParams, body CreateBookableProductJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBookableProductResponse, error)
 
 	// DeleteProductWithResponse request
 	DeleteProductWithResponse(ctx context.Context, id IdPath, params *DeleteProductParams, reqEditors ...RequestEditorFn) (*DeleteProductResponse, error)
@@ -20621,11 +23732,19 @@ type BulkUpdateAvailabilitiesResponse struct {
 				Type           *BulkUpdateAvailabilities200DataSideEffectsType `json:"type,omitempty"`
 			} `json:"side_effects,omitempty"`
 
-			// SkipReasons Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`.
+			// SkipReasons Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`, `pricing_tier_foreign_to_product`, `pricing_tier_unresolvable`, `departure_has_no_pricing_ladder`.
 			SkipReasons *map[string]int                        `json:"skip_reasons,omitempty"`
 			Status      *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
 
-			// TotalChanged `setting=pricing` dry-run only. Matched slots whose fares would actually move.
+			// TotalChanged `setting=pricing` dry-run only. Matched slots
+			// whose fares would actually move. NOT
+			// refusal-aware: it is computed separately from
+			// `would_update` / `skip_reasons` and still
+			// counts a slot that the write will refuse
+			// under `pricing_tier_foreign_to_product`. Read
+			// it for "will this change any price at all",
+			// and the `would_update` / `skip_reasons` pair
+			// for "how many departures will be written".
 			TotalChanged *int `json:"total_changed,omitempty"`
 			TotalMatched *int `json:"total_matched,omitempty"`
 
@@ -20941,6 +24060,123 @@ func (r ListBookingsResponse) StatusCode() int {
 	return 0
 }
 
+type CreateBookingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Booking Always null on a dry run.
+			Booking interface{} `json:"booking,omitempty"`
+
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// GuestMixWarnings Companion-rule violations the booking was
+			// allowed to carry anyway. A product may declare
+			// that one guest type must travel with another
+			// (a child with an adult); staff may book past
+			// that rule, as they may on the dashboard, which
+			// warns on screen instead of refusing. This
+			// surface had no equivalent, so the rule was
+			// waived for every caller and nothing said so.
+			// `[]` means the mix satisfies every rule —
+			// distinguishable from the key being absent.
+			GuestMixWarnings *[]struct {
+				Message string `json:"message"`
+				Title   string `json:"title"`
+			} `json:"guest_mix_warnings,omitempty"`
+
+			// PaymentUrl Always null on a dry run.
+			PaymentUrl interface{} `json:"payment_url,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                              `json:"identifier,omitempty"`
+				PayloadSummary *string                              `json:"payload_summary,omitempty"`
+				Type           *CreateBooking200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON201 *struct {
+		Data struct {
+			Booking *Booking `json:"booking,omitempty"`
+
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// GuestMixWarnings Companion-rule violations the booking was
+			// allowed to carry anyway. A product may declare
+			// that one guest type must travel with another
+			// (a child with an adult); staff may book past
+			// that rule, as they may on the dashboard, which
+			// warns on screen instead of refusing. This
+			// surface had no equivalent, so the rule was
+			// waived for every caller and nothing said so.
+			// `[]` means the mix satisfies every rule —
+			// distinguishable from the key being absent.
+			GuestMixWarnings *[]struct {
+				Message string `json:"message"`
+				Title   string `json:"title"`
+			} `json:"guest_mix_warnings,omitempty"`
+
+			// PaymentUrl Hosted checkout link for the outstanding
+			// balance, for the operator to pass to the
+			// customer. Null when, and only when, the
+			// booking owes nothing. The link needs no
+			// further credential, so treat it as the
+			// booking's bearer token: send it to the
+			// operator who asked, and nowhere else.
+			PaymentUrl *string `json:"payment_url,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                              `json:"identifier,omitempty"`
+				PayloadSummary *string                              `json:"payload_summary,omitempty"`
+				Type           *CreateBooking201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON403 *Forbidden
+	JSON404 *ErrorEnvelope
+	JSON409 *ErrorEnvelope
+	JSON422 *ErrorEnvelope
+}
+type CreateBooking200DataSideEffectsType string
+type CreateBooking201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateBookingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBookingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ShowBookingResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20963,6 +24199,38 @@ func (r ShowBookingResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ShowBookingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateBookingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Common shape for mutation responses (and dry-run previews)
+		Data       MutationResult `json:"data"`
+		Meta       Meta           `json:"meta"`
+		Pagination *Pagination    `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON403 *Forbidden
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ErrorEnvelope
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateBookingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateBookingResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -21146,6 +24414,60 @@ func (r RefundBookingResponse) StatusCode() int {
 	return 0
 }
 
+type RescheduleBookingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// DepartureTimeUnverified True when the destination departure's timezone
+			// could not be resolved, so the guard that
+			// refuses a departed slot could not prove this
+			// one has not departed. The move still applied.
+			DepartureTimeUnverified *bool `json:"departure_time_unverified,omitempty"`
+
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                  `json:"identifier,omitempty"`
+				PayloadSummary *string                                  `json:"payload_summary,omitempty"`
+				Type           *RescheduleBooking200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON403 *Forbidden
+	JSON404 *NotFound
+	JSON409 *ErrorEnvelope
+	JSON422 *ErrorEnvelope
+}
+type RescheduleBooking200DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r RescheduleBookingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RescheduleBookingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UpdateBookingResourcesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -21176,7 +24498,7 @@ type UpdateBookingResourcesResponse struct {
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
 	JSON409 *ErrorEnvelope
-	JSON422 *ValidationError
+	JSON422 *ErrorEnvelope
 }
 type UpdateBookingResources200DataSideEffectsType string
 
@@ -22294,9 +25616,12 @@ type CreateLocationResponse struct {
 			// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
 			// `MEETING` — earlier spec drafts listed it but it was never a valid
 			// value; the column write would silently coerce to NULL).
-			// `address` is a derived accessor (`getAddressAttribute()` composing
-			// `street_address` + city + country). `timezone` and `notes` have no
-			// underlying columns and read as null today.
+			// `address` is a derived accessor (`getAddressAttribute()`, which
+			// interpolates `street_address`, `city` and `country` — there is no
+			// `country` column, so that last part is always empty and `address`
+			// carries a trailing space). Read the components individually instead.
+			// `timezone` and `notes` have no underlying columns and read as null
+			// today.
 			Location *Location `json:"location,omitempty"`
 
 			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -22366,9 +25691,12 @@ type ShowLocationResponse struct {
 		// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
 		// `MEETING` — earlier spec drafts listed it but it was never a valid
 		// value; the column write would silently coerce to NULL).
-		// `address` is a derived accessor (`getAddressAttribute()` composing
-		// `street_address` + city + country). `timezone` and `notes` have no
-		// underlying columns and read as null today.
+		// `address` is a derived accessor (`getAddressAttribute()`, which
+		// interpolates `street_address`, `city` and `country` — there is no
+		// `country` column, so that last part is always empty and `address`
+		// carries a trailing space). Read the components individually instead.
+		// `timezone` and `notes` have no underlying columns and read as null
+		// today.
 		Data       Location    `json:"data"`
 		Meta       Meta        `json:"meta"`
 		Pagination *Pagination `json:"pagination,omitempty"`
@@ -23301,6 +26629,135 @@ func (r CreateProductResponse) StatusCode() int {
 	return 0
 }
 
+type CreateBookableProductResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// Notes Present only when `product.readiness.blocking` is non-empty, keyed
+			// by the blocking code with a value of 1. This is what the operator
+			// assistant's confirmation card renders as "This product will not sell
+			// yet: …", so a caller reporting readiness to a human should read
+			// `readiness.blocking` and not this bag — the bag exists for the card
+			// and carries no information the readiness block does not.
+			Notes             *map[string]int    `json:"notes,omitempty"`
+			PricingCategories *[]PricingCategory `json:"pricing_categories,omitempty"`
+			PricingTiers      *[]PricingTier     `json:"pricing_tiers,omitempty"`
+
+			// Product Mirrors `ProductResource::toArray()`. Translatable text fields
+			// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+			// `exclusions`) are returned in English via
+			// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+			// `requirements` are rich-text (HTML accepted). `inclusions` and
+			// `exclusions` are plain text — the dashboard renders them as a bullet
+			// list, splitting on newlines. `status` is derived from `is_active`
+			// (`is_active` is also surfaced directly for clients that prefer the
+			// canonical boolean).
+			//
+			// A value READ here can exceed the 65,535-byte cap the write schemas
+			// enforce. The cap arrived in 1.17.0 and rows written before it were not
+			// rewritten, and an image pasted into the dashboard editor lands as an
+			// inline base64 data URI. So a read-modify-write that echoes one of these
+			// fields back unchanged is a 422 naming that field, on a request that
+			// meant to change something else entirely. Shorten or clear the named
+			// field; retrying the same body cannot succeed.
+			Product        *Product         `json:"product,omitempty"`
+			ProductOptions *[]ProductOption `json:"product_options,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                      `json:"identifier,omitempty"`
+				PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+				Type           *CreateBookableProduct200DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON201 *struct {
+		Data struct {
+			// Diff Before/after summary (always present on dry-run, optional on commit)
+			Diff *struct {
+				After  *map[string]interface{} `json:"after,omitempty"`
+				Before *map[string]interface{} `json:"before,omitempty"`
+			} `json:"diff,omitempty"`
+
+			// Notes Present only when `product.readiness.blocking` is non-empty, keyed
+			// by the blocking code with a value of 1. This is what the operator
+			// assistant's confirmation card renders as "This product will not sell
+			// yet: …", so a caller reporting readiness to a human should read
+			// `readiness.blocking` and not this bag — the bag exists for the card
+			// and carries no information the readiness block does not.
+			Notes             *map[string]int    `json:"notes,omitempty"`
+			PricingCategories *[]PricingCategory `json:"pricing_categories,omitempty"`
+			PricingTiers      *[]PricingTier     `json:"pricing_tiers,omitempty"`
+
+			// Product Mirrors `ProductResource::toArray()`. Translatable text fields
+			// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+			// `exclusions`) are returned in English via
+			// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+			// `requirements` are rich-text (HTML accepted). `inclusions` and
+			// `exclusions` are plain text — the dashboard renders them as a bullet
+			// list, splitting on newlines. `status` is derived from `is_active`
+			// (`is_active` is also surfaced directly for clients that prefer the
+			// canonical boolean).
+			//
+			// A value READ here can exceed the 65,535-byte cap the write schemas
+			// enforce. The cap arrived in 1.17.0 and rows written before it were not
+			// rewritten, and an image pasted into the dashboard editor lands as an
+			// inline base64 data URI. So a read-modify-write that echoes one of these
+			// fields back unchanged is a 422 naming that field, on a request that
+			// meant to change something else entirely. Shorten or clear the named
+			// field; retrying the same body cannot succeed.
+			Product        *Product         `json:"product,omitempty"`
+			ProductOptions *[]ProductOption `json:"product_options,omitempty"`
+
+			// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+			SideEffects *[]struct {
+				Identifier     *string                                      `json:"identifier,omitempty"`
+				PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+				Type           *CreateBookableProduct201DataSideEffectsType `json:"type,omitempty"`
+			} `json:"side_effects,omitempty"`
+
+			// WouldApply True only when the request was a dry-run
+			WouldApply *bool `json:"would_apply,omitempty"`
+		} `json:"data"`
+		Meta       Meta        `json:"meta"`
+		Pagination *Pagination `json:"pagination,omitempty"`
+	}
+	JSON401 *Unauthenticated
+	JSON403 *Forbidden
+	JSON409 *IdempotencyConflict
+	JSON422 *ValidationError
+}
+type CreateBookableProduct200DataSideEffectsType string
+type CreateBookableProduct201DataSideEffectsType string
+
+// Status returns HTTPResponse.Status
+func (r CreateBookableProductResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBookableProductResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DeleteProductResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23556,6 +27013,7 @@ type RestoreProductResponse struct {
 		Pagination *Pagination    `json:"pagination,omitempty"`
 	}
 	JSON401 *Unauthenticated
+	JSON403 *Forbidden
 	JSON404 *NotFound
 	JSON409 *IdempotencyConflictOrProductBeingDuplicated
 }
@@ -23860,6 +27318,7 @@ type CreateResourceResponse struct {
 		Pagination *Pagination `json:"pagination,omitempty"`
 	}
 	JSON401 *Unauthenticated
+	JSON403 *Forbidden
 	JSON409 *IdempotencyConflict
 	JSON422 *ValidationError
 }
@@ -23978,6 +27437,7 @@ type RestoreResourceResponse struct {
 		Pagination *Pagination    `json:"pagination,omitempty"`
 	}
 	JSON401 *Unauthenticated
+	JSON403 *Forbidden
 	JSON404 *NotFound
 }
 
@@ -24948,6 +28408,23 @@ func (c *ClientWithResponses) ListBookingsWithResponse(ctx context.Context, para
 	return ParseListBookingsResponse(rsp)
 }
 
+// CreateBookingWithBodyWithResponse request with arbitrary body returning *CreateBookingResponse
+func (c *ClientWithResponses) CreateBookingWithBodyWithResponse(ctx context.Context, params *CreateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBookingResponse, error) {
+	rsp, err := c.CreateBookingWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBookingResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateBookingWithResponse(ctx context.Context, params *CreateBookingParams, body CreateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBookingResponse, error) {
+	rsp, err := c.CreateBooking(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBookingResponse(rsp)
+}
+
 // ShowBookingWithResponse request returning *ShowBookingResponse
 func (c *ClientWithResponses) ShowBookingWithResponse(ctx context.Context, id IdPath, reqEditors ...RequestEditorFn) (*ShowBookingResponse, error) {
 	rsp, err := c.ShowBooking(ctx, id, reqEditors...)
@@ -24955,6 +28432,23 @@ func (c *ClientWithResponses) ShowBookingWithResponse(ctx context.Context, id Id
 		return nil, err
 	}
 	return ParseShowBookingResponse(rsp)
+}
+
+// UpdateBookingWithBodyWithResponse request with arbitrary body returning *UpdateBookingResponse
+func (c *ClientWithResponses) UpdateBookingWithBodyWithResponse(ctx context.Context, id IdPath, params *UpdateBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBookingResponse, error) {
+	rsp, err := c.UpdateBookingWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBookingResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateBookingWithResponse(ctx context.Context, id IdPath, params *UpdateBookingParams, body UpdateBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBookingResponse, error) {
+	rsp, err := c.UpdateBooking(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBookingResponse(rsp)
 }
 
 // CancelBookingWithBodyWithResponse request with arbitrary body returning *CancelBookingResponse
@@ -25023,6 +28517,23 @@ func (c *ClientWithResponses) RefundBookingWithResponse(ctx context.Context, id 
 		return nil, err
 	}
 	return ParseRefundBookingResponse(rsp)
+}
+
+// RescheduleBookingWithBodyWithResponse request with arbitrary body returning *RescheduleBookingResponse
+func (c *ClientWithResponses) RescheduleBookingWithBodyWithResponse(ctx context.Context, id IdPath, params *RescheduleBookingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RescheduleBookingResponse, error) {
+	rsp, err := c.RescheduleBookingWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRescheduleBookingResponse(rsp)
+}
+
+func (c *ClientWithResponses) RescheduleBookingWithResponse(ctx context.Context, id IdPath, params *RescheduleBookingParams, body RescheduleBookingJSONRequestBody, reqEditors ...RequestEditorFn) (*RescheduleBookingResponse, error) {
+	rsp, err := c.RescheduleBooking(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRescheduleBookingResponse(rsp)
 }
 
 // UpdateBookingResourcesWithBodyWithResponse request with arbitrary body returning *UpdateBookingResourcesResponse
@@ -25808,6 +29319,23 @@ func (c *ClientWithResponses) CreateProductWithResponse(ctx context.Context, par
 		return nil, err
 	}
 	return ParseCreateProductResponse(rsp)
+}
+
+// CreateBookableProductWithBodyWithResponse request with arbitrary body returning *CreateBookableProductResponse
+func (c *ClientWithResponses) CreateBookableProductWithBodyWithResponse(ctx context.Context, params *CreateBookableProductParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBookableProductResponse, error) {
+	rsp, err := c.CreateBookableProductWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBookableProductResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateBookableProductWithResponse(ctx context.Context, params *CreateBookableProductParams, body CreateBookableProductJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBookableProductResponse, error) {
+	rsp, err := c.CreateBookableProduct(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBookableProductResponse(rsp)
 }
 
 // DeleteProductWithResponse request returning *DeleteProductResponse
@@ -26741,11 +30269,19 @@ func ParseBulkUpdateAvailabilitiesResponse(rsp *http.Response) (*BulkUpdateAvail
 					Type           *BulkUpdateAvailabilities200DataSideEffectsType `json:"type,omitempty"`
 				} `json:"side_effects,omitempty"`
 
-				// SkipReasons Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`.
+				// SkipReasons Dry-run only. Why rows will be refused, by reason — `has_active_bookings`, `capacity_below_booked`, `resource_managed_capacity`, `pricing_tier_foreign_to_product`, `pricing_tier_unresolvable`, `departure_has_no_pricing_ladder`.
 				SkipReasons *map[string]int                        `json:"skip_reasons,omitempty"`
 				Status      *BulkUpdateAvailabilities200DataStatus `json:"status,omitempty"`
 
-				// TotalChanged `setting=pricing` dry-run only. Matched slots whose fares would actually move.
+				// TotalChanged `setting=pricing` dry-run only. Matched slots
+				// whose fares would actually move. NOT
+				// refusal-aware: it is computed separately from
+				// `would_update` / `skip_reasons` and still
+				// counts a slot that the write will refuse
+				// under `pricing_tier_foreign_to_product`. Read
+				// it for "will this change any price at all",
+				// and the `would_update` / `skip_reasons` pair
+				// for "how many departures will be written".
 				TotalChanged *int `json:"total_changed,omitempty"`
 				TotalMatched *int `json:"total_matched,omitempty"`
 
@@ -27191,6 +30727,161 @@ func ParseListBookingsResponse(rsp *http.Response) (*ListBookingsResponse, error
 	return response, nil
 }
 
+// ParseCreateBookingResponse parses an HTTP response from a CreateBookingWithResponse call
+func ParseCreateBookingResponse(rsp *http.Response) (*CreateBookingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBookingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Booking Always null on a dry run.
+				Booking interface{} `json:"booking,omitempty"`
+
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// GuestMixWarnings Companion-rule violations the booking was
+				// allowed to carry anyway. A product may declare
+				// that one guest type must travel with another
+				// (a child with an adult); staff may book past
+				// that rule, as they may on the dashboard, which
+				// warns on screen instead of refusing. This
+				// surface had no equivalent, so the rule was
+				// waived for every caller and nothing said so.
+				// `[]` means the mix satisfies every rule —
+				// distinguishable from the key being absent.
+				GuestMixWarnings *[]struct {
+					Message string `json:"message"`
+					Title   string `json:"title"`
+				} `json:"guest_mix_warnings,omitempty"`
+
+				// PaymentUrl Always null on a dry run.
+				PaymentUrl interface{} `json:"payment_url,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                              `json:"identifier,omitempty"`
+					PayloadSummary *string                              `json:"payload_summary,omitempty"`
+					Type           *CreateBooking200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				Booking *Booking `json:"booking,omitempty"`
+
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// GuestMixWarnings Companion-rule violations the booking was
+				// allowed to carry anyway. A product may declare
+				// that one guest type must travel with another
+				// (a child with an adult); staff may book past
+				// that rule, as they may on the dashboard, which
+				// warns on screen instead of refusing. This
+				// surface had no equivalent, so the rule was
+				// waived for every caller and nothing said so.
+				// `[]` means the mix satisfies every rule —
+				// distinguishable from the key being absent.
+				GuestMixWarnings *[]struct {
+					Message string `json:"message"`
+					Title   string `json:"title"`
+				} `json:"guest_mix_warnings,omitempty"`
+
+				// PaymentUrl Hosted checkout link for the outstanding
+				// balance, for the operator to pass to the
+				// customer. Null when, and only when, the
+				// booking owes nothing. The link needs no
+				// further credential, so treat it as the
+				// booking's bearer token: send it to the
+				// operator who asked, and nowhere else.
+				PaymentUrl *string `json:"payment_url,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                              `json:"identifier,omitempty"`
+					PayloadSummary *string                              `json:"payload_summary,omitempty"`
+					Type           *CreateBooking201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseShowBookingResponse parses an HTTP response from a ShowBookingWithResponse call
 func ParseShowBookingResponse(rsp *http.Response) (*ShowBookingResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27229,6 +30920,72 @@ func ParseShowBookingResponse(rsp *http.Response) (*ShowBookingResponse, error) 
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateBookingResponse parses an HTTP response from a UpdateBookingWithResponse call
+func ParseUpdateBookingResponse(rsp *http.Response) (*UpdateBookingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateBookingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Data Common shape for mutation responses (and dry-run previews)
+			Data       MutationResult `json:"data"`
+			Meta       Meta           `json:"meta"`
+			Pagination *Pagination    `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27509,6 +31266,93 @@ func ParseRefundBookingResponse(rsp *http.Response) (*RefundBookingResponse, err
 	return response, nil
 }
 
+// ParseRescheduleBookingResponse parses an HTTP response from a RescheduleBookingWithResponse call
+func ParseRescheduleBookingResponse(rsp *http.Response) (*RescheduleBookingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RescheduleBookingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// DepartureTimeUnverified True when the destination departure's timezone
+				// could not be resolved, so the guard that
+				// refuses a departed slot could not prove this
+				// one has not departed. The move still applied.
+				DepartureTimeUnverified *bool `json:"departure_time_unverified,omitempty"`
+
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                  `json:"identifier,omitempty"`
+					PayloadSummary *string                                  `json:"payload_summary,omitempty"`
+					Type           *RescheduleBooking200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseUpdateBookingResourcesResponse parses an HTTP response from a UpdateBookingResourcesWithResponse call
 func ParseUpdateBookingResourcesResponse(rsp *http.Response) (*UpdateBookingResourcesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27575,7 +31419,7 @@ func ParseUpdateBookingResourcesResponse(rsp *http.Response) (*UpdateBookingReso
 		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest ValidationError
+		var dest ErrorEnvelope
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -29326,9 +33170,12 @@ func ParseCreateLocationResponse(rsp *http.Response) (*CreateLocationResponse, e
 				// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
 				// `MEETING` — earlier spec drafts listed it but it was never a valid
 				// value; the column write would silently coerce to NULL).
-				// `address` is a derived accessor (`getAddressAttribute()` composing
-				// `street_address` + city + country). `timezone` and `notes` have no
-				// underlying columns and read as null today.
+				// `address` is a derived accessor (`getAddressAttribute()`, which
+				// interpolates `street_address`, `city` and `country` — there is no
+				// `country` column, so that last part is always empty and `address`
+				// carries a trailing space). Read the components individually instead.
+				// `timezone` and `notes` have no underlying columns and read as null
+				// today.
 				Location *Location `json:"location,omitempty"`
 
 				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
@@ -29435,9 +33282,12 @@ func ParseShowLocationResponse(rsp *http.Response) (*ShowLocationResponse, error
 			// a MySQL enum with values `PRIMARY|START|END|VISITED|SECONDARY` (no
 			// `MEETING` — earlier spec drafts listed it but it was never a valid
 			// value; the column write would silently coerce to NULL).
-			// `address` is a derived accessor (`getAddressAttribute()` composing
-			// `street_address` + city + country). `timezone` and `notes` have no
-			// underlying columns and read as null today.
+			// `address` is a derived accessor (`getAddressAttribute()`, which
+			// interpolates `street_address`, `city` and `country` — there is no
+			// `country` column, so that last part is always empty and `address`
+			// carries a trailing space). Read the components individually instead.
+			// `timezone` and `notes` have no underlying columns and read as null
+			// today.
 			Data       Location    `json:"data"`
 			Meta       Meta        `json:"meta"`
 			Pagination *Pagination `json:"pagination,omitempty"`
@@ -30922,6 +34772,167 @@ func ParseCreateProductResponse(rsp *http.Response) (*CreateProductResponse, err
 	return response, nil
 }
 
+// ParseCreateBookableProductResponse parses an HTTP response from a CreateBookableProductWithResponse call
+func ParseCreateBookableProductResponse(rsp *http.Response) (*CreateBookableProductResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBookableProductResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// Notes Present only when `product.readiness.blocking` is non-empty, keyed
+				// by the blocking code with a value of 1. This is what the operator
+				// assistant's confirmation card renders as "This product will not sell
+				// yet: …", so a caller reporting readiness to a human should read
+				// `readiness.blocking` and not this bag — the bag exists for the card
+				// and carries no information the readiness block does not.
+				Notes             *map[string]int    `json:"notes,omitempty"`
+				PricingCategories *[]PricingCategory `json:"pricing_categories,omitempty"`
+				PricingTiers      *[]PricingTier     `json:"pricing_tiers,omitempty"`
+
+				// Product Mirrors `ProductResource::toArray()`. Translatable text fields
+				// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+				// `exclusions`) are returned in English via
+				// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+				// `requirements` are rich-text (HTML accepted). `inclusions` and
+				// `exclusions` are plain text — the dashboard renders them as a bullet
+				// list, splitting on newlines. `status` is derived from `is_active`
+				// (`is_active` is also surfaced directly for clients that prefer the
+				// canonical boolean).
+				//
+				// A value READ here can exceed the 65,535-byte cap the write schemas
+				// enforce. The cap arrived in 1.17.0 and rows written before it were not
+				// rewritten, and an image pasted into the dashboard editor lands as an
+				// inline base64 data URI. So a read-modify-write that echoes one of these
+				// fields back unchanged is a 422 naming that field, on a request that
+				// meant to change something else entirely. Shorten or clear the named
+				// field; retrying the same body cannot succeed.
+				Product        *Product         `json:"product,omitempty"`
+				ProductOptions *[]ProductOption `json:"product_options,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                      `json:"identifier,omitempty"`
+					PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+					Type           *CreateBookableProduct200DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Data struct {
+				// Diff Before/after summary (always present on dry-run, optional on commit)
+				Diff *struct {
+					After  *map[string]interface{} `json:"after,omitempty"`
+					Before *map[string]interface{} `json:"before,omitempty"`
+				} `json:"diff,omitempty"`
+
+				// Notes Present only when `product.readiness.blocking` is non-empty, keyed
+				// by the blocking code with a value of 1. This is what the operator
+				// assistant's confirmation card renders as "This product will not sell
+				// yet: …", so a caller reporting readiness to a human should read
+				// `readiness.blocking` and not this bag — the bag exists for the card
+				// and carries no information the readiness block does not.
+				Notes             *map[string]int    `json:"notes,omitempty"`
+				PricingCategories *[]PricingCategory `json:"pricing_categories,omitempty"`
+				PricingTiers      *[]PricingTier     `json:"pricing_tiers,omitempty"`
+
+				// Product Mirrors `ProductResource::toArray()`. Translatable text fields
+				// (`title`, `description`, `instructions`, `requirements`, `inclusions`,
+				// `exclusions`) are returned in English via
+				// `toArrayWithTranslations('en')`. `description`, `instructions`, and
+				// `requirements` are rich-text (HTML accepted). `inclusions` and
+				// `exclusions` are plain text — the dashboard renders them as a bullet
+				// list, splitting on newlines. `status` is derived from `is_active`
+				// (`is_active` is also surfaced directly for clients that prefer the
+				// canonical boolean).
+				//
+				// A value READ here can exceed the 65,535-byte cap the write schemas
+				// enforce. The cap arrived in 1.17.0 and rows written before it were not
+				// rewritten, and an image pasted into the dashboard editor lands as an
+				// inline base64 data URI. So a read-modify-write that echoes one of these
+				// fields back unchanged is a 422 naming that field, on a request that
+				// meant to change something else entirely. Shorten or clear the named
+				// field; retrying the same body cannot succeed.
+				Product        *Product         `json:"product,omitempty"`
+				ProductOptions *[]ProductOption `json:"product_options,omitempty"`
+
+				// SideEffects List of jobs/mails/Stripe calls that ran (or would run on dry-run)
+				SideEffects *[]struct {
+					Identifier     *string                                      `json:"identifier,omitempty"`
+					PayloadSummary *string                                      `json:"payload_summary,omitempty"`
+					Type           *CreateBookableProduct201DataSideEffectsType `json:"type,omitempty"`
+				} `json:"side_effects,omitempty"`
+
+				// WouldApply True only when the request was a dry-run
+				WouldApply *bool `json:"would_apply,omitempty"`
+			} `json:"data"`
+			Meta       Meta        `json:"meta"`
+			Pagination *Pagination `json:"pagination,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest IdempotencyConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeleteProductResponse parses an HTTP response from a DeleteProductWithResponse call
 func ParseDeleteProductResponse(rsp *http.Response) (*DeleteProductResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -31359,6 +35370,13 @@ func ParseRestoreProductResponse(rsp *http.Response) (*RestoreProductResponse, e
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -31831,6 +35849,13 @@ func ParseCreateResourceResponse(rsp *http.Response) (*CreateResourceResponse, e
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest IdempotencyConflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -32023,6 +36048,13 @@ func ParseRestoreResourceResponse(rsp *http.Response) (*RestoreResourceResponse,
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound

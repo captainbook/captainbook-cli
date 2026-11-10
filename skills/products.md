@@ -2,6 +2,8 @@
 
 Products are the top of the inventory hierarchy: a Product is "a thing the tenant sells" — a tour, a class, a rental. Each Product has one or more `ProductOption`s (variants), and is referenced by `PricingTier`s, `Availability` rows, `Extras`, `Questions`, and `Booking` rows. Products are soft-deletable (Laravel `SoftDeletes`).
 
+**Start from `products create-bookable`, not `products create`.** A product on its own cannot be sold: departures, prices and questions all hang off a product *option*, and a non-internal pricing category with no tier is filtered out of the booking widget — so a plain `create` followed by nothing leaves a product no customer can reach. `create-bookable` (spec 1.44.0) makes the product, its options and its priced categories in one call and one transaction. The plain `create` is still the right call for a shell an operator will fill in from the dashboard.
+
 ## Endpoints
 
 | Command | Method + path | Ability | Dry-run |
@@ -9,6 +11,7 @@ Products are the top of the inventory hierarchy: a Product is "a thing the tenan
 | `inventory products list` | GET /products | `cli:read` | n/a |
 | `inventory products get <id>` | GET /products/{id} | `cli:read` | n/a |
 | `inventory products create` | POST /products | `cli:write` | body |
+| `inventory products create-bookable` | POST /products/bookable | `cli:write` | body |
 | `inventory products update <id>` | PATCH /products/{id} | `cli:write` | body |
 | `inventory products delete <id>` | DELETE /products/{id} | `cli:write` | none |
 | `inventory products restore <id>` | POST /products/{id}/restore | `cli:write` | body |
@@ -24,6 +27,8 @@ ceebee inventory products list --category 18 --include-trashed=false --limit 100
 
 Returns `{id, title, status, schedule_type, from_price, currency, is_private, ...}`. Cursor-paginate with `--cursor "<pagination.cursor_next>"`.
 
+`--q` is **case- and accent-insensitive** (spec 1.36.0), and was neither: `products.title` is a JSON column, MySQL hands every extracted value back as a binary collation, so `--q foo` never matched a product titled `Foo`. It now folds accents too, so `--q croisiere` returns "Croisière". The other four free-text searches on this API have always behaved this way; `/products` was the exception and nothing said so. **Do not read a single hit as an identity match.**
+
 `--status` filters server-side on `draft|published` only:
 
 ```bash
@@ -33,6 +38,19 @@ ceebee inventory products list --status published
 On the response, `status` is *derived* from the canonical `is_active` column (`true` → published, `false` → draft) and `is_active` is surfaced directly for clients that prefer the boolean.
 
 ⚠️ **There is no `archived` status.** `status` filters the two-state `is_active` column, and the server validates it with `in:published,draft`. `--status archived` is now rejected client-side by the CLI's enum gate (`invalid value for --status: "archived" (allowed: draft, published)`), same as a typo like `--status publshed` — no round trip. Use `--status draft` / `--status published`, or omit the flag. (The spec used to advertise `archived`, which put it on the allow-list and cost a server 422 to discover; fixed upstream in [captainbook#8111](https://github.com/captainbook/captainbook/issues/8111), tracked here as [captainbook-cli#18](https://github.com/captainbook/captainbook-cli/issues/18).)
+
+### 1a. `can_be_sold` and `readiness` — is this product actually sellable? (spec 1.44.0)
+
+Every `Product` read carries two fields that answer the question directly, and before 1.44.0 neither was published even though `Product::updateCanBeSold()` had always computed the answer on every write:
+
+```bash
+ceebee inventory products get 42 --format json | jq '{can_be_sold: .data.can_be_sold, readiness: .data.readiness}'
+```
+
+- **`can_be_sold`** is the stored column every selling surface filters on. A freshly created product answers `false`.
+- **`readiness`** is `{missing[], blocking[]}`. **`blocking == []` is the definition of `can_be_sold`** — that is the field to report to a human, not the bare boolean.
+- **`missing` is advisory and is not a reason a product cannot sell.** It additionally carries `no_future_departure`, which is true of every product a seasonal operator owns out of season. Do not relay it as a fault.
+- Since 1.44.0 `can_be_sold` also requires at least one non-internal pricing category to have a tier (`no_priced_category`). Products this moved to `false` were already unsellable — both the embedded product page and the calendar widget load categories filtered on `whereHas('pricingTiers')` — the column simply had not noticed.
 
 ### 2. Show one product, machine-readable
 
@@ -128,10 +146,52 @@ Not refused when the product has no bookings in that window (`affected_bookings:
 
 `affected_bookings` is an **estimate, not an outcome**: it's counted just before the write, and the job re-reads its own window afterwards, so a booking taken in between is reissued without being counted. It is also *not* scoped to your business unit, because the job isn't either — a scoped number would promise a smaller blast radius than the one that actually lands.
 
+### 9. Create a product that can actually be sold (`create-bookable`)
+
+Intent: stand up a sellable product in one call, rather than a shell plus three follow-ups.
+
+```bash
+ceebee inventory products create-bookable \
+  --title "Sunset Sailing Tour" \
+  --currency EUR --timezone "Europe/Athens" \
+  --schedule-type datetime \
+  --options '[{"title":"10:00 departure","capacity":12},
+              {"title":"18:00 departure","capacity":12}]' \
+  --pricing-categories '[{"name":"Adults","amount":7500,"type":"ADULT"},
+                         {"name":"Children","amount":4000,"type":"CHILD","max_age":12}]' \
+  --dry-run
+```
+
+It takes every flag `products create` takes, under the same rules, plus the two lists. What to know:
+
+- **Both item shapes are CLOSED**: an unlisted key is a 422 naming it, not an ignored field. The two spellings callers get wrong are `title` on an option (the column is `name`) and `amount` on a category — and silently discarding either produces a product priced at nothing under a `201`. The CLI refuses both locally, along with `is_internal`, which is not accepted: every category is created with `is_internal: false`.
+- **Each pricing category also creates one open-ended tier** (`min: 1`, `max: null`) at its `amount`, because a category with no tier is invisible to the booking widget. `amount` is in **minor units**.
+- **`--status` defaults to `draft`**, exactly as the plain create does. Publishing a product with no photo and no departures would put an empty page on the widget.
+- **It does not create departures or the main photo.** Departures need a schedule only the operator can state (`availabilities create` or the rule/bulk commands); a photo is an upload (`media upload`). Both therefore stay in `readiness.blocking` on the response — **read and report that field** rather than announcing a finished product.
+- **The dry run is built entirely from unsaved models**, so it is reproducible: `uuid`, `product_code`, `option_code` and `color` are minted only on commit and read as `null` on the preview.
+
+### 10. Let one booking span several resources (`--allocation-mode`)
+
+A product's `allocation_mode` decides how many resources one booking may occupy: `single_resource`, or `homogeneous_multi` for a party spread over a fleet (five riders over three jet skis). It reached the API in spec 1.53.0; before that it was writable from the product edit page alone, and a value sent here was dropped under a `200`.
+
+```bash
+# 1. The fleet has to exist first: two or more capacity-bearing ASSETS on one schedule.
+ceebee inventory products update prd_7 --allocation-mode homogeneous_multi --dry-run
+```
+
+- **`PATCH` only.** `products create` and `products create-bookable` **refuse** the field with a 422 rather than dropping it, because a spanning mode needs a fleet to span and neither endpoint creates resources. Neither CLI create command offers the flag. The sequence is: create the product, create its schedules, attach two or more assets with a capacity each, then PATCH the mode.
+- **`homogeneous_multi` is refused with a 422 naming which of five gates refused it.** One of them is not operator-fixable: the `MultiResourceAllocation` account feature being off means contacting CaptainBook support, and for most accounts that is the answer — **do not retry**. The others are a shared `capacity` above 0, a capacity on a guide or equipment, the Payroll app with several guides on a schedule, and no schedule carrying two or more capacity-bearing assets.
+- **`single_resource` is never refused**, so a product can always be moved back off a spanning mode.
+- **Echoing the stored value is not a change** and runs no gate, so a read-modify-write round trip is never refused over this field — even on a row whose mode a gate now blocks.
+- **Read two keys, not one.** `allocation_mode` is what the operator configured; `spans_several_resources` is what the platform is actually honouring. They differ behind those gates, all of which degrade silently.
+- **Never price a party off `allocation_mode`.** On a per-group-priced product each unit a party takes is one group, so five riders on three jet skis pay three times — and a party that spans nothing pays once.
+
 ## Pitfalls
 
 - ⚠️ **Changing either ticketing field needs the `update_delivery_method` permission** — the single permission the Ticketing form's Update button carries. The gate is on the *change*, not the key: both fields are on the read shape, so echoing back the stored value is free. That keeps the ordinary read-modify-write round trip, and "GET a product, POST it back to clone it", working for a caller who never touches ticketing. On `products create` there's no stored row to compare against, so the comparison is against the column default — sending `VOUCHER` / `MANIFEST`, or omitting the fields, needs nothing.
 - ⚠️ **`--redemption-method` reissues nothing.** Only `--delivery-method` invalidates tickets. Changing the redemption method alone still needs the permission, but no confirmation.
+- ⚠️ **`PLAN_LIMIT_REACHED` (403) is not a permissions problem.** `create`, `duplicate` and `restore` are gated on the account's plan allowance as well as the `create_product` permission (spec 1.39.0–1.40.0), and the entitlement is checked FIRST, so one account state gives one code whoever is asking — an account owner included, which is the hole 1.40.0 closed. `FORBIDDEN` means fix the token or the role; `PLAN_LIMIT_REACHED` means the operator must upgrade the plan or delete a product, and its `details` carry `plan_item`, `limit` and `current`. Enforcement is rolled out **per account**, so an account over its limit may still be answered `201` — handle the refusal, never predict it from the allowance.
+- ⚠️ **Switching `--is-private` recomputes inventory AFTER the response (spec 1.45.0).** It runs one schedule at a time from the start of yesterday onwards, so a read taken straight after the `200` can still show the old inventory for a short while. Past departures keep the vacancies and fully-booked state they were last computed with, and `booked_quantity` is not recomputed at all — it counts booked guests and does not depend on `is_private`. Do not treat an immediate re-read as a verification failure.
 - ⚠️ **Cascade on delete:** `Product::$cascadeDeletes = ['options']` — soft-deleting a Product cascades to its `ProductOption`s, and each option in turn cascades to its `virtualProductOption` and `discount`. **`PricingTier`s and `Availability` rows are NOT cascaded** — clean those up separately or restore later may leave orphans visible.
 - ⚠️ **`delete` has no server dry-run.** The CLI rejects `--dry-run` on `products delete` at parse time. To preview cascade impact, fetch the option count first: `ceebee inventory product-options list --product-id 42 --format json | jq '.data | length'`.
 - ⚠️ **Implicit-override traps:**
@@ -143,6 +203,8 @@ Not refused when the product has no bookings in that window (`affected_bookings:
 - ⚠️ **`--category-ids` is integer**, not string. The flag is `intSlice`. Comma-separate: `--category-ids "18,87,7"`.
 - ⚠️ **Known server bug:** `--category-ids` on POST/PATCH may return 404 even when categories exist. Workaround: create the product without categories then PATCH `--category-ids` afterwards (still 404 today; tracked).
 - ⚠️ **Translatable fields are English-only on read.** `title`, `description`, `instructions`, `requirements`, `inclusions`, `exclusions` are translatable on the server, but the CLI returns the English translation only. Multi-language editing is not in V1.
+- ⚠️ **A plain `products create` leaves a product nothing can sell.** No option means no departures, no prices and no questions; a priced category needs a tier. Prefer `products create-bookable`, and read `readiness.blocking` on whichever you use before telling an operator the product is ready.
+- ⚠️ **Changing the effective allocation mode republishes capacity to every connected channel** — and so does changing `--capacity`, which this endpoint never announced while the identical dashboard edit always has. The figure a channel publishes is chosen by the mode: the sum of free seats across the fleet for a spanning product, the largest single free unit otherwise. A CLI capacity edit used to recompute the stored seat counts and leave GetYourGuide, Viator and Octo advertising the old number.
 - ⚠️ **`from_price` is a denormalized hint**, not the price applied at booking. Real prices live on `PricingTier`s under `PricingCategory`s. Updating `from_price` does not re-price existing availabilities.
 
 ## See also

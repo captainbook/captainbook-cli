@@ -83,8 +83,8 @@
 //
 // Scope is deliberately narrow: only `oneOf`/`anyOf` sequences containing a
 // `type: "null"` member, `type:` sequences of exactly one real type plus
-// null, and parameter schemas whose array branch has inline enum items are
-// touched. Everything else passes through untouched, so an
+// null, `type:` sequences holding nothing but null, and parameter schemas
+// whose array branch has inline enum items are touched. Everything else passes through untouched, so an
 // unexpected upstream construct fails loudly in codegen rather than being
 // silently mangled here.
 //
@@ -166,6 +166,10 @@ func normalizeAt(n *yaml.Node, inData bool) int {
 		if !inData {
 			count += rewriteNullableUnion(n)
 			count += rewriteNullableTypeArray(n)
+			// Runs after rewriteNullableUnion so a bare `{type: "null"}`
+			// union branch has already been consumed by rule 1; what reaches
+			// here is a schema that is null and nothing else.
+			count += rewriteNullOnlyType(n)
 		}
 		// Descend key by key so a data block can be recognised by the key
 		// that introduces it. A sequence or scalar just inherits the flag.
@@ -375,6 +379,86 @@ func dropNullEnumMember(m *yaml.Node) {
 		}
 		return
 	}
+}
+
+// rewriteNullOnlyType converts a schema whose type is NULL AND NOTHING ELSE —
+// `type: ["null"]` — into an untyped `nullable: true` schema.
+//
+// Returns 1 if it rewrote this mapping, 0 otherwise.
+//
+// This is the one nullable spelling rewriteNullableTypeArray deliberately
+// declines: it collapses `[T, "null"]` down to T, and a null-only array has no
+// T to collapse to. 1.56.0 introduced it, on the dry-run branch of
+// `POST /bookings`, to say that a field is ALWAYS null there:
+//
+//	booking:
+//	  type: ["null"]
+//	  description: Always null on a dry run.
+//
+// which codegen rejects with "unhandled Schema type: &[null]" — the same death
+// rule 1 exists to prevent, reached by a different road.
+//
+// 3.0 has no null type to map onto, so the type is dropped and only
+// `nullable: true` remains. Codegen renders a typeless schema as `interface{}`
+// and adds no pointer, because `interface{}` is already nilable — so the field
+// becomes a plain `interface{}` (verified: `PaymentUrl interface{}` in
+// internal/inventory/gen), which holds the one value the schema permits, and no
+// other value the server can legally send.
+// Widening the Go type is safe in a way narrowing would not be: every
+// conforming payload still round-trips.
+//
+// Two guards, both for the same reason the rest of this package has them —
+// silently mangling a schema is worse than not helping:
+//
+//   - A mapping whose ONLY key is `type` is left alone. Rule 1 owns the SCALAR
+//     spelling of that (`{type: null}`), because isNullTypeSchema requires a
+//     scalar value; it does NOT own the one-member SEQUENCE spelling
+//     (`{type: ["null"]}`), which no rule claims. Either way codegen SHOULD
+//     reject what neither rule handled rather than have this rule quietly
+//     erase the branch — failing loudly is the safe direction, but it is not
+//     the same as being handled. See TODOS.md.
+//   - An anchored sequence is left alone, because splicing it out orphans
+//     every alias pointing at it and the emitted file stops parsing.
+func rewriteNullOnlyType(m *yaml.Node) int {
+	if len(m.Content) == 2 {
+		// A mapping whose only key is `type`. Rule 1 owns the SCALAR spelling
+		// of that (`{type: null}`): isNullTypeSchema requires
+		// `val.Kind == yaml.ScalarNode`. It does NOT own the one-member
+		// SEQUENCE spelling (`{type: ["null"]}`), so that construct is owned
+		// by neither rule and would still fail codegen loudly. That is the
+		// safe direction — failing beats silently erasing a union branch — but
+		// do not read this guard as "handled elsewhere". See TODOS.md.
+		return 0
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		key, val := m.Content[i], m.Content[i+1]
+		if key.Kind != yaml.ScalarNode || key.Value != "type" {
+			continue
+		}
+		if val.Kind != yaml.SequenceNode || val.Anchor != "" {
+			continue
+		}
+		if len(val.Content) == 0 {
+			continue
+		}
+		allNull := true
+		for _, member := range val.Content {
+			if member.Kind != yaml.ScalarNode || member.Anchor != "" ||
+				(member.Tag != "!!null" && member.Value != "null") {
+				allNull = false
+				break
+			}
+		}
+		if !allNull {
+			continue
+		}
+		// Splice the `type` pair out, leaving the mapping's other entries —
+		// `description` above all — in place.
+		m.Content = append(m.Content[:i:i], m.Content[i+2:]...)
+		setNullable(m)
+		return 1
+	}
+	return 0
 }
 
 // isJSONSchemaTypeName reports whether s is one of the seven type names JSON

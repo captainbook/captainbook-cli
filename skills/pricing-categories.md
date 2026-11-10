@@ -25,7 +25,7 @@ Default: `TRAVELLER` (use when no specific audience type applies).
 
 ## "Must travel with" (`--companions`)
 
-A category can be gated on another one: *"a Child seat may only be booked when at least one Adult is in the same booking."* That rule lives on the dependent category as a list of **companion links**, each `{category_id, min_quantity}`.
+A category can be gated on another one: *"a Child seat may only be booked when at least one Adult is in the same booking."* That rule lives on the dependent category as a list of **companion links**, each `{category_id, min_quantity, same_resource?}`.
 
 ```bash
 # Children can only be booked alongside at least 1 Adult
@@ -38,6 +38,30 @@ Three rules decide what the list means:
 - **ANY one link satisfies it.** Links are never added together. `[{A,1},{B,1}]` means "at least one A **or** at least one B", not both.
 - **The write REPLACES the whole set.** `[]` clears every link; omitting `--companions` leaves them untouched. There is no add-one call.
 - **No links means no rule** — the category is freely bookable.
+
+### `same_resource` — in the booking, or on the same unit (spec 1.50.0)
+
+By default a link asks only that the companions be **in the booking**. `same_resource: true` asks for more: they must sit on **every resource that carries a guest of this category** — a Passenger needs a Driver on their own jet ski, not merely somewhere in the party.
+
+```bash
+ceebee inventory pricing-categories update $PASSENGER_ID \
+  --companions '[{"category_id": '"$DRIVER_ID"', "min_quantity": 1, "same_resource": true}]'
+```
+
+- **Omitted is a third state, not `false`.** A link sent without the key keeps its stored value (`false` for a new link), so re-sending links written before 1.50.0 changes nothing. Send `false` explicitly to switch it off.
+- **It must be a boolean.** `1`, `"true"` and `null` are all refused — the CLI names the field before the wire; the server answers 422 under `companions.{n}.same_resource`.
+
+### `--max-per-resource` — how many of this category one unit carries (spec 1.51.0)
+
+On a product that spreads a party over resources, this caps how many guests of *this* category one resource may carry — one Driver per jet ski:
+
+```bash
+ceebee inventory pricing-categories update $DRIVER_ID --max-per-resource 1
+```
+
+- **1–99, or no limit.** The CLI bounds both ends locally. Omitting it on `update` leaves it unchanged; clearing the limit needs a JSON null, which an int flag cannot express — use `--data '{"max_per_resource": null}'`.
+- **A party is then seated on the fewest resources that respect it**, so three Drivers capped at one take three jet skis.
+- It only does anything on a product whose `allocation_mode` spans several resources — see [products.md](products.md).
 
 Pass `@file.json` instead of an inline string for anything past a link or two:
 

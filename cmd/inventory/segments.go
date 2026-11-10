@@ -28,7 +28,7 @@ func segmentsDefs() []CommandDef {
 			Use: "segments list", Short: "List customer segments", Kind: KindRead,
 			Verb: "GET", Path: "/segments", Ability: invpkg.Read,
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "since", Type: "string", Description: "ISO 8601 lower-bound on updated_at"},
 				{Name: "status", Type: "string", Description: "active|archived|backfilling|draft|errored"},
@@ -89,7 +89,7 @@ func segmentsDefs() []CommandDef {
 			Kind: KindRead, Verb: "GET", Path: "/segments/{id}/members", Ability: invpkg.Read,
 			PositionalArgs: []string{"id"},
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {

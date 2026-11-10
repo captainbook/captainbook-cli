@@ -84,6 +84,8 @@ ceebee inventory resources restore 2
 
 ## Pitfalls
 
+- ⚠️ **`create` and `restore` are gated on the account's plan allowance (spec 1.38.0), and the refusal is `PLAN_LIMIT_REACHED` (403), not `FORBIDDEN`.** The endpoint previously enforced neither the `create_resource` permission nor the limit — a token holder denied resource creation in the web UI could create them here, past the plan limit, without the web path's per-unit charge ever being raised, permanently and silently under a `201`. The limit is counted **tenant-wide**, so a multi-business-unit tenant cannot pass it one unit at a time, and `restore` is gated the same way because a trashed resource is not counted. Nothing on this API ever raises a customer's bill: at the limit the operator upgrades the plan or removes a resource.
+
 - ⚠️ **Detach is hard, not soft.** No restore. Re-attach with the original `resource_id` if you need to undo.
 - ⚠️ **Pivot capacity vs Resource capacity** — `attach --capacity N` overrides the Resource's default for that one product option. Don't confuse them: setting `Resource.capacity=8` then `attach --capacity 2` means "this resource normally seats 8, but on THIS option only 2 of those seats are available."
 - ⚠️ **Pivot capacity is what makes a resource "main".** `Booking::attachResources()` reads the pivot capacity, so `attach --capacity N` doesn't just cap seats — it moves the resource into the single main slot the booking competes over. Setting it on an equipment resource is refused with 422 rather than silently nulled, because a resource that claims seats nothing downstream honours is worse than a rejected write.

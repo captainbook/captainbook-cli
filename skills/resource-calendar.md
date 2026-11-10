@@ -37,7 +37,7 @@ ceebee inventory resource-calendar list --resource-id res_12,res_13,res_14 \
 ceebee inventory resource-calendar list --resource-id res_12 --product-option-id 48
 
 # Page through a busy season
-ceebee inventory resource-calendar list --resource-id res_12 --limit 100 --cursor "<cursor>"
+ceebee inventory resource-calendar list --resource-id res_12 --limit 25 --cursor "<cursor>"
 ```
 
 ## Flags
@@ -48,7 +48,7 @@ ceebee inventory resource-calendar list --resource-id res_12 --limit 100 --curso
 | `--from`, `--to` | `YYYY-MM-DD` window. |
 | `--event-types` | Comma-separated subset of `booking`, `busy`, `unavailable`. Omit for all three. |
 | `--product-option-id` | Positive integer. `0` is refused rather than silently ignored. |
-| `--limit`, `--cursor` | Cursor pagination. |
+| `--limit`, `--cursor` | Cursor pagination. `--limit` is **1–25** here, not the 200 the other list endpoints allow — the CLI refuses a larger value locally. |
 
 ## Pitfalls
 

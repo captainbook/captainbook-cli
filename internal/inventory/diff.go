@@ -66,6 +66,25 @@ type DiffEnvelope struct {
 	// flip would render as an ordinary one-line change and the operator would
 	// never see how many customers it strands.
 	TicketReissue *TicketReissue `json:"ticket_reissue,omitempty"`
+
+	// GuestMixWarnings is present on POST /bookings, preview and commit alike,
+	// and is parsed here for exactly the reason TicketReissue is: it is a
+	// sibling of `diff`, so a table render that only walked the diff dropped it
+	// silently.
+	//
+	// What it carries is a companion-rule violation the booking was allowed
+	// ANYWAY — a child booked with no adult, say. The dashboard warns on
+	// screen; this surface did not, so "the rule was waived for every AI caller
+	// silently" (spec, 1.47.0). An empty array means the mix satisfies every
+	// rule and is distinguishable from the key being absent.
+	GuestMixWarnings []GuestMixWarning `json:"guest_mix_warnings,omitempty"`
+}
+
+// GuestMixWarning mirrors the spec's `guest_mix_warnings[]` sub-object, whose
+// item shape is closed on `{title, message}`.
+type GuestMixWarning struct {
+	Title   string `json:"title"`
+	Message string `json:"message"`
 }
 
 // TicketReissue mirrors the spec's `ticket_reissue` block: how many bookings
@@ -287,6 +306,22 @@ func renderDiff(w io.Writer, env DiffEnvelope, opts renderOptions) error {
 		}
 		if env.WouldApply && tr.AffectedBookings > 0 {
 			if _, err := fmt.Fprintln(w, "  Applying this requires --confirm-ticket-reissue."); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(env.GuestMixWarnings) > 0 {
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+		// Named as a waiver, not a validation error: the booking IS allowed and
+		// the operator has to decide whether to let it stand.
+		if _, err := fmt.Fprintln(w, "Guest-mix warnings (the booking was allowed anyway):"); err != nil {
+			return err
+		}
+		for _, gw := range env.GuestMixWarnings {
+			if _, err := fmt.Fprintf(w, "  ! %s: %s\n", gw.Title, gw.Message); err != nil {
 				return err
 			}
 		}

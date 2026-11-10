@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,10 +25,13 @@ const companionsMaxItems = 20
 // response says so — the payload just comes back with one link, which reads
 // like it worked.
 var companionsDesc = `"Must travel with" links as JSON, or @file.json: ` +
-	fmt.Sprintf(`[{"category_id": 7, "min_quantity": 2}, ...] (max %d). REPLACES every `, companionsMaxItems) +
+	fmt.Sprintf(`[{"category_id": 7, "min_quantity": 2, "same_resource": false}, ...] (max %d). REPLACES every `, companionsMaxItems) +
 	`existing link — resend the ones you are keeping. '[]' clears them all; ` +
 	`omit the flag to leave them unchanged. The category is bookable when ANY ` +
-	`one link is met; links are never added together`
+	`one link is met; links are never added together. same_resource is optional ` +
+	`(1.50.0): true means the companions must sit on every resource carrying a ` +
+	`guest of this category, not merely be in the booking; omitted, a link keeps ` +
+	`its stored value and a new one is false`
 
 // companionsRawFromArgs returns the companions value as the operator WROTE it,
 // from --companions when the flag is set and otherwise from --data, plus the
@@ -191,9 +195,16 @@ func parseCompanionsValue(raw json.RawMessage, selfID, label string) ([]json.Raw
 		// is a 422 rather than an ignored field. Named locally because a
 		// typo'd key would otherwise be reported as the required key missing,
 		// which sends the operator hunting for something already there.
+		//
+		// same_resource joined the schema in 1.50.0 and is OPTIONAL. It has to
+		// be admitted here or this gate refuses, locally, a link the server
+		// accepts — and the operator is told their own correct payload carries
+		// an unknown key, which is the worst possible reading of a flag whose
+		// semantics are REPLACE: the obvious workaround is to drop the key and
+		// resend, which silently reverts the rule for every link in the list.
 		for k := range obj {
-			if k != "category_id" && k != "min_quantity" {
-				return nil, fmt.Errorf("%s[%d]: unknown key %q (the payload accepts only category_id and min_quantity)", label, i, k)
+			if k != "category_id" && k != "min_quantity" && k != "same_resource" {
+				return nil, fmt.Errorf("%s[%d]: unknown key %q (the payload accepts only category_id, min_quantity and same_resource)", label, i, k)
 			}
 		}
 		rawID, ok := obj["category_id"]
@@ -225,6 +236,30 @@ func parseCompanionsValue(raw json.RawMessage, selfID, label string) ([]json.Raw
 		}
 		if qty < 1 || qty > companionMaxQuantity {
 			return nil, fmt.Errorf("%s[%d].min_quantity: must be between 1 and %d (got %d)", label, i, companionMaxQuantity, qty)
+		}
+
+		// same_resource is optional, so only a PRESENT value is typed. The
+		// spec is explicit that "any other value than a boolean is a 422 under
+		// companions.{n}.same_resource", and JSON's truthiness neighbours are
+		// exactly what a caller reaches for: `1`, `"true"`, `"yes"`. Catching
+		// them here matters more than the round trip, because a refused call
+		// leaves the existing links alone and this field rides on the array
+		// that REPLACES them.
+		if rawSame, ok := obj["same_resource"]; ok {
+			var same bool
+			// `null` needs naming separately: encoding/json accepts it into a
+			// bool and leaves the zero value, so an explicit null would pass
+			// this check and then reach the wire as a key the spec types as a
+			// plain boolean — and FALSE is the value it would be read as, which
+			// is the one that switches the rule off.
+			if string(bytes.TrimSpace(rawSame)) == "null" {
+				return nil, fmt.Errorf("%s[%d].same_resource: must be true or false, got null "+
+					"(omit the key to keep the stored value — false on a new link)", label, i)
+			}
+			if err := json.Unmarshal(rawSame, &same); err != nil {
+				return nil, fmt.Errorf("%s[%d].same_resource: must be true or false, got %s "+
+					"(omit the key to keep the stored value — false on a new link)", label, i, rawSame)
+			}
 		}
 	}
 	return rows, nil
@@ -294,7 +329,7 @@ func pricingCategoriesDefs() []CommandDef {
 			// client-side. Re-adding the flag would not compile —
 			// gen.ListPricingCategoriesParams has no Since field.
 			Flags: []FlagDef{
-				{Name: "limit", Type: "int", Min: 1, Description: "Page size"},
+				{Name: "limit", Type: "int", Min: 1, Max: 200, Description: "Page size"},
 				{Name: "cursor", Type: "string", Description: "Pagination cursor"},
 				{Name: "product-id", Type: "int", Min: 1, Description: "Filter by parent product"},
 				{Name: "include-trashed", Type: "bool", Description: "Include soft-deleted"},
@@ -353,6 +388,7 @@ func pricingCategoriesDefs() []CommandDef {
 				{Name: "min-age", Type: "int", Description: "Minimum age (optional)"},
 				{Name: "max-age", Type: "int", Description: "Maximum age (optional)"},
 				{Name: "is-internal", Type: "bool", Description: "Internal categories are excluded from public-facing checkout flows."},
+				{Name: "max-per-resource", Type: "int", Min: 1, Max: 99, Description: "How many guests of this category one resource may carry on a product that spreads a party over resources (1 Driver per jet ski). 1-99; omit for no limit. A party is then seated on the fewest resources that respect it."},
 				{Name: "companions", Type: "json", Description: companionsDesc},
 			},
 			// D20: companions decide whether the category can be booked at
@@ -362,15 +398,16 @@ func pricingCategoriesDefs() []CommandDef {
 			// audited. So it answers "what did this call make the rule" and
 			// never "which links did it delete"; reconstructing the removal
 			// needs the prior audit row for the same category.
-			ForensicFields: []string{"product-id", "name", "type", "is-internal", "companions"},
+			ForensicFields: []string{"product-id", "name", "type", "is-internal", "companions", "max-per-resource"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"product-id":  "product_id",
-					"name":        "name",
-					"type":        "type",
-					"min-age":     "min_age",
-					"max-age":     "max_age",
-					"is-internal": "is_internal",
+					"product-id":       "product_id",
+					"name":             "name",
+					"type":             "type",
+					"min-age":          "min_age",
+					"max-age":          "max_age",
+					"is-internal":      "is_internal",
+					"max-per-resource": "max_per_resource",
 				})
 				if err != nil {
 					return nil, err
@@ -409,20 +446,22 @@ func pricingCategoriesDefs() []CommandDef {
 				{Name: "min-age", Type: "int", Description: "Minimum age"},
 				{Name: "max-age", Type: "int", Description: "Maximum age"},
 				{Name: "is-internal", Type: "bool", Description: "Internal categories are excluded from public-facing checkout flows. Setting it true is refused with 422 while another category's companions names this one."},
+				{Name: "max-per-resource", Type: "int", Min: 1, Max: 99, Description: "How many guests of this category one resource may carry on a product that spreads a party over resources (1 Driver per jet ski). 1-99; omit to leave unchanged. Clearing the limit needs --data '{\"max_per_resource\": null}' — an int flag cannot express null."},
 				{Name: "companions", Type: "json", Description: companionsDesc},
 			},
-			ForensicFields: []string{"name", "type", "is-internal", "companions"},
+			ForensicFields: []string{"name", "type", "is-internal", "companions", "max-per-resource"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				id, err := pathArg(args)
 				if err != nil {
 					return nil, err
 				}
 				body, err := JSONBodyFromArgs(args, args.DryRun, map[string]string{
-					"name":        "name",
-					"type":        "type",
-					"min-age":     "min_age",
-					"max-age":     "max_age",
-					"is-internal": "is_internal",
+					"name":             "name",
+					"type":             "type",
+					"min-age":          "min_age",
+					"max-age":          "max_age",
+					"is-internal":      "is_internal",
+					"max-per-resource": "max_per_resource",
 				})
 				if err != nil {
 					return nil, err
