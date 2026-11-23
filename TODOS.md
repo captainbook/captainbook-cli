@@ -1727,9 +1727,28 @@ caught by the server.
 ## `--data null` panics the two workflow body builders
 
 `ceebee inventory workflows trigger create <id> --data null --action-type X`
-panics with `assignment to entry in nil map`, and so do `workflows steps
-create/update --data null`, `workflows trigger update`, and every `{dry_run}`
-body (`workflows delete/restore/activate/deactivate`, `workflows steps delete`).
+panics with `assignment to entry in nil map`, and so does `workflows steps
+create <id> --data null --step-type action --order 0`.
+
+The panic needs a reachable assignment, so the other affected commands need a
+co-requisite flag before they reach it — measured on the real registered tree:
+
+| invocation | observed |
+|---|---|
+| `workflows trigger create --data null --action-type X` | panics |
+| `workflows steps create --data null --step-type action --order 0` | panics |
+| `workflows delete/restore/activate/deactivate --data null --dry-run` | panics |
+| `workflows steps update <id> <step> --data null --config '{}'` | panics |
+| `workflows trigger update --data null` | no panic: refused, "--config or --data must supply the trigger `config` field" |
+| `workflows steps update <id> <step> --data null` | no panic: same refusal for the step `config` field |
+| `workflows delete/restore/activate/deactivate --data null` (no --dry-run) | no panic, and worse: the nil map marshals back to the literal `null`, which is SENT as the request body |
+| `workflows steps delete <id> <step> --data null` | same: `null` goes on the wire |
+
+`triggerOrStepBody` only assigns inside its `fieldMap` loop, for `--config`, and
+for `--dry-run`; `trigger update` and `steps update` pass a nil fieldMap.
+`dryRunOnlyBody`'s only assignment is `body["dry_run"] = true`. So the reach is
+two commands as typed, four more with one extra flag, and five that ship a
+`null` body today.
 
 `json.Unmarshal` sets a `map[string]any` to **nil** on the literal `null`
 (verified in isolation), and the next line assigns into it. `JSONBodyFromArgs`
@@ -1750,7 +1769,7 @@ fixing them belonged in its own change rather than widening a spec sync.
 
 **Fix:** copy `JSONBodyFromArgs`'s `if body == nil` refusal into both builders,
 or route them through it. Add one test per builder driving `--data null`.
-**Why:** a crash on malformed input, on nine workflow commands, with no audit row.
+**Why:** a crash on malformed input, with no audit row, on two workflow commands as typed and four more with one extra flag; five others silently put `null` on the wire instead.
 **Effort:** human S / CC S. **Priority:** P1. **Depends on:** nothing.
 
 ## The step-pair gate's loop and condition arms are only half tested

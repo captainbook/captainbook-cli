@@ -18,7 +18,7 @@ Intent: gate a long-running script on a working token.
 ceebee inventory whoami --format json
 ```
 
-Returns the envelope's `data.actor` (id, name, email), `data.tenant` (slug, currency, timezone), and `data.abilities` array. A refused `whoami` exits `1`, not `10` — codes `10`-`18` are the `stats` namespace's mapping, and every server-side `inventory` refusal renders its typed message to stderr and exits `1` (see [index.md](index.md#exit-codes)). So read stderr to tell a bad token (`UNAUTHENTICATED`) from a trial account (`FORBIDDEN`, the pitfall below); the exit code alone cannot.
+Returns the envelope's `data.actor` (id, name, email), `data.tenant` (slug, currency, timezone), and `data.abilities` array. A refused `whoami` exits `1`, not `10` — codes `10`-`18` are the `stats` namespace's mapping, and every server-side `inventory` refusal renders its typed message to stderr and exits `1` (see [index.md](index.md#exit-codes)). So read stderr to tell a bad token from a trial account; the exit code alone cannot. Match on the sentence, not on the API's code name: a 401 prints `token expired or revoked. Run \`ceebee config use <profile>\`…`, and the trial 403 prints the `Four states answer FORBIDDEN…` paragraph (the pitfall below). The literal `UNAUTHENTICATED` never reaches stderr — it lives in the developer-facing `Error()` the CLI does not print — and `whoami` is a read, so there is no audit row to fall back on either.
 
 ### 2. Check whether the token has `cli:cs`
 
