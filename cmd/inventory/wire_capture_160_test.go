@@ -9,8 +9,12 @@ package inventory
 // on the server's 422 would still read as a gate by inspection while costing a
 // round trip, so each refusal case asserts that nothing reached the server, and
 // each legal pair asserts that it did. (The audit row is written either way:
-// runMutation appends it before the closure runs, so a local refusal still
-// records the command and its forensic fields — only the round trip is saved.) The other is the error
+// runMutation appends it at inventory.go:690, after the closure returns and
+// regardless of the error it returned, so a refusal from INSIDE the closure —
+// this gate — still records the command and its forensic fields, and only the
+// round trip is saved. A refusal that happens earlier than the closure, such as
+// the ability gate at inventory.go:601, returns before that Append and records
+// nothing.) The other is the error
 // path: three refusals changed shape or meaning (1.57.0's child-bearing step
 // delete, 1.58.0's trial 403, 1.60.0's INVALID_STEP_CONFIG), and a code that
 // parses into the wrong type still prints SOMETHING, so only an assertion on

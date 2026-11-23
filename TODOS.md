@@ -1670,8 +1670,9 @@ but mechanical). **Priority:** P3. **Depends on:** nothing.
 Spec 1.60.0 made a `(step_type, action_type)` pair that does not fit a write-time
 `422 INVALID_STEP_CONFIG`, and the CLI mirrors the part of that rule it can:
 `step_type=delay` takes `action_type=delay`, `delay_until` takes `delay_until`,
-and `step_type=action` takes neither (`assertStepTypesFitActionTypes` and
-`stepPairProblem` in `cmd/inventory/workflows.go`).
+and `step_type=action` takes neither (`assertStepPairFitsActionType` for a
+single step, `assertComposedStepsFitActionTypes` for the composed `--steps`
+array, both over the shared `stepPairProblem`, in `cmd/inventory/workflows.go`).
 
 The other half of the server's rule — "`action_type` is a real `ActionType`" —
 is not checkable here. The spec never enumerates `ActionType`: the field is
