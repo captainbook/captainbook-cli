@@ -1726,7 +1726,7 @@ caught by the server.
 
 ## `--data null` panics the two workflow body builders
 
-`ceebee inventory workflows trigger create <id> --data null --action-type X`
+`ceebee inventory workflows trigger create <id> --data null --action-type booking_confirmed`
 panics with `assignment to entry in nil map`, and so does `workflows steps
 create <id> --data null --step-type action --order 0`.
 
@@ -1735,7 +1735,7 @@ co-requisite flag before they reach it — measured on the real registered tree:
 
 | invocation | observed |
 |---|---|
-| `workflows trigger create --data null --action-type X` | panics |
+| `workflows trigger create --data null --action-type booking_confirmed` | panics |
 | `workflows steps create --data null --step-type action --order 0` | panics |
 | `workflows delete/restore/activate/deactivate --data null --dry-run` | panics |
 | `workflows steps update <id> <step> --data null --config '{}'` | panics |
@@ -1746,9 +1746,13 @@ co-requisite flag before they reach it — measured on the real registered tree:
 
 `triggerOrStepBody` only assigns inside its `fieldMap` loop, for `--config`, and
 for `--dry-run`; `trigger update` and `steps update` pass a nil fieldMap.
-`dryRunOnlyBody`'s only assignment is `body["dry_run"] = true`. So the reach is
-two commands as typed, four more with one extra flag, and five that ship a
-`null` body today.
+`dryRunOnlyBody`'s only assignment is `body["dry_run"] = true`. So two commands
+panic as typed, every other write panics once a co-requisite flag is present
+(`--dry-run`, or `--config` on the two `update`s), and the rest ship a `null`
+body instead. Treat the table as the measured sample, not an exhaustive count:
+derive the reach from which assignments a builder actually makes. And use a
+valid enum value in any repro — `--action-type X` is refused by that flag's own
+enum gate with exit 12, before the builder ever runs.
 
 `json.Unmarshal` sets a `map[string]any` to **nil** on the literal `null`
 (verified in isolation), and the next line assigns into it. `JSONBodyFromArgs`
@@ -1769,7 +1773,7 @@ fixing them belonged in its own change rather than widening a spec sync.
 
 **Fix:** copy `JSONBodyFromArgs`'s `if body == nil` refusal into both builders,
 or route them through it. Add one test per builder driving `--data null`.
-**Why:** a crash on malformed input, with no audit row, on two workflow commands as typed and four more with one extra flag; five others silently put `null` on the wire instead.
+**Why:** a crash on malformed input, with no audit row, on two workflow commands as typed and more once a co-requisite flag is present; the rest silently put `null` on the wire instead.
 **Effort:** human S / CC S. **Priority:** P1. **Depends on:** nothing.
 
 ## The step-pair gate's loop and condition arms are only half tested

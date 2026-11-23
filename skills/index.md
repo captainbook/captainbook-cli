@@ -239,13 +239,15 @@ client-side refusal carries one, because only those return an `api.ExitError`:
 a bad flag value, a `(step_type, action_type)` pair the CLI rejects before
 sending, and `--dry-run` on an operation the server cannot preview are all
 `12`, a config problem is `15`, and a failure to mint an idempotency
-key is `18`. **Every other `inventory` outcome exits `1`** — every server-side
+key is `18`. **Every other `inventory` FAILURE exits `1`** — every server-side
 refusal whatever its status (403, 409, 422 alike) and the local
 `ABILITY_MISSING` refusal too, because each renders through its typed
 `UserMessage`, which the error handler prints to stderr before exiting 1. So
-rows 10, 11, 13, 14, 16 and 17 describe `stats`, not `inventory` — a dropped
-connection or an unparseable body on an `inventory` call exits `1` as well,
-because 13 and 14 are only ever minted by the `stats` lane's own mapper.
+rows 10, 11, 13, 14, 16 and 17 describe `stats`, not `inventory`: a dropped
+connection or an unparseable body on an `inventory` call exits `1` too. Read
+that as "every other failure", not "every other outcome" — a successful call
+exits 0, and the workflow reads that bypass the typed parse can print a body
+the formatter could not read and still exit 0.
 
 To tell inventory refusals apart, read **stderr**, or the audit row's
 `error_code` via `ceebee audit list --format json`. Do not look for an error
@@ -349,7 +351,7 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory bookings update <id>` | PATCH /bookings/{id} | `cli:write` | body |
 | `inventory bookings reschedule <id>` | POST /bookings/{id}/reschedule | `cli:cs` | body |
 
-When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally and makes no HTTP call. The message names the operation it refused — `--dry-run is not supported by DELETE /products/{id} (this endpoint has no server-side dry-run capability)` — and the exit code is `12`, not `1`: the refusal is a client-side `api.ExitError`, so it is one of the few inventory outcomes that carries a code at all (see [Exit codes](#exit-codes)).
+When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally and the mutation request is never sent. (Not necessarily before any HTTP at all: the gate runs inside the command, so a cold ability cache can spend one `whoami` in the preflight first.) The message names the operation it refused — `--dry-run is not supported by DELETE /products/{id} (this endpoint has no server-side dry-run capability)` — and the exit code is `12`, not `1`: the refusal is a client-side `api.ExitError`, so it is one of the few inventory outcomes that carries a code at all (see [Exit codes](#exit-codes)).
 
 **Not every dry-run tells you the same amount.** Most return `total_matched` — the number of rows the filter hit — which cannot answer *"will this change anything?"*, because it is identical whether your proposed value matches the current one or not. `availabilities bulk-update pricing` is the exception: its dry-run also returns `total_changed` plus a `diff` of the first `preview_limit` matched slots. See [availabilities.md](availabilities.md) example 5.
 

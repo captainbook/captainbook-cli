@@ -220,7 +220,7 @@ Override with `--format <json|table|csv>` on any command.
 
 ## Dry-run
 
-Most mutations support `--dry-run` and return a colored diff envelope (`{ would_apply: true, diff: { before, after } }`) without persisting. The CLI rejects `--dry-run` at parse time on endpoints where the server doesn't support it (e.g. `products delete`, `media upload`), with a typed error naming the operation and exit code 12.
+Most mutations support `--dry-run` and return a colored diff envelope (`{ would_apply: true, diff: { before, after } }`) without persisting. The CLI rejects `--dry-run` locally on endpoints where the server doesn't support it (e.g. `products delete`, `media upload`), with a typed error naming the operation and exit code 12. The mutation request is never sent; the gate runs inside the command, so a cold ability cache may still spend one `whoami` first.
 
 ```bash
 ceebee inventory products update 42 --title "New title" --dry-run
