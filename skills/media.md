@@ -66,7 +66,7 @@ Hard delete; no restore. The remote storage object is reaped async.
 
 - ⚠️ **No `update` endpoint in V1.** Want to change `alt_text` or `position`? Delete and re-upload. Phase 2 will add PATCH.
 - ⚠️ **`--since` bounds `media_updated_at`, not `updated_at`.** This resource has no Laravel timestamps at all; `media_updated_at` is what the endpoint surfaces as `created_at`. Scripts that reuse a generic "sync since last run" helper across resources are reading a different column here — see example 1b.
-- ⚠️ **Size limits return 413, MIME mismatches return 415.** Both have stable `code` fields in the error envelope. The CLI surfaces these as exit code 12 (validation). Re-encode large JPEGs before upload, or check tenant plan limits via the admin UI.
+- ⚠️ **Size limits return 413, MIME mismatches return 415.** Both have stable `code` fields in the error envelope, and the CLI surfaces both the way it surfaces every server-side `inventory` refusal: the typed message on stderr, exit code `1` — not a status-specific code (see [index.md](index.md#exit-codes)). A file over 10 MiB is refused locally with that same typed error before anything uploads. Re-encode large JPEGs before upload, or check tenant plan limits via the admin UI.
 - ⚠️ **Variants are async.** A successful 201 does NOT mean thumbnails are ready. Customer-facing widgets may show the original until Paperclip finishes — typically seconds, but no in-band signal.
 - ⚠️ **No dry-run.** Upload is multipart; the server has no preview path. To check size + MIME locally before upload, use `file ./hero.jpg` and `du -h ./hero.jpg`.
 

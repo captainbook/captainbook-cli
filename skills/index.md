@@ -223,7 +223,7 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | Code | Meaning |
 |------|---------|
 | 0    | Success (or async-accepted; see stderr signal) |
-| 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), missing subcommand, or `--dry-run` on an operation the server can't preview |
+| 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), or a missing subcommand |
 | 10   | Authentication failed (401) |
 | 11   | Access denied (403) — `stats` only; see the note below the table |
 | 12   | Validation error (422) |
@@ -236,13 +236,16 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 
 **Codes 10-18 are the `stats` namespace's mapping.** In `inventory`, only a
 client-side refusal carries one, because only those return an `api.ExitError`:
-a bad flag value or a `(step_type, action_type)` pair the CLI rejects before
-sending is `12`, a config problem is `15`, and a failure to mint an idempotency
+a bad flag value, a `(step_type, action_type)` pair the CLI rejects before
+sending, and `--dry-run` on an operation the server cannot preview are all
+`12`, a config problem is `15`, and a failure to mint an idempotency
 key is `18`. **Every other `inventory` outcome exits `1`** — every server-side
 refusal whatever its status (403, 409, 422 alike) and the local
 `ABILITY_MISSING` refusal too, because each renders through its typed
 `UserMessage`, which the error handler prints to stderr before exiting 1. So
-rows 10, 11, 16 and 17 describe `stats`, not `inventory`.
+rows 10, 11, 13, 14, 16 and 17 describe `stats`, not `inventory` — a dropped
+connection or an unparseable body on an `inventory` call exits `1` as well,
+because 13 and 14 are only ever minted by the `stats` lane's own mapper.
 
 To tell inventory refusals apart, read **stderr**, or the audit row's
 `error_code` via `ceebee audit list --format json`. Do not look for an error
@@ -346,7 +349,7 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory bookings update <id>` | PATCH /bookings/{id} | `cli:write` | body |
 | `inventory bookings reschedule <id>` | POST /bookings/{id}/reschedule | `cli:cs` | body |
 
-When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally with `"dry-run not supported for this command"` and exit code 1 — no HTTP call is made.
+When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally and makes no HTTP call. The message names the operation it refused — `--dry-run is not supported by DELETE /products/{id} (this endpoint has no server-side dry-run capability)` — and the exit code is `12`, not `1`: the refusal is a client-side `api.ExitError`, so it is one of the few inventory outcomes that carries a code at all (see [Exit codes](#exit-codes)).
 
 **Not every dry-run tells you the same amount.** Most return `total_matched` — the number of rows the filter hit — which cannot answer *"will this change anything?"*, because it is identical whether your proposed value matches the current one or not. `availabilities bulk-update pricing` is the exception: its dry-run also returns `total_changed` plus a `diff` of the first `preview_limit` matched slots. See [availabilities.md](availabilities.md) example 5.
 

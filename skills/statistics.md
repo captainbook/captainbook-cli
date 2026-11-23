@@ -219,7 +219,7 @@ period only** — a comparison carries its own copy, and monetary entries in
 
 ## Exit codes
 
-Shared with the rest of the CLI: `10` auth, `11` forbidden, `12` validation (including every local refusal above), `13` network, `14` JSON parse, `15` config, `16` server, `17` rate limited, `18` unexpected.
+This mapping is this namespace's own, not the whole CLI's: `10` auth, `11` forbidden, `12` validation (including every local refusal above), `13` network, `14` JSON parse, `15` config, `16` server, `17` rate limited, `18` unexpected. `inventory` reuses only the client-side codes; every server-side refusal there exits `1`. See [index.md](index.md#exit-codes).
 
 ## See also
 

@@ -220,7 +220,7 @@ Override with `--format <json|table|csv>` on any command.
 
 ## Dry-run
 
-Most mutations support `--dry-run` and return a colored diff envelope (`{ would_apply: true, diff: { before, after } }`) without persisting. The CLI rejects `--dry-run` at parse time on endpoints where the server doesn't support it (e.g. `products delete`, `media upload`), with a typed error and exit code 1.
+Most mutations support `--dry-run` and return a colored diff envelope (`{ would_apply: true, diff: { before, after } }`) without persisting. The CLI rejects `--dry-run` at parse time on endpoints where the server doesn't support it (e.g. `products delete`, `media upload`), with a typed error naming the operation and exit code 12.
 
 ```bash
 ceebee inventory products update 42 --title "New title" --dry-run
@@ -254,7 +254,7 @@ ceebee completion fish | source
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | CLI usage error (unknown flag, unknown command, missing subcommand, dry-run not supported) |
+| 1 | CLI usage error (unknown flag, unknown command, missing subcommand) |
 | 10 | Authentication failed (401) |
 | 11 | Access denied (403) |
 | 12 | Validation error (422) |
@@ -266,7 +266,8 @@ ceebee completion fish | source
 | 18 | Unexpected status |
 
 These are the `stats` namespace's mapping. In `inventory` only a client-side
-refusal carries one (`12` for a rejected flag value or step-type pair, `15` for
+refusal carries one (`12` for a rejected flag value, a bad step-type pair, or
+`--dry-run` on an operation the server cannot preview; `15` for
 a config problem, `18` if an idempotency key cannot be minted); every
 server-side inventory refusal and the local `ABILITY_MISSING` refusal render
 through their typed message on stderr and exit `1`. A non-2xx never reaches

@@ -18,7 +18,7 @@ Intent: gate a long-running script on a working token.
 ceebee inventory whoami --format json
 ```
 
-Returns the envelope's `data.actor` (id, name, email), `data.tenant` (slug, currency, timezone), and `data.abilities` array. Exit code 10 means token is invalid; bail.
+Returns the envelope's `data.actor` (id, name, email), `data.tenant` (slug, currency, timezone), and `data.abilities` array. A refused `whoami` exits `1`, not `10` — codes `10`-`18` are the `stats` namespace's mapping, and every server-side `inventory` refusal renders its typed message to stderr and exits `1` (see [index.md](index.md#exit-codes)). So read stderr to tell a bad token (`UNAUTHENTICATED`) from a trial account (`FORBIDDEN`, the pitfall below); the exit code alone cannot.
 
 ### 2. Check whether the token has `cli:cs`
 
