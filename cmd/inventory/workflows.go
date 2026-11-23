@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -197,7 +198,7 @@ func workflowsDefs() []CommandDef {
 				if err != nil {
 					return nil, err
 				}
-				if err := assertStepTypesFitActionTypes(body); err != nil {
+				if err := assertComposedStepsFitActionTypes(body); err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.CreateWorkflowWithBodyWithResponse(ctx, &gen.CreateWorkflowParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -495,7 +496,7 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 				if err != nil {
 					return nil, err
 				}
-				if err := assertStepTypesFitActionTypes(body); err != nil {
+				if err := assertStepPairFitsActionType(body); err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.CreateWorkflowStepWithBodyWithResponse(ctx, id, &gen.CreateWorkflowStepParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -779,35 +780,50 @@ func triggerOrStepBody(args RunArgs, fieldMap map[string]string) ([]byte, error)
 	return json.Marshal(body)
 }
 
-// assertStepTypesFitActionTypes refuses, before the request leaves, the
-// (step_type, action_type) pairs spec 1.60.0 made a write-time 422
-// INVALID_STEP_CONFIG. It reads BOTH shapes a step can arrive in — the
-// top-level pair that `workflows steps create` sends, and each element of the
-// `steps` array that `workflows create` composes in one request — so the two
-// call sites share one rule instead of drifting apart. A body only ever
-// carries one of the two, and a body carrying neither is a no-op.
+// assertStepPairFitsActionType refuses, before the request leaves, a top-level
+// (step_type, action_type) pair that spec 1.60.0 made a write-time 422
+// INVALID_STEP_CONFIG. It belongs to `workflows steps create`, whose request
+// body IS one step.
 //
-// The composed array is worth the extra few lines: it is the path an agent
-// reaches for (one call instead of N), and the server refuses the WHOLE
-// request on one bad pair, so a mismatch in step 7 costs the workflow, the
-// trigger and the other six steps.
+// Scoped to this one route on purpose. An earlier version judged the top-level
+// pair AND a `steps` array on both routes, on the theory that a body only ever
+// carries one of the two. `--data` makes that false: neither request schema
+// forbids extra keys, so `workflows create --name x --data
+// '{"step_type":"delay","action_type":"send_email"}'` carried a pair the server
+// simply ignores (CreateWorkflowRequest does not declare those fields), and the
+// gate refused a shell create the server would have accepted. A gate whose
+// whole justification is "never refuse what the server accepts" cannot afford
+// that, so each route now reads only the shape it actually sends.
 //
 // Reads the assembled body rather than the flags so --data is covered too:
-// triggerOrStepBody and JSONBodyFromArgs both merge --data first and overlay
-// the typed flags, and a mismatched pair pushed in through --data is the same
-// wire request.
-func assertStepTypesFitActionTypes(body []byte) error {
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		return fmt.Errorf("validating request body: %w", err)
+// triggerOrStepBody merges --data first and overlays the typed flags, and a
+// mismatched pair pushed in through --data is the same wire request.
+func assertStepPairFitsActionType(body []byte) error {
+	m, err := decodeBodyFields(body)
+	if err != nil {
+		return err
 	}
-
 	stepType, _ := m["step_type"].(string)
 	actionType, _ := m["action_type"].(string)
 	if problem := stepPairProblem(stepType, actionType); problem != "" {
 		return stepPairRefusal(problem)
 	}
+	return nil
+}
 
+// assertComposedStepsFitActionTypes applies the same rule to each element of
+// the `steps` array that `workflows create` composes in one request. It is
+// worth its own gate: the server refuses the WHOLE request on one bad pair, so
+// a mismatch in step 7 costs the workflow, the trigger and the other six.
+//
+// Only `steps` is read here, for the reason above: `workflows create`'s own
+// body has no step of its own, and an extra top-level key is the caller's to
+// send.
+func assertComposedStepsFitActionTypes(body []byte) error {
+	m, err := decodeBodyFields(body)
+	if err != nil {
+		return err
+	}
 	steps, _ := m["steps"].([]any)
 	for i, raw := range steps {
 		step, ok := raw.(map[string]any)
@@ -823,6 +839,27 @@ func assertStepTypesFitActionTypes(body []byte) error {
 		}
 	}
 	return nil
+}
+
+// decodeBodyFields decodes an assembled request body for the two gates above.
+//
+// UseNumber keeps every JSON number as its literal text instead of converting
+// it to float64, so a value outside float64's range — `1e400` is legal JSON the
+// server may well accept — cannot fail the decode and make the gate refuse a
+// request over a number in a field it does not even read. Measured: with
+// UseNumber the gate returns nil for such a body. Note the refusal an operator
+// actually sees for `--data '{"x":1e400}'` today comes from further upstream,
+// in triggerOrStepBody's own `json.Unmarshal` into `map[string]any`
+// (`--data: invalid JSON: ... into Go value of type float64`); that is
+// pre-existing and untouched here.
+func decodeBodyFields(body []byte) (map[string]any, error) {
+	var m map[string]any
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&m); err != nil {
+		return nil, fmt.Errorf("validating request body: %w", err)
+	}
+	return m, nil
 }
 
 // stepPairProblem returns a sentence saying why action_type cannot sit in a

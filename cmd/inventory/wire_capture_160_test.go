@@ -6,9 +6,11 @@ package inventory
 // own file: everything it changes lives on the two edges the drift tests do not
 // watch. One edge is a local gate that must refuse BEFORE the request (1.60.0's
 // step_type/action_type pairing) — a gate that let the call through and leaned
-// on the server's 422 would still read as a gate by inspection while costing an
-// audit row and a round trip, so each refusal case asserts that nothing reached
-// the server, and each legal pair asserts that it did. The other is the error
+// on the server's 422 would still read as a gate by inspection while costing a
+// round trip, so each refusal case asserts that nothing reached the server, and
+// each legal pair asserts that it did. (The audit row is written either way:
+// runMutation appends it before the closure runs, so a local refusal still
+// records the command and its forensic fields — only the round trip is saved.) The other is the error
 // path: three refusals changed shape or meaning (1.57.0's child-bearing step
 // delete, 1.58.0's trial 403, 1.60.0's INVALID_STEP_CONFIG), and a code that
 // parses into the wrong type still prints SOMETHING, so only an assertion on
@@ -419,5 +421,53 @@ func TestWire_TrialRefusalIsNotReadAsAPermissionsProblem(t *testing.T) {
 	}
 	if !strings.Contains(msg, "whoami") {
 		t.Errorf("UserMessage() = %q, want the remediation for the ability cause too", msg)
+	}
+}
+
+// TestWire_EachGateReadsOnlyItsOwnRouteShape pins the scoping both outside
+// readers asked for. Neither request schema forbids extra keys, so `--data` can
+// put a step-shaped pair on a shell create and a `steps` array on a single-step
+// create. The server ignores the ones its own schema does not declare, so the
+// CLI must too: an earlier version judged both shapes on both routes and
+// refused a `workflows create` the server would have accepted.
+//
+// Value: protects=each gate reads only the shape its own route sends, so an extra key the server ignores never costs a local refusal; fails_when=either gate widens back to reading both shapes, or one is wired to the other's route; why_new=the single combined gate refused a shell create carrying a stray pair; seam=captureReq; no_claim=says nothing about what the server does with the stray key
+func TestWire_EachGateReadsOnlyItsOwnRouteShape(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want map[string]any
+	}{
+		{
+			// A shell create carrying a step-shaped pair the server ignores.
+			// The pair is a mismatched one, so the old combined gate refused it.
+			name: "workflows create is not judged on a stray top-level pair",
+			args: []string{"workflows", "create", "--name", "pre-trip reminders",
+				"--data", `{"step_type":"delay","action_type":"send_email"}`},
+			want: map[string]any{"name": "pre-trip reminders", "step_type": "delay", "action_type": "send_email"},
+		},
+		{
+			// The mirror case: a single-step create carrying a stray `steps`
+			// array, which CreateWorkflowStepRequest does not declare.
+			name: "steps create is not judged on a stray steps array",
+			args: []string{"workflows", "steps", "create", "7b9e5a2c-0000-4000-8000-000000000001",
+				"--step-type", "action", "--action-type", "send_email", "--order", "0",
+				"--data", `{"steps":[{"step_type":"delay","action_type":"send_email"}]}`},
+			want: map[string]any{"step_type": "action", "action_type": "send_email"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, body, _, hit, err := captureReq(t, tc.args...)
+			if !hit {
+				t.Fatalf("the request was refused locally, but the server accepts it: %v", err)
+			}
+			for key, want := range tc.want {
+				if got := body[key]; got != want {
+					t.Errorf("body[%q] = %#v, want %#v", key, got, want)
+				}
+			}
+		})
 	}
 }
