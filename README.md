@@ -267,8 +267,10 @@ ceebee completion fish | source
 
 These are the `stats` namespace's mapping. In `inventory` only a client-side
 refusal carries one (`12` for a rejected flag value or step-type pair, `15` for
-a config problem); every server-side inventory refusal and the local
-`ABILITY_MISSING` refusal render through their typed message and exit `1`. See
+a config problem, `18` if an idempotency key cannot be minted); every
+server-side inventory refusal and the local `ABILITY_MISSING` refusal render
+through their typed message on stderr and exit `1`. A non-2xx never reaches
+stdout, so read stderr or the audit row's `error_code`. See
 [skills/index.md](skills/index.md#exit-codes).
 
 ## Development

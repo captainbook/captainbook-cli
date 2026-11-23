@@ -225,7 +225,7 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | 0    | Success (or async-accepted; see stderr signal) |
 | 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), missing subcommand, or `--dry-run` on an operation the server can't preview |
 | 10   | Authentication failed (401) |
-| 11   | Forbidden / ability missing (403) |
+| 11   | Access denied (403) — `stats` only; see the note below the table |
 | 12   | Validation error (422) |
 | 13   | Network / timeout |
 | 14   | JSON parse error |
@@ -237,13 +237,17 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 **Codes 10-18 are the `stats` namespace's mapping.** In `inventory`, only a
 client-side refusal carries one, because only those return an `api.ExitError`:
 a bad flag value or a `(step_type, action_type)` pair the CLI rejects before
-sending is `12`, and a config problem is `15`. **Everything else in `inventory`
-exits `1`** — every server-side refusal whatever its status (403, 409, 422
-alike) and the local `ABILITY_MISSING` refusal too, because each renders
-through its typed `UserMessage`, which the error handler prints before exiting
-1. So rows 10, 11, 16 and 17 describe `stats`, not `inventory`. Branch on
-`error.code` from `--format json`, or on stderr, when you need to tell
-inventory refusals apart.
+sending is `12`, a config problem is `15`, and a failure to mint an idempotency
+key is `18`. **Every other `inventory` outcome exits `1`** — every server-side
+refusal whatever its status (403, 409, 422 alike) and the local
+`ABILITY_MISSING` refusal too, because each renders through its typed
+`UserMessage`, which the error handler prints to stderr before exiting 1. So
+rows 10, 11, 16 and 17 describe `stats`, not `inventory`.
+
+To tell inventory refusals apart, read **stderr**, or the audit row's
+`error_code` via `ceebee audit list --format json`. Do not look for an error
+envelope on stdout: a non-2xx never reaches it (`res.Body` is reserved for
+successful payloads), so `--format json` only ever formats a success.
 
 ### Error codes
 
