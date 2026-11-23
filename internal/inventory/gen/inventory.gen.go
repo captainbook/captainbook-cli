@@ -2362,14 +2362,20 @@ type Answer struct {
 	// store one entry per purchased unit and flatten to a comma-joined
 	// list here — use `answer_raw` to recover the per-unit structure.
 	//
-	// Close to, but deliberately NOT identical to, how
-	// `GetAnswersAction::normaliseAnswerToString` renders the same answer
-	// for workflows and manifests. Two values differ, both in this
-	// surface's favour: boolean `false` is `"0"` here and `""` there
-	// (that method casts with `(string)`, and `(string)false` is the
-	// empty string), and a nested array without an `answer` key is
-	// flattened recursively here but stringifies to the literal `"Array"`
-	// there. Do not assume the two surfaces agree byte-for-byte.
+	// Rendered identically to how `GetAnswersAction::normaliseAnswerToString`
+	// renders the same answer for workflows and manifests. Three values
+	// used to differ, all resolved in this surface's favour: boolean
+	// `false` is `"0"` on both (never `""`, which cannot be told apart
+	// from a question that was never answered), a nested array without an
+	// `answer` key is flattened recursively on both rather than
+	// stringified to the literal `"Array"`, and a bare boolean nested in
+	// an array follows the same `"0"`/`"1"` rule as a top-level one.
+	//
+	// They remain two implementations with no shared code, held in step
+	// by `tests/Architecture/AnswerNormalisationParityTest.php`. A
+	// boolean question stores the raw value of its own select — `1` for
+	// yes, anything else for no — so compare against `1` rather than
+	// against a localised "Yes".
 	Answer *string `json:"answer,omitempty"`
 
 	// AnswerRaw The stored answer decoded verbatim from its JSON column, with no
@@ -6705,7 +6711,10 @@ type WorkflowStep struct {
 	// ActionType For TRIGGER steps: matches TriggerType (booking_confirmed,
 	// scheduled_time, …). For ACTION steps: matches ActionType
 	// (send_notification, charge_card_on_file, …). Null for
-	// CONDITION steps (use condition_type instead).
+	// CONDITION steps (use condition_type instead). A step saved with
+	// a type that no longer exists reads back with that stored name,
+	// which is not in TriggerType/ActionType; such a workflow cannot
+	// be activated until the step is replaced or deleted.
 	ActionType *string `json:"action_type,omitempty"`
 
 	// BranchType Branch tag for CONDITION children (true/false) or LOOP children (true).
@@ -28118,6 +28127,7 @@ type DestroyWorkflowStepResponse struct {
 	JSON401 *Unauthenticated
 	JSON404 *NotFound
 	JSON409 *ErrorEnvelope
+	JSON422 *ValidationError
 }
 
 // Status returns HTTPResponse.Status
@@ -37217,6 +37227,13 @@ func ParseDestroyWorkflowStepResponse(rsp *http.Response) (*DestroyWorkflowStepR
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 

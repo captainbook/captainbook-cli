@@ -214,12 +214,12 @@ period only** — a comparison carries its own copy, and monetary entries in
 - **`--time-from` / `--time-to` no longer exist.** They were renamed to `--time-of-day-from` / `--time-of-day-to`. The old names sent query keys the API never accepted, so they returned the whole period **unfiltered while presenting it as filtered**. If a script still uses them it now fails loudly, which is the point.
 - **Money is in the tenant's display units** — `150.00` for EUR, `15000` for JPY. Check `meta.currency`.
 - **Read `meta.filters`.** The server echoes back which filters it applied. If something is missing from that echo, it was not applied.
-- **Statistics needs a subscription.** A plan without it answers `403`, as does a token whose user lacks `view_reports`.
+- **Statistics needs a subscription, and so does the API itself.** Three states answer `403` here: a plan that does not include statistics, a token whose user lacks `view_reports`, and — since statistics spec 1.5.0 — an account still on its unpaid free trial, which closes the whole API until it subscribes. The message says which; only the first two are fixed by a plan upgrade or a role change.
 - **`revenue` and a booking's own `total_amount` are different bases — never cross-foot them.** This surface sums `bookings.gross_price`, which is pricing tiers ONLY and carries no purchased add-ons; add-on money is reported separately by `stats extras`. Since Inventory CLI spec 1.34.0, a booking's `total_amount` from `ceebee inventory bookings get` **includes** its extras (see [bookings.md](bookings.md)). So the sum of per-booking totals over a period will exceed `stats revenue` for that period by roughly the extras total, and that gap is a basis difference, not a discrepancy to chase. A marketplace booking adds a second, independent gap: most per-booking readers base on `retail_price`, which adds the application fee.
 
 ## Exit codes
 
-Shared with the rest of the CLI: `10` auth, `11` forbidden, `12` validation (including every local refusal above), `13` network, `14` JSON parse, `15` config, `16` server, `17` rate limited, `18` unexpected.
+This mapping is this namespace's own, not the whole CLI's: `10` auth, `11` forbidden, `12` validation (including every local refusal above), `13` network, `14` JSON parse, `15` config, `16` server, `17` rate limited, `18` unexpected. `inventory` reuses only the client-side codes; every server-side refusal there exits `1`. See [index.md](index.md#exit-codes).
 
 ## See also
 

@@ -42,8 +42,14 @@ Four things those tests deliberately do NOT prove, each with its own guard:
 
 - **That a value reaches the wire.** A flag can be declared and never wired, and
   both drift directions stay green. `cmd/inventory/wire_capture_test.go` (plus
-  the per-sync `wire_capture_134_test.go` and `wire_capture_156_test.go`) and
-  `cmd/stats_wire_test.go` assert on the request the server actually receives.
+  the per-sync `wire_capture_134_test.go`, `wire_capture_156_test.go` and
+  `wire_capture_160_test.go`) and `cmd/stats_wire_test.go` assert on the request
+  the server actually receives. `wire_capture_160_test.go` also covers the other
+  thing a drift test cannot see: a gate that refuses BEFORE the request, so each
+  LOCAL-refusal case asserts the server received nothing and each legal pair
+  asserts it did. Its server-refusal cases are the mirror image, asserting the
+  request DID arrive, since an assertion on a response the CLI never fetched
+  would pass for the wrong reason.
 - **That a flag's TYPE matches the spec.** See
   `TestSpecDrift_FlagTypesMatchSpecTypes`; it reads the LIVE cobra tree, not the
   AST, because an AST walker reads a non-literal field as empty and skips the

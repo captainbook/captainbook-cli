@@ -41,7 +41,7 @@ When both are set, `--profile` wins over env vars.
 
 ### Token abilities
 
-Tokens carry one or more abilities. The server enforces them at the route layer; missing abilities return `403 ABILITY_MISSING`.
+Tokens carry one or more abilities. The CLI checks them against the token's cached `whoami` set before it sends anything, so a missing ability is normally a LOCAL refusal carrying `ABILITY_MISSING`: **the command you ran never reaches the server.** It is not fully offline, though — `refuseAbility` is Refuse plus one retry, so a refusal decided on the cached set issues one live `whoami` before it is final. That exists because an admin can grant `cli:cs` to an existing token without the token string changing, and a cached entry would otherwise refuse forever. The server enforces the same gate at the route layer for whatever gets past that, and its answer is `403 FORBIDDEN` with the ability named in the message. `ABILITY_MISSING` is the CLI's own code: it appears nowhere in the vendored spec's `Error.code` catalogue. The CLI still decodes an `ABILITY_MISSING` envelope if one ever arrives, which is tolerance for a code the contract does not promise, not evidence that the API sends it.
 
 | Ability     | Required for |
 |-------------|--------------|
@@ -223,9 +223,9 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | Code | Meaning |
 |------|---------|
 | 0    | Success (or async-accepted; see stderr signal) |
-| 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), missing subcommand, or `--dry-run` on an operation the server can't preview |
+| 1    | CLI usage error, before any HTTP call: unknown flag (`--since` on the five resources that dropped it), unknown command (a bare `false` left behind by the space form of a bool flag), or a missing subcommand |
 | 10   | Authentication failed (401) |
-| 11   | Forbidden / ability missing (403) |
+| 11   | Access denied (403) — `stats` only; see the note below the table |
 | 12   | Validation error (422) |
 | 13   | Network / timeout |
 | 14   | JSON parse error |
@@ -234,6 +234,29 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | 17   | Rate limited (429) |
 | 18   | Unexpected status |
 
+**Codes 10-18 are the `stats` namespace's mapping.** In `inventory`, only a
+client-side refusal carries one, because only those return an `api.ExitError`:
+a bad flag value, a `(step_type, action_type)` pair the CLI rejects before
+sending, and `--dry-run` on an operation the server cannot preview are all
+`12`, a config problem is `15`, and a failure to mint an idempotency
+key is `18`. **Every other `inventory` FAILURE exits `1`** — every server-side
+refusal whatever its status (403, 409, 422 alike) and the local
+`ABILITY_MISSING` refusal too, because each renders through its typed
+`UserMessage`, which the error handler prints to stderr before exiting 1. So
+rows 10, 11, 13, 14, 16 and 17 describe `stats`, not `inventory`: a dropped
+connection or an unparseable body on an `inventory` call exits `1` too. Read
+that as "every other failure", not "every other outcome" — a successful call
+exits 0, and the workflow reads that bypass the typed parse can print a body
+the formatter could not read and still exit 0.
+
+To tell inventory refusals apart, read **stderr**, or the audit row's
+`error_code` via `ceebee audit list --format json`. A refusal the CLI decided
+itself (a rejected flag value or step-type pair, or a `--dry-run` it cannot
+preview) records `CLIENT_REFUSED` there — the CLI's own code, not one the API
+sends. Do not look for an error
+envelope on stdout: a non-2xx never reaches it (`res.Body` is reserved for
+successful payloads), so `--format json` only ever formats a success.
+
 ### Error codes
 
 The server emits a stable `code` string in every error envelope. The CLI maps each to a typed error with a crisp `UserMessage`. Common codes you will see:
@@ -241,7 +264,8 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | Code | When |
 |------|------|
 | `UNAUTHENTICATED` | Token missing, invalid, or expired. |
-| `ABILITY_MISSING` | Token valid, but lacks the required ability (`cli:write` / `cli:cs`). |
+| `ABILITY_MISSING` | Token valid, but lacks the required ability (`cli:write` / `cli:cs`). Raised by the CLI's own preflight, before the request; the server spells the same refusal `FORBIDDEN`, and this code is absent from the spec's catalogue. |
+| `FORBIDDEN` | 403, and FOUR states produce it, each with a different fix: the token is not scoped to the ability the route needs (the message names it), the user the token was issued to lacks the role permission the web UI requires, the request crossed tenants, or — since spec 1.58.0 — the account is still on its unpaid free trial, which closes every endpoint until it subscribes to a paid plan. Read the message before touching token scopes; no scope or role change lifts the trial one. |
 | `VALIDATION_FAILED` | Request body violates schema; `errors[]` lists field paths. |
 | `IDEMPOTENCY_CONFLICT` | Same key, different body. |
 | `IDEMPOTENCY_IN_PROGRESS` | Same key still executing on the server. |
@@ -259,6 +283,7 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED` | 422 on `bookings reschedule`: the destination departure belongs to another product option. That move cancels and replaces on the dashboard; it is not an in-place reschedule. |
 | `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE` | 422 on `bookings update`: the custom attribute is backed by a code pool, which changes only through the atomic claim/release action — writing it directly would leave the same code drawable for a second customer. |
 | `BOOKING_RESOURCE_REQUEST_INVALID` | 422 on `bookings set-resources` when every rejection is request-shape (`MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` / `REPLACED_RESOURCE_WITHOUT_MAIN`). Same `details.rejections[]` as the 409. Nothing was applied, so the key is released. |
+| `INVALID_STEP_CONFIG` | 422 on the workflow trigger and step writes: either a config field the action's own `rules()` rejected, or — since spec 1.60.0 — a type that does not fit the step holding it (a misspelt `sendEmail`, a `delay` step carrying `send_email`, an `action` step carrying `delay`). `details.errors` is Laravel-shaped field => messages and is where the explanation lives; the top-level message is a fixed sentence. The CLI refuses the delay mismatches locally, before the request. |
 | `RATE_LIMITED` | 429; respect `Retry-After`. |
 
 ## Capability table
@@ -329,7 +354,7 @@ Which mutations support `--dry-run`, where it lives in the request, and any cave
 | `inventory bookings update <id>` | PATCH /bookings/{id} | `cli:write` | body |
 | `inventory bookings reschedule <id>` | POST /bookings/{id}/reschedule | `cli:cs` | body |
 
-When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally with `"dry-run not supported for this command"` and exit code 1 — no HTTP call is made.
+When the dry-run column says **none**, sending `--dry-run` from the CLI errors locally and the mutation request is never sent. (Not necessarily before any HTTP at all: the gate runs inside the command, so a cold ability cache can spend one `whoami` in the preflight first.) The message names the operation it refused — `--dry-run is not supported by DELETE /products/{id} (this endpoint has no server-side dry-run capability)` — and the exit code is `12`, not `1`: the refusal is a client-side `api.ExitError`, so it is one of the few inventory outcomes that carries a code at all (see [Exit codes](#exit-codes)).
 
 **Not every dry-run tells you the same amount.** Most return `total_matched` — the number of rows the filter hit — which cannot answer *"will this change anything?"*, because it is identical whether your proposed value matches the current one or not. `availabilities bulk-update pricing` is the exception: its dry-run also returns `total_changed` plus a `diff` of the first `preview_limit` matched slots. See [availabilities.md](availabilities.md) example 5.
 

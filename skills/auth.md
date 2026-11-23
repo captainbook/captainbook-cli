@@ -18,7 +18,7 @@ Intent: gate a long-running script on a working token.
 ceebee inventory whoami --format json
 ```
 
-Returns the envelope's `data.actor` (id, name, email), `data.tenant` (slug, currency, timezone), and `data.abilities` array. Exit code 10 means token is invalid; bail.
+Returns the envelope's `data.actor` (id, name, email), `data.tenant` (slug, currency, timezone), and `data.abilities` array. A refused `whoami` exits `1`, not `10` — codes `10`-`18` are the `stats` namespace's mapping, and every server-side `inventory` refusal renders its typed message to stderr and exits `1` (see [index.md](index.md#exit-codes)). So read stderr to tell a bad token from a trial account; the exit code alone cannot. Match on the sentence, not on the API's code name: a 401 prints ``token expired or revoked. Run `ceebee config use <profile>` to switch, or refresh your token.``, and the trial 403 prints the `Four states answer FORBIDDEN…` paragraph (the pitfall below). The literal `UNAUTHENTICATED` never reaches stderr — it lives in the developer-facing `Error()` the CLI does not print — and `whoami` is a read, so there is no audit row to fall back on either.
 
 ### 2. Check whether the token has `cli:cs`
 
@@ -54,6 +54,7 @@ Returns e.g. `{"slug":"demo","currency":"EUR"}`. If this prints `JPY` and you we
 
 - ⚠️ **A missing ability may not be re-issuable by whoever issued the token.** Since spec 1.3.0, minting a token carrying `cli:read` / `cli:write` / `cli:cs` requires the matching `issue_cli_read_token` / `issue_cli_write_token` / `issue_cli_cs_token` permission (the latter two admin-only by default), and attributing a token to another user requires `issue_api_token_for_other_users`. Existing tokens keep working — the check runs at issue time, not call time — so this surfaces on rotation: "just re-issue it with `cli:cs`" may need an admin. Say so explicitly when telling an operator to upgrade their token.
 - ⚠️ **Mobile device-login tokens no longer carry a wildcard.** They used to hold Sanctum's `*`, which satisfied every ability gate including `cli:cs`. A script that worked against a device token may now 403.
+- ⚠️ **An account on its free trial is refused everywhere, `whoami` included (spec 1.58.0).** Every endpoint answers `403 FORBIDDEN` with a message saying API access starts once the account subscribes to a paid plan — and because the gate is middleware, the identity probe this cookbook tells you to run first is the call that fails. A valid token with every ability still gets it, so a 403 on `whoami` is the one case where the answer is never "fix the token". MCP refuses the same accounts, with `subscription_required`.
 - ⚠️ **A 401 from `whoami` doesn't always mean a bad token** — it can also mean the token's `expires_at` has passed (Sanctum 4 enforces this framework-side). Check the issuance UI before re-issuing.
 - ⚠️ **Token leakage:** the bearer token is the credential of record (no TLS pinning). Treat `CEEBEE_API_TOKEN` and `~/.ceebee/config.yaml` as secrets — both end up in the audit log if you `cat` them inside a piped command.
 - ⚠️ **Cross-tenant tokens silently 401:** Sanctum scopes tokens to the issuing tenant. Pointing `CEEBEE_API_URL` at a different tenant's subdomain returns 401, not a clear "wrong tenant" error.

@@ -44,6 +44,56 @@ func TestUserMessages(t *testing.T) {
 				"or switch profiles with --profile <name>.",
 		},
 		{
+			name: "ForbiddenError",
+			err: &ForbiddenError{
+				Message: "API and MCP access are not available during the free trial. Subscribe to a paid plan to use them.",
+			},
+			wantError: "FORBIDDEN: API and MCP access are not available during the free trial. Subscribe to a paid plan to use them.",
+			wantMessage: "API and MCP access are not available during the free trial. Subscribe to a paid plan to use them.\n" +
+				"  Four states answer FORBIDDEN and the fixes differ: the token's abilities " +
+				"(`ceebee inventory whoami` lists them), the role permissions of the user it was " +
+				"issued to (Settings → Users), a request that crossed tenants (wrong --profile), " +
+				"or an account still on its unpaid free trial — since spec 1.58.0 a trial is " +
+				"refused on every endpoint, whoami included, so a 403 there rules the token " +
+				"out as the cause rather than in; only subscribing to a paid plan lifts it.",
+		},
+		{
+			// The server always writes a message; this is the "body carried
+			// none" floor, which must not claim one of the four causes.
+			name:      "ForbiddenError_no_message",
+			err:       &ForbiddenError{},
+			wantError: "FORBIDDEN",
+			wantMessage: "refused (403 FORBIDDEN)\n" +
+				"  Four states answer FORBIDDEN and the fixes differ: the token's abilities " +
+				"(`ceebee inventory whoami` lists them), the role permissions of the user it was " +
+				"issued to (Settings → Users), a request that crossed tenants (wrong --profile), " +
+				"or an account still on its unpaid free trial — since spec 1.58.0 a trial is " +
+				"refused on every endpoint, whoami included, so a 403 there rules the token " +
+				"out as the cause rather than in; only subscribing to a paid plan lifts it.",
+		},
+		{
+			// The envelope's `hint` is server-authored remediation, and the
+			// FORBIDDEN constructor is new in this sync — it reads Hint off
+			// the envelope, so the rendering has to show it or the field is
+			// plumbed to nowhere.
+			//
+			// Value: protects=the server's hint on a 403 reaches the operator below the four-cause paragraph; fails_when=the registry stops copying env.Error.Hint, or UserMessage drops the hint branch; why_new=no row exercised ForbiddenError.Hint; seam=none; no_claim=nothing about which cause the hint describes
+			name: "ForbiddenError_with_hint",
+			err: &ForbiddenError{
+				Message: "This action is unauthorized.",
+				Hint:    "Issue a token with the `inventory:write` ability.",
+			},
+			wantError: "FORBIDDEN: This action is unauthorized.",
+			wantMessage: "This action is unauthorized.\n" +
+				"  Four states answer FORBIDDEN and the fixes differ: the token's abilities " +
+				"(`ceebee inventory whoami` lists them), the role permissions of the user it was " +
+				"issued to (Settings → Users), a request that crossed tenants (wrong --profile), " +
+				"or an account still on its unpaid free trial — since spec 1.58.0 a trial is " +
+				"refused on every endpoint, whoami included, so a 403 there rules the token " +
+				"out as the cause rather than in; only subscribing to a paid plan lifts it.\n" +
+				"  hint: Issue a token with the `inventory:write` ability.",
+		},
+		{
 			name:        "NotFoundError",
 			err:         &NotFoundError{ResourceType: "product", ID: "prod_42"},
 			wantError:   "NOT_FOUND: product prod_42",
@@ -264,6 +314,49 @@ func TestUserMessages(t *testing.T) {
 			wantMessage: "server returned an unexpected response shape (status 200). The CLI may be out of date — try upgrading. Underlying parse error: invalid character '?'",
 		},
 		{
+			// The 1.60.0 case: the type does not fit the step holding it. The
+			// server's own sentence does not say the fix may be the STEP type,
+			// so the message adds the pairing rule.
+			name: "InvalidStepConfigError_action_type",
+			err: &InvalidStepConfigError{
+				Message:     "Step config does not match the action schema.",
+				FieldErrors: map[string][]string{"action_type": {`Unknown delay type "send_email".`}},
+				Hint:        "Check the action_type and the required config fields.",
+			},
+			wantError: "INVALID_STEP_CONFIG (1 fields)",
+			wantMessage: "Step config does not match the action schema.\n" +
+				"  - action_type: Unknown delay type \"send_email\".\n" +
+				"  A type has to fit the step holding it: step_type=delay takes action_type=delay " +
+				"and nothing else, delay_until takes delay_until, and step_type=action takes any " +
+				"other action type. `ceebee inventory workflows nodes` lists the catalogue with " +
+				"each type's config.\n" +
+				"  hint: Check the action_type and the required config fields.",
+		},
+		{
+			// A rules() failure on the config itself: same code, no pairing
+			// advice, and the field names are what the caller needs.
+			name: "InvalidStepConfigError_config_fields",
+			err: &InvalidStepConfigError{
+				Message: "Step config does not match the action schema.",
+				FieldErrors: map[string][]string{
+					"template_id": {"The template id field is required."},
+					"channel":     {"The selected channel is invalid."},
+				},
+			},
+			wantError: "INVALID_STEP_CONFIG (2 fields)",
+			wantMessage: "Step config does not match the action schema.\n" +
+				"  - channel: The selected channel is invalid.\n" +
+				"  - template_id: The template id field is required.",
+		},
+		{
+			// details dropped by the server: degrade to a sentence, never to
+			// a swallowed refusal.
+			name:        "InvalidStepConfigError_no_details",
+			err:         &InvalidStepConfigError{},
+			wantError:   "INVALID_STEP_CONFIG (0 fields)",
+			wantMessage: "step config does not match the action schema",
+		},
+		{
 			name:        "RawAPIError_with_code",
 			err:         &RawAPIError{Code: "BOOKING_ALREADY_CANCELLED", Status: 409, Message: "Booking is already cancelled."},
 			wantError:   "BOOKING_ALREADY_CANCELLED (status 409): Booking is already cancelled.",
@@ -378,6 +471,116 @@ func TestParseError(t *testing.T) {
 				}
 				if nf.ResourceType != "product" || nf.ID != "prod_42" {
 					t.Errorf("wrong fields: %+v", nf)
+				}
+			},
+		},
+		{
+			// Spec 1.58.0: an unpaid trial is refused on every endpoint with
+			// this envelope. Before FORBIDDEN was registered it reached
+			// RawAPIError, which prefixes the code onto the sentence.
+			name:   "FORBIDDEN maps to *ForbiddenError and keeps the server's sentence",
+			status: 403,
+			body: `{
+				"meta":{"request_id":"req_F"},
+				"error":{"code":"FORBIDDEN",
+				         "message":"API and MCP access are not available during the free trial. Subscribe to a paid plan to use them.",
+				         "retriable":false}
+			}`,
+			check: func(t *testing.T, err error) {
+				var fe *ForbiddenError
+				if !errors.As(err, &fe) {
+					t.Fatalf("want *ForbiddenError, got %T", err)
+				}
+				if !strings.Contains(fe.UserMessage(), "free trial") {
+					t.Errorf("UserMessage dropped the server's reason: %q", fe.UserMessage())
+				}
+				if !strings.Contains(fe.UserMessage(), "whoami") {
+					t.Errorf("UserMessage names no way to check the other causes: %q", fe.UserMessage())
+				}
+			},
+		},
+		{
+			// Spec 1.60.0 routes a misspelt or mismatched step type through
+			// this code, and `details.errors` is the only place that says
+			// which. RawAPIError carried `message` alone, so the whole
+			// explanation used to be dropped.
+			name:   "INVALID_STEP_CONFIG extracts details.errors",
+			status: 422,
+			body: `{
+				"meta":{"request_id":"req_S"},
+				"error":{
+					"code":"INVALID_STEP_CONFIG",
+					"message":"Step config does not match the action schema.",
+					"hint":"Check the action_type and the required config fields.",
+					"retriable":false,
+					"details":{"errors":{"action_type":["Unknown delay type \"send_email\"."]}}
+				}
+			}`,
+			check: func(t *testing.T, err error) {
+				var se *InvalidStepConfigError
+				if !errors.As(err, &se) {
+					t.Fatalf("want *InvalidStepConfigError, got %T", err)
+				}
+				got := se.FieldErrors["action_type"]
+				if len(got) != 1 || got[0] != `Unknown delay type "send_email".` {
+					t.Fatalf("details.errors not extracted: %+v", se.FieldErrors)
+				}
+				if se.Hint != "Check the action_type and the required config fields." {
+					t.Errorf("hint dropped: %q", se.Hint)
+				}
+				if !strings.Contains(se.UserMessage(), "step_type=delay takes action_type=delay") {
+					t.Errorf("UserMessage does not state the pairing rule: %q", se.UserMessage())
+				}
+			},
+		},
+		{
+			// The decode is best-effort: `details` is additionalProperties,
+			// so a server that stops sending `errors` must still produce a
+			// refusal with its sentence, not a nil error or a panic.
+			name:   "INVALID_STEP_CONFIG without details still refuses",
+			status: 422,
+			body: `{
+				"meta":{"request_id":"req_S2"},
+				"error":{"code":"INVALID_STEP_CONFIG","message":"Step config does not match the action schema.","retriable":false}
+			}`,
+			check: func(t *testing.T, err error) {
+				var se *InvalidStepConfigError
+				if !errors.As(err, &se) {
+					t.Fatalf("want *InvalidStepConfigError, got %T", err)
+				}
+				if len(se.FieldErrors) != 0 {
+					t.Errorf("invented field errors: %+v", se.FieldErrors)
+				}
+				if se.UserMessage() != "Step config does not match the action schema." {
+					t.Errorf("UserMessage = %q", se.UserMessage())
+				}
+			},
+		},
+		{
+			// `details` is additionalProperties: true, so `errors` can arrive
+			// in a shape decodeFieldErrors cannot read — for example the flat
+			// list shape the VALIDATION_FAILED envelope uses. The decode is
+			// best-effort by design: a shape it cannot read must degrade to
+			// the server's sentence, never to a panic or a swallowed refusal.
+			//
+			// Value: protects=an unreadable details.errors still yields a typed INVALID_STEP_CONFIG with the server's sentence; fails_when=decodeFieldErrors stops tolerating a wrong type and the constructor panics or returns nil; why_new=only the absent-details case was covered, not the wrong-shape one; seam=none; no_claim=does not pin which shapes the server may send
+			name:   "INVALID_STEP_CONFIG with an unreadable details.errors degrades",
+			status: 422,
+			body: `{
+				"meta":{"request_id":"req_S3"},
+				"error":{"code":"INVALID_STEP_CONFIG","message":"Step config does not match the action schema.","retriable":false,
+				         "details":{"errors":["action_type is unknown"]}}
+			}`,
+			check: func(t *testing.T, err error) {
+				var se *InvalidStepConfigError
+				if !errors.As(err, &se) {
+					t.Fatalf("want *InvalidStepConfigError, got %T", err)
+				}
+				if len(se.FieldErrors) != 0 {
+					t.Errorf("read field errors out of a shape it cannot read: %+v", se.FieldErrors)
+				}
+				if se.UserMessage() != "Step config does not match the action schema." {
+					t.Errorf("UserMessage = %q, want the server's bare sentence", se.UserMessage())
 				}
 			},
 		},

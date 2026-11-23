@@ -46,7 +46,15 @@ func answersDefs() []CommandDef {
 				"written, and are read in the tenant's timezone (or the product's when " +
 				"--product-option-id narrows the query to one). --since is the genuine " +
 				"UTC bound against updated_at. They answer different questions: use " +
-				"--from/--to for a manifest, --since to sync what changed.",
+				"--from/--to for a manifest, --since to sync what changed.\n\n" +
+				"answer is always a string, and empty when the stored value is null. Since " +
+				"spec 1.59.0 a boolean reads 1 or 0 wherever it sits: a false stored inside " +
+				"an array used to flatten to the empty string, so \"answered no\" was " +
+				"indistinguishable from an unanswered question. Empty still is not a " +
+				"synonym for unanswered — a stored empty string and a stored empty array " +
+				"both render empty too — so read answer_raw when you need to tell those " +
+				"apart. A boolean question stores the raw value of its own select, so " +
+				"compare against 1 rather than a localised Yes.",
 			Example: "  # Tomorrow's answers for one departure's product option\n" +
 				"  ceebee inventory answers list --product-option-id 42 \\\n" +
 				"      --from 2026-09-01T00:00:00Z --to 2026-09-02T00:00:00Z\n\n" +

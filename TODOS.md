@@ -880,8 +880,23 @@ fail at cobra flag-validation (no entry) now fails inside `Run` (entry). Same fo
 the `--to` must-be-after-`--from` check, the availability-ids caps, `segments get`'s
 UUID parse, and the new `--status`/`--booking-status` exclusivity.
 
+The cli-v1 1.60.0 sync added one more, and measured it: the new
+`(step_type, action_type)` gate refuses inside the closure, and its row carries
+no `error_code` at all. Note what that says about the fix below — the gate DOES
+return an `*api.ExitError`, and the row still loses the code, because
+`errorCode` in `cmd/inventory/inventory.go` is a type switch over `invpkg`
+types only and has no `*api.ExitError` case; its fallthrough is `""` and
+`AuditEntry.ErrorCode` is `omitempty`. So "return a distinguishable error" is
+necessary but not sufficient; `errorCode` needs the case too. Measured on the
+real binary: the row for `workflows steps create --step-type delay
+--action-type send_email` has no `error_code` key, while its
+`forensic_summary` does carry `{"action-type":"send_email","order":0,
+"step-type":"delay"}`, so the inputs that caused the refusal are recoverable
+even today — it is the code string that is missing, not the diagnosis.
+
 **Fix:** have pre-flight gates return a distinguishable error (an `*api.ExitError`
-or a sentinel) and skip `Append` when `res == nil && WireBody == nil`.
+or a sentinel), give `errorCode` a case for it (a client-side code such as
+`CLIENT_REFUSED`), and skip `Append` when `res == nil && WireBody == nil`.
 **Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
 
 ## `--data` bypasses the bulk-update scope gate and is absent from the audit
@@ -1423,6 +1438,15 @@ Note there is still no test pinning the registry against the spec's `Error.code`
 catalogue in either direction, so a code the server starts emitting is invisible
 here until someone hits it.
 
+The 1.60.0 sync applied that criterion to two more codes and left the rest.
+`INVALID_STEP_CONFIG` earned a type because `RawAPIError` was not merely
+remedy-free on it — it was dropping content: the message is the fixed sentence
+"Step config does not match the action schema." and every word naming the field
+or the type lives in `details.errors`. `FORBIDDEN` earned one because 1.58.0
+gave it a fourth cause (an unpaid free trial) whose remedy contradicts the other
+three: no token scope or role change lifts it, and nothing in the server's
+sentence says the other three exist.
+
 **Why:** the fallback is honest, so nothing is lost today; the gap is that
 "which codes deserve a type" is decided per sync with no written rule.
 **Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
@@ -1655,3 +1679,121 @@ Cosmetic, severity Low, deferred by the Standard fix tier. The fix is to trim a 
 shape that let a real regression through during that very sync.
 **Effort:** human S / CC S each, except the `FlagDef.Min` change (human M / CC M — wide
 but mechanical). **Priority:** P3. **Depends on:** nothing.
+
+## The step-type/action-type gate can only check the delay half
+
+Spec 1.60.0 made a `(step_type, action_type)` pair that does not fit a write-time
+`422 INVALID_STEP_CONFIG`, and the CLI mirrors the part of that rule it can:
+`step_type=delay` takes `action_type=delay`, `delay_until` takes `delay_until`,
+and `step_type=action` takes neither (`assertStepPairFitsActionType` for a
+single step, `assertComposedStepsFitActionTypes` for the composed `--steps`
+array, both over the shared `stepPairProblem`, in `cmd/inventory/workflows.go`).
+
+The other half of the server's rule — "`action_type` is a real `ActionType`" —
+is not checkable here. The spec never enumerates `ActionType`: the field is
+declared a bare string on `CreateWorkflowStepRequest` and the prose points at
+`GET /workflow-nodes`, whose catalogue is per-tenant and plan-dependent. So a
+misspelt type (`sendEmail`) still costs a round trip, and `--action-type` on
+`workflows steps create` is the one enum-ish flag with no client-side gate. A
+hard-coded list would be a second contract that drifts, and would refuse a type
+the day upstream ships it — which is exactly the failure mode the trigger's
+hand-maintained enum run has had twice (two live trigger types the CLI refused
+locally until 1.55.0 wrote them down).
+
+Related upstream inconsistency found while wiring this gate: the vendored spec
+states `action_type`'s requiredness twice and the two disagree —
+`CreateWorkflowStepRequest` says "Required for ACTION/DELAY/DELAY_UNTIL/LOOP"
+(`api/inventory/cli-v1.yaml:12396`) while the composed-steps shape says
+"Required for `action`, `delay` and `delay_until`" (`:12255`). The server
+implements the second: `CreateWorkflowStepRequest::rules()` declares
+`'action_type' => ['nullable', 'required_if:step_type,action,delay,delay_until',
+'string']`, and `ActionResolver::resolve` returns the loop evaluator whatever
+`action_type` says. The CLI's `--action-type` help follows the server. Never fix
+this by editing the vendored spec; it belongs in a ticket on
+`captainbook/captainbook`.
+
+Two ways out, neither free: ask upstream to publish the enum in the spec (then
+the existing description-enum gate and its drift test apply unchanged, and the
+loop/condition free-string case needs an exemption), or have the CLI fetch
+`workflow-nodes` and validate against it, which turns one write into two calls
+and needs a cache with an invalidation story.
+
+**Why:** the local gate is honest about its scope, so nothing is wrong today —
+the gap is that a typo in the most structured field on this surface is only
+caught by the server.
+**Effort:** human S / CC S (spec route), human M / CC M (catalogue route).
+**Priority:** P3. **Depends on:** an upstream spec change for the cheap route.
+
+## `--data null` panics the two workflow body builders
+
+`ceebee inventory workflows trigger create <id> --data null --action-type booking_confirmed`
+panics with `assignment to entry in nil map`, and so does `workflows steps
+create <id> --data null --step-type action --order 0`.
+
+The panic needs a reachable assignment, so the other affected commands need a
+co-requisite flag before they reach it — measured on the real registered tree:
+
+| invocation | observed |
+|---|---|
+| `workflows trigger create --data null --action-type booking_confirmed` | panics |
+| `workflows steps create --data null --step-type action --order 0` | panics |
+| `workflows delete/restore/activate/deactivate --data null --dry-run` | panics |
+| `workflows steps update <id> <step> --data null --config '{}'` | panics |
+| `workflows trigger update --data null` | no panic: refused, "--config or --data must supply the trigger `config` field" |
+| `workflows steps update <id> <step> --data null` | no panic: same refusal for the step `config` field |
+| `workflows delete/restore/activate/deactivate --data null` (no --dry-run) | no panic, and worse: the nil map marshals back to the literal `null`, which is SENT as the request body |
+| `workflows steps delete <id> <step> --data null` | same: `null` goes on the wire |
+
+`triggerOrStepBody` only assigns inside its `fieldMap` loop, for `--config`, and
+for `--dry-run`; `trigger update` and `steps update` pass a nil fieldMap.
+`dryRunOnlyBody`'s only assignment is `body["dry_run"] = true`. So two commands
+panic as typed, every other write panics once a co-requisite flag is present
+(`--dry-run`, or `--config` on the two `update`s), and the rest ship a `null`
+body instead. Treat the table as the measured sample, not an exhaustive count:
+derive the reach from which assignments a builder actually makes. And use a
+valid enum value in any repro — `--action-type X` is refused by that flag's own
+enum gate with exit 12, before the builder ever runs.
+
+`json.Unmarshal` sets a `map[string]any` to **nil** on the literal `null`
+(verified in isolation), and the next line assigns into it. `JSONBodyFromArgs`
+(`cmd/inventory/inventory.go:1552`) guards exactly this case, and its comment
+says so: "every overlay helper then unmarshals that back into a nil map and
+PANICS on its first assignment, crashing the CLI before it can audit the call or
+report a validation error". But `triggerOrStepBody` and `dryRunOnlyBody` in
+`cmd/inventory/workflows.go` each do their own `json.Unmarshal` with no nil
+check, so they are a second, unguarded source — the guard's "at the source"
+claim does not cover them.
+
+A panic means a stack trace, no typed error, and no audit row for an attempted
+mutation.
+
+Found by the adversarial pass of the cli-v1 1.60.0 ship and verified, but left
+unfixed there: the builders are pre-existing and outside that PR's hunks, so
+fixing them belonged in its own change rather than widening a spec sync.
+
+**Fix:** copy `JSONBodyFromArgs`'s `if body == nil` refusal into both builders,
+or route them through it. Add one test per builder driving `--data null`.
+**Why:** a crash on malformed input, with no audit row, on two workflow commands as typed and more once a co-requisite flag is present; the rest silently put `null` on the wire instead.
+**Effort:** human S / CC S. **Priority:** P1. **Depends on:** nothing.
+
+## The step-pair gate's loop and condition arms are only half tested
+
+`stepPairProblem` (`cmd/inventory/workflows.go`) deliberately judges nothing for
+`step_type=loop` and `step_type=condition`, because the server's
+`ActionResolver` returns their evaluator whatever `action_type` says. The
+`condition` half is pinned (a condition step carrying an `action_type` the gate
+refuses elsewhere must still reach the wire); the `loop` half is not, and a
+round-2 reviewer demonstrated the gap empirically: widening the arm to
+`case "action", "loop":` leaves the whole `./cmd/inventory` suite green, so the
+gate can grow a refusal that makes a documented step unreachable with no test
+failing. Three composed-array cells (`loop` and `condition` with a mismatched
+type, `delay_until` with a fitting one) are likewise unexercised, though those
+replay arms already proven at the top level.
+
+Left as a note at the review loop's round cap rather than fixed, since a test
+gap is below the blocking floor.
+
+**Fix:** one row in `TestWire_LegalStepAndActionTypePairsStillReachTheServer`
+(`--step-type loop --action-type delay` must reach the wire with both fields),
+mirroring the condition row beside it, plus the three composed elements.
+**Effort:** human XS / CC XS. **Priority:** P2. **Depends on:** nothing.

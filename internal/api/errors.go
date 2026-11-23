@@ -31,11 +31,22 @@ type ForbiddenError struct {
 	Message string
 }
 
+// Error leads with the server's own sentence when there is one, because the
+// statistics spec names three states behind this status and they need three
+// different fixes: the user lacks `view_reports`, the plan does not include
+// statistics, or — added in statistics spec 1.5.0 — the account is still on
+// its unpaid free trial, which closes the whole API until it subscribes. Only
+// the server knows which, and all three do send a message — two from
+// middleware, one from the request's own authorize() — so the bare form below
+// is the "no body to read" fallback. It lists all three rather than naming
+// one: it used to assert `view_reports`, which now reads as a wrong answer two
+// thirds of the time.
 func (e *ForbiddenError) Error() string {
 	if e.Message != "" {
 		return fmt.Sprintf("Access denied: %s", e.Message)
 	}
-	return "Access denied: requires view_reports permission"
+	return "Access denied: the user needs the view_reports permission, the plan has to include " +
+		"statistics, and the account has to be on a paid plan (the API is closed during the free trial)"
 }
 
 type ValidationError struct {

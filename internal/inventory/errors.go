@@ -108,6 +108,58 @@ func (e *AuthError) UserMessage() string {
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
+// 2b. ForbiddenError — FORBIDDEN, 403
+//
+// One code, four causes, and they need four different fixes:
+//
+//   - the token is not scoped to the ability the route requires (the server
+//     answers FORBIDDEN here, NOT ABILITY_MISSING — ApiExceptionHandler's
+//     MissingAbilityException arm names the ability in the message),
+//   - the user the token was issued to lacks the role permission the web UI
+//     requires for the same action,
+//   - the request reached another tenant's row,
+//   - the account is still on an unpaid free trial, which spec 1.58.0 refuses
+//     on EVERY endpoint — no token or role change lifts it, only subscribing.
+//
+// The server's own message says which one it is, so UserMessage leads with it
+// verbatim and appends the four causes rather than guessing from its wording:
+// the trial sentence is a translated string, so matching on it would break in
+// any locale but English, and read as "a permissions problem" when it isn't.
+// -----------------------------------------------------------------------------
+
+type ForbiddenError struct {
+	Message string
+	Hint    string
+}
+
+func (e *ForbiddenError) Error() string {
+	if e.Message != "" {
+		return "FORBIDDEN: " + e.Message
+	}
+	return "FORBIDDEN"
+}
+
+func (e *ForbiddenError) UserMessage() string {
+	var b strings.Builder
+	if e.Message != "" {
+		b.WriteString(e.Message)
+	} else {
+		b.WriteString("refused (403 FORBIDDEN)")
+	}
+	b.WriteString("\n  Four states answer FORBIDDEN and the fixes differ: the token's " +
+		"abilities (`ceebee inventory whoami` lists them), the role permissions of the " +
+		"user it was issued to (Settings → Users), a request that crossed tenants (wrong " +
+		"--profile), or an account still on its unpaid free trial — since spec 1.58.0 a " +
+		"trial is refused on every endpoint, whoami included, so a 403 there rules the " +
+		"token out as the cause rather than in; only subscribing to a paid plan lifts it.")
+	if e.Hint != "" {
+		b.WriteString("\n  hint: ")
+		b.WriteString(e.Hint)
+	}
+	return b.String()
+}
+
+// -----------------------------------------------------------------------------
 // 3. NotFoundError — NOT_FOUND, 404
 // -----------------------------------------------------------------------------
 
@@ -592,6 +644,90 @@ func (e *TicketReissueNotConfirmedError) UserMessage() string {
 }
 
 // -----------------------------------------------------------------------------
+// 9h. InvalidStepConfigError — INVALID_STEP_CONFIG, 422
+//
+// The write-time sibling of 9d: WorkflowActivationValidator reports this code
+// as one ENTRY inside WORKFLOW_NOT_ACTIVATABLE, while the step and trigger
+// writes raise it as the envelope's own code. Raised by
+// POST/PATCH /workflows/{id}/trigger, POST /workflows/{id}/steps,
+// PATCH /workflows/{id}/steps/{stepId}, and the composed steps of
+// POST /workflows.
+//
+// Two different failures share it, and `details.errors` is what tells them
+// apart — Laravel-shaped field => messages[], exactly as the spec says:
+//
+//   - a config field the resolved action's rules() rejected (keys are config
+//     field names), and
+//   - since spec 1.60.0, a type that does not fit the step holding it: a
+//     misspelt `sendEmail` for `send_email`, a `delay` step carrying
+//     `send_email`, an `action` step carrying `delay`. Those arrive under the
+//     `action_type` key and used to be accepted with a 201 and then fail every
+//     run.
+//
+// Which is why this type exists at all: the code was unregistered until that
+// release, so it fell through to RawAPIError, which carries `message` alone.
+// The message is the fixed sentence "Step config does not match the action
+// schema." — every word about WHICH field or WHICH type is wrong lives in
+// `details.errors`, and was being dropped on the floor.
+// -----------------------------------------------------------------------------
+
+type InvalidStepConfigError struct {
+	// FieldErrors is details.errors: config field (or `action_type`) =>
+	// messages. Empty when the server omits it, which leaves UserMessage with
+	// the bare sentence rather than a panic.
+	FieldErrors map[string][]string
+	Message     string
+	Hint        string
+}
+
+func (e *InvalidStepConfigError) Error() string {
+	return fmt.Sprintf("INVALID_STEP_CONFIG (%d fields)", len(e.FieldErrors))
+}
+
+func (e *InvalidStepConfigError) UserMessage() string {
+	var b strings.Builder
+	if e.Message != "" {
+		b.WriteString(e.Message)
+	} else {
+		b.WriteString("step config does not match the action schema")
+	}
+	for _, f := range sortedKeys(e.FieldErrors) {
+		for _, m := range e.FieldErrors[f] {
+			b.WriteString("\n  - ")
+			b.WriteString(f)
+			b.WriteString(": ")
+			b.WriteString(m)
+		}
+	}
+	// The action_type arm is the one a reader cannot act on from the message
+	// alone: "Unknown delay type "send_email"" does not say that the fix may be
+	// the STEP type rather than the action type.
+	if _, ok := e.FieldErrors["action_type"]; ok {
+		b.WriteString("\n  A type has to fit the step holding it: step_type=delay takes " +
+			"action_type=delay and nothing else, delay_until takes delay_until, and " +
+			"step_type=action takes any other action type. `ceebee inventory workflows " +
+			"nodes` lists the catalogue with each type's config.")
+	}
+	if e.Hint != "" {
+		b.WriteString("\n  hint: ")
+		b.WriteString(e.Hint)
+	}
+	return b.String()
+}
+
+// sortedKeys returns the keys of a field-errors map in a stable order, so a
+// multi-field refusal reads the same on every run. Go randomizes map
+// iteration, and these messages are diffed by agents and by tests.
+func sortedKeys(m map[string][]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// -----------------------------------------------------------------------------
 // 10. PayloadTooLargeError — PAYLOAD_TOO_LARGE, 413 (multipart upload)
 //
 // Spec: 10 MiB cap by default; tenant plans may raise. ActualBytes/MaxBytes
@@ -954,6 +1090,14 @@ func init() {
 			return &AbilityMissingError{Needed: Ability(needed), Have: have}
 		},
 
+		// FORBIDDEN carries no structured details — the cause is in the
+		// message, which the server writes differently for each of the four
+		// (missing ability, missing role permission, cross-tenant, unpaid
+		// trial). Pass it through and let UserMessage name the set.
+		"FORBIDDEN": func(status int, env errorEnvelope) error {
+			return &ForbiddenError{Message: env.Error.Message, Hint: env.Error.Hint}
+		},
+
 		"NOT_FOUND": func(status int, env errorEnvelope) error {
 			rt, _ := decodeStringField(env.Error.Details, "resource_type")
 			id, _ := decodeStringField(env.Error.Details, "id")
@@ -1053,6 +1197,21 @@ func init() {
 				st, _ = decodeStringField(env.Error.Details, "workflow_status")
 			}
 			return &WorkflowNotEditableError{Status: st, Hint: env.Error.Hint}
+		},
+
+		// InvalidStepConfigException::details() returns exactly
+		// `{"errors": {field: [msg, ...]}}`, so unlike VALIDATION_FAILED there
+		// is no second shape to tolerate — but the decode is still best-effort,
+		// because `details` is additionalProperties: true and a server that
+		// stopped sending it must degrade to the bare message, not to a
+		// swallowed refusal.
+		"INVALID_STEP_CONFIG": func(status int, env errorEnvelope) error {
+			fe, _ := decodeFieldErrors(env.Error.Details, "errors")
+			return &InvalidStepConfigError{
+				FieldErrors: fe,
+				Message:     env.Error.Message,
+				Hint:        env.Error.Hint,
+			}
 		},
 
 		"WORKFLOW_NOT_ACTIVATABLE": func(status int, env errorEnvelope) error {
@@ -1255,6 +1414,21 @@ func decodeActivationFailures(d map[string]json.RawMessage, key string) ([]Workf
 		return nil, false
 	}
 	return fs, true
+}
+
+// decodeFieldErrors returns the Laravel-shaped field => messages[] map at key,
+// or nil if absent / wrong type. Used by the INVALID_STEP_CONFIG constructor to
+// read `details.errors`.
+func decodeFieldErrors(d map[string]json.RawMessage, key string) (map[string][]string, bool) {
+	raw, ok := d[key]
+	if !ok {
+		return nil, false
+	}
+	var fe map[string][]string
+	if err := json.Unmarshal(raw, &fe); err != nil || fe == nil {
+		return nil, false
+	}
+	return fe, true
 }
 
 // decodeStringSliceField returns []string at key, or nil if absent / wrong type.

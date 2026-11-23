@@ -82,21 +82,39 @@ func TestAuthError_Error(t *testing.T) {
 	}
 }
 
+// TestForbiddenError_Error pins both forms. The no-message form is the one that
+// needs more than one substring: statistics spec 1.5.0 added a THIRD state behind
+// this status (an unpaid free trial closes the whole API), and the fallback used
+// to name `view_reports` alone — which now reads as a wrong answer two thirds of
+// the time. A single `view_reports` assertion passes either way, so it could not
+// see that change land and could not see it reverted.
 func TestForbiddenError_Error(t *testing.T) {
 	tests := []struct {
-		name    string
-		err     *ForbiddenError
-		wantSub string
+		name     string
+		err      *ForbiddenError
+		wantSubs []string
 	}{
-		{"with message", &ForbiddenError{Message: "not allowed"}, "not allowed"},
-		{"without message", &ForbiddenError{}, "view_reports permission"},
+		{"with message", &ForbiddenError{Message: "not allowed"}, []string{"not allowed"}},
+		{
+			// All three causes, because each needs a different fix and the
+			// server is the only thing that knows which one it is.
+			name: "without message names every cause",
+			err:  &ForbiddenError{},
+			wantSubs: []string{
+				"view_reports",       // the user's role permission
+				"include statistics", // the plan
+				"free trial",         // spec 1.5.0: paid plan required
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.err.Error()
-			if !strings.Contains(got, tt.wantSub) {
-				t.Errorf("Error() = %q, want substring %q", got, tt.wantSub)
+			for _, want := range tt.wantSubs {
+				if !strings.Contains(got, want) {
+					t.Errorf("Error() = %q, want substring %q", got, want)
+				}
 			}
 			if !strings.Contains(got, "Access denied") {
 				t.Errorf("Error() = %q, want prefix 'Access denied'", got)

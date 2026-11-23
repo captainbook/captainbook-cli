@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Statistics API
-  version: 1.4.0
+  version: 1.5.0
   description: |
     Analytics and reporting API for CaptainBook booking platform.
     Provides revenue, bookings, products, resources, customers, channels,
@@ -1011,7 +1011,7 @@ components:
                 type: string
                 example: Unauthenticated.
     Forbidden:
-      description: User lacks `view_reports` permission or plan does not include statistics
+      description: User lacks `view_reports` permission, the plan does not include statistics, or the account is still on its free trial (API access needs a paid plan)
       content:
         application/json:
           schema:

@@ -2189,12 +2189,16 @@ func specErrorCodes(t *testing.T) []string {
 			"the error-code catalogue moved; re-point this test rather than deleting it")
 	}
 
-	// Single-word codes need naming: an underscore filter alone drops FORBIDDEN
-	// and UNAUTHENTICATED, and FORBIDDEN is the one with no registry entry and
-	// no errorCode case at all — it reaches the audit row only by falling
-	// through to RawAPIError, which is exactly the path this test exists to
-	// keep honest. Listed rather than inferred, so a new single-word code is a
-	// deliberate addition.
+	// Single-word codes need naming: the underscore filter below alone drops
+	// FORBIDDEN and UNAUTHENTICATED, so without this list neither would be
+	// checked at all. Both now type to an error of their own — UNAUTHENTICATED
+	// to AuthError, and FORBIDDEN to ForbiddenError, which gained its registry
+	// entry and its errorCode case in the cli-v1 1.60.0 sync (spec 1.58.0 gave
+	// it a fourth cause, an unpaid free trial, whose remedy contradicts the
+	// other three). Before that it reached the audit row only by falling
+	// through to RawAPIError. Either way this test asserts the same invariant:
+	// the row carries the code, however the error got typed. Listed rather than
+	// inferred, so a new single-word code is a deliberate addition.
 	singleWord := map[string]bool{"FORBIDDEN": true, "UNAUTHENTICATED": true}
 	seen := map[string]bool{}
 	var out []string
