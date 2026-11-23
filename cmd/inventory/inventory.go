@@ -756,6 +756,20 @@ func errorCode(err error) string {
 		return "PLAN_LIMIT_REACHED"
 	case *invpkg.RawAPIError:
 		return e.Code
+	case *api.ExitError:
+		// A refusal the CLI made itself, so there is no server code to record.
+		// Keep the code of any typed error it wraps, and otherwise name the
+		// decision: the fallthrough below is "" and AuditEntry.ErrorCode is
+		// omitempty, so a missing case REMOVES the field from the row instead
+		// of blanking it — exactly the failure this function's doc comment
+		// warns about. Four independent reviewers read the row for the
+		// step-pair gate and could not tell it from a transport failure.
+		// Reached by the flag-enum gate, the dry-run gate, the step-pair gates
+		// and the idempotency-key minting failure.
+		if code := errorCode(e.Err); code != "" {
+			return code
+		}
+		return "CLIENT_REFUSED"
 	}
 	return ""
 }

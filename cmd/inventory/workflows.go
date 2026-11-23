@@ -199,7 +199,10 @@ func workflowsDefs() []CommandDef {
 					return nil, err
 				}
 				if err := assertComposedStepsFitActionTypes(body); err != nil {
-					return nil, err
+					// WireBody so the audit row hashes what the gate judged,
+					// not the raw --data fallback runMutation uses when a
+					// closure returns no result.
+					return &RunResult{WireBody: body}, err
 				}
 				resp, err := r.Client.CreateWorkflowWithBodyWithResponse(ctx, &gen.CreateWorkflowParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {
@@ -497,7 +500,8 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 					return nil, err
 				}
 				if err := assertStepPairFitsActionType(body); err != nil {
-					return nil, err
+					// WireBody for the same reason as the composed gate above.
+					return &RunResult{WireBody: body}, err
 				}
 				resp, err := r.Client.CreateWorkflowStepWithBodyWithResponse(ctx, id, &gen.CreateWorkflowStepParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
 				if err != nil {

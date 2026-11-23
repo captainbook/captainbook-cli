@@ -24,8 +24,11 @@ package inventory
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -473,5 +476,82 @@ func TestWire_EachGateReadsOnlyItsOwnRouteShape(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestAudit_LocalPairRefusalRecordsItsCodeAndBody pins the forensic half of the
+// gate, which four independent reviewers raised and the last one asked for by
+// name: a refusal decided inside the closure still writes an audit row, and
+// that row used to be indistinguishable from a transport failure.
+//
+// Two things make it legible. `errorCode` has a case for `*api.ExitError`, so
+// `error_code` is present at all (its fallthrough is "" and the field is
+// omitempty, so a missing case deletes the field rather than blanking it). And
+// the closure returns its assembled body as WireBody, so `body_sha256` covers
+// what the gate actually judged instead of the raw `--data` fallback
+// runMutation uses when a closure returns no result — here that fallback would
+// have hashed nothing at all, since this invocation passes no --data.
+//
+// Value: protects=a locally refused mutation is identifiable in the audit log by its code and the body the gate judged; fails_when=errorCode loses its *api.ExitError case, or a gate stops returning WireBody, either of which silently drops a field from the row; why_new=no test pinned the audit row for any local-gate refusal; seam=testNewRunner; no_claim=says nothing about whether such rows should be written at all, which is a separate policy choice
+func TestAudit_LocalPairRefusalRecordsItsCodeAndBody(t *testing.T) {
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Error("the request reached the server; the gate should have refused it first")
+	})
+
+	auditPath := filepath.Join(t.TempDir(), "audit.jsonl")
+	logger, err := invpkg.NewFileLogger(auditPath)
+	if err != nil {
+		t.Fatalf("new audit logger: %v", err)
+	}
+	runner.AuditLogger = logger
+
+	prevShared := sharedRunner
+	sharedRunner = &Runner{}
+	prev := testNewRunner
+	testNewRunner = func() (*Runner, error) { return runner, nil }
+	t.Cleanup(func() {
+		testNewRunner = prev
+		sharedRunner = prevShared
+	})
+
+	root := Cmd()
+	root.SetArgs(stepArgs("--action-type", "send_email"))
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	if err := root.Execute(); err == nil {
+		t.Fatal("the mismatched pair was accepted")
+	}
+
+	raw, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatalf("read audit log: %v", err)
+	}
+	line := strings.TrimSpace(string(raw))
+	if line == "" {
+		t.Fatal("audit log is empty: a refused mutation wrote no row")
+	}
+	var entry struct {
+		ErrorCode  string `json:"error_code"`
+		BodySHA256 string `json:"body_sha256"`
+	}
+	if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		t.Fatalf("parse audit entry: %v", err)
+	}
+
+	if entry.ErrorCode != "CLIENT_REFUSED" {
+		t.Errorf("error_code = %q, want CLIENT_REFUSED; an empty value here means the field "+
+			"was dropped from the row entirely, which is how a local refusal became "+
+			"indistinguishable from a transport failure", entry.ErrorCode)
+	}
+
+	// The body the gate judged, as triggerOrStepBody assembles it: json.Marshal
+	// sorts map keys, so this spelling is the contract.
+	wantBody := `{"action_type":"send_email","order":0,"step_type":"delay"}`
+	if want := sha256Hex([]byte(wantBody)); entry.BodySHA256 != want {
+		t.Errorf("body_sha256 = %q, want %q (the hash of %s)", entry.BodySHA256, want, wantBody)
+	}
+	if entry.BodySHA256 == sha256Hex(nil) {
+		t.Error("body_sha256 is the hash of no bytes: the row fell back to raw --data, " +
+			"so it records nothing about the body the gate refused")
 	}
 }

@@ -250,7 +250,10 @@ exits 0, and the workflow reads that bypass the typed parse can print a body
 the formatter could not read and still exit 0.
 
 To tell inventory refusals apart, read **stderr**, or the audit row's
-`error_code` via `ceebee audit list --format json`. Do not look for an error
+`error_code` via `ceebee audit list --format json`. A refusal the CLI decided
+itself (a rejected flag value or step-type pair, or a `--dry-run` it cannot
+preview) records `CLIENT_REFUSED` there — the CLI's own code, not one the API
+sends. Do not look for an error
 envelope on stdout: a non-2xx never reaches it (`res.Body` is reserved for
 successful payloads), so `--format json` only ever formats a success.
 
