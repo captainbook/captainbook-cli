@@ -711,6 +711,8 @@ func errorCode(err error) string {
 		return "UNAUTHENTICATED"
 	case *invpkg.AbilityMissingError:
 		return "ABILITY_MISSING"
+	case *invpkg.ForbiddenError:
+		return "FORBIDDEN"
 	case *invpkg.NotFoundError:
 		return "NOT_FOUND"
 	case *invpkg.ValidationError:
@@ -737,6 +739,8 @@ func errorCode(err error) string {
 		return "WORKFLOW_NOT_EDITABLE"
 	case *invpkg.WorkflowNotActivatableError:
 		return "WORKFLOW_NOT_ACTIVATABLE"
+	case *invpkg.InvalidStepConfigError:
+		return "INVALID_STEP_CONFIG"
 	case *invpkg.PayloadTooLargeError:
 		return "PAYLOAD_TOO_LARGE"
 	case *invpkg.UnsupportedMediaTypeError:

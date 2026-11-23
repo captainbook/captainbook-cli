@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Inventory CLI API
-  version: 1.56.0
+  version: 1.60.0
   description: |
     Internal HTTP JSON API serving the CaptainBook inventory CLI client
     (which lives in a separate repository). Primary consumer is Claude Code
@@ -165,6 +165,45 @@ info:
     known consumer; breaking changes ship here without a major bump and are
     marked **Breaking** below. The URL major (`/api/v1/cli`) is a separate axis
     and does not move.
+
+    - **1.60.0** — **Fixed.** A workflow step whose `action_type` does not fit
+      its `step_type` is refused at write time instead of failing every run.
+      `POST /workflows/{id}/steps`, the composed steps of `POST /workflows`
+      and the step and trigger `PATCH` routes now return
+      `422 INVALID_STEP_CONFIG` for a misspelt type (`sendEmail` for
+      `send_email`) or a mismatched pair (a `delay` step holding
+      `send_email`, an `action` step holding `delay`), and activation
+      refuses such a workflow with `422 WORKFLOW_NOT_ACTIVATABLE` carrying
+      an `INVALID_STEP_TYPE` entry for the step; both used to be
+      accepted with a 201 and then fail at run time. A stored step whose
+      type no longer exists (for example one imported from a hand-written
+      workflow file) now reads back with that stored name in `action_type`
+      instead of a `500`, and a `PATCH` on it is refused with a `422` that
+      names it. Correct payloads see no change.
+
+    - **1.59.0** — **Fixed.** `Answer.answer` renders a boolean the same way
+      wherever it appears. An answer whose stored JSON is an array holding a
+      bare boolean previously flattened `false` to `""`, which is the same
+      string an unanswered question produces — so "answered no" and "never
+      asked" were indistinguishable on the wire. It is now `"0"`, matching how
+      a top-level boolean has always rendered here. `answer_raw` is unchanged.
+      Note a boolean question stores the raw value of its own select, `1` for
+      yes and anything else for no, so compare against `1` rather than a
+      localised "Yes".
+
+    - **1.58.0** — **Breaking.** An account on its free trial (not yet on a
+      paid plan) is refused on every endpoint with `403 FORBIDDEN`, whose
+      message says API access starts once the account subscribes. MCP refuses
+      the same accounts with `subscription_required`. Paid accounts see no
+      change.
+
+    - **1.57.0** — **Breaking.** `DELETE /workflows/{id}/steps/{stepId}` now
+      refuses with `422` while the step still has steps inside it, naming the
+      children in the message. Delete a branch depth-first, deepest step
+      first. It previously deleted the named step alone and left its children
+      pointing at a soft-deleted parent: the workflow then failed activation
+      with `ORPHAN_PARENT_REF`, and WorkflowExecutor ran those children as
+      ROOT steps, so a branch fired unconditionally.
 
     - **1.56.0** — **Added.** `send_notification` accepts
       `config.channel: "whatsapp"`, which previously came back
@@ -7718,6 +7757,14 @@ paths:
     delete:
       operationId: destroyWorkflowStep
       summary: Soft-delete a step
+      description: |
+        Deletes exactly the step named, and never cascades. A condition,
+        filter or loop that still has steps inside it is refused with 422
+        naming those children, so delete a branch depth-first (deepest step
+        first). Cascading would take rows the caller did not name; leaving
+        the children behind would point them at a deleted parent, which is
+        the ORPHAN_PARENT_REF state activation refuses and which
+        WorkflowExecutor would run as root steps.
       tags: [Workflows]
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -7752,6 +7799,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   # ──────────────────────────────────────────────────────────────────────
   # Workflow executions — read-only (Eng D3).
@@ -8021,7 +8069,7 @@ components:
                   message: Missing or invalid bearer token.
                   retriable: false
     Forbidden:
-      description: Token valid but lacks the ability for this action, the token's user lacks the role permission the web UI requires for it, or the request attempts cross-tenant access
+      description: Token valid but lacks the ability for this action, the token's user lacks the role permission the web UI requires for it, the request attempts cross-tenant access, or the account is still on its free trial (API access needs a paid plan)
       content:
         application/json:
           schema:
@@ -9702,14 +9750,20 @@ components:
             store one entry per purchased unit and flatten to a comma-joined
             list here — use `answer_raw` to recover the per-unit structure.
 
-            Close to, but deliberately NOT identical to, how
-            `GetAnswersAction::normaliseAnswerToString` renders the same answer
-            for workflows and manifests. Two values differ, both in this
-            surface's favour: boolean `false` is `"0"` here and `""` there
-            (that method casts with `(string)`, and `(string)false` is the
-            empty string), and a nested array without an `answer` key is
-            flattened recursively here but stringifies to the literal `"Array"`
-            there. Do not assume the two surfaces agree byte-for-byte.
+            Rendered identically to how `GetAnswersAction::normaliseAnswerToString`
+            renders the same answer for workflows and manifests. Three values
+            used to differ, all resolved in this surface's favour: boolean
+            `false` is `"0"` on both (never `""`, which cannot be told apart
+            from a question that was never answered), a nested array without an
+            `answer` key is flattened recursively on both rather than
+            stringified to the literal `"Array"`, and a bare boolean nested in
+            an array follows the same `"0"`/`"1"` rule as a top-level one.
+
+            They remain two implementations with no shared code, held in step
+            by `tests/Architecture/AnswerNormalisationParityTest.php`. A
+            boolean question stores the raw value of its own select — `1` for
+            yes, anything else for no — so compare against `1` rather than
+            against a localised "Yes".
         answer_raw:
           oneOf:
             - type: string
@@ -11989,7 +12043,10 @@ components:
             For TRIGGER steps: matches TriggerType (booking_confirmed,
             scheduled_time, …). For ACTION steps: matches ActionType
             (send_notification, charge_card_on_file, …). Null for
-            CONDITION steps (use condition_type instead).
+            CONDITION steps (use condition_type instead). A step saved with
+            a type that no longer exists reads back with that stored name,
+            which is not in TriggerType/ActionType; such a workflow cannot
+            be activated until the step is replaced or deleted.
         condition_type:
           type: [string, "null"]
           enum: [value_check, filter, null]

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/captainbook/captainbook-cli/internal/api"
 	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 	"github.com/captainbook/captainbook-cli/internal/inventory/gen"
 	"github.com/spf13/cobra"
@@ -164,7 +165,12 @@ func workflowsDefs() []CommandDef {
 			Use: "create", Short: "Create a workflow (DRAFT)", Kind: KindMutation,
 			Verb: "POST", Path: "/workflows", Ability: invpkg.Write, DryRunMode: DryRunBody,
 			Long: "Creates an empty workflow shell in DRAFT. Add a trigger and at least one " +
-				"step, then run `activate <id>` to flip to ACTIVE.",
+				"step, then run `activate <id>` to flip to ACTIVE.\n\n" +
+				"--trigger and --steps compose the automation in this one request, and each " +
+				"composed step's action_type has to fit its step_type: since spec 1.60.0 one " +
+				"mismatched or misspelt pair refuses the WHOLE request with 422 " +
+				"INVALID_STEP_CONFIG, taking the workflow and the other steps with it. The " +
+				"CLI refuses the delay mismatches locally, naming the array index.",
 			Flags: []FlagDef{
 				{Name: "name", Type: "string", Required: true, Description: "Workflow name (≤200 chars)"},
 				{Name: "description", Type: "string"},
@@ -189,6 +195,9 @@ func workflowsDefs() []CommandDef {
 					"steps":               "steps",
 				})
 				if err != nil {
+					return nil, err
+				}
+				if err := assertStepTypesFitActionTypes(body); err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.CreateWorkflowWithBodyWithResponse(ctx, &gen.CreateWorkflowParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -442,7 +451,18 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 		Short: "Manage workflow steps (tree-shaped, non-trigger)",
 		Long: "Creates ACTION/CONDITION/DELAY/DELAY_UNTIL/LOOP steps. TRIGGER steps live " +
 			"under `workflows trigger`. Step structure is immutable post-create — to move or " +
-			"reshape a step, delete and re-create.",
+			"reshape a step, delete and re-create.\n\n" +
+			"A step's action_type has to fit the step_type holding it, and since spec 1.60.0 " +
+			"the server refuses a pair that does not at WRITE time with 422 " +
+			"INVALID_STEP_CONFIG: step_type=delay takes action_type=delay and nothing else, " +
+			"delay_until takes delay_until, step_type=action takes any other action type, and " +
+			"a misspelt type (sendEmail for send_email) is refused rather than resolved. " +
+			"Both used to be accepted with a 201 and then fail every run; activation now " +
+			"refuses such a workflow too, with an INVALID_STEP_TYPE entry naming the step.\n\n" +
+			"A step stored with a type that no longer exists reads back with that stored " +
+			"name in action_type — a value outside TriggerType/ActionType — rather than a " +
+			"500. It cannot be patched (the PATCH is refused with a 422 naming it) and the " +
+			"workflow cannot be activated until the step is deleted and re-created.",
 	}
 	bindCommands(parent, []CommandDef{
 		{
@@ -451,7 +471,7 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id"},
 			Flags: []FlagDef{
 				{Name: "step-type", Type: "string", Required: true, Description: "action|condition|delay|delay_until|loop"},
-				{Name: "action-type", Type: "string", Description: "Required for action/delay/delay_until/loop. See ActionType enum."},
+				{Name: "action-type", Type: "string", Description: "Required for action/delay/delay_until; optional for loop and condition, which ignore it. See ActionType enum. Must fit --step-type: delay takes delay, delay_until takes delay_until, action takes neither."},
 				{Name: "condition-type", Type: "string", Description: "value_check|filter (required for condition step_type)"},
 				{Name: "config", Type: "string", Description: "JSON object validated against the resolved action's rules() (literal or @file.json)"},
 				{Name: "order", Type: "int", Required: true, Description: "Position within the parent branch (≥0)"},
@@ -473,6 +493,9 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 					"branch-type":    "branch_type",
 				})
 				if err != nil {
+					return nil, err
+				}
+				if err := assertStepTypesFitActionTypes(body); err != nil {
 					return nil, err
 				}
 				resp, err := r.Client.CreateWorkflowStepWithBodyWithResponse(ctx, id, &gen.CreateWorkflowStepParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -524,6 +547,18 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 			Use: "delete <workflow-id> <step-id>", Short: "Soft-delete a workflow step",
 			Kind: KindMutation, Verb: "DELETE", Path: "/workflows/{id}/steps/{stepId}",
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id", "step-id"},
+			Long: "Deletes exactly the step named, and never cascades. Since spec 1.57.0 a " +
+				"condition, filter or loop that still has steps inside it is refused with " +
+				"422, and the message names the children — so delete a branch depth-first, " +
+				"deepest step first.\n\n" +
+				"It previously deleted the named step alone and left its children pointing " +
+				"at a soft-deleted parent: activation then failed with ORPHAN_PARENT_REF, " +
+				"and WorkflowExecutor ran those children as ROOT steps, so a branch fired " +
+				"unconditionally. A script that deleted a parent and expected the subtree " +
+				"to go with it now gets the 422 instead of a silently broken workflow — " +
+				"read the child ids out of the message and delete those first.\n\n" +
+				"Triggers are not deletable here either (that is a separate 422): replace " +
+				"one by POSTing `workflows trigger create`.",
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				workflowID, stepID, err := workflowStepArgs(args)
 				if err != nil {
@@ -742,6 +777,104 @@ func triggerOrStepBody(args RunArgs, fieldMap map[string]string) ([]byte, error)
 		body["dry_run"] = true
 	}
 	return json.Marshal(body)
+}
+
+// assertStepTypesFitActionTypes refuses, before the request leaves, the
+// (step_type, action_type) pairs spec 1.60.0 made a write-time 422
+// INVALID_STEP_CONFIG. It reads BOTH shapes a step can arrive in — the
+// top-level pair that `workflows steps create` sends, and each element of the
+// `steps` array that `workflows create` composes in one request — so the two
+// call sites share one rule instead of drifting apart. A body only ever
+// carries one of the two, and a body carrying neither is a no-op.
+//
+// The composed array is worth the extra few lines: it is the path an agent
+// reaches for (one call instead of N), and the server refuses the WHOLE
+// request on one bad pair, so a mismatch in step 7 costs the workflow, the
+// trigger and the other six steps.
+//
+// Reads the assembled body rather than the flags so --data is covered too:
+// triggerOrStepBody and JSONBodyFromArgs both merge --data first and overlay
+// the typed flags, and a mismatched pair pushed in through --data is the same
+// wire request.
+func assertStepTypesFitActionTypes(body []byte) error {
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		return fmt.Errorf("validating request body: %w", err)
+	}
+
+	stepType, _ := m["step_type"].(string)
+	actionType, _ := m["action_type"].(string)
+	if problem := stepPairProblem(stepType, actionType); problem != "" {
+		return stepPairRefusal(problem)
+	}
+
+	steps, _ := m["steps"].([]any)
+	for i, raw := range steps {
+		step, ok := raw.(map[string]any)
+		if !ok {
+			// Not an object: let the server's own validator name the shape
+			// problem rather than inventing a second vocabulary for it.
+			continue
+		}
+		st, _ := step["step_type"].(string)
+		at, _ := step["action_type"].(string)
+		if problem := stepPairProblem(st, at); problem != "" {
+			return stepPairRefusal(fmt.Sprintf("steps[%d]: %s", i, problem))
+		}
+	}
+	return nil
+}
+
+// stepPairProblem returns a sentence saying why action_type cannot sit in a
+// step of this step_type, or "" for a pair the server accepts.
+//
+// The server decides this in PolymorphicWorkflowStepTypeEnumCast::isKnown; the
+// two arms below are the subset of it that can be decided without the
+// ActionType enum. The rest of that rule is "action_type is a real ActionType",
+// and the spec never enumerates ActionType — it points at `workflows nodes`,
+// whose catalogue is the authority and is per-tenant. A local list would be a
+// second contract that drifts, and would refuse a type the day upstream ships
+// it (the trigger's hand-maintained enum run did exactly that, twice).
+//
+// condition and loop are absent on purpose rather than by omission: the
+// server's resolver returns their evaluator whatever action_type says, so any
+// value is legal there and refusing one would make a documented step
+// unreachable from the CLI. An absent or empty action_type is likewise the
+// server's call — it is required for action / delay / delay_until and genuinely
+// optional for loop.
+func stepPairProblem(stepType, actionType string) string {
+	if actionType == "" {
+		return ""
+	}
+	switch stepType {
+	case "delay", "delay_until":
+		// want == stepType for both: a delay step runs a delay and nothing else.
+		if actionType != stepType {
+			return fmt.Sprintf("step_type %s takes action_type %s and nothing else, got %q",
+				stepType, stepType, actionType)
+		}
+	case "action":
+		if actionType == "delay" || actionType == "delay_until" {
+			return fmt.Sprintf("step_type action cannot carry action_type %q — a delay runs as "+
+				"its own step type, so use step_type %s instead", actionType, actionType)
+		}
+	}
+	return ""
+}
+
+// stepPairRefusal wraps a stepPairProblem sentence in the exit error, with the
+// part the sentence cannot carry: why the pair is refused at all, and where to
+// look up the types.
+func stepPairRefusal(problem string) error {
+	return &api.ExitError{
+		Err: fmt.Errorf(
+			"%s. The executor picks its path from the step type, so a mismatched pair "+
+				"fails every run — the server refuses it with 422 INVALID_STEP_CONFIG "+
+				"(spec 1.60.0). `ceebee inventory workflows nodes` lists the action types",
+			problem,
+		),
+		Code: api.ExitValidation,
+	}
 }
 
 // requireBodyKey returns an error when the assembled body is missing a

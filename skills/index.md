@@ -41,7 +41,7 @@ When both are set, `--profile` wins over env vars.
 
 ### Token abilities
 
-Tokens carry one or more abilities. The server enforces them at the route layer; missing abilities return `403 ABILITY_MISSING`.
+Tokens carry one or more abilities. The CLI checks them against the token's cached `whoami` set before it sends anything, so a missing ability is normally a LOCAL refusal carrying `ABILITY_MISSING`: **the command you ran never reaches the server.** It is not fully offline, though — `refuseAbility` is Refuse plus one retry, so a refusal decided on the cached set issues one live `whoami` before it is final. That exists because an admin can grant `cli:cs` to an existing token without the token string changing, and a cached entry would otherwise refuse forever. The server enforces the same gate at the route layer for whatever gets past that, and its answer is `403 FORBIDDEN` with the ability named in the message. `ABILITY_MISSING` is the CLI's own code: it appears nowhere in the vendored spec's `Error.code` catalogue. The CLI still decodes an `ABILITY_MISSING` envelope if one ever arrives, which is tolerance for a code the contract does not promise, not evidence that the API sends it.
 
 | Ability     | Required for |
 |-------------|--------------|
@@ -234,6 +234,17 @@ Use this to reconstruct what an agent did, or to find an idempotency key for a d
 | 17   | Rate limited (429) |
 | 18   | Unexpected status |
 
+**Codes 10-18 are the `stats` namespace's mapping.** In `inventory`, only a
+client-side refusal carries one, because only those return an `api.ExitError`:
+a bad flag value or a `(step_type, action_type)` pair the CLI rejects before
+sending is `12`, and a config problem is `15`. **Everything else in `inventory`
+exits `1`** — every server-side refusal whatever its status (403, 409, 422
+alike) and the local `ABILITY_MISSING` refusal too, because each renders
+through its typed `UserMessage`, which the error handler prints before exiting
+1. So rows 10, 11, 16 and 17 describe `stats`, not `inventory`. Branch on
+`error.code` from `--format json`, or on stderr, when you need to tell
+inventory refusals apart.
+
 ### Error codes
 
 The server emits a stable `code` string in every error envelope. The CLI maps each to a typed error with a crisp `UserMessage`. Common codes you will see:
@@ -241,7 +252,8 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | Code | When |
 |------|------|
 | `UNAUTHENTICATED` | Token missing, invalid, or expired. |
-| `ABILITY_MISSING` | Token valid, but lacks the required ability (`cli:write` / `cli:cs`). |
+| `ABILITY_MISSING` | Token valid, but lacks the required ability (`cli:write` / `cli:cs`). Raised by the CLI's own preflight, before the request; the server spells the same refusal `FORBIDDEN`, and this code is absent from the spec's catalogue. |
+| `FORBIDDEN` | 403, and FOUR states produce it, each with a different fix: the token is not scoped to the ability the route needs (the message names it), the user the token was issued to lacks the role permission the web UI requires, the request crossed tenants, or — since spec 1.58.0 — the account is still on its unpaid free trial, which closes every endpoint until it subscribes to a paid plan. Read the message before touching token scopes; no scope or role change lifts the trial one. |
 | `VALIDATION_FAILED` | Request body violates schema; `errors[]` lists field paths. |
 | `IDEMPOTENCY_CONFLICT` | Same key, different body. |
 | `IDEMPOTENCY_IN_PROGRESS` | Same key still executing on the server. |
@@ -259,6 +271,7 @@ The server emits a stable `code` string in every error envelope. The CLI maps ea
 | `PRODUCT_OPTION_CHANGE_NOT_SUPPORTED` | 422 on `bookings reschedule`: the destination departure belongs to another product option. That move cancels and replaces on the dashboard; it is not an in-place reschedule. |
 | `POOL_BACKED_ATTRIBUTE_NOT_EDITABLE` | 422 on `bookings update`: the custom attribute is backed by a code pool, which changes only through the atomic claim/release action — writing it directly would leave the same code drawable for a second customer. |
 | `BOOKING_RESOURCE_REQUEST_INVALID` | 422 on `bookings set-resources` when every rejection is request-shape (`MAIN_RESOURCE_REPLACEMENT_AMBIGUOUS` / `REPLACED_RESOURCE_WITHOUT_MAIN`). Same `details.rejections[]` as the 409. Nothing was applied, so the key is released. |
+| `INVALID_STEP_CONFIG` | 422 on the workflow trigger and step writes: either a config field the action's own `rules()` rejected, or — since spec 1.60.0 — a type that does not fit the step holding it (a misspelt `sendEmail`, a `delay` step carrying `send_email`, an `action` step carrying `delay`). `details.errors` is Laravel-shaped field => messages and is where the explanation lives; the top-level message is a fixed sentence. The CLI refuses the delay mismatches locally, before the request. |
 | `RATE_LIMITED` | 429; respect `Retry-After`. |
 
 ## Capability table

@@ -24,6 +24,10 @@
       "internal/inventory/errors_test.go",
       "cmd/inventory/inventory_test.go"
     ],
+    "internal/api/errors.go": [
+      "internal/api/errors_test.go",
+      "internal/api/client_test.go"
+    ],
     "tools/speccompat/main.go": [
       "tools/speccompat/main_test.go",
       "tools/speccompat/hoist_test.go",
@@ -37,6 +41,7 @@
       "cmd/inventory/wire_capture_test.go",
       "cmd/inventory/wire_capture_134_test.go",
       "cmd/inventory/wire_capture_156_test.go",
+      "cmd/inventory/wire_capture_160_test.go",
       "cmd/inventory/inventory_test.go"
     ],
     "skills/*.md": [

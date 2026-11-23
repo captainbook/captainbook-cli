@@ -1423,6 +1423,15 @@ Note there is still no test pinning the registry against the spec's `Error.code`
 catalogue in either direction, so a code the server starts emitting is invisible
 here until someone hits it.
 
+The 1.60.0 sync applied that criterion to two more codes and left the rest.
+`INVALID_STEP_CONFIG` earned a type because `RawAPIError` was not merely
+remedy-free on it — it was dropping content: the message is the fixed sentence
+"Step config does not match the action schema." and every word naming the field
+or the type lives in `details.errors`. `FORBIDDEN` earned one because 1.58.0
+gave it a fourth cause (an unpaid free trial) whose remedy contradicts the other
+three: no token scope or role change lifts it, and nothing in the server's
+sentence says the other three exist.
+
 **Why:** the fallback is honest, so nothing is lost today; the gap is that
 "which codes deserve a type" is decided per sync with no written rule.
 **Effort:** human S / CC S. **Priority:** P3. **Depends on:** nothing.
@@ -1655,3 +1664,46 @@ Cosmetic, severity Low, deferred by the Standard fix tier. The fix is to trim a 
 shape that let a real regression through during that very sync.
 **Effort:** human S / CC S each, except the `FlagDef.Min` change (human M / CC M — wide
 but mechanical). **Priority:** P3. **Depends on:** nothing.
+
+## The step-type/action-type gate can only check the delay half
+
+Spec 1.60.0 made a `(step_type, action_type)` pair that does not fit a write-time
+`422 INVALID_STEP_CONFIG`, and the CLI mirrors the part of that rule it can:
+`step_type=delay` takes `action_type=delay`, `delay_until` takes `delay_until`,
+and `step_type=action` takes neither (`assertStepTypesFitActionTypes` and
+`stepPairProblem` in `cmd/inventory/workflows.go`).
+
+The other half of the server's rule — "`action_type` is a real `ActionType`" —
+is not checkable here. The spec never enumerates `ActionType`: the field is
+declared a bare string on `CreateWorkflowStepRequest` and the prose points at
+`GET /workflow-nodes`, whose catalogue is per-tenant and plan-dependent. So a
+misspelt type (`sendEmail`) still costs a round trip, and `--action-type` on
+`workflows steps create` is the one enum-ish flag with no client-side gate. A
+hard-coded list would be a second contract that drifts, and would refuse a type
+the day upstream ships it — which is exactly the failure mode the trigger's
+hand-maintained enum run has had twice (two live trigger types the CLI refused
+locally until 1.55.0 wrote them down).
+
+Related upstream inconsistency found while wiring this gate: the vendored spec
+states `action_type`'s requiredness twice and the two disagree —
+`CreateWorkflowStepRequest` says "Required for ACTION/DELAY/DELAY_UNTIL/LOOP"
+(`api/inventory/cli-v1.yaml:12396`) while the composed-steps shape says
+"Required for `action`, `delay` and `delay_until`" (`:12255`). The server
+implements the second: `CreateWorkflowStepRequest::rules()` declares
+`'action_type' => ['nullable', 'required_if:step_type,action,delay,delay_until',
+'string']`, and `ActionResolver::resolve` returns the loop evaluator whatever
+`action_type` says. The CLI's `--action-type` help follows the server. Never fix
+this by editing the vendored spec; it belongs in a ticket on
+`captainbook/captainbook`.
+
+Two ways out, neither free: ask upstream to publish the enum in the spec (then
+the existing description-enum gate and its drift test apply unchanged, and the
+loop/condition free-string case needs an exemption), or have the CLI fetch
+`workflow-nodes` and validate against it, which turns one write into two calls
+and needs a cache with an invalidation story.
+
+**Why:** the local gate is honest about its scope, so nothing is wrong today —
+the gap is that a typo in the most structured field on this surface is only
+caught by the server.
+**Effort:** human S / CC S (spec route), human M / CC M (catalogue route).
+**Priority:** P3. **Depends on:** an upstream spec change for the cheap route.

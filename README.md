@@ -265,6 +265,12 @@ ceebee completion fish | source
 | 17 | Rate limited (429) |
 | 18 | Unexpected status |
 
+These are the `stats` namespace's mapping. In `inventory` only a client-side
+refusal carries one (`12` for a rejected flag value or step-type pair, `15` for
+a config problem); every server-side inventory refusal and the local
+`ABILITY_MISSING` refusal render through their typed message and exit `1`. See
+[skills/index.md](skills/index.md#exit-codes).
+
 ## Development
 
 ```bash

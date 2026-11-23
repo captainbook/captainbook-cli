@@ -57,7 +57,7 @@ Dry-run returns the would-be `notification_id` and recipient — no email sent, 
 
 ## Pitfalls
 
-- ⚠️ **`cli:cs` ability required.** Operator tokens (`cli:write` only) get `403 ABILITY_MISSING`. Customer-contact operations are deliberately CS-gated.
+- ⚠️ **`cli:cs` ability required.** Operator tokens (`cli:write` only) get `ABILITY_MISSING`: the resend itself never leaves the machine, though the CLI does spend one `whoami` re-checking the cached ability set before refusing (see [index.md](index.md#token-abilities)). The server spells its own version of that refusal `403 FORBIDDEN`. Customer-contact operations are deliberately CS-gated.
 - ⚠️ **External side effect.** Mailer (or SMS provider) fires for real on success. There is no "unsend". Dry-run before any production resend.
 - ⚠️ **No localized render preview in V1.** The confirmation email is rendered in the booking's locale on the server; the CLI does not return the rendered HTML/text. Phase 2 will add a `preview` mode.
 - ⚠️ **`forensic_summary` captures the recipient.** Audit log entry includes the resolved recipient (PII). Treat `~/.ceebee/audit.jsonl` as PII-bearing.
