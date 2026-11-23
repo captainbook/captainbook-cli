@@ -880,8 +880,23 @@ fail at cobra flag-validation (no entry) now fails inside `Run` (entry). Same fo
 the `--to` must-be-after-`--from` check, the availability-ids caps, `segments get`'s
 UUID parse, and the new `--status`/`--booking-status` exclusivity.
 
+The cli-v1 1.60.0 sync added one more, and measured it: the new
+`(step_type, action_type)` gate refuses inside the closure, and its row carries
+no `error_code` at all. Note what that says about the fix below — the gate DOES
+return an `*api.ExitError`, and the row still loses the code, because
+`errorCode` in `cmd/inventory/inventory.go` is a type switch over `invpkg`
+types only and has no `*api.ExitError` case; its fallthrough is `""` and
+`AuditEntry.ErrorCode` is `omitempty`. So "return a distinguishable error" is
+necessary but not sufficient; `errorCode` needs the case too. Measured on the
+real binary: the row for `workflows steps create --step-type delay
+--action-type send_email` has no `error_code` key, while its
+`forensic_summary` does carry `{"action-type":"send_email","order":0,
+"step-type":"delay"}`, so the inputs that caused the refusal are recoverable
+even today — it is the code string that is missing, not the diagnosis.
+
 **Fix:** have pre-flight gates return a distinguishable error (an `*api.ExitError`
-or a sentinel) and skip `Append` when `res == nil && WireBody == nil`.
+or a sentinel), give `errorCode` a case for it (a client-side code such as
+`CLIENT_REFUSED`), and skip `Append` when `res == nil && WireBody == nil`.
 **Effort:** human S / CC S. **Priority:** P2. **Depends on:** nothing.
 
 ## `--data` bypasses the bulk-update scope gate and is absent from the audit
@@ -1708,3 +1723,54 @@ the gap is that a typo in the most structured field on this surface is only
 caught by the server.
 **Effort:** human S / CC S (spec route), human M / CC M (catalogue route).
 **Priority:** P3. **Depends on:** an upstream spec change for the cheap route.
+
+## `--data null` panics the two workflow body builders
+
+`ceebee inventory workflows trigger create <id> --data null --action-type X`
+panics with `assignment to entry in nil map`, and so do `workflows steps
+create/update --data null`, `workflows trigger update`, and every `{dry_run}`
+body (`workflows delete/restore/activate/deactivate`, `workflows steps delete`).
+
+`json.Unmarshal` sets a `map[string]any` to **nil** on the literal `null`
+(verified in isolation), and the next line assigns into it. `JSONBodyFromArgs`
+(`cmd/inventory/inventory.go:1552`) guards exactly this case, and its comment
+says so: "every overlay helper then unmarshals that back into a nil map and
+PANICS on its first assignment, crashing the CLI before it can audit the call or
+report a validation error". But `triggerOrStepBody` and `dryRunOnlyBody` in
+`cmd/inventory/workflows.go` each do their own `json.Unmarshal` with no nil
+check, so they are a second, unguarded source — the guard's "at the source"
+claim does not cover them.
+
+A panic means a stack trace, no typed error, and no audit row for an attempted
+mutation.
+
+Found by the adversarial pass of the cli-v1 1.60.0 ship and verified, but left
+unfixed there: the builders are pre-existing and outside that PR's hunks, so
+fixing them belonged in its own change rather than widening a spec sync.
+
+**Fix:** copy `JSONBodyFromArgs`'s `if body == nil` refusal into both builders,
+or route them through it. Add one test per builder driving `--data null`.
+**Why:** a crash on malformed input, on nine workflow commands, with no audit row.
+**Effort:** human S / CC S. **Priority:** P1. **Depends on:** nothing.
+
+## The step-pair gate's loop and condition arms are only half tested
+
+`stepPairProblem` (`cmd/inventory/workflows.go`) deliberately judges nothing for
+`step_type=loop` and `step_type=condition`, because the server's
+`ActionResolver` returns their evaluator whatever `action_type` says. The
+`condition` half is pinned (a condition step carrying an `action_type` the gate
+refuses elsewhere must still reach the wire); the `loop` half is not, and a
+round-2 reviewer demonstrated the gap empirically: widening the arm to
+`case "action", "loop":` leaves the whole `./cmd/inventory` suite green, so the
+gate can grow a refusal that makes a documented step unreachable with no test
+failing. Three composed-array cells (`loop` and `condition` with a mismatched
+type, `delay_until` with a fitting one) are likewise unexercised, though those
+replay arms already proven at the top level.
+
+Left as a note at the review loop's round cap rather than fixed, since a test
+gap is below the blocking floor.
+
+**Fix:** one row in `TestWire_LegalStepAndActionTypePairsStillReachTheServer`
+(`--step-type loop --action-type delay` must reach the wire with both fields),
+mirroring the condition row beside it, plus the three composed elements.
+**Effort:** human XS / CC XS. **Priority:** P2. **Depends on:** nothing.
