@@ -1724,6 +1724,38 @@ caught by the server.
 **Effort:** human S / CC S (spec route), human M / CC M (catalogue route).
 **Priority:** P3. **Depends on:** an upstream spec change for the cheap route.
 
+## The parent-step gate can only check the composed half
+
+Spec 1.61.0 made a `parent_step_id` / `parent_ref` naming a step that never runs
+children a write-time `422`: the field means "I am inside this step's branch",
+and only a CONDITION or a LOOP runs children, so a step parented to a plain
+action or a delay used to be written, answered `201`, and then silently never
+run. The CLI mirrors the half the request itself settles —
+`assertComposedParentRefsRunChildren` in `cmd/inventory/workflows.go` resolves
+each `parent_ref` against the `ref`s in the same `--steps` array and refuses a
+childless parent before the request, naming the element.
+
+`workflows steps create --parent-step-id` is not checkable here. It carries an
+id, not a type: the parent is a row that already exists server-side and nothing
+in the request says what `step_type` it has. So the two routes are deliberately
+asymmetric, which is pinned in `TestWire_ParentStepIDIsLeftToTheServer` — the
+obvious "finish the job" follow-up is to add a gate on this route too, where it
+could only be built on a guess.
+
+The way out is the same catalogue-fetch shape the step-type gap needs, with an
+extra problem of its own: validating `--parent-step-id` means a `GET
+/workflows/{id}` before the write, which turns one write into two calls AND
+races anyone editing the tree between them. A parent that passed the local check
+can be deleted or replaced before the write lands, so the server's 422 stays
+load-bearing either way.
+
+**Why:** the local gate is honest about its scope, so nothing is wrong today —
+the gap is that the single-step route still pays a round trip to learn a rule
+the composed route catches locally.
+**Effort:** human M / CC M (fetch route), and it needs a cache with an
+invalidation story to be worth it.
+**Priority:** P3. **Depends on:** nothing; the server already refuses correctly.
+
 ## `--data null` panics the two workflow body builders
 
 `ceebee inventory workflows trigger create <id> --data null --action-type booking_confirmed`

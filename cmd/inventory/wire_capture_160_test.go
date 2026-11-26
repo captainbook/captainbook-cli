@@ -519,6 +519,15 @@ func TestAudit_LocalPairRefusalRecordsItsCodeAndBody(t *testing.T) {
 				"--steps", `[{"step_type":"delay","action_type":"send_email","order":0}]`},
 			wantBody: `{"name":"pre-trip reminders","steps":[{"step_type":"delay","action_type":"send_email","order":0}]}`,
 		},
+		{
+			// The 1.61.0 parent gate is a third, separate return, so it needs
+			// its own case for the same reason the composed one did: reverting
+			// its WireBody left the other two green.
+			name: "workflows create, the composed parent_ref gate",
+			args: []string{"workflows", "create", "--name", "pre-trip reminders",
+				"--steps", `[{"step_type":"action","action_type":"send_email","ref":"mail","order":1},{"step_type":"action","action_type":"send_sms","parent_ref":"mail","branch_type":"true","order":2}]`},
+			wantBody: `{"name":"pre-trip reminders","steps":[{"step_type":"action","action_type":"send_email","ref":"mail","order":1},{"step_type":"action","action_type":"send_sms","parent_ref":"mail","branch_type":"true","order":2}]}`,
+		},
 	}
 
 	for _, tc := range cases {
