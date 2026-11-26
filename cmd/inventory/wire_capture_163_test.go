@@ -142,7 +142,7 @@ func TestWire_ParentRefNamingAChildlessStepNeverReachesTheServer(t *testing.T) {
 // the server's own validator names it. Asserting on a refusal message would be
 // useless for these — the assertion is that the request LEFT.
 //
-// Value: protects=the parent_ref gate refuses only what it can prove, so a legal branch and an unresolvable ref both still reach the server; fails_when=the gate negates a condition/loop test instead of listing the childless types, or starts refusing unknown refs and duplicate refs it cannot judge, making documented shapes unreachable from the CLI; why_new=the new gate's pass-through arms had no coverage; seam=captureReq; no_claim=says nothing about what the server answers for these bodies
+// Value: protects=the parent_ref gate refuses only what it can prove, so a legal branch, an unresolvable ref and a mistyped one all still reach the server; fails_when=the gate negates a condition/loop test instead of listing the childless types, or starts refusing what it cannot judge (an unknown or duplicate ref, a non-string ref, a non-array steps), making documented shapes unreachable from the CLI; why_new=the new gate's pass-through arms had no coverage; seam=captureReq; no_claim=says nothing about what the server answers for these bodies
 func TestWire_ParentRefTheGateCannotJudgeStillReachesTheServer(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -196,6 +196,22 @@ func TestWire_ParentRefTheGateCannotJudgeStillReachesTheServer(t *testing.T) {
 			name:  "a non-object element does not stop the array being passed on",
 			steps: `[{"step_type":"condition","condition_type":"value_check","ref":"check","order":1},"nope",{"step_type":"action","action_type":"send_email","parent_ref":"check","branch_type":"true","order":2}]`,
 		},
+		{
+			// The mirror on the map-building pass: a non-string `ref` leaves
+			// the parent unresolvable, so the referrer falls through the
+			// unknown-ref arm instead of being judged on a type the gate
+			// never actually read.
+			name:  "the named parent's ref is not a string",
+			steps: `[{"step_type":"action","action_type":"send_email","ref":7,"order":1},{"step_type":"action","action_type":"send_sms","parent_ref":"7","branch_type":"true","order":2}]`,
+		},
+		{
+			// `steps` present but not an array at all. Both composed gates
+			// read it through the same `.([]any)` assertion, so a non-array
+			// has to leave BOTH of them with nothing to judge rather than
+			// producing a refusal over a shape the server's validator names.
+			name:  "steps is an object rather than an array",
+			steps: `{"step_type":"action","action_type":"send_email","parent_ref":"mail"}`,
+		},
 	}
 
 	for _, tc := range cases {
@@ -229,5 +245,45 @@ func TestWire_ParentStepIDIsLeftToTheServer(t *testing.T) {
 	}
 	if req.Method != "POST" {
 		t.Errorf("method = %q, want POST", req.Method)
+	}
+}
+
+// TestWire_OneBodyBreakingBothComposedRulesIsRefusedOnTheFirst pins the order
+// of the two composed gates, which is operator-facing and not visible to
+// either gate's own test.
+//
+// `workflows create` now runs two local gates over the same `steps` array:
+// 1.60.0's pairing gate, then 1.61.0's parent gate. A body that breaks both
+// gets exactly ONE sentence, and which one is a choice — the pairing gate
+// returns first, so the operator is told about the pair. That is the right
+// half to lead with: a mismatched pair makes the element's step_type doubtful,
+// and a parent complaint computed from a doubtful step_type would send the
+// operator to the wrong step. Either way the request must not leave, and the
+// two messages must not be concatenated into one unreadable refusal.
+//
+// Value: protects=a body breaking both composed rules is refused once, before the request, on the pairing gate; fails_when=the parent gate is moved ahead of the pairing gate so a mismatched pair is reported as a parent problem, or a gate stops returning and both sentences are emitted; why_new=the second gate added in this sync created an ordering neither gate's own test can see; seam=captureReq
+func TestWire_OneBodyBreakingBothComposedRulesIsRefusedOnTheFirst(t *testing.T) {
+	// steps[0] is a delay carrying send_email (pairing gate) AND is named as a
+	// parent by steps[1] (parent gate). Both refusals point at a real problem.
+	hit, err := composedCreate(t, `[{"step_type":"delay","action_type":"send_email","ref":"wait","order":1},{"step_type":"action","action_type":"send_email","parent_ref":"wait","branch_type":"true","order":2}]`)
+	if hit {
+		t.Error("the request reached the server — two local refusals applied and neither stopped it")
+	}
+	if err == nil {
+		t.Fatal("a body breaking both composed rules was accepted")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, `steps[0]: step_type delay takes action_type delay and nothing else, got "send_email"`) {
+		t.Errorf("error = %q, want the pairing gate's sentence, which returns first", msg)
+	}
+	if strings.Contains(msg, "parent_ref") {
+		t.Errorf("error = %q, want ONE refusal, not both gates' sentences concatenated", msg)
+	}
+	var ee *api.ExitError
+	if !errors.As(err, &ee) {
+		t.Fatalf("want *api.ExitError, got %T", err)
+	}
+	if ee.Code != api.ExitValidation {
+		t.Errorf("exit code = %d, want %d (validation)", ee.Code, api.ExitValidation)
 	}
 }
