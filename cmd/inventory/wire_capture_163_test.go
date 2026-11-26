@@ -508,6 +508,25 @@ func TestRedactForensicCredentials_CoversEveryArm(t *testing.T) {
 			wantKept: `"api_key":""`,
 		},
 		{
+			// The same lossy decode one level up, which the row above does NOT
+			// reach: here the duplicate is an ANCESTOR key, so last-wins makes
+			// the credential NAME disappear from the decoded value altogether.
+			// The name walk then reports nothing, and a fast path that trusts
+			// the decoded view hands back the operator's bytes with the real
+			// key still in the overwritten member.
+			name:     "a duplicate ancestor key hides a credential from the decoded view",
+			in:       `[{"config":{"api_key":"LEAK"},"config":{"url":"https://example.test"}}]`,
+			wantGone: "LEAK",
+		},
+		{
+			// Same shape, but hiding a header PAIR rather than a named field.
+			// A raw scan for credential NAMES would not catch this one either:
+			// the only key names here are config, headers, key and value.
+			name:     "a duplicate ancestor key hides a credential header pair",
+			in:       `[{"config":{"headers":[{"key":"Authorization","value":"Bearer LEAK"}]},"config":{}}]`,
+			wantGone: "LEAK",
+		},
+		{
 			// send_webhook carries its secrets as headers: [{key, value}]
 			// pairs, so the secret's own key is the literal string `value` and
 			// a name-only check walks straight past it. Measured: before the
@@ -568,6 +587,80 @@ func TestRedactForensicCredentials_CoversEveryArm(t *testing.T) {
 			}
 			if tc.wantKept != "" && !strings.Contains(string(raw), tc.wantKept) {
 				t.Errorf("want %s in the redacted value, got %s", tc.wantKept, raw)
+			}
+		})
+	}
+}
+
+// TestRawJSONHasDuplicateObjectKey_TellsADuplicateFromARepeatedName is the
+// scanner's own test, because the redactor table above can only see the two
+// shapes where a duplicate hides a credential.
+//
+// This function decides whether an operator's bytes are kept verbatim, so a
+// false POSITIVE costs every row its key order, and a false NEGATIVE writes a
+// credential to disk. The cases that separate the two are all about what counts
+// as "the same key": the same name in two SIBLING objects is not a duplicate
+// (one `seen` map shared across frames would call it one), and a string that
+// merely equals a member name is not a name at all.
+//
+// Value: protects=the lossless-decode gate fires on a real duplicate at any depth and stays quiet for sibling objects, array elements and value strings; fails_when=the frame stack is replaced by one shared seen-map, the name/value alternation is dropped so value strings are counted as names, or array frames start collecting names; why_new=the redactor table reaches only the two duplicate shapes that hide a credential; seam=none; no_claim=says nothing about what the redactor does with the answer
+func TestRawJSONHasDuplicateObjectKey_TellsADuplicateFromARepeatedName(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{name: "no duplicate", in: `{"a":1,"b":2}`, want: false},
+		{name: "duplicate at the top level", in: `{"a":1,"a":2}`, want: true},
+		{name: "duplicate nested in an object", in: `{"x":{"a":1,"a":2}}`, want: true},
+		{name: "duplicate inside an array element", in: `[{"a":1,"a":2}]`, want: true},
+		{
+			// The false-positive case that matters: every composed step object
+			// carries step_type and order, so a shared seen-map would report a
+			// duplicate for every multi-step workflow ever audited.
+			name: "the same name in sibling objects is not a duplicate",
+			in:   `[{"step_type":"action","order":1},{"step_type":"delay","order":2}]`,
+			want: false,
+		},
+		{
+			name: "the same name in sibling objects nested deeper",
+			in:   `{"a":{"k":1},"b":{"k":2}}`,
+			want: false,
+		},
+		{
+			// A string VALUE that happens to equal its own member name. Lose
+			// the name/value alternation and this reads as a duplicate.
+			name: "a value equal to its member name is not a duplicate",
+			in:   `{"a":"a"}`,
+			want: false,
+		},
+		{
+			// Array elements are not member names, so repeats are legal.
+			name: "repeated strings in an array are not duplicates",
+			in:   `{"tags":["config","config"]}`,
+			want: false,
+		},
+		{
+			// Reopening the same name after a nested container closed: the
+			// frame has to be restored on pop, or this is missed.
+			name: "duplicate separated by a nested container",
+			in:   `{"a":{"n":1},"b":[1,2],"a":2}`,
+			want: true,
+		},
+		{
+			// Fails open by contract: the caller only asks about bytes it has
+			// already decoded, and its own decode-failure arm fails closed.
+			name: "malformed input reports no duplicate",
+			in:   `{"a":`,
+			want: false,
+		},
+		{name: "a bare scalar has no object at all", in: `"just a string"`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := rawJSONHasDuplicateObjectKey([]byte(tc.in)); got != tc.want {
+				t.Errorf("rawJSONHasDuplicateObjectKey(%s) = %v, want %v", tc.in, got, tc.want)
 			}
 		})
 	}

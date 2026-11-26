@@ -951,6 +951,18 @@ func assertComposedParentRefsRunChildren(body []byte) error {
 	// unknown ref), which the server's validator already names; reading every
 	// ref keeps this gate to the ONE question it can answer with certainty —
 	// whether the named step is a kind that runs children.
+	//
+	// Resolving wider than "unique and earlier" cannot refuse a request the
+	// server would have taken, which is what makes it safe: the spec declares
+	// `ref` "Must be unique within the request" and a forward or unknown
+	// `parent_ref` a 422 (ComposedWorkflowStep, api/inventory/cli-v1.yaml), so
+	// every body this wider lookup can reach is already refused upstream. The
+	// only difference is WHICH refusal the operator reads, and the local one
+	// names the parent-as-ordering mistake that is usually the real cause.
+	// Pinned from both sides: "a forward ref to a childless step is still
+	// refused on type" in TestWire_ParentRefNamingAChildlessStepNeverReachesTheServer,
+	// and "a duplicate ref does not let the second definition decide" in
+	// TestWire_ParentRefTheGateCannotJudgeStillReachesTheServer.
 	refType := make(map[string]string, len(steps))
 	for _, raw := range steps {
 		step, ok := raw.(map[string]any)

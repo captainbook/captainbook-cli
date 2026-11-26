@@ -935,14 +935,33 @@ func looksLikeCredentialName(name string) bool {
 // as making audit.jsonl credential-free; it closes the shapes a node's rules()
 // declares as fields, not every shape an operator can hand-build.
 //
-// Returns v UNCHANGED only when no credential NAME appeared anywhere, which is
-// the overwhelmingly common case and keeps the operator's own bytes and key
-// order in the row. Re-encoding is driven by "a credential name was seen", not
-// by "a value was mutated": `changed` is computed on the DECODED copy, and Go
-// resolves a duplicate JSON key last-wins, so `{"api_key":"REAL","api_key":""}`
-// decodes to a blank, mutates nothing, and would have returned the original
-// bytes with REAL still in them. Measured before the fix. Re-encoding collapses
-// the duplicate, which is what removes it.
+// Returns v UNCHANGED only when the fast path is SAFE, which takes two
+// conditions, not one. Keeping the original bytes is worth having: it preserves
+// the operator's own key order in the row, and it is the overwhelmingly common
+// case. But the bytes may only be kept when the decoded value is a faithful
+// read of them, because every check here runs on the DECODED copy.
+//
+//  1. No credential NAME appeared in the decoded value. Re-encoding is driven by
+//     "a name was seen", not by "a value was mutated": Go resolves a duplicate
+//     JSON key last-wins, so `{"api_key":"REAL","api_key":""}` decodes to a
+//     blank, mutates nothing, and a mutation-driven fast path would hand back
+//     the original bytes with REAL still in them. Measured before the fix.
+//
+//  2. The bytes contain no duplicate object key ANYWHERE. Condition 1 only sees
+//     what survived the decode, and a duplicate one level UP deletes the
+//     credential from the decoded value entirely:
+//     `{"config":{"api_key":"REAL"},"config":{"url":"..."}}` decodes to a config
+//     with no credential in it, so the name walk reports nothing and the fast
+//     path wrote REAL to disk. Found in review, measured, now pinned.
+//
+//     Scanning the raw bytes for credential NAMES instead would close that one
+//     shape and miss the next: the same trick hides a `{"key","value"}` header
+//     pair, whose only key names are `config`, `headers`, `key` and `value`.
+//     So the condition is about the DECODE being lossless, not about what the
+//     bytes appear to contain. Any duplicate key forces the re-encode, which
+//     collapses duplicates last-wins and drops the overwritten member with its
+//     credential. The row then shows what the SERVER will act on, since both
+//     Go and the server's json_decode resolve duplicates the same way.
 func redactForensicCredentials(v any) any {
 	raw, ok := v.(json.RawMessage)
 	if !ok {
@@ -963,7 +982,7 @@ func redactForensicCredentials(v any) any {
 		return v
 	}
 	redacted, sawCredential := redactCredentialFields(decoded)
-	if !sawCredential {
+	if !sawCredential && !rawJSONHasDuplicateObjectKey(raw) {
 		return v
 	}
 	out, err := json.Marshal(redacted)
@@ -976,6 +995,82 @@ func redactForensicCredentials(v any) any {
 		}}
 	}
 	return json.RawMessage(out)
+}
+
+// rawJSONHasDuplicateObjectKey reports whether raw contains an object with the
+// same member name twice, at any depth.
+//
+// This is the "is the decode lossless?" half of redactForensicCredentials'
+// fast path. A duplicate key is the one way the decoded value can be missing
+// bytes that are still sitting in raw, and those bytes go to the audit log
+// verbatim if the fast path trusts the decode. See that function's comment for
+// the shape this catches.
+//
+// Reads tokens rather than re-parsing into a duplicate-preserving tree: the
+// question is only whether a repeat exists, so a name seen twice in one frame
+// can answer it without building anything. json.Decoder.Token() does not say
+// whether a string is a member name or a value, so the frame stack tracks it:
+// inside an object, tokens alternate name, value, name, value.
+//
+// Fails OPEN on a malformed or truncated value (reports no duplicate) because
+// the caller has already decoded raw successfully by the time it asks. A value
+// that does not parse here cannot have parsed there, and the caller's own
+// decode-failure arm hands such a value to capForensicValue, which fails
+// closed.
+func rawJSONHasDuplicateObjectKey(raw []byte) bool {
+	type frame struct {
+		isObject bool
+		seen     map[string]struct{}
+	}
+	var stack []frame
+
+	// expectName is true when the next string token is a member name rather
+	// than a value, i.e. when the innermost frame is an object and the
+	// previous token completed a value (or opened the object).
+	expectName := false
+	innerIsObject := func() bool {
+		return len(stack) > 0 && stack[len(stack)-1].isObject
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			// io.EOF after a complete value, or a parse error. Either way there
+			// is no duplicate left to report.
+			return false
+		}
+		switch t := tok.(type) {
+		case json.Delim:
+			switch t {
+			case '{':
+				stack = append(stack, frame{isObject: true, seen: map[string]struct{}{}})
+				expectName = true
+				continue
+			case '[':
+				stack = append(stack, frame{})
+				expectName = false
+				continue
+			default: // '}' or ']'
+				stack = stack[:len(stack)-1]
+			}
+		case string:
+			if expectName {
+				top := stack[len(stack)-1]
+				if _, dup := top.seen[t]; dup {
+					return true
+				}
+				top.seen[t] = struct{}{}
+				// The next token is this member's value, so it is not a name
+				// even though the innermost frame is still an object.
+				expectName = false
+				continue
+			}
+		}
+		// A completed value: scalar, or the close of a nested container. The
+		// next token is a name when the frame it lands in is an object.
+		expectName = innerIsObject()
+	}
 }
 
 // redactCredentialFields walks a decoded JSON value, empties every credential
