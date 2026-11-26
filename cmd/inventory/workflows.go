@@ -65,9 +65,15 @@ func workflowsDefs() []CommandDef {
 				"reasons fail — no_whatsapp_sender, whatsapp_not_in_plan, " +
 				"no_booking_in_context and empty_message, all cases where nothing was " +
 				"attempted and nothing downstream will fix it. Three deliberately do not: " +
-				"not_delivered (the catch-all default, and the only reason mail, SMS and " +
-				"push ever produce) and the wallet channel's intended skips throttled and " +
-				"no_installed_passes.\n\n" +
+				"not_delivered (the catch-all DELIVERY outcome) and the wallet channel's " +
+				"intended skips throttled and no_installed_passes.\n\n" +
+				"Do not read 1.62.0 as a WhatsApp-and-wallet change. empty_message is judged " +
+				"BEFORE the channel branch, so mail, SMS and push reach it too: a step whose " +
+				"body resolves to nothing — an unresolved {variable}, or only invisible " +
+				"characters — fails the step and stops the run. That is the likeliest way an " +
+				"existing mail workflow starts failing. The spec's 1.62.0 entry still calls " +
+				"not_delivered the only code those three ever produce; this text follows the " +
+				"server instead, and the discrepancy is tracked in TODOS.md.\n\n" +
 				"config.continue_on_error (boolean, optional) joined send_notification in " +
 				"spec 1.62.0 and restores the old behaviour for ONE step: the refusal is " +
 				"still reported in reason and the run carries on. That is the migration path " +
@@ -193,7 +199,11 @@ func workflowsDefs() []CommandDef {
 				"row and produce a workflow that silently stopped there. A step that simply " +
 				"FOLLOWS another has no parent: omit parent_ref and give it a later order. " +
 				"The CLI refuses this locally too, naming the array index, because the whole " +
-				"request carries both the ref and the step it names.",
+				"request carries both the ref and the step it names.\n\n" +
+				"branch_type rides along with it: a child of a LOOP, or of a FILTER condition, " +
+				"must carry branch_type true, because those two run only their true children. A " +
+				"false child under either is another 422 that takes the WHOLE composed request, " +
+				"and the CLI does not pre-empt that one.",
 			Flags: []FlagDef{
 				{Name: "name", Type: "string", Required: true, Description: "Workflow name (≤200 chars)"},
 				{Name: "description", Type: "string"},
@@ -522,10 +532,10 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 				{Name: "step-type", Type: "string", Required: true, Description: "action|condition|delay|delay_until|loop"},
 				{Name: "action-type", Type: "string", Description: "Required for action/delay/delay_until; optional for loop and condition, which ignore it. See ActionType enum. Must fit --step-type: delay takes delay, delay_until takes delay_until, action takes neither."},
 				{Name: "condition-type", Type: "string", Description: "value_check|filter (required for condition step_type)"},
-				{Name: "config", Type: "string", Description: "JSON object validated against the resolved action's rules() (literal or @file.json). send_notification takes continue_on_error (bool) since spec 1.62.0. Credential fields (api_key, secret, token, password) are withheld on read and left alone when sent empty or omitted (1.63.0)"},
+				{Name: "config", Type: "string", Description: "JSON object validated against the resolved action's rules() (literal or @file.json). send_notification and send_webhook both take continue_on_error (bool); read each node's own rules() from the workflows nodes catalogue. Credential fields (api_key, secret, token, password) are withheld on read and left alone when sent empty or omitted (1.63.0)"},
 				{Name: "order", Type: "int", Required: true, Description: "Position within the parent branch (≥0)"},
 				{Name: "parent-step-id", Type: "int", Description: "Parent step in the tree. Must be a CONDITION or a LOOP — the only types that run children (spec 1.61.0 refuses any other with 422). Means \"inside this step's branch\", not \"after this step\": a step that merely follows another omits this and takes a later --order"},
-				{Name: "branch-type", Type: "string", Description: "true|false — required when --parent-step-id is set. A CONDITION's children take either (the then/else branches); a LOOP's children are always true, so false under a loop is a 422 the CLI does not pre-empt"},
+				{Name: "branch-type", Type: "string", Description: "true|false — required when --parent-step-id is set. A value_check CONDITION's children take either (the then/else branches); a LOOP's children and a FILTER condition's children are always true, so false under either is a 422 the CLI does not pre-empt"},
 			},
 			ForensicFields: []string{"step-type", "action-type", "condition-type", "order", "parent-step-id", "branch-type"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {

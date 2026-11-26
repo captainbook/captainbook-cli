@@ -1756,10 +1756,32 @@ for loop children" (`:12457`) — and on the composed route it is as decidable a
 the parent rule, since the parent's `step_type` and the child's `branch_type` are
 both in the array. It was left out on purpose: it belongs to an earlier spec
 version, not to this sync, and growing a sync's gate to cover a second rule is how
-a scoped change stops being reviewable. `--branch-type` now says a loop child is
-always true. The condition half of the server's rule (a FILTER condition runs only
-its true children) is NOT in the spec at all, so that part is not locally
-decidable even in principle and would need the same catalogue fetch.
+a scoped change stops being reviewable. `--branch-type` and the composed create's help
+now carry the rule.
+
+One correction to the obvious reading of that gap: the FILTER half is just as
+locally decidable as the parent rule on the composed route, even though the spec
+never states it. `StepType::runsOnlyTrueChildren` in the server returns true for a
+LOOP *and* for a CONDITION whose `condition_type` is `filter`, and `condition_type`
+travels in the same `--steps` array (`ComposedWorkflowStep.condition_type`), one map
+away from the `step_type` the gate already reads. What is missing is the SPEC's
+statement of it, which is an upstream ticket, not a decidability problem. The
+per-step route would need `GET /workflows/{id}` to learn an existing parent's
+`condition_type`; `GET /workflow-nodes` is the wrong instrument there, because it
+publishes node vocabulary rather than a stored row.
+
+Two upstream spec gaps found while wiring this sync, both for a ticket on
+`captainbook/captainbook` and NEVER a local edit to the vendored spec:
+
+1. The 1.62.0 changelog entry (`api/inventory/cli-v1.yaml:192`) calls `not_delivered`
+   "the only code mail, SMS and push ever produce". The server disagrees:
+   `SendNotificationAction.php:164` judges the empty-body guard BEFORE the channel
+   branch, so `empty_message` is channel-independent, and it sits in
+   `REFUSAL_REASONS`, so a mail/SMS/push step whose body resolves to nothing now
+   FAILS. The CLI's own prose follows the server, as the action_type precedent above
+   does.
+2. The FILTER-condition branch rule is absent from the spec entirely (see the
+   correction above).
 
 **Why:** the local gate is honest about its scope, so nothing is wrong today —
 the gap is that the single-step route still pays a round trip to learn a rule
