@@ -1012,11 +1012,21 @@ func redactForensicCredentials(v any) any {
 // whether a string is a member name or a value, so the frame stack tracks it:
 // inside an object, tokens alternate name, value, name, value.
 //
-// Fails OPEN on a malformed or truncated value (reports no duplicate) because
-// the caller has already decoded raw successfully by the time it asks. A value
-// that does not parse here cannot have parsed there, and the caller's own
-// decode-failure arm hands such a value to capForensicValue, which fails
-// closed.
+// MUST be configured exactly like the caller's decoder, which is why
+// UseNumber is set here too. This function fails OPEN: a token error reports
+// "no duplicate", and the caller then keeps the operator's original bytes. So
+// any input this scanner rejects and the caller's decoder ACCEPTS is a
+// credential written to disk. Without UseNumber that gap is reachable with one
+// number: `{"config":{"n":1e1000,"api_key":"live"},"config":{}}` overflows
+// float64 here, errors, fails open, and never reaches the duplicate `config`
+// that hides the key, while the caller decodes it happily. Found in review
+// after the first version of this function shipped without UseNumber, and
+// pinned in both tables.
+//
+// Fail-open is still the right default for a genuinely malformed value, since
+// the caller's own decode-failure arm hands that to capForensicValue, which
+// fails closed. It is only safe while the two decoders agree, so any future
+// decoder option added to redactForensicCredentials belongs here as well.
 func rawJSONHasDuplicateObjectKey(raw []byte) bool {
 	type frame struct {
 		isObject bool
@@ -1033,12 +1043,29 @@ func rawJSONHasDuplicateObjectKey(raw []byte) bool {
 	}
 
 	dec := json.NewDecoder(bytes.NewReader(raw))
+	// Match redactForensicCredentials' decoder. See the note above: a number
+	// this scanner cannot read is a credential the caller keeps in plaintext.
+	dec.UseNumber()
 	for {
 		tok, err := dec.Token()
-		if err != nil {
-			// io.EOF after a complete value, or a parse error. Either way there
-			// is no duplicate left to report.
+		if errors.Is(err, io.EOF) {
+			// The whole value was read and no name repeated. A TRUNCATED value
+			// lands here too, because the decoder reports both as io.EOF, and
+			// that is harmless: the caller's own decode fails on truncated
+			// bytes and returns through its decode-failure arm without ever
+			// asking this function.
 			return false
+		}
+		if err != nil {
+			// FAIL CLOSED. The caller only reaches this function after its own
+			// decoder accepted these bytes, so a parse error here does not mean
+			// "malformed": it means this scanner and that decoder disagree, and
+			// that disagreement is exactly how a credential stays in the bytes
+			// while the decoded view looks clean. Reporting a duplicate costs a
+			// re-encode and the row's key order. Reporting none costs the
+			// credential. The UseNumber note above is the gap that was found;
+			// this arm is so the next one of its kind is not a leak.
+			return true
 		}
 		switch t := tok.(type) {
 		case json.Delim:

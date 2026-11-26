@@ -527,6 +527,15 @@ func TestRedactForensicCredentials_CoversEveryArm(t *testing.T) {
 			wantGone: "LEAK",
 		},
 		{
+			// The duplicate-key scanner has to read numbers the way the
+			// redactor's own decoder does. 1e1000 overflows float64, so a
+			// scanner without UseNumber errors on the token, fails open, and
+			// never reaches the duplicate `config` that hides the credential.
+			name:     "an out-of-range number does not blind the duplicate scan",
+			in:       `[{"config":{"n":1e1000,"api_key":"LEAK"},"config":{}}]`,
+			wantGone: "LEAK",
+		},
+		{
 			// send_webhook carries its secrets as headers: [{key, value}]
 			// pairs, so the secret's own key is the literal string `value` and
 			// a name-only check walks straight past it. Measured: before the
@@ -648,11 +657,34 @@ func TestRawJSONHasDuplicateObjectKey_TellsADuplicateFromARepeatedName(t *testin
 			want: true,
 		},
 		{
-			// Fails open by contract: the caller only asks about bytes it has
-			// already decoded, and its own decode-failure arm fails closed.
-			name: "malformed input reports no duplicate",
+			// A TRUNCATED value surfaces as plain io.EOF, indistinguishable
+			// from a clean end, so it reports no duplicate. Harmless and
+			// unreachable: the caller decodes before it asks, and truncated
+			// bytes fail that decode, which returns through its own arm without
+			// consulting this function.
+			name: "a truncated value reports no duplicate",
 			in:   `{"a":`,
 			want: false,
+		},
+		{
+			// A SYNTAX error is the arm that matters, and it fails CLOSED.
+			// Bytes that error here but satisfied the caller's decoder are
+			// exactly how a credential hides in the bytes while the decoded
+			// view looks clean, which is what the missing UseNumber did. The
+			// answer that costs a re-encode beats the answer that costs the
+			// credential.
+			name: "a syntax error fails closed",
+			in:   `{"a":xyz}`,
+			want: true,
+		},
+		{
+			// A number outside float64's range is legal JSON the server may
+			// accept, and the redactor's decoder keeps it as a json.Number. If
+			// this scanner does not, it errors here and fails open on a value
+			// whose duplicate is hiding a credential.
+			name: "an out-of-range number does not stop the scan",
+			in:   `{"config":{"n":1e1000},"config":{}}`,
+			want: true,
 		},
 		{name: "a bare scalar has no object at all", in: `"just a string"`, want: false},
 	}
