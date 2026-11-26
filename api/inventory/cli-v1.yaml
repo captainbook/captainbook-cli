@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CaptainBook Inventory CLI API
-  version: 1.60.0
+  version: 1.63.0
   description: |
     Internal HTTP JSON API serving the CaptainBook inventory CLI client
     (which lives in a separate repository). Primary consumer is Claude Code
@@ -166,6 +166,47 @@ info:
     marked **Breaking** below. The URL major (`/api/v1/cli`) is a separate axis
     and does not move.
 
+    - **1.63.0** — **Breaking for anyone reading a step's credential fields.**
+      `config.api_key`, `config.secret`, `config.token` and `config.password`
+      now always read back as an empty string, whatever is stored. Reading a
+      workflow is governed by `view_any_workflow`, which is not authority over
+      a credential the account installed, and this endpoint was handing a
+      working Ads API key to any read-scoped token. The same change went to the
+      UI's workflow export.
+
+      The write side pairs with it: an empty string or an OMITTED credential
+      field means "leave the stored value alone", not "clear it". Without that,
+      the obvious read, change one field, write it back would post the withheld
+      blank over a live key — a step update replaces the whole `config`. Send a
+      real value to replace one. A credential cannot be cleared through this
+      API; remove the step, or clear it in the builder.
+
+    - **1.62.0** — **Breaking for anyone reading `sent`.** A `send_notification`
+      step that we DECLINED to send now FAILS, where it used to complete with
+      `sent: false` and a `reason`. The step status in the execution log is the
+      contract that changed: a run whose notification never went out is no longer
+      reported as successful. Four codes fail — `no_whatsapp_sender`,
+      `whatsapp_not_in_plan`, `no_booking_in_context` and `empty_message`, all of
+      them cases where nothing was attempted and nothing downstream will fix it.
+      Three deliberately do not: `not_delivered` (the catch-all default, and the
+      only code mail, SMS and push ever produce) and the wallet channel's intended
+      skips `throttled` and `no_installed_passes`. Supersedes the last sentence of
+      1.56.0.
+
+      **Also added:** `config.continue_on_error` (boolean, optional) on
+      `send_notification`, which restores the previous behaviour for one step —
+      the refusal is still reported in `reason` and the run carries on. That is
+      the migration path for a workflow that was relying on the silence.
+
+    - **1.61.0** — **Breaking, by clarification.** `parent_step_id` on
+      `POST /workflows/{id}/steps`, and `parent_ref` in a whole-workflow
+      composition, are now REFUSED when they name a step that never runs
+      children. The field does not mean "the step before me"; it means "I am
+      inside this step's branch", and only a condition or a loop runs children —
+      every other step type is marked processed the moment it runs, and the
+      executor then skips anything parented to it. A plain action or a delay named
+      as parent used to return `201`, write the row, and produce a workflow that
+      silently stopped there. Both field descriptions say so now.
     - **1.60.0** — **Fixed.** A workflow step whose `action_type` does not fit
       its `step_type` is refused at write time instead of failing every run.
       `POST /workflows/{id}/steps`, the composed steps of `POST /workflows`
@@ -211,8 +252,10 @@ info:
       paired WhatsApp and threads into the Inbox; it is free text, so there is no
       template to name. Needs a connected WhatsApp — without one the step runs and
       reports `sent: false` with `reason: no_whatsapp_sender` rather than falling
-      back to SMS. The full channel list stays readable from
-      `GET /workflow-nodes`, which publishes each node's `rules()` verbatim.
+      back to SMS. **That last sentence no longer describes the behaviour: see
+      1.62.0, where a refusal fails the step.** The full channel list stays
+      readable from `GET /workflow-nodes`, which publishes each node's `rules()`
+      verbatim.
 
     - **1.55.0** — **Added.** `whatsapp_message_received` joins the
       `action_type` enum on `POST /workflows/{id}/trigger`: a workflow can now
@@ -7266,6 +7309,11 @@ paths:
         `parent_ref` naming a step that is not listed EARLIER is a 422, never a
         silently-flattened branch.
 
+        A `parent_ref` must also name a CONDITION or a LOOP — the only step
+        types that run their children. Pointing at a plain action or a delay is
+        a 422: the step would be written and then never execute. A step that
+        simply follows another has no parent; omit `parent_ref`.
+
         `order` defaults to the step's position in the list (the trigger holds
         order 0, so the first step is 1).
 
@@ -7665,6 +7713,13 @@ paths:
         LOOP). Steps form a tree via `parent_step_id` + `branch_type`. The
         parent must belong to the same workflow — cross-workflow refs are
         rejected with 422.
+
+        **`parent_step_id` is not "the step before me".** It means "I am inside
+        this step's branch", so only a CONDITION or a LOOP may be named: those
+        are the only step types that run their children. Naming any other step
+        is a 422 — the step would be written and then never execute, because
+        the executor skips anything whose parent it has already run. A step
+        that simply follows another has no parent; omit the field.
 
         Config is validated against the resolved action's `rules()` schema
         before persistence; failures return 422 INVALID_STEP_CONFIG.
@@ -12057,6 +12112,20 @@ components:
             action's `rules()` schema at write time and again at
             execution time. See app/Workflows/Actions/*.php for the
             per-action shape.
+
+            CREDENTIAL FIELDS ARE WITHHELD ON READ. `api_key`, `secret`,
+            `token` and `password` always come back as an empty string,
+            whatever is stored. Reading a workflow is governed by
+            `view_any_workflow`, which is not authority over a credential
+            the account installed, so the value is not part of the read.
+
+            On WRITE, an empty string or an omitted credential field means
+            "leave the stored value alone", NOT "clear it" — because this
+            endpoint replaces the whole config, and the obvious read,
+            change one field, write it back would otherwise post the
+            withheld blank over a working key. Send a new value to replace
+            one. A credential cannot be cleared through this API; remove
+            the step, or clear it in the builder.
         order: { type: integer }
         parent_step_id:
           type: [integer, "null"]

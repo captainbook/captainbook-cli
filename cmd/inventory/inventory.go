@@ -788,7 +788,10 @@ func forensicSummary(def CommandDef, args RunArgs) map[string]any {
 	}
 	for _, name := range def.ForensicFields {
 		if v, ok := args.Flags[name]; ok {
-			out[name] = capForensicValue(v)
+			// Redact BEFORE capping: the cap replaces an oversized value with a
+			// hash marker, and hashing a credential still records it for anyone
+			// who can guess the plaintext.
+			out[name] = capForensicValue(redactForensicCredentials(v))
 		}
 	}
 	if len(out) == 0 {
@@ -848,6 +851,319 @@ func capForensicValue(v any) any {
 		"canonical_json_sha256": sha256Hex(raw),
 		"cap_bytes":             forensicValueMaxBytes,
 	}}
+}
+
+// forensicCredentialFields are the config fields the server withholds on read
+// (spec 1.63.0) and blanks nowhere else: `SecretConfigFields::NAMES` in the
+// server repo is this exact list.
+//
+// Matched case-insensitively, which is wider than the server's own check. That
+// is deliberate: over-blanking a value in a LOCAL audit row costs a little
+// reconstructability, while under-blanking one writes a live credential to
+// disk, so the two errors are not worth trading evenly.
+var forensicCredentialFields = map[string]struct{}{
+	"api_key":  {},
+	"secret":   {},
+	"token":    {},
+	"password": {},
+}
+
+// forensicCredentialHeaderHints match a HEADER NAME whose paired value is a
+// credential. A send_webhook step carries its secrets as
+// `headers: [{"key": "Authorization", "value": "Bearer ..."}]`, so the secret
+// sits under the literal map keys `key` and `value` and a name-only check walks
+// straight past it. Measured: before this list, `Bearer sk-live-...` reached
+// audit.jsonl intact.
+//
+// Substring matching on a normalised name, which is wider than it strictly
+// needs to be. Same trade as the case-insensitive match above: a header called
+// `x-request-token` losing its value in a LOCAL audit row costs a little
+// reconstructability, and the alternative is a live bearer token on disk.
+var forensicCredentialHeaderHints = []string{
+	"authorization",
+	"apikey",
+	"secret",
+	"token",
+	"password",
+	"credential",
+	"bearer",
+}
+
+// looksLikeCredentialName reports whether a field or header name names a
+// credential. Normalises away the separators that distinguish `x-api-key`,
+// `X_API_KEY` and `apiKey` so one list covers all three spellings.
+func looksLikeCredentialName(name string) bool {
+	normalised := strings.Map(func(r rune) rune {
+		switch r {
+		case '-', '_', ' ', '.':
+			return -1
+		}
+		return r
+	}, strings.ToLower(name))
+	if _, exact := forensicCredentialFields[strings.ToLower(name)]; exact {
+		return true
+	}
+	for _, hint := range forensicCredentialHeaderHints {
+		if strings.Contains(normalised, hint) {
+			return true
+		}
+	}
+	return false
+}
+
+// redactForensicCredentials blanks every credential field inside a forensic
+// value before it is written to the audit log.
+//
+// Why this exists: `workflows create` declares `trigger` and `steps` as
+// ForensicFields on purpose (see the D20 note on that command — they ARE the
+// automation, so a row without them cannot reconstruct the workflow), and a
+// composed step's `config` can carry an Ads API key. capForensicValue only
+// size-caps, so the key landed in ~/.ceebee/audit.jsonl in cleartext.
+// Pre-existing, but spec 1.63.0 is what made it matter: the server now returns
+// "" for those fields forever, so this file could hold the only plaintext copy
+// of a working credential. Confirmed with a canary before the fix.
+//
+// The KEY is kept and only its value emptied. "This step had an api_key" is
+// part of reconstructing the workflow; the key itself is not. That also mirrors
+// what a read from the server now looks like, so a row and a fresh GET agree.
+//
+// WHAT THIS DOES NOT CATCH, because a name-based filter cannot: a credential
+// carried inside a JSON *string*. `send_webhook`'s `config.body` is declared a
+// string, so `{"body":"{\"api_key\":\"sk-live-...\"}"}` is one opaque value to
+// every check here and is written verbatim. The server's own SecretConfigFields
+// documents the same limit for the same reason. Do not describe this function
+// as making audit.jsonl credential-free; it closes the shapes a node's rules()
+// declares as fields, not every shape an operator can hand-build.
+//
+// Returns v UNCHANGED only when the fast path is SAFE, which takes two
+// conditions, not one. Keeping the original bytes is worth having: it preserves
+// the operator's own key order in the row, and it is the overwhelmingly common
+// case. But the bytes may only be kept when the decoded value is a faithful
+// read of them, because every check here runs on the DECODED copy.
+//
+//  1. No credential NAME appeared in the decoded value. Re-encoding is driven by
+//     "a name was seen", not by "a value was mutated": Go resolves a duplicate
+//     JSON key last-wins, so `{"api_key":"REAL","api_key":""}` decodes to a
+//     blank, mutates nothing, and a mutation-driven fast path would hand back
+//     the original bytes with REAL still in them. Measured before the fix.
+//
+//  2. The bytes contain no duplicate object key ANYWHERE. Condition 1 only sees
+//     what survived the decode, and a duplicate one level UP deletes the
+//     credential from the decoded value entirely:
+//     `{"config":{"api_key":"REAL"},"config":{"url":"..."}}` decodes to a config
+//     with no credential in it, so the name walk reports nothing and the fast
+//     path wrote REAL to disk. Found in review, measured, now pinned.
+//
+//     Scanning the raw bytes for credential NAMES instead would close that one
+//     shape and miss the next: the same trick hides a `{"key","value"}` header
+//     pair, whose only key names are `config`, `headers`, `key` and `value`.
+//     So the condition is about the DECODE being lossless, not about what the
+//     bytes appear to contain. Any duplicate key forces the re-encode, which
+//     collapses duplicates last-wins and drops the overwritten member with its
+//     credential. The row then shows what the SERVER will act on, since both
+//     Go and the server's json_decode resolve duplicates the same way.
+func redactForensicCredentials(v any) any {
+	raw, ok := v.(json.RawMessage)
+	if !ok {
+		// Every field that can carry a node config is a `json`-typed flag. A
+		// string, int or bool flag has no nested shape to walk.
+		return v
+	}
+	var decoded any
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	// UseNumber for the same reason decodeBodyFields has it: a number outside
+	// float64's range is legal JSON the server may accept, and a redactor must
+	// not be the thing that mangles it.
+	dec.UseNumber()
+	if err := dec.Decode(&decoded); err != nil {
+		// parseJSONFlag already validated this value, so a decode failure here
+		// is not something to paper over: hand the original to capForensicValue,
+		// which fails closed on anything it cannot encode.
+		return v
+	}
+	redacted, sawCredential := redactCredentialFields(decoded)
+	if !sawCredential && !rawJSONHasDuplicateObjectKey(raw) {
+		return v
+	}
+	out, err := json.Marshal(redacted)
+	if err != nil {
+		// Re-encoding a value that just decoded should not fail. If it somehow
+		// does, returning the original would write the credential, so return the
+		// marker capForensicValue uses for a value it cannot encode instead.
+		return map[string]any{forensicCapKey: map[string]any{
+			"omitted": "value could not be re-encoded after credential redaction",
+		}}
+	}
+	return json.RawMessage(out)
+}
+
+// rawJSONHasDuplicateObjectKey reports whether raw contains an object with the
+// same member name twice, at any depth.
+//
+// This is the "is the decode lossless?" half of redactForensicCredentials'
+// fast path. A duplicate key is the one way the decoded value can be missing
+// bytes that are still sitting in raw, and those bytes go to the audit log
+// verbatim if the fast path trusts the decode. See that function's comment for
+// the shape this catches.
+//
+// Reads tokens rather than re-parsing into a duplicate-preserving tree: the
+// question is only whether a repeat exists, so a name seen twice in one frame
+// can answer it without building anything. json.Decoder.Token() does not say
+// whether a string is a member name or a value, so the frame stack tracks it:
+// inside an object, tokens alternate name, value, name, value.
+//
+// Configured exactly like the caller's decoder, which is why UseNumber is set
+// here too, and a SYNTAX error fails CLOSED (reports a duplicate, forcing the
+// re-encode). Both exist for the same reason: whatever this scanner rejects and
+// the caller's decoder ACCEPTS is a credential written to disk.
+//
+// That gap is not hypothetical. The first version of this function shipped
+// without UseNumber, so `[{"config":{"n":1e1000,"api_key":"live"},"config":{}}]`
+// overflowed float64 here, errored, reported no duplicate, and never reached
+// the duplicate `config` hiding the key, while the caller decoded the same
+// bytes happily and kept them. Measured, and pinned in both tables.
+//
+// So the error arm does not get to assume "malformed". By the time the caller
+// asks, its own decode has already succeeded on these bytes, which means a
+// syntax error here can only be the two decoders disagreeing. A reported
+// duplicate costs a re-encode and the row's key order; a reported
+// non-duplicate costs the credential. Any future decoder option added to
+// redactForensicCredentials belongs here as well, but the fail-closed arm is
+// what keeps forgetting one a formatting nit rather than a leak.
+//
+// A TRUNCATED value is the one error that still reports no duplicate, because
+// Go surfaces it as plain io.EOF rather than a syntax error. Harmless: the
+// caller's decode fails on truncated bytes and returns through its own arm
+// without ever asking this function.
+func rawJSONHasDuplicateObjectKey(raw []byte) bool {
+	type frame struct {
+		isObject bool
+		seen     map[string]struct{}
+	}
+	var stack []frame
+
+	// expectName is true when the next string token is a member name rather
+	// than a value, i.e. when the innermost frame is an object and the
+	// previous token completed a value (or opened the object).
+	expectName := false
+	innerIsObject := func() bool {
+		return len(stack) > 0 && stack[len(stack)-1].isObject
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	// Match redactForensicCredentials' decoder. See the note above: a number
+	// this scanner cannot read is a credential the caller keeps in plaintext.
+	dec.UseNumber()
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			// The whole value was read and no name repeated. A TRUNCATED value
+			// lands here too, because the decoder reports both as io.EOF, and
+			// that is harmless: the caller's own decode fails on truncated
+			// bytes and returns through its decode-failure arm without ever
+			// asking this function.
+			return false
+		}
+		if err != nil {
+			// FAIL CLOSED. The caller only reaches this function after its own
+			// decoder accepted these bytes, so a parse error here does not mean
+			// "malformed": it means this scanner and that decoder disagree, and
+			// that disagreement is exactly how a credential stays in the bytes
+			// while the decoded view looks clean. Reporting a duplicate costs a
+			// re-encode and the row's key order. Reporting none costs the
+			// credential. The UseNumber note above is the gap that was found;
+			// this arm is so the next one of its kind is not a leak.
+			return true
+		}
+		switch t := tok.(type) {
+		case json.Delim:
+			switch t {
+			case '{':
+				stack = append(stack, frame{isObject: true, seen: map[string]struct{}{}})
+				expectName = true
+				continue
+			case '[':
+				stack = append(stack, frame{})
+				expectName = false
+				continue
+			default: // '}' or ']'
+				stack = stack[:len(stack)-1]
+			}
+		case string:
+			if expectName {
+				top := stack[len(stack)-1]
+				if _, dup := top.seen[t]; dup {
+					return true
+				}
+				top.seen[t] = struct{}{}
+				// The next token is this member's value, so it is not a name
+				// even though the innermost frame is still an object.
+				expectName = false
+				continue
+			}
+		}
+		// A completed value: scalar, or the close of a nested container. The
+		// next token is a name when the frame it lands in is an object.
+		expectName = innerIsObject()
+	}
+}
+
+// redactCredentialFields walks a decoded JSON value, empties every credential
+// it finds, and reports whether it SAW a credential name at all.
+//
+// The return value is deliberately "saw one", not "changed one". A caller that
+// re-encodes only on mutation hands back the original bytes for a value whose
+// decode was lossy, and duplicate JSON keys make that reachable. Seeing the
+// name is the safe trigger.
+//
+// Two shapes are covered. A credential FIELD is a map key whose own name names
+// a credential, at any depth: the shapes differ (`steps` is an array of configs,
+// `trigger` is one), `config` has no fixed schema by design, and a path-specific
+// check would walk past a nesting upstream adds later. A credential PAIR is the
+// `{"key": <name>, "value": <secret>}` shape `send_webhook` uses for headers,
+// where the secret's own key is the literal string `value`.
+func redactCredentialFields(v any) (any, bool) {
+	switch t := v.(type) {
+	case map[string]any:
+		saw := false
+
+		// The pair shape first: a {key, value} object whose `key` names a
+		// credential. Checked before the per-key walk so the `value` entry is
+		// already blank by the time the walk reaches it.
+		if name, hasKey := t["key"].(string); hasKey {
+			if _, hasValue := t["value"]; hasValue && looksLikeCredentialName(name) {
+				t["value"] = ""
+				saw = true
+			}
+		}
+
+		for k, val := range t {
+			if looksLikeCredentialName(k) {
+				// Blank unconditionally rather than skipping an already-empty
+				// value. There is nothing to preserve: `saw` has already forced
+				// a re-encode, and a JSON null and an "" mean the same thing to
+				// the server's own preserve() check.
+				t[k] = ""
+				saw = true
+				continue
+			}
+			if nested, nestedSaw := redactCredentialFields(val); nestedSaw {
+				t[k] = nested
+				saw = true
+			}
+		}
+		return t, saw
+	case []any:
+		saw := false
+		for i, val := range t {
+			if nested, nestedSaw := redactCredentialFields(val); nestedSaw {
+				t[i] = nested
+				saw = true
+			}
+		}
+		return t, saw
+	}
+	return v, false
 }
 
 // forensicCapKey namespaces the cap marker so an operator value cannot forge

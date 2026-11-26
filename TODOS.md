@@ -1724,6 +1724,134 @@ caught by the server.
 **Effort:** human S / CC S (spec route), human M / CC M (catalogue route).
 **Priority:** P3. **Depends on:** an upstream spec change for the cheap route.
 
+## The parent-step gate can only check the composed half
+
+Spec 1.61.0 made a `parent_step_id` / `parent_ref` naming a step that never runs
+children a write-time `422`: the field means "I am inside this step's branch",
+and only a CONDITION or a LOOP runs children, so a step parented to a plain
+action or a delay used to be written, answered `201`, and then silently never
+run. The CLI mirrors the half the request itself settles —
+`assertComposedParentRefsRunChildren` in `cmd/inventory/workflows.go` resolves
+each `parent_ref` against the `ref`s in the same `--steps` array and refuses a
+childless parent before the request, naming the element.
+
+`workflows steps create --parent-step-id` is not checkable here. It carries an
+id, not a type: the parent is a row that already exists server-side and nothing
+in the request says what `step_type` it has. So the two routes are deliberately
+asymmetric, which is pinned in `TestWire_ParentStepIDIsLeftToTheServer` — the
+obvious "finish the job" follow-up is to add a gate on this route too, where it
+could only be built on a guess.
+
+The way out is the same catalogue-fetch shape the step-type gap needs, with an
+extra problem of its own: validating `--parent-step-id` means a `GET
+/workflows/{id}` before the write, which turns one write into two calls AND
+races anyone editing the tree between them. A parent that passed the local check
+can be deleted or replaced before the write lands, so the server's 422 stays
+load-bearing either way.
+
+The sibling branch rule is ungated for the same reason plus one more. The spec
+states it twice — "LOOP children use branch_type=true"
+(`api/inventory/cli-v1.yaml:12088`) and "true/false for condition children; true
+for loop children" (`:12457`) — and on the composed route it is as decidable as
+the parent rule, since the parent's `step_type` and the child's `branch_type` are
+both in the array. It was left out on purpose: it belongs to an earlier spec
+version, not to this sync, and growing a sync's gate to cover a second rule is how
+a scoped change stops being reviewable. `--branch-type` and the composed create's help
+now carry the rule.
+
+One correction to the obvious reading of that gap: the FILTER half is just as
+locally decidable as the parent rule on the composed route, even though the spec
+never states it. `StepType::runsOnlyTrueChildren` in the server returns true for a
+LOOP *and* for a CONDITION whose `condition_type` is `filter`, and `condition_type`
+travels in the same `--steps` array (`ComposedWorkflowStep.condition_type`), one map
+away from the `step_type` the gate already reads. What is missing is the SPEC's
+statement of it, which is an upstream ticket, not a decidability problem. The
+per-step route would need `GET /workflows/{id}` to learn an existing parent's
+`condition_type`; `GET /workflow-nodes` is the wrong instrument there, because it
+publishes node vocabulary rather than a stored row.
+
+Two upstream spec gaps found while wiring this sync, both for a ticket on
+`captainbook/captainbook` and NEVER a local edit to the vendored spec:
+
+**Why:** the local gate is honest about its scope, so nothing is wrong today —
+the gap is that the single-step route still pays a round trip to learn a rule
+the composed route catches locally.
+**Effort:** human M / CC M (fetch route), and it needs a cache with an
+invalidation story to be worth it.
+**Priority:** P3. **Depends on:** nothing; the server already refuses correctly.
+
+## The capability table has no row for any workflow mutation
+
+`skills/index.md`'s capability table lists `inventory workflows nodes` and nothing
+else from the family. All eleven writes are absent: `workflows`
+create/update/delete/restore/activate/deactivate, `trigger` create/update and
+`steps` create/update/delete, each `cli:write` with `DryRunMode: DryRunBody`. So
+the routes the 1.61.0/1.63.0 sync changed have no ability or dry-run reference
+row, and an agent sizing up a workflow write has to read `--help` instead.
+
+Nothing catches it: `TestSkillsDocEndpointTables` validates doc rows against the
+code, not the reverse, so a missing row is invisible the same way a missing
+`--since` claim was. The reverse direction is the fix worth having, because it
+would also catch the next family someone forgets.
+
+Found by the /document-release audit during the 1.63.0 ship and deliberately NOT
+fixed there: eleven hand-written reference rows on a spec-sync PR is a lot of new
+factual claims to land unreviewed, and this repo has already been bitten twice in
+one session by doc claims written from a neighbour rather than from the source.
+
+**Why:** the agent-facing reference is silent on the ability and dry-run shape of
+every workflow write.
+**Effort:** human S / CC S for the rows, human M / CC M to add the code-to-doc
+direction to the drift test. **Priority:** P2.
+
+## The 1.63.0 credential pairing is implemented on the steps route only
+
+Spec 1.63.0 pairs a blanked READ with a forgiving WRITE: `api_key`, `secret`,
+`token` and `password` read back empty, and on write an empty or omitted one
+means "leave the stored value alone". The read half covers the trigger —
+`WorkflowStepResource::toArray()` is used for both standalone step rows and the
+trigger step, and it calls `SecretConfigFields::blank()`. The write half does
+not: `SecretConfigFields::preserve()` is called in exactly one place,
+`WorkflowStepController::update()`. `WorkflowTriggerController::update()` writes
+`config` verbatim.
+
+So `trigger get | jq .config | trigger update --data @-` — which this CLI's own
+help recommended until this sync — returns 200 and wipes a webhook trigger's
+`token`, and the response shows the same empty string the blanked read showed,
+so nothing tells the operator. `WebhookTrigger::rules()` declares
+`'token' => ['nullable', 'string', 'min:1']`, and `min` is not an implicit rule,
+so a blank skips validation rather than 422-ing.
+
+`workflows trigger update --help` now refuses to recommend the round-trip and
+says the trigger route does not preserve. The server asymmetry is the real fix
+and belongs in a ticket on `captainbook/captainbook`; never paper over it by
+editing the vendored spec.
+
+**Why:** an operator following the CLI's documented idiom could silently destroy
+a stored credential, and the 200 response is indistinguishable from success.
+**Effort:** human S / CC S upstream (call `preserve()` in the trigger
+controller). **Priority:** P2 — the CLI side is documented, the server side is a
+one-line change someone else owns.
+
+## Upstream spec gaps found during the 1.63.0 sync
+
+1. The 1.62.0 changelog entry (`api/inventory/cli-v1.yaml:192`) calls `not_delivered`
+   "the only code mail, SMS and push ever produce". The server disagrees:
+   `SendNotificationAction.php:164` judges the empty-body guard BEFORE the channel
+   branch, so `empty_message` is channel-independent, and it sits in
+   `REFUSAL_REASONS`, so a mail/SMS/push step whose body resolves to nothing now
+   FAILS. The CLI's own prose follows the server, as the action_type precedent above
+   does.
+2. The FILTER-condition branch rule is absent from the spec entirely (see the
+   correction above).
+
+
+**Why:** the CLI's own prose follows the server, so nothing is wrong in this
+repo today; the gap is that the published contract says otherwise, so the next
+reader to trust the spec over the server gets it wrong again.
+**Effort:** human S / CC S (two ticket descriptions). **Priority:** P3.
+**Depends on:** upstream accepting them.
+
 ## `--data null` panics the two workflow body builders
 
 `ceebee inventory workflows trigger create <id> --data null --action-type booking_confirmed`

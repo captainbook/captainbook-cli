@@ -6725,6 +6725,20 @@ type WorkflowStep struct {
 	// action's `rules()` schema at write time and again at
 	// execution time. See app/Workflows/Actions/*.php for the
 	// per-action shape.
+	//
+	// CREDENTIAL FIELDS ARE WITHHELD ON READ. `api_key`, `secret`,
+	// `token` and `password` always come back as an empty string,
+	// whatever is stored. Reading a workflow is governed by
+	// `view_any_workflow`, which is not authority over a credential
+	// the account installed, so the value is not part of the read.
+	//
+	// On WRITE, an empty string or an omitted credential field means
+	// "leave the stored value alone", NOT "clear it" — because this
+	// endpoint replaces the whole config, and the obvious read,
+	// change one field, write it back would otherwise post the
+	// withheld blank over a working key. Send a new value to replace
+	// one. A credential cannot be cleared through this API; remove
+	// the step, or clear it in the builder.
 	Config    *map[string]interface{} `json:"config,omitempty"`
 	CreatedAt *time.Time              `json:"created_at,omitempty"`
 	DeletedAt *time.Time              `json:"deleted_at,omitempty"`

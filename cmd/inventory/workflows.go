@@ -56,10 +56,31 @@ func workflowsDefs() []CommandDef {
 				"includes channel: whatsapp, which previously came back 422 " +
 				"INVALID_STEP_CONFIG: the message goes out over the account's own paired " +
 				"WhatsApp and threads into the Inbox, and it is FREE TEXT, so there is no " +
-				"template to name. It needs a connected WhatsApp — without one the step " +
-				"still runs and reports sent: false with reason: no_whatsapp_sender rather " +
-				"than falling back to SMS, so a workflow that looks healthy can be " +
-				"delivering nothing.\n\n" +
+				"template to name. It needs a connected WhatsApp, and without one the step " +
+				"does NOT fall back to SMS.\n\n" +
+				"Since spec 1.62.0 a send_notification we declined to send FAILS the step, " +
+				"where it used to complete with sent: false and a reason. Read the step " +
+				"status in `workflow-executions logs`, not just `sent`: a run whose " +
+				"notification never went out is no longer reported as successful. Four " +
+				"reasons fail — no_whatsapp_sender, whatsapp_not_in_plan, " +
+				"no_booking_in_context and empty_message, all cases where nothing was " +
+				"attempted and nothing downstream will fix it. Three deliberately do not: " +
+				"not_delivered (the catch-all DELIVERY outcome) and the wallet channel's " +
+				"intended skips throttled and no_installed_passes.\n\n" +
+				"Do not read 1.62.0 as a WhatsApp-and-wallet change. empty_message is judged " +
+				"BEFORE the channel branch, so mail, SMS and push reach it too: a step whose " +
+				"body resolves to nothing — an unresolved {variable}, or only invisible " +
+				"characters — fails the step and stops the run. That is the likeliest way an " +
+				"existing mail workflow starts failing. The spec's 1.62.0 entry still calls " +
+				"not_delivered the only code those three ever produce; this text follows the " +
+				"server instead, and the discrepancy is tracked in TODOS.md.\n\n" +
+				"config.continue_on_error (boolean, optional) joined send_notification in " +
+				"spec 1.62.0 and restores the old behaviour for ONE step: the refusal is " +
+				"still reported in reason and the run carries on. That is the migration path " +
+				"for a workflow that was relying on the silence. It goes in --config like any " +
+				"other rules() field. It is not unique to send_notification — send_webhook " +
+				"takes one too — so read each node's own rules() from this catalogue rather " +
+				"than assuming which actions have it.\n\n" +
 				"Every TRIGGER node comes back with config: [] (an empty JSON array) " +
 				"where the spec declares an object, because Laravel serializes an empty " +
 				"config as [] rather than {}. The CLI reads this response as raw bytes " +
@@ -171,7 +192,18 @@ func workflowsDefs() []CommandDef {
 				"composed step's action_type has to fit its step_type: since spec 1.60.0 one " +
 				"mismatched or misspelt pair refuses the WHOLE request with 422 " +
 				"INVALID_STEP_CONFIG, taking the workflow and the other steps with it. The " +
-				"CLI refuses the delay mismatches locally, naming the array index.",
+				"CLI refuses the delay mismatches locally, naming the array index.\n\n" +
+				"parent_ref is a branch, not an ordering. Since spec 1.61.0 it must name a " +
+				"CONDITION or a LOOP — the only step types that run their children — and " +
+				"naming a plain action or a delay is refused, where it used to write the " +
+				"row and produce a workflow that silently stopped there. A step that simply " +
+				"FOLLOWS another has no parent: omit parent_ref and give it a later order. " +
+				"The CLI refuses this locally too, naming the array index, because the whole " +
+				"request carries both the ref and the step it names.\n\n" +
+				"branch_type rides along with it: a child of a LOOP, or of a FILTER condition, " +
+				"must carry branch_type true, because those two run only their true children. A " +
+				"false child under either is another 422 that takes the WHOLE composed request, " +
+				"and the CLI does not pre-empt that one.",
 			Flags: []FlagDef{
 				{Name: "name", Type: "string", Required: true, Description: "Workflow name (≤200 chars)"},
 				{Name: "description", Type: "string"},
@@ -179,7 +211,7 @@ func workflowsDefs() []CommandDef {
 				{Name: "max-credits-per-run", Type: "int", Description: "Per-execution credit ceiling (default 50)"},
 				{Name: "notify-on-fail", Type: "bool"},
 				{Name: "trigger", Type: "json", Description: "Trigger as JSON, or @file.json: {action_type, config?}. Run workflows nodes for the vocabulary"},
-				{Name: "steps", Type: "json", Description: "Steps as JSON, or @file.json: [{step_type, action_type?, parent_ref?, ...}, ...], written alongside the workflow"},
+				{Name: "steps", Type: "json", Description: "Steps as JSON, or @file.json: [{step_type, action_type?, ref?, parent_ref?, ...}, ...], written alongside the workflow. parent_ref names an EARLIER step's ref and must be a condition or a loop (spec 1.61.0); a step that merely follows another omits it"},
 			},
 			// D20: `steps` and `trigger` ARE the automation this workflow will
 			// run. The audit keeps only body_sha256, so leaving them out would
@@ -202,6 +234,10 @@ func workflowsDefs() []CommandDef {
 					// WireBody so the audit row hashes what the gate judged,
 					// not the raw --data fallback runMutation uses when a
 					// closure returns no result.
+					return &RunResult{WireBody: body}, err
+				}
+				if err := assertComposedParentRefsRunChildren(body); err != nil {
+					// Same WireBody reason as the pairing gate above.
 					return &RunResult{WireBody: body}, err
 				}
 				resp, err := r.Client.CreateWorkflowWithBodyWithResponse(ctx, &gen.CreateWorkflowParams{IdempotencyKey: args.IdempotencyKeyUUID}, "application/json", asReader(body))
@@ -414,8 +450,18 @@ func workflowsTriggerCmd(runner *Runner) *cobra.Command {
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id"},
 			Long: "Replaces the trigger's `config`. action_type is immutable here — run " +
 				"`trigger create` to atomically replace. 404 if no trigger exists yet. " +
-				"Supply config via --config (typed flag) OR --data (whole-body JSON, " +
-				"useful for `trigger get | jq .config | trigger update --data @-` round-trips).",
+				"Supply config via --config (typed flag) OR --data (whole-body JSON).\n\n" +
+				"DO NOT round-trip a trigger config through this command. " +
+				"`trigger get | jq .config | trigger update --data @-` used to be the " +
+				"documented idiom here and it now DESTROYS a credential. Spec 1.63.0 blanks " +
+				"api_key, secret, token and password on read, and its write-side pairing — an " +
+				"empty or omitted credential means leave the stored value alone — is " +
+				"implemented on the STEPS route only. The trigger route writes config " +
+				"verbatim, so the withheld blank lands on top of the real value, returns 200, " +
+				"and reports the same empty string back, which is indistinguishable from the " +
+				"blanked read you started with. A webhook trigger's `token` is the live case. " +
+				"Send the fields you mean to change, with a real value for any credential, or " +
+				"use the builder. This asymmetry is the server's and is tracked in TODOS.md.",
 			Flags: []FlagDef{
 				{Name: "config", Type: "string", Description: "JSON object (literal or @file.json); optional if --data carries config"},
 			},
@@ -466,7 +512,26 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 			"A step stored with a type that no longer exists reads back with that stored " +
 			"name in action_type — a value outside TriggerType/ActionType — rather than a " +
 			"500. It cannot be patched (the PATCH is refused with a 422 naming it) and the " +
-			"workflow cannot be activated until the step is deleted and re-created.",
+			"workflow cannot be activated until the step is deleted and re-created.\n\n" +
+			"--parent-step-id is NOT \"the step before me\". It means \"I am inside this " +
+			"step's branch\", so since spec 1.61.0 only a CONDITION or a LOOP may be named: " +
+			"those are the only step types that run their children, and the executor skips " +
+			"anything whose parent it has already run. Naming any other step is a 422, where " +
+			"it used to return 201 and build a workflow that silently stopped there. A step " +
+			"that simply FOLLOWS another has no parent — omit the flag and give it a later " +
+			"--order. The CLI cannot pre-empt this one: the parent is a row that already " +
+			"exists server-side and its step_type is not in the request, so the 422 is the " +
+			"server's. The composed form (`workflows create --steps`) IS refused locally, " +
+			"because there the whole tree is in one body.\n\n" +
+			"Credential fields inside a step's config — api_key, secret, token, password — " +
+			"always read back as an EMPTY STRING since spec 1.63.0, whatever is stored: a " +
+			"read is governed by view_any_workflow, which is not authority over a credential " +
+			"the account installed. The write side pairs with it, and this is the part that " +
+			"bites: `update` REPLACES the whole config, but an empty or omitted credential " +
+			"field means \"leave the stored value alone\", not \"clear it\" — so the obvious " +
+			"get, edit one field, send it back no longer posts the withheld blank over a " +
+			"live key. Send a real value to replace one. A credential cannot be cleared " +
+			"through this API: delete the step, or clear it in the builder.",
 	}
 	bindCommands(parent, []CommandDef{
 		{
@@ -477,10 +542,10 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 				{Name: "step-type", Type: "string", Required: true, Description: "action|condition|delay|delay_until|loop"},
 				{Name: "action-type", Type: "string", Description: "Required for action/delay/delay_until; optional for loop and condition, which ignore it. See ActionType enum. Must fit --step-type: delay takes delay, delay_until takes delay_until, action takes neither."},
 				{Name: "condition-type", Type: "string", Description: "value_check|filter (required for condition step_type)"},
-				{Name: "config", Type: "string", Description: "JSON object validated against the resolved action's rules() (literal or @file.json)"},
+				{Name: "config", Type: "string", Description: "JSON object validated against the resolved action's rules() (literal or @file.json). send_notification and send_webhook both take continue_on_error (bool); read each node's own rules() from the workflows nodes catalogue. Credential fields (api_key, secret, token, password) are withheld on read and left alone when sent empty or omitted (1.63.0)"},
 				{Name: "order", Type: "int", Required: true, Description: "Position within the parent branch (≥0)"},
-				{Name: "parent-step-id", Type: "int", Description: "Parent step in the tree (CONDITION/LOOP children)"},
-				{Name: "branch-type", Type: "string", Description: "true|false — required when --parent-step-id is set"},
+				{Name: "parent-step-id", Type: "int", Description: "Parent step in the tree. Must be a CONDITION or a LOOP — the only types that run children (spec 1.61.0 refuses any other with 422). Means \"inside this step's branch\", not \"after this step\": a step that merely follows another omits this and takes a later --order"},
+				{Name: "branch-type", Type: "string", Description: "true|false — required when --parent-step-id is set. A value_check CONDITION's children take either (the then/else branches); a LOOP's children and a FILTER condition's children are always true, so false under either is a 422 the CLI does not pre-empt"},
 			},
 			ForensicFields: []string{"step-type", "action-type", "condition-type", "order", "parent-step-id", "branch-type"},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
@@ -521,9 +586,18 @@ func workflowsStepsCmd(runner *Runner) *cobra.Command {
 			Long: "Updates only the step's `config` payload. parent_step_id, branch_type, " +
 				"order, step_type, action_type, and condition_type are immutable post-create — " +
 				"delete and re-create to move or reshape. Supply config via --config (typed " +
-				"flag) OR --data (whole-body JSON, useful for read-modify-write loops).",
+				"flag) OR --data (whole-body JSON, useful for read-modify-write loops).\n\n" +
+				"This PATCH replaces the WHOLE config, so a read-modify-write loop has to " +
+				"send back every field it wants to keep. Credential fields are the one " +
+				"exception, and they need it: api_key, secret, token and password read back " +
+				"as an empty string since spec 1.63.0 (a read is not authority over a stored " +
+				"credential), so on write an empty or omitted one means \"leave the stored " +
+				"value alone\", NOT \"clear it\". Without that pairing the loop above would " +
+				"post the withheld blank over a working key. Send a real value to replace " +
+				"one; a credential cannot be cleared through this API (delete the step, or " +
+				"clear it in the builder).",
 			Flags: []FlagDef{
-				{Name: "config", Type: "string", Description: "JSON object (literal or @file.json); optional if --data carries config"},
+				{Name: "config", Type: "string", Description: "JSON object (literal or @file.json); optional if --data carries config. Replaces the whole config, except that an empty or omitted credential field leaves the stored value alone (spec 1.63.0)"},
 			},
 			Run: func(ctx context.Context, r *Runner, args RunArgs) (*RunResult, error) {
 				workflowID, stepID, err := workflowStepArgs(args)
@@ -845,7 +919,143 @@ func assertComposedStepsFitActionTypes(body []byte) error {
 	return nil
 }
 
-// decodeBodyFields decodes an assembled request body for the two gates above.
+// assertComposedParentRefsRunChildren refuses, before the request leaves, a
+// `parent_ref` naming a composed step that never runs children — the 422 spec
+// 1.61.0 made explicit.
+//
+// `parent_ref` does not mean "the step before me". It means "I am inside this
+// step's branch", and only a CONDITION or a LOOP runs children: every other
+// step type is marked processed the moment it runs, and the executor then skips
+// anything parented to it. Before 1.61.0 the server wrote the row, answered
+// 201, and produced a workflow that silently stopped at that step.
+//
+// Local on this route only, and only for the cases the request itself settles.
+// `--steps` carries every step AND its `ref` in one body, so the named parent's
+// step_type is right there to read. `workflows steps create --parent-step-id`
+// names a row that already exists server-side, whose type the CLI cannot know
+// without a fetch it does not make; that half stays the server's 422 and is
+// documented as such on the flag.
+//
+// Worth its own gate for the same reason the pairing gate is: the server
+// refuses the WHOLE request on one bad ref, so a mistake in step 7 costs the
+// workflow, the trigger and the other six.
+func assertComposedParentRefsRunChildren(body []byte) error {
+	m, err := decodeBodyFields(body)
+	if err != nil {
+		return err
+	}
+	steps, _ := m["steps"].([]any)
+
+	// Resolve refs over the whole array rather than only the elements before
+	// the referrer. Position is a separate rule with its own 422 (a forward or
+	// unknown ref), which the server's validator already names; reading every
+	// ref keeps this gate to the ONE question it can answer with certainty —
+	// whether the named step is a kind that runs children.
+	//
+	// Resolving wider than "unique and earlier" cannot refuse a request the
+	// server would have taken, which is what makes it safe: the spec declares
+	// `ref` "Must be unique within the request" and a forward or unknown
+	// `parent_ref` a 422 (ComposedWorkflowStep, api/inventory/cli-v1.yaml), so
+	// every body this wider lookup can reach is already refused upstream. The
+	// only difference is WHICH refusal the operator reads, and the local one
+	// names the parent-as-ordering mistake that is usually the real cause.
+	// Pinned from both sides: "a forward ref to a childless step is still
+	// refused on type" in TestWire_ParentRefNamingAChildlessStepNeverReachesTheServer,
+	// and "a duplicate ref does not let the second definition decide" in
+	// TestWire_ParentRefTheGateCannotJudgeStillReachesTheServer.
+	refType := make(map[string]string, len(steps))
+	for _, raw := range steps {
+		step, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		ref, _ := step["ref"].(string)
+		if ref == "" {
+			continue
+		}
+		if _, dup := refType[ref]; dup {
+			// A duplicate ref is itself a 422 (refs must be unique within the
+			// request). Keep the first and do not let a second definition
+			// decide a refusal.
+			continue
+		}
+		refType[ref] = stepTypeOf(step)
+	}
+
+	for i, raw := range steps {
+		step, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		parentRef, _ := step["parent_ref"].(string)
+		if parentRef == "" {
+			continue
+		}
+		parentType, known := refType[parentRef]
+		if !known {
+			// An unknown or forward ref: the server's own 422 names it, and it
+			// was a 422 before 1.61.0 too. Inventing a second vocabulary for
+			// it is the mistake the non-object arm above is written to avoid.
+			continue
+		}
+		if problem := parentRefProblem(parentRef, parentType); problem != "" {
+			return parentRefRefusal(fmt.Sprintf("steps[%d]: %s", i, problem))
+		}
+	}
+	return nil
+}
+
+// stepTypeOf reads a composed step's declared step_type, or "" when it is
+// absent or not a string. "" reaches parentRefProblem's default arm, which
+// refuses nothing.
+func stepTypeOf(step map[string]any) string {
+	st, _ := step["step_type"].(string)
+	return st
+}
+
+// parentRefProblem returns a sentence saying why a step of parentType cannot
+// parent another step, or "" for a parent the server accepts — or one this
+// gate cannot judge.
+//
+// The arms are explicit rather than a negated condition/loop test so that a
+// step_type the spec adds after this build falls through to "" instead of being
+// refused by a CLI that has not heard of it. The spec enumerates step_type as
+// [action, condition, delay, delay_until, loop], so the two arms below cover
+// the whole of today's vocabulary; `trigger` (not accepted in a composed
+// `steps` array at all), an empty value and anything new are the server's call.
+func parentRefProblem(parentRef, parentType string) string {
+	switch parentType {
+	case "condition", "loop":
+		return ""
+	case "action", "delay", "delay_until":
+		// Phrased as "whose step_type is X" rather than "an X step" so the
+		// sentence stays grammatical for all three values (a/an).
+		return fmt.Sprintf("parent_ref %q names a step whose step_type is %s, and only a "+
+			"condition or a loop runs its children, so this step would be written and then "+
+			"never run. A step that simply FOLLOWS another has no parent — omit parent_ref "+
+			"and order it after",
+			parentRef, parentType)
+	}
+	return ""
+}
+
+// parentRefRefusal wraps a parentRefProblem sentence in the exit error, with
+// the part the sentence cannot carry: why it is refused at all, and that one
+// bad ref costs the whole composed request.
+func parentRefRefusal(problem string) error {
+	return &api.ExitError{
+		Err: fmt.Errorf(
+			"%s. The executor skips anything whose parent it has already run, so the "+
+				"server refuses the parent outright (spec 1.61.0) — and it refuses the "+
+				"WHOLE request, taking the workflow, the trigger and every other step "+
+				"with it",
+			problem,
+		),
+		Code: api.ExitValidation,
+	}
+}
+
+// decodeBodyFields decodes an assembled request body for the gates above.
 //
 // UseNumber keeps every JSON number as its literal text instead of converting
 // it to float64, so a value outside float64's range — `1e400` is legal JSON the
