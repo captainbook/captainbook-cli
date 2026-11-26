@@ -826,6 +826,33 @@ const forensicValueMaxBytes = 16 << 10
 //
 // It does not cover `products media upload`, which builds its AuditEntry and
 // forensic map by hand rather than through forensicSummary. See TODOS.md.
+func capForensicValue(v any) any {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		// Fail CLOSED. Returning v here was the original spelling and it was
+		// the one path where the size is unknown skipping the cap — but worse
+		// than unbounded: an unencodable value makes json.Marshal of the whole
+		// AuditEntry fail, and FileLogger.Append then drops the ENTIRE row with
+		// only a stderr warning. Reachable today, because pflag's Float64
+		// accepts NaN and Inf and both `--rating` and `--discount-pct` are
+		// ForensicFields, so `--rating NaN` cost the audit its whole entry for
+		// a call that was refused locally. One field is the right price.
+		return map[string]any{forensicCapKey: map[string]any{
+			"omitted": "value is not JSON-encodable",
+			"go_type": fmt.Sprintf("%T", v),
+		}}
+	}
+	if len(raw) <= forensicValueMaxBytes {
+		return v
+	}
+	return map[string]any{forensicCapKey: map[string]any{
+		"omitted":               "value exceeds the forensic size cap",
+		"bytes":                 len(raw),
+		"canonical_json_sha256": sha256Hex(raw),
+		"cap_bytes":             forensicValueMaxBytes,
+	}}
+}
+
 // forensicCredentialFields are the config fields the server withholds on read
 // (spec 1.63.0) and blanks nowhere else: `SecretConfigFields::NAMES` in the
 // server repo is this exact list.
@@ -941,33 +968,6 @@ func redactCredentialFields(v any) (any, bool) {
 		return t, changed
 	}
 	return v, false
-}
-
-func capForensicValue(v any) any {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		// Fail CLOSED. Returning v here was the original spelling and it was
-		// the one path where the size is unknown skipping the cap — but worse
-		// than unbounded: an unencodable value makes json.Marshal of the whole
-		// AuditEntry fail, and FileLogger.Append then drops the ENTIRE row with
-		// only a stderr warning. Reachable today, because pflag's Float64
-		// accepts NaN and Inf and both `--rating` and `--discount-pct` are
-		// ForensicFields, so `--rating NaN` cost the audit its whole entry for
-		// a call that was refused locally. One field is the right price.
-		return map[string]any{forensicCapKey: map[string]any{
-			"omitted": "value is not JSON-encodable",
-			"go_type": fmt.Sprintf("%T", v),
-		}}
-	}
-	if len(raw) <= forensicValueMaxBytes {
-		return v
-	}
-	return map[string]any{forensicCapKey: map[string]any{
-		"omitted":               "value exceeds the forensic size cap",
-		"bytes":                 len(raw),
-		"canonical_json_sha256": sha256Hex(raw),
-		"cap_bytes":             forensicValueMaxBytes,
-	}}
 }
 
 // forensicCapKey namespaces the cap marker so an operator value cannot forge

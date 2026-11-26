@@ -415,3 +415,167 @@ func TestAudit_AForensicValueWithNoCredentialKeepsItsOwnBytes(t *testing.T) {
 		t.Errorf("forensic value was re-encoded:\n got %s\nwant %s", got, steps)
 	}
 }
+
+// TestRedactForensicCredentials_CoversEveryArm is a table over the redactor's
+// own branches, which the two audit tests above reach only one path of.
+//
+// CLAUDE.md asks for both branches of a new conditional. The audit test's
+// credential sits at steps[0].config.api_key and is a non-empty string, so on
+// its own it leaves three deliberate decisions unpinned: the case-insensitive
+// match (drop strings.ToLower and `API_KEY` reaches the log), the any-depth
+// walk (narrow it to a key named `config` and the test still passes), and the
+// already-blank skip (delete it and an operator who legitimately sent "" gets
+// their row re-encoded and reordered for nothing).
+//
+// Value: protects=the redactor blanks a credential whatever its case, depth, container or value type, and returns its input untouched when nothing matched; fails_when=strings.ToLower is dropped, the walk is narrowed to a `config` key, the already-blank skip is removed, or a non-string credential value stops being blanked; why_new=the audit test exercises one shape only, so three new conditionals had no coverage; seam=none; no_claim=says nothing about which commands pass values through this function, which is forensicSummary's concern
+func TestRedactForensicCredentials_CoversEveryArm(t *testing.T) {
+	cases := []struct {
+		name      string
+		in        string
+		wantGone  string // substring that must NOT survive ("" = skip)
+		wantKept  string // substring that must survive ("" = skip)
+		unchanged bool   // the input must come back byte-identical
+	}{
+		{
+			name:     "lowercase api_key under config",
+			in:       `[{"config":{"api_key":"LEAK","url":"https://example.test"}}]`,
+			wantGone: "LEAK",
+			wantKept: `"api_key":""`,
+		},
+		{
+			// The comment calls the case-insensitive match deliberate, so it
+			// needs an assertion: dropping strings.ToLower writes this to disk.
+			name:     "uppercase API_KEY is matched too",
+			in:       `[{"config":{"API_KEY":"LEAK"}}]`,
+			wantGone: "LEAK",
+			wantKept: `"API_KEY":""`,
+		},
+		{
+			name:     "mixed-case Token is matched too",
+			in:       `[{"config":{"Token":"LEAK"}}]`,
+			wantGone: "LEAK",
+			wantKept: `"Token":""`,
+		},
+		{
+			// The walk is any-depth on purpose. Narrowing it to a key literally
+			// named `config` would pass every other row in this table.
+			name:     "a credential deeper than config",
+			in:       `[{"config":{"auth":{"headers":{"secret":"LEAK"}}}}]`,
+			wantGone: "LEAK",
+			wantKept: `"secret":""`,
+		},
+		{
+			// `trigger` is the other ForensicField that carries a config, and it
+			// is one object rather than an array.
+			name:     "a trigger object, not an array",
+			in:       `{"action_type":"scheduled_time","config":{"password":"LEAK"}}`,
+			wantGone: "LEAK",
+			wantKept: `"password":""`,
+		},
+		{
+			// Not a string: the type assertion must not let it through just
+			// because the already-blank check does not apply.
+			name:     "a non-string credential value is blanked",
+			in:       `[{"config":{"api_key":12345}}]`,
+			wantGone: "12345",
+			wantKept: `"api_key":""`,
+		},
+		{
+			name:     "an object-valued credential is blanked",
+			in:       `[{"config":{"token":{"nested":"LEAK"}}}]`,
+			wantGone: "LEAK",
+			wantKept: `"token":""`,
+		},
+		{
+			// Already blank: 1.63.0 reads "" on write as "leave the stored value
+			// alone", so an operator sends it legitimately. Nothing changed, so
+			// the value must come back as the operator's own bytes.
+			// Key order here is deliberately NOT alphabetical. With the keys
+			// sorted, a re-encode produces identical bytes and this case cannot
+			// see the skip being removed at all (measured: it passed).
+			name:      "an already-blank credential leaves the value untouched",
+			in:        `[{"config":{"url":"https://example.test","api_key":""}}]`,
+			unchanged: true,
+		},
+		{
+			name:      "no credential anywhere leaves the value untouched",
+			in:        `[{"step_type":"action","order":1,"config":{"url":"https://example.test"}}]`,
+			unchanged: true, // step_type before order before config: not sorted
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := redactForensicCredentials(json.RawMessage(tc.in))
+			raw, ok := got.(json.RawMessage)
+			if !ok {
+				t.Fatalf("got %T, want json.RawMessage", got)
+			}
+			if tc.unchanged {
+				if string(raw) != tc.in {
+					t.Errorf("value was re-encoded when nothing matched:\n got %s\nwant %s", raw, tc.in)
+				}
+				return
+			}
+			if tc.wantGone != "" && strings.Contains(string(raw), tc.wantGone) {
+				t.Errorf("credential survived redaction: %s", raw)
+			}
+			if tc.wantKept != "" && !strings.Contains(string(raw), tc.wantKept) {
+				t.Errorf("want %s in the redacted value, got %s", tc.wantKept, raw)
+			}
+		})
+	}
+}
+
+// TestForensic_RedactionRunsBeforeTheSizeCap pins the ORDER of the two calls in
+// forensicSummary, which the commit calls deliberate and which nothing else
+// catches.
+//
+// Over the cap, capForensicValue throws the value away and keeps a
+// canonical_json_sha256 of it. If the cap ran first, that digest would be taken
+// over the PLAINTEXT credential — recoverable by anyone who can guess it — and
+// redactForensicCredentials would then early-return, because the marker it
+// receives is a map rather than a json.RawMessage. Both existing audit tests
+// use under-cap values, where capForensicValue returns its input unchanged, so
+// swapping the two calls leaves them green.
+//
+// Value: protects=an oversized forensic value is redacted before it is hashed, so the audit digest is never taken over a plaintext credential; fails_when=the two calls in forensicSummary are swapped, or the cap stops hashing canonical JSON; why_new=both audit tests use under-cap values, where the order is unobservable; seam=none
+func TestForensic_RedactionRunsBeforeTheSizeCap(t *testing.T) {
+	// One oversized steps array carrying a credential. The filler is what pushes
+	// it past the cap; the credential is what must not be in the digest.
+	filler := strings.Repeat("x", forensicValueMaxBytes)
+	big := `[{"config":{"api_key":"LEAK-IN-THE-DIGEST","note":"` + filler + `"}}]`
+	if len(big) <= forensicValueMaxBytes {
+		t.Fatalf("test value is %d bytes, not over the %d cap", len(big), forensicValueMaxBytes)
+	}
+
+	def := CommandDef{ForensicFields: []string{"steps"}}
+	args := RunArgs{Flags: map[string]any{"steps": json.RawMessage(big)}}
+
+	out := forensicSummary(def, args)
+	marker, ok := out["steps"].(map[string]any)
+	if !ok {
+		t.Fatalf("steps is %T, want the oversized-value marker map", out["steps"])
+	}
+	inner, ok := marker[forensicCapKey].(map[string]any)
+	if !ok {
+		t.Fatalf("marker has no %q payload: %v", forensicCapKey, marker)
+	}
+	gotDigest, _ := inner["canonical_json_sha256"].(string)
+	if gotDigest == "" {
+		t.Fatalf("marker carries no canonical_json_sha256: %v", inner)
+	}
+
+	// The digest the CLI should have recorded: of the REDACTED canonical JSON.
+	redactedRaw, err := json.Marshal(redactForensicCredentials(json.RawMessage(big)))
+	if err != nil {
+		t.Fatalf("marshal redacted value: %v", err)
+	}
+	if want := sha256Hex(redactedRaw); gotDigest != want {
+		plaintextRaw, merr := json.Marshal(json.RawMessage(big))
+		if merr == nil && gotDigest == sha256Hex(plaintextRaw) {
+			t.Fatalf("the digest is over the PLAINTEXT credential: the size cap ran before redaction")
+		}
+		t.Errorf("canonical_json_sha256 = %q, want %q (the digest of the redacted value)", gotDigest, want)
+	}
+}
