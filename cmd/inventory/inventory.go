@@ -788,7 +788,10 @@ func forensicSummary(def CommandDef, args RunArgs) map[string]any {
 	}
 	for _, name := range def.ForensicFields {
 		if v, ok := args.Flags[name]; ok {
-			out[name] = capForensicValue(v)
+			// Redact BEFORE capping: the cap replaces an oversized value with a
+			// hash marker, and hashing a credential still records it for anyone
+			// who can guess the plaintext.
+			out[name] = capForensicValue(redactForensicCredentials(v))
 		}
 	}
 	if len(out) == 0 {
@@ -823,6 +826,123 @@ const forensicValueMaxBytes = 16 << 10
 //
 // It does not cover `products media upload`, which builds its AuditEntry and
 // forensic map by hand rather than through forensicSummary. See TODOS.md.
+// forensicCredentialFields are the config fields the server withholds on read
+// (spec 1.63.0) and blanks nowhere else: `SecretConfigFields::NAMES` in the
+// server repo is this exact list.
+//
+// Matched case-insensitively, which is wider than the server's own check. That
+// is deliberate: over-blanking a value in a LOCAL audit row costs a little
+// reconstructability, while under-blanking one writes a live credential to
+// disk, so the two errors are not worth trading evenly.
+var forensicCredentialFields = map[string]struct{}{
+	"api_key":  {},
+	"secret":   {},
+	"token":    {},
+	"password": {},
+}
+
+// redactForensicCredentials blanks every credential field inside a forensic
+// value before it is written to the audit log.
+//
+// Why this exists: `workflows create` declares `trigger` and `steps` as
+// ForensicFields on purpose (see the D20 note on that command — they ARE the
+// automation, so a row without them cannot reconstruct the workflow), and a
+// composed step's `config` can carry an Ads API key. capForensicValue only
+// size-caps, so the key landed in ~/.ceebee/audit.jsonl in cleartext.
+// Pre-existing, but spec 1.63.0 is what made it matter: the server now returns
+// "" for those fields forever, so this file could hold the only plaintext copy
+// of a working credential. Confirmed with a canary before the fix.
+//
+// The KEY is kept and only its value emptied. "This step had an api_key" is
+// part of reconstructing the workflow; the key itself is not. That also mirrors
+// what a read from the server now looks like, so a row and a fresh GET agree.
+//
+// Returns v UNCHANGED when it carries no credential field, which is the
+// overwhelmingly common case. That matters beyond speed: a json-typed flag
+// rides as a json.RawMessage, so an untouched value keeps the operator's own
+// bytes and key order in the row. Only a value that actually holds a credential
+// is re-encoded, and only that copy loses ordering — never the request body,
+// which is built separately from args.Flags and is not touched here.
+func redactForensicCredentials(v any) any {
+	raw, ok := v.(json.RawMessage)
+	if !ok {
+		// Every field that can carry a node config is a `json`-typed flag. A
+		// string, int or bool flag has no nested shape to walk.
+		return v
+	}
+	var decoded any
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	// UseNumber for the same reason decodeBodyFields has it: a number outside
+	// float64's range is legal JSON the server may accept, and a redactor must
+	// not be the thing that mangles it.
+	dec.UseNumber()
+	if err := dec.Decode(&decoded); err != nil {
+		// parseJSONFlag already validated this value, so a decode failure here
+		// is not something to paper over: hand the original to capForensicValue,
+		// which fails closed on anything it cannot encode.
+		return v
+	}
+	redacted, changed := redactCredentialFields(decoded)
+	if !changed {
+		return v
+	}
+	out, err := json.Marshal(redacted)
+	if err != nil {
+		// Re-encoding a value that just decoded should not fail. If it somehow
+		// does, returning the original would write the credential, so return the
+		// marker capForensicValue uses for a value it cannot encode instead.
+		return map[string]any{forensicCapKey: map[string]any{
+			"omitted": "value could not be re-encoded after credential redaction",
+		}}
+	}
+	return json.RawMessage(out)
+}
+
+// redactCredentialFields walks a decoded JSON value and empties every
+// credential field it finds, reporting whether it changed anything.
+//
+// It blanks a credential key at ANY depth rather than only inside a key named
+// `config`. The shapes that reach here differ (`steps` is an array of objects
+// each with its own `config`, `trigger` is one object with one), `config`
+// itself has no fixed schema — it is validated per-node against that node's
+// own rules() — and a nested shape upstream adds later would walk straight
+// past a path-specific check. A key named `api_key` in a forensic row has no
+// reading under which writing its value is preferable.
+func redactCredentialFields(v any) (any, bool) {
+	switch t := v.(type) {
+	case map[string]any:
+		changed := false
+		for k, val := range t {
+			if _, isCredential := forensicCredentialFields[strings.ToLower(k)]; isCredential {
+				// Already blank: leave it, so an operator who sent "" (which
+				// 1.63.0 reads as "leave the stored value alone") does not show
+				// up in the row as though something was redacted.
+				if s, isString := val.(string); isString && s == "" {
+					continue
+				}
+				t[k] = ""
+				changed = true
+				continue
+			}
+			if nested, nestedChanged := redactCredentialFields(val); nestedChanged {
+				t[k] = nested
+				changed = true
+			}
+		}
+		return t, changed
+	case []any:
+		changed := false
+		for i, val := range t {
+			if nested, nestedChanged := redactCredentialFields(val); nestedChanged {
+				t[i] = nested
+				changed = true
+			}
+		}
+		return t, changed
+	}
+	return v, false
+}
+
 func capForensicValue(v any) any {
 	raw, err := json.Marshal(v)
 	if err != nil {

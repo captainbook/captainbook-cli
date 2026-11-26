@@ -18,11 +18,18 @@ package inventory
 // here as reaching the wire.
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/captainbook/captainbook-cli/internal/api"
+	invpkg "github.com/captainbook/captainbook-cli/internal/inventory"
 )
 
 // composedCreate runs `workflows create` with a --steps array, which is the one
@@ -285,5 +292,126 @@ func TestWire_OneBodyBreakingBothComposedRulesIsRefusedOnTheFirst(t *testing.T) 
 	}
 	if ee.Code != api.ExitValidation {
 		t.Errorf("exit code = %d, want %d (validation)", ee.Code, api.ExitValidation)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// 1.63.0 — credentials must not reach the local audit log
+// -----------------------------------------------------------------------------
+
+// TestAudit_ComposedStepCredentialIsRedactedButStillReachesTheWire pins both
+// halves of the forensic redaction, and the second half is the one worth
+// worrying about.
+//
+// `workflows create` declares `steps` and `trigger` as ForensicFields
+// deliberately: they ARE the automation, so a row without them cannot
+// reconstruct the workflow. capForensicValue only size-caps, so a composed
+// step's config.api_key used to land in ~/.ceebee/audit.jsonl in cleartext.
+// Spec 1.63.0 is what made that matter: the server now returns "" for those
+// fields forever, so the audit file could hold the only plaintext copy of a
+// working credential.
+//
+// The redaction must change the ROW and nothing else. A redactor that also
+// reached the request body would silently send a blank over a live key — which
+// is the exact accident 1.63.0's write rule exists to prevent — and no
+// assertion on the audit row alone could tell the two apart. So this test reads
+// the body the SERVER received and the row the CLI wrote, from one invocation.
+//
+// Value: protects=a step config credential is blanked in the audit row while the real value still reaches the server; fails_when=redactForensicCredentials stops being called, blanks the wrong depth, or mutates args.Flags so the wire body loses the credential; why_new=the leak was confirmed with a canary and nothing pinned either half; seam=testNewRunner+fakeServer; no_claim=says nothing about credentials on any other command, and workflows create is the only one whose ForensicFields carry a config
+func TestAudit_ComposedStepCredentialIsRedactedButStillReachesTheWire(t *testing.T) {
+	const canary = "sk-live-CANARY-must-not-be-logged"
+
+	var gotBody []byte
+	_, runner := fakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			gotBody, _ = io.ReadAll(r.Body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{},"meta":{"request_id":"r1"}}`))
+	})
+
+	auditPath := filepath.Join(t.TempDir(), "audit.jsonl")
+	logger, err := invpkg.NewFileLogger(auditPath)
+	if err != nil {
+		t.Fatalf("new audit logger: %v", err)
+	}
+	runner.AuditLogger = logger
+
+	prevShared := sharedRunner
+	sharedRunner = &Runner{}
+	prev := testNewRunner
+	testNewRunner = func() (*Runner, error) { return runner, nil }
+	t.Cleanup(func() {
+		testNewRunner = prev
+		sharedRunner = prevShared
+	})
+
+	root := Cmd()
+	root.SetArgs([]string{"workflows", "create", "--name", "pre-trip reminders",
+		"--steps", `[{"step_type":"action","action_type":"send_webhook","order":1,"config":{"url":"https://example.test/hook","api_key":"` + canary + `"}}]`})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("a legal composed create failed: %v", err)
+	}
+
+	// Half 1: the wire still carries the real credential.
+	if len(gotBody) == 0 {
+		t.Fatal("the server received no body")
+	}
+	if !strings.Contains(string(gotBody), canary) {
+		t.Errorf("the request body lost the credential, so the redactor reached the wire: %s", gotBody)
+	}
+
+	// Half 2: the audit row does not.
+	raw, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatalf("read audit log: %v", err)
+	}
+	line := strings.TrimSpace(string(raw))
+	if line == "" {
+		t.Fatal("audit log is empty: the mutation wrote no row")
+	}
+	if strings.Contains(line, canary) {
+		t.Errorf("the credential is in the audit row in cleartext:\n%s", line)
+	}
+	// The KEY has to survive with an empty value: the row's job is to make the
+	// workflow reconstructable, and "this step had an api_key" is part of that.
+	if !strings.Contains(line, `"api_key":""`) {
+		t.Errorf("want the api_key key kept with an empty value, got:\n%s", line)
+	}
+	// A non-credential sibling in the same config must be untouched, or the
+	// redactor is blanking the whole object rather than the credential.
+	if !strings.Contains(line, "https://example.test/hook") {
+		t.Errorf("the non-credential sibling was dropped too:\n%s", line)
+	}
+}
+
+// TestAudit_AForensicValueWithNoCredentialKeepsItsOwnBytes pins the
+// not-changed path.
+//
+// redactForensicCredentials returns its input unchanged when nothing matched,
+// which is what keeps a json-typed flag's own byte order in the row (it rides
+// as a json.RawMessage). A redactor that re-encoded unconditionally would pass
+// the test above and still quietly reorder every audit row's steps array, so
+// that property needs its own assertion.
+//
+// Value: protects=a forensic value with no credential field is written byte-for-byte, preserving the operator's key order; fails_when=redactForensicCredentials re-encodes unconditionally instead of returning the original on no match; why_new=the unchanged path is invisible to the redaction test; seam=forensicSummary
+func TestAudit_AForensicValueWithNoCredentialKeepsItsOwnBytes(t *testing.T) {
+	// Key order here is deliberately NOT alphabetical: json.Marshal of a map
+	// would sort these, so surviving verbatim is the observable.
+	const steps = `[{"step_type":"action","order":1,"action_type":"send_email"}]`
+
+	def := CommandDef{ForensicFields: []string{"steps"}}
+	args := RunArgs{Flags: map[string]any{"steps": json.RawMessage(steps)}}
+
+	out := forensicSummary(def, args)
+	got, ok := out["steps"].(json.RawMessage)
+	if !ok {
+		t.Fatalf("steps is %T, want json.RawMessage left as-is", out["steps"])
+	}
+	if string(got) != steps {
+		t.Errorf("forensic value was re-encoded:\n got %s\nwant %s", got, steps)
 	}
 }
