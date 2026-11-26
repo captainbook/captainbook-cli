@@ -1773,6 +1773,37 @@ publishes node vocabulary rather than a stored row.
 Two upstream spec gaps found while wiring this sync, both for a ticket on
 `captainbook/captainbook` and NEVER a local edit to the vendored spec:
 
+## The 1.63.0 credential pairing is implemented on the steps route only
+
+Spec 1.63.0 pairs a blanked READ with a forgiving WRITE: `api_key`, `secret`,
+`token` and `password` read back empty, and on write an empty or omitted one
+means "leave the stored value alone". The read half covers the trigger —
+`WorkflowStepResource::toArray()` is used for both standalone step rows and the
+trigger step, and it calls `SecretConfigFields::blank()`. The write half does
+not: `SecretConfigFields::preserve()` is called in exactly one place,
+`WorkflowStepController::update()`. `WorkflowTriggerController::update()` writes
+`config` verbatim.
+
+So `trigger get | jq .config | trigger update --data @-` — which this CLI's own
+help recommended until this sync — returns 200 and wipes a webhook trigger's
+`token`, and the response shows the same empty string the blanked read showed,
+so nothing tells the operator. `WebhookTrigger::rules()` declares
+`'token' => ['nullable', 'string', 'min:1']`, and `min` is not an implicit rule,
+so a blank skips validation rather than 422-ing.
+
+`workflows trigger update --help` now refuses to recommend the round-trip and
+says the trigger route does not preserve. The server asymmetry is the real fix
+and belongs in a ticket on `captainbook/captainbook`; never paper over it by
+editing the vendored spec.
+
+**Why:** an operator following the CLI's documented idiom could silently destroy
+a stored credential, and the 200 response is indistinguishable from success.
+**Effort:** human S / CC S upstream (call `preserve()` in the trigger
+controller). **Priority:** P2 — the CLI side is documented, the server side is a
+one-line change someone else owns.
+
+## Upstream spec gaps found during the 1.63.0 sync
+
 1. The 1.62.0 changelog entry (`api/inventory/cli-v1.yaml:192`) calls `not_delivered`
    "the only code mail, SMS and push ever produce". The server disagrees:
    `SendNotificationAction.php:164` judges the empty-body guard BEFORE the channel

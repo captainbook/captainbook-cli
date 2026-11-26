@@ -450,8 +450,18 @@ func workflowsTriggerCmd(runner *Runner) *cobra.Command {
 			Ability: invpkg.Write, DryRunMode: DryRunBody, PositionalArgs: []string{"workflow-id"},
 			Long: "Replaces the trigger's `config`. action_type is immutable here — run " +
 				"`trigger create` to atomically replace. 404 if no trigger exists yet. " +
-				"Supply config via --config (typed flag) OR --data (whole-body JSON, " +
-				"useful for `trigger get | jq .config | trigger update --data @-` round-trips).",
+				"Supply config via --config (typed flag) OR --data (whole-body JSON).\n\n" +
+				"DO NOT round-trip a trigger config through this command. " +
+				"`trigger get | jq .config | trigger update --data @-` used to be the " +
+				"documented idiom here and it now DESTROYS a credential. Spec 1.63.0 blanks " +
+				"api_key, secret, token and password on read, and its write-side pairing — an " +
+				"empty or omitted credential means leave the stored value alone — is " +
+				"implemented on the STEPS route only. The trigger route writes config " +
+				"verbatim, so the withheld blank lands on top of the real value, returns 200, " +
+				"and reports the same empty string back, which is indistinguishable from the " +
+				"blanked read you started with. A webhook trigger's `token` is the live case. " +
+				"Send the fields you mean to change, with a real value for any credential, or " +
+				"use the builder. This asymmetry is the server's and is tracked in TODOS.md.",
 			Flags: []FlagDef{
 				{Name: "config", Type: "string", Description: "JSON object (literal or @file.json); optional if --data carries config"},
 			},

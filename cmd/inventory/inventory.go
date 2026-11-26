@@ -868,6 +868,49 @@ var forensicCredentialFields = map[string]struct{}{
 	"password": {},
 }
 
+// forensicCredentialHeaderHints match a HEADER NAME whose paired value is a
+// credential. A send_webhook step carries its secrets as
+// `headers: [{"key": "Authorization", "value": "Bearer ..."}]`, so the secret
+// sits under the literal map keys `key` and `value` and a name-only check walks
+// straight past it. Measured: before this list, `Bearer sk-live-...` reached
+// audit.jsonl intact.
+//
+// Substring matching on a normalised name, which is wider than it strictly
+// needs to be. Same trade as the case-insensitive match above: a header called
+// `x-request-token` losing its value in a LOCAL audit row costs a little
+// reconstructability, and the alternative is a live bearer token on disk.
+var forensicCredentialHeaderHints = []string{
+	"authorization",
+	"apikey",
+	"secret",
+	"token",
+	"password",
+	"credential",
+	"bearer",
+}
+
+// looksLikeCredentialName reports whether a field or header name names a
+// credential. Normalises away the separators that distinguish `x-api-key`,
+// `X_API_KEY` and `apiKey` so one list covers all three spellings.
+func looksLikeCredentialName(name string) bool {
+	normalised := strings.Map(func(r rune) rune {
+		switch r {
+		case '-', '_', ' ', '.':
+			return -1
+		}
+		return r
+	}, strings.ToLower(name))
+	if _, exact := forensicCredentialFields[strings.ToLower(name)]; exact {
+		return true
+	}
+	for _, hint := range forensicCredentialHeaderHints {
+		if strings.Contains(normalised, hint) {
+			return true
+		}
+	}
+	return false
+}
+
 // redactForensicCredentials blanks every credential field inside a forensic
 // value before it is written to the audit log.
 //
@@ -884,12 +927,22 @@ var forensicCredentialFields = map[string]struct{}{
 // part of reconstructing the workflow; the key itself is not. That also mirrors
 // what a read from the server now looks like, so a row and a fresh GET agree.
 //
-// Returns v UNCHANGED when it carries no credential field, which is the
-// overwhelmingly common case. That matters beyond speed: a json-typed flag
-// rides as a json.RawMessage, so an untouched value keeps the operator's own
-// bytes and key order in the row. Only a value that actually holds a credential
-// is re-encoded, and only that copy loses ordering — never the request body,
-// which is built separately from args.Flags and is not touched here.
+// WHAT THIS DOES NOT CATCH, because a name-based filter cannot: a credential
+// carried inside a JSON *string*. `send_webhook`'s `config.body` is declared a
+// string, so `{"body":"{\"api_key\":\"sk-live-...\"}"}` is one opaque value to
+// every check here and is written verbatim. The server's own SecretConfigFields
+// documents the same limit for the same reason. Do not describe this function
+// as making audit.jsonl credential-free; it closes the shapes a node's rules()
+// declares as fields, not every shape an operator can hand-build.
+//
+// Returns v UNCHANGED only when no credential NAME appeared anywhere, which is
+// the overwhelmingly common case and keeps the operator's own bytes and key
+// order in the row. Re-encoding is driven by "a credential name was seen", not
+// by "a value was mutated": `changed` is computed on the DECODED copy, and Go
+// resolves a duplicate JSON key last-wins, so `{"api_key":"REAL","api_key":""}`
+// decodes to a blank, mutates nothing, and would have returned the original
+// bytes with REAL still in them. Measured before the fix. Re-encoding collapses
+// the duplicate, which is what removes it.
 func redactForensicCredentials(v any) any {
 	raw, ok := v.(json.RawMessage)
 	if !ok {
@@ -909,8 +962,8 @@ func redactForensicCredentials(v any) any {
 		// which fails closed on anything it cannot encode.
 		return v
 	}
-	redacted, changed := redactCredentialFields(decoded)
-	if !changed {
+	redacted, sawCredential := redactCredentialFields(decoded)
+	if !sawCredential {
 		return v
 	}
 	out, err := json.Marshal(redacted)
@@ -925,47 +978,60 @@ func redactForensicCredentials(v any) any {
 	return json.RawMessage(out)
 }
 
-// redactCredentialFields walks a decoded JSON value and empties every
-// credential field it finds, reporting whether it changed anything.
+// redactCredentialFields walks a decoded JSON value, empties every credential
+// it finds, and reports whether it SAW a credential name at all.
 //
-// It blanks a credential key at ANY depth rather than only inside a key named
-// `config`. The shapes that reach here differ (`steps` is an array of objects
-// each with its own `config`, `trigger` is one object with one), `config`
-// itself has no fixed schema — it is validated per-node against that node's
-// own rules() — and a nested shape upstream adds later would walk straight
-// past a path-specific check. A key named `api_key` in a forensic row has no
-// reading under which writing its value is preferable.
+// The return value is deliberately "saw one", not "changed one". A caller that
+// re-encodes only on mutation hands back the original bytes for a value whose
+// decode was lossy, and duplicate JSON keys make that reachable. Seeing the
+// name is the safe trigger.
+//
+// Two shapes are covered. A credential FIELD is a map key whose own name names
+// a credential, at any depth: the shapes differ (`steps` is an array of configs,
+// `trigger` is one), `config` has no fixed schema by design, and a path-specific
+// check would walk past a nesting upstream adds later. A credential PAIR is the
+// `{"key": <name>, "value": <secret>}` shape `send_webhook` uses for headers,
+// where the secret's own key is the literal string `value`.
 func redactCredentialFields(v any) (any, bool) {
 	switch t := v.(type) {
 	case map[string]any:
-		changed := false
+		saw := false
+
+		// The pair shape first: a {key, value} object whose `key` names a
+		// credential. Checked before the per-key walk so the `value` entry is
+		// already blank by the time the walk reaches it.
+		if name, hasKey := t["key"].(string); hasKey {
+			if _, hasValue := t["value"]; hasValue && looksLikeCredentialName(name) {
+				t["value"] = ""
+				saw = true
+			}
+		}
+
 		for k, val := range t {
-			if _, isCredential := forensicCredentialFields[strings.ToLower(k)]; isCredential {
-				// Already blank: leave it, so an operator who sent "" (which
-				// 1.63.0 reads as "leave the stored value alone") does not show
-				// up in the row as though something was redacted.
-				if s, isString := val.(string); isString && s == "" {
-					continue
-				}
+			if looksLikeCredentialName(k) {
+				// Blank unconditionally rather than skipping an already-empty
+				// value. There is nothing to preserve: `saw` has already forced
+				// a re-encode, and a JSON null and an "" mean the same thing to
+				// the server's own preserve() check.
 				t[k] = ""
-				changed = true
+				saw = true
 				continue
 			}
-			if nested, nestedChanged := redactCredentialFields(val); nestedChanged {
+			if nested, nestedSaw := redactCredentialFields(val); nestedSaw {
 				t[k] = nested
-				changed = true
+				saw = true
 			}
 		}
-		return t, changed
+		return t, saw
 	case []any:
-		changed := false
+		saw := false
 		for i, val := range t {
-			if nested, nestedChanged := redactCredentialFields(val); nestedChanged {
+			if nested, nestedSaw := redactCredentialFields(val); nestedSaw {
 				t[i] = nested
-				changed = true
+				saw = true
 			}
 		}
-		return t, changed
+		return t, saw
 	}
 	return v, false
 }

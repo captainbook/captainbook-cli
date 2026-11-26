@@ -487,15 +487,61 @@ func TestRedactForensicCredentials_CoversEveryArm(t *testing.T) {
 			wantKept: `"token":""`,
 		},
 		{
-			// Already blank: 1.63.0 reads "" on write as "leave the stored value
-			// alone", so an operator sends it legitimately. Nothing changed, so
-			// the value must come back as the operator's own bytes.
-			// Key order here is deliberately NOT alphabetical. With the keys
-			// sorted, a re-encode produces identical bytes and this case cannot
-			// see the skip being removed at all (measured: it passed).
-			name:      "an already-blank credential leaves the value untouched",
-			in:        `[{"config":{"url":"https://example.test","api_key":""}}]`,
-			unchanged: true,
+			// An already-blank credential is still RE-ENCODED, and that is the
+			// design rather than an accident: re-encoding is driven by "a
+			// credential name was seen", not by "a value was mutated". The
+			// duplicate-key row below is why that distinction matters.
+			name:     "an already-blank credential is still re-encoded",
+			in:       `[{"config":{"url":"https://example.test","api_key":""}}]`,
+			wantKept: `"api_key":""`,
+		},
+		{
+			// The reachable instance of the lossy-decode gap. Go resolves a
+			// duplicate object key last-wins, so this decodes to a BLANK
+			// api_key: nothing is mutated, and a mutation-driven fast path
+			// returns the operator's original bytes with the real key still in
+			// them. Measured: it did. Re-encoding collapses the duplicate,
+			// which is what removes it.
+			name:     "a duplicate credential key does not survive via the fast path",
+			in:       `[{"config":{"api_key":"LEAK","api_key":""}}]`,
+			wantGone: "LEAK",
+			wantKept: `"api_key":""`,
+		},
+		{
+			// send_webhook carries its secrets as headers: [{key, value}]
+			// pairs, so the secret's own key is the literal string `value` and
+			// a name-only check walks straight past it. Measured: before the
+			// pair arm, `Bearer LEAK` reached audit.jsonl intact.
+			name:     "a webhook Authorization header pair is blanked",
+			in:       `[{"config":{"headers":[{"key":"Authorization","value":"Bearer LEAK"}]}}]`,
+			wantGone: "LEAK",
+			wantKept: `"value":""`,
+		},
+		{
+			// Separator and case spellings of the same header must all match.
+			name:     "an X-API-Key header pair is blanked",
+			in:       `[{"config":{"headers":[{"key":"X-API-Key","value":"LEAK"}]}}]`,
+			wantGone: "LEAK",
+			wantKept: `"value":""`,
+		},
+		{
+			// The other direction: a benign header pair must keep its value, or
+			// the hint list is blanking the whole headers array and the row
+			// stops being able to reconstruct the step.
+			name:     "a benign header pair keeps its value",
+			in:       `[{"config":{"headers":[{"key":"Content-Type","value":"application/json"}]}}]`,
+			wantKept: `"value":"application/json"`,
+		},
+		{
+			// The documented limit, asserted so it cannot be forgotten: a
+			// credential inside a JSON STRING is one opaque value to every
+			// check here. config.body is declared a string, so this is written
+			// verbatim. The server's SecretConfigFields documents the same
+			// limit. If this ever starts passing, the doc comment and
+			// skills/index.md both need updating.
+			name:     "a credential inside a config.body string is NOT caught",
+			in:       `[{"config":{"body":"{\"api_key\":\"LEAK\"}"}}]`,
+			wantKept: "LEAK",
 		},
 		{
 			name:      "no credential anywhere leaves the value untouched",
