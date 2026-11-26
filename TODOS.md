@@ -1749,6 +1749,18 @@ races anyone editing the tree between them. A parent that passed the local check
 can be deleted or replaced before the write lands, so the server's 422 stays
 load-bearing either way.
 
+The sibling branch rule is ungated for the same reason plus one more. The spec
+states it twice — "LOOP children use branch_type=true"
+(`api/inventory/cli-v1.yaml:12088`) and "true/false for condition children; true
+for loop children" (`:12457`) — and on the composed route it is as decidable as
+the parent rule, since the parent's `step_type` and the child's `branch_type` are
+both in the array. It was left out on purpose: it belongs to an earlier spec
+version, not to this sync, and growing a sync's gate to cover a second rule is how
+a scoped change stops being reviewable. `--branch-type` now says a loop child is
+always true. The condition half of the server's rule (a FILTER condition runs only
+its true children) is NOT in the spec at all, so that part is not locally
+decidable even in principle and would need the same catalogue fetch.
+
 **Why:** the local gate is honest about its scope, so nothing is wrong today —
 the gap is that the single-step route still pays a round trip to learn a rule
 the composed route catches locally.
