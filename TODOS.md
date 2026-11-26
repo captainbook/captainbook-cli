@@ -1773,6 +1773,30 @@ publishes node vocabulary rather than a stored row.
 Two upstream spec gaps found while wiring this sync, both for a ticket on
 `captainbook/captainbook` and NEVER a local edit to the vendored spec:
 
+## The capability table has no row for any workflow mutation
+
+`skills/index.md`'s capability table lists `inventory workflows nodes` and nothing
+else from the family. All eleven writes are absent: `workflows`
+create/update/delete/restore/activate/deactivate, `trigger` create/update and
+`steps` create/update/delete, each `cli:write` with `DryRunMode: DryRunBody`. So
+the routes the 1.61.0/1.63.0 sync changed have no ability or dry-run reference
+row, and an agent sizing up a workflow write has to read `--help` instead.
+
+Nothing catches it: `TestSkillsDocEndpointTables` validates doc rows against the
+code, not the reverse, so a missing row is invisible the same way a missing
+`--since` claim was. The reverse direction is the fix worth having, because it
+would also catch the next family someone forgets.
+
+Found by the /document-release audit during the 1.63.0 ship and deliberately NOT
+fixed there: eleven hand-written reference rows on a spec-sync PR is a lot of new
+factual claims to land unreviewed, and this repo has already been bitten twice in
+one session by doc claims written from a neighbour rather than from the source.
+
+**Why:** the agent-facing reference is silent on the ability and dry-run shape of
+every workflow write.
+**Effort:** human S / CC S for the rows, human M / CC M to add the code-to-doc
+direction to the drift test. **Priority:** P2.
+
 ## The 1.63.0 credential pairing is implemented on the steps route only
 
 Spec 1.63.0 pairs a blanked READ with a forgiving WRITE: `api_key`, `secret`,
