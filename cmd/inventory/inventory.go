@@ -1012,21 +1012,29 @@ func redactForensicCredentials(v any) any {
 // whether a string is a member name or a value, so the frame stack tracks it:
 // inside an object, tokens alternate name, value, name, value.
 //
-// MUST be configured exactly like the caller's decoder, which is why
-// UseNumber is set here too. This function fails OPEN: a token error reports
-// "no duplicate", and the caller then keeps the operator's original bytes. So
-// any input this scanner rejects and the caller's decoder ACCEPTS is a
-// credential written to disk. Without UseNumber that gap is reachable with one
-// number: `{"config":{"n":1e1000,"api_key":"live"},"config":{}}` overflows
-// float64 here, errors, fails open, and never reaches the duplicate `config`
-// that hides the key, while the caller decodes it happily. Found in review
-// after the first version of this function shipped without UseNumber, and
-// pinned in both tables.
+// Configured exactly like the caller's decoder, which is why UseNumber is set
+// here too, and a SYNTAX error fails CLOSED (reports a duplicate, forcing the
+// re-encode). Both exist for the same reason: whatever this scanner rejects and
+// the caller's decoder ACCEPTS is a credential written to disk.
 //
-// Fail-open is still the right default for a genuinely malformed value, since
-// the caller's own decode-failure arm hands that to capForensicValue, which
-// fails closed. It is only safe while the two decoders agree, so any future
-// decoder option added to redactForensicCredentials belongs here as well.
+// That gap is not hypothetical. The first version of this function shipped
+// without UseNumber, so `[{"config":{"n":1e1000,"api_key":"live"},"config":{}}]`
+// overflowed float64 here, errored, reported no duplicate, and never reached
+// the duplicate `config` hiding the key, while the caller decoded the same
+// bytes happily and kept them. Measured, and pinned in both tables.
+//
+// So the error arm does not get to assume "malformed". By the time the caller
+// asks, its own decode has already succeeded on these bytes, which means a
+// syntax error here can only be the two decoders disagreeing. A reported
+// duplicate costs a re-encode and the row's key order; a reported
+// non-duplicate costs the credential. Any future decoder option added to
+// redactForensicCredentials belongs here as well, but the fail-closed arm is
+// what keeps forgetting one a formatting nit rather than a leak.
+//
+// A TRUNCATED value is the one error that still reports no duplicate, because
+// Go surfaces it as plain io.EOF rather than a syntax error. Harmless: the
+// caller's decode fails on truncated bytes and returns through its own arm
+// without ever asking this function.
 func rawJSONHasDuplicateObjectKey(raw []byte) bool {
 	type frame struct {
 		isObject bool
