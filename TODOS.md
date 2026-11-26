@@ -1773,6 +1773,13 @@ publishes node vocabulary rather than a stored row.
 Two upstream spec gaps found while wiring this sync, both for a ticket on
 `captainbook/captainbook` and NEVER a local edit to the vendored spec:
 
+**Why:** the local gate is honest about its scope, so nothing is wrong today —
+the gap is that the single-step route still pays a round trip to learn a rule
+the composed route catches locally.
+**Effort:** human M / CC M (fetch route), and it needs a cache with an
+invalidation story to be worth it.
+**Priority:** P3. **Depends on:** nothing; the server already refuses correctly.
+
 ## The capability table has no row for any workflow mutation
 
 `skills/index.md`'s capability table lists `inventory workflows nodes` and nothing
@@ -1838,12 +1845,12 @@ one-line change someone else owns.
 2. The FILTER-condition branch rule is absent from the spec entirely (see the
    correction above).
 
-**Why:** the local gate is honest about its scope, so nothing is wrong today —
-the gap is that the single-step route still pays a round trip to learn a rule
-the composed route catches locally.
-**Effort:** human M / CC M (fetch route), and it needs a cache with an
-invalidation story to be worth it.
-**Priority:** P3. **Depends on:** nothing; the server already refuses correctly.
+
+**Why:** the CLI's own prose follows the server, so nothing is wrong in this
+repo today; the gap is that the published contract says otherwise, so the next
+reader to trust the spec over the server gets it wrong again.
+**Effort:** human S / CC S (two ticket descriptions). **Priority:** P3.
+**Depends on:** upstream accepting them.
 
 ## `--data null` panics the two workflow body builders
 
